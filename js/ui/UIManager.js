@@ -34,6 +34,7 @@ export class UIManager {
       messages: $('messages'),
       version: $('version'),
       seed: $('seed'),
+      biome: $('biome'),
     };
 
     this.el.title.textContent = gameInfo.TITLE;
@@ -61,6 +62,11 @@ export class UIManager {
     events.on(GameEvents.WORLD_GENERATED, ({ seed }) => {
       this.el.seed.textContent = `Seed: ${seed}`;
       if (this._started) this.showMessage(`Mundo generado · seed "${seed}"`);
+    });
+    events.on(GameEvents.PLAYER_BIOME_CHANGED, ({ biome, first }) => {
+      this.el.biome.textContent = biome.name;
+      this.el.biome.dataset.biome = biome.id;
+      if (!first && this._started) this.showMessage(`Has entrado en: ${biome.name}`, 'biome');
     });
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
   }

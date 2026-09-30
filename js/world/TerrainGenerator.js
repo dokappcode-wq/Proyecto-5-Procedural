@@ -1,5 +1,6 @@
 import { SimplexNoise } from './noise/SimplexNoise.js';
 import { deriveSeed } from '../core/SeededRandom.js';
+import { smoothstep } from '../core/MathUtils.js';
 
 /**
  * TerrainGenerator — función de altura determinista h(x, z).
@@ -14,13 +15,22 @@ import { deriveSeed } from '../core/SeededRandom.js';
  *      montañosas. `mountain` (0..1) se expone para que BiomeSystem (Fase 3)
  *      pueda situar las Montañas Heladas donde realmente hay montañas.
  *   4. Detalle fino.
+ *   Las colinas y el detalle se escalan según los pesos de bioma que devuelve
+ *   BiomeSystem (explanada más llana, bosque más ondulado).
  *   5. Costa: el terreno desciende hacia el fondo marino en el borde del
  *      mundo finito (línea de costa irregular). Las montañas se atenúan
  *      antes de llegar a la costa para que el borde sea siempre tierra baja.
  */
 export class TerrainGenerator {
-  constructor({ profile, seed, worldSize, edgeMargin }) {
+  constructor({ profile, biomes, seed, worldSize, edgeMargin }) {
     this._p = profile;
+    this._biomes = biomes;
+    this._hillScale = {};
+    this._detailScale = {};
+    for (const id of biomes.ids) {
+      this._hillScale[id] = biomes.get(id).HILL_SCALE;
+      this._detailScale[id] = biomes.get(id).DETAIL_SCALE;
+    }
     this._half = worldSize / 2;
     this._edgeMargin = edgeMargin;
 
@@ -32,7 +42,7 @@ export class TerrainGenerator {
     this._detail = new SimplexNoise(deriveSeed(seed, 'detail'));
     this._coast = new SimplexNoise(deriveSeed(seed, 'coast'));
 
-    this._sample = { height: 0, mountain: 0, coast: 0 };
+    this._sample = { height: 0, mountain: 0, coast: 0, biomes: {} };
   }
 
   heightAt(x, z) {
@@ -40,7 +50,7 @@ export class TerrainGenerator {
   }
 
   /**
-   * Evalúa todas las capas en (x, z).
+   * Evalúa todas las capas en (x, z): { height, mountain, coast, biomes }.
    * Devuelve un objeto REUTILIZADO (copiar los valores si se necesitan guardar).
    */
   sample(x, z) {
@@ -63,15 +73,24 @@ export class TerrainGenerator {
     const mountain = smoothstep(p.MOUNTAIN_MASK_START, p.MOUNTAIN_MASK_END, maskRaw) * inland;
     let mountainHeight = 0;
     if (mountain > 0) {
-      const ridges = this._mountains.ridged(x, z, { frequency: p.MOUNTAIN_FREQUENCY, octaves: 5 });
+      const ridges = this._mountains.ridged(x, z, { frequency: p.MOUNTAIN_FREQUENCY, octaves: p.MOUNTAIN_OCTAVES });
       mountainHeight = mountain * (p.MOUNTAIN_BASE_LIFT + ridges * p.MOUNTAIN_HEIGHT);
+    }
+
+    // Relieve modulado por bioma.
+    const w = this._biomes.weightsAt(x, z, mountain, this._sample.biomes);
+    let hillScale = 0;
+    let detailScale = 0;
+    for (const id in w) {
+      hillScale += w[id] * this._hillScale[id];
+      detailScale += w[id] * this._detailScale[id];
     }
 
     let height =
       p.BASE_HEIGHT +
       continent * p.CONTINENT_AMPLITUDE +
-      hills * p.HILL_AMPLITUDE * (1 - 0.5 * mountain) +
-      detail * p.DETAIL_AMPLITUDE +
+      hills * p.HILL_AMPLITUDE * hillScale * (1 - 0.5 * mountain) +
+      detail * p.DETAIL_AMPLITUDE * detailScale +
       mountainHeight;
 
     // Costa: el terreno desciende hacia el fondo marino.
@@ -83,9 +102,4 @@ export class TerrainGenerator {
     s.coast = coast;
     return s;
   }
-}
-
-export function smoothstep(edge0, edge1, x) {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
 }

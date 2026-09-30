@@ -3,8 +3,9 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: FASE 2** — mundo finito generado proceduralmente a partir de una seed
-(terreno por chunks, montañas, costa), sobre la base de la Fase 1 (jugador, cámara 1ª/3ª, Admin).
+**Estado actual: FASE 3** — biomas (Explanada, Bosque, Montañas Heladas) sobre un mundo finito
+generado a partir de una seed, con estilo visual low-poly coherente (terreno facetado, cielo con
+degradado y sol, oclusión aproximada). Base de las Fases 1–2: jugador, cámara 1ª/3ª, chunks, Admin.
 
 ## Cómo ejecutarlo
 
@@ -52,7 +53,8 @@ js/
 │   ├── GameLoop.js     Bucle: update(dt) ordenado → render → lateUpdate
 │   ├── InputManager.js Acciones con nombre, ratón, rueda, bloqueo por causas
 │   ├── RenderContext.js Renderer, escena, cámara, resize
-│   └── SeededRandom.js Hash de texto, sub-seeds y PRNG (mulberry32)
+│   ├── SeededRandom.js Hash de texto, sub-seeds y PRNG (mulberry32)
+│   └── MathUtils.js    smoothstep, clamp01
 ├── world/
 │   ├── WorldGenerator.js    Mundo finito: seed, caché de alturas, spawn — interfaz de terreno
 │   ├── WorldSeed.js         Seed + sub-seeds (terrain, biome, resource, animal, celestial, spawn)
@@ -60,7 +62,10 @@ js/
 │   ├── noise/SimplexNoise.js  Ruido Simplex 2D con seed (fBm, ridged)
 │   ├── ChunkManager.js      Carga/descarga progresiva de mallas alrededor del jugador
 │   ├── TerrainMesher.js     Alturas de chunk → BufferGeometry (índice compartido)
-│   ├── HeightColorizer.js   Color provisional por altura/pendiente (Fase 3: biomas)
+│   ├── BiomeSystem.js       Pesos de bioma por punto, bioma dominante, temperatura base
+│   ├── BiomeColorizer.js    Color por vértice según bioma, pendiente, nieve/hielo y curvatura
+│   ├── BiomeTracker.js      Bioma actual del jugador (con histéresis) → evento de cambio
+│   ├── SkyDome.js           Cielo con degradado y disco solar (niebla = color del horizonte)
 │   └── SceneLighting.js     Luz ambiente + sol con sombras que siguen al jugador
 ├── player/
 │   ├── Player.js            Estado del jugador (posición, mirada, flags)
@@ -85,6 +90,12 @@ Principios:
   través de sub-seeds independientes (cambiar el terreno no altera animales ni lunas).
 - **Planetas futuros.** Los parámetros del relieve están en un perfil de planeta
   (`GameConfig.PLANETS.MUNDO_0`); otro planeta = otro perfil.
+- **Biomas por pesos.** Cada punto tiene pesos por bioma (suman 1): relieve y color se mezclan
+  en las fronteras. Las Montañas Heladas siguen al relieve; Bosque/Explanada salen de la
+  sub-seed `biome`. El jugador aparece siempre en Explanada. Cada bioma define en configuración
+  su nombre, temperatura base (para la Fase 10), escala de relieve y colores.
+- **Estilo visual.** Low-poly facetado (`RENDER.TERRAIN_FLAT_SHADING`), tone mapping neutro,
+  cielo y niebla del mismo color de horizonte, sol bajo para marcar el relieve.
 - **Mundo finito.** 1024 × 1024 m en chunks de 64 m. Los datos de altura se generan bajo demanda
   y se guardan; solo existen mallas en un radio de 4 chunks. El borde desciende a un mar y el
   jugador no puede salir del área jugable.

@@ -10,20 +10,23 @@ import * as THREE from 'three';
  * de `setSun()` y `setAmbient()`; este módulo no calcula la hora.
  */
 export class SceneLighting {
-  constructor({ scene, renderConfig }) {
+  constructor({ scene, renderConfig, config }) {
     this.name = 'lighting';
-    this._sunOffset = new THREE.Vector3(0.45, 0.8, 0.35).normalize().multiplyScalar(80);
+    const d = config.SUN_DIRECTION;
+    this.sunDirection = new THREE.Vector3(d.x, d.y, d.z).normalize();
+    this._sunDistance = 120;
 
-    this.hemi = new THREE.HemisphereLight(0xcfe8ff, 0x5a6b3a, 1.1);
+    this.hemi = new THREE.HemisphereLight(config.HEMI_SKY_COLOR, config.HEMI_GROUND_COLOR, config.HEMI_INTENSITY);
     scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xfff2dd, 2.2);
+    this.sun = new THREE.DirectionalLight(config.SUN_COLOR, config.SUN_INTENSITY);
     this.sun.castShadow = renderConfig.SHADOWS;
     const half = renderConfig.SHADOW_AREA / 2;
-    Object.assign(this.sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 200 });
+    Object.assign(this.sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 300 });
     this.sun.shadow.mapSize.set(renderConfig.SHADOW_MAP_SIZE, renderConfig.SHADOW_MAP_SIZE);
-    this.sun.shadow.bias = -0.0005;
-    this.sun.shadow.normalBias = 0.03;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.04;
+    this.sun.shadow.radius = 3;
     scene.add(this.sun);
     scene.add(this.sun.target);
 
@@ -37,7 +40,7 @@ export class SceneLighting {
 
   /** @param {THREE.Vector3} direction dirección HACIA el sol (normalizada) */
   setSun({ direction, color, intensity } = {}) {
-    if (direction) this._sunOffset.copy(direction).normalize().multiplyScalar(80);
+    if (direction) this.sunDirection.copy(direction).normalize();
     if (color !== undefined) this.sun.color.set(color);
     if (intensity !== undefined) this.sun.intensity = intensity;
   }
@@ -54,6 +57,6 @@ export class SceneLighting {
     const fx = Math.round(this._focus.x / snap) * snap;
     const fz = Math.round(this._focus.z / snap) * snap;
     this.sun.target.position.set(fx, this._focus.y, fz);
-    this.sun.position.set(fx, this._focus.y, fz).add(this._sunOffset);
+    this.sun.position.set(fx, this._focus.y, fz).addScaledVector(this.sunDirection, this._sunDistance);
   }
 }

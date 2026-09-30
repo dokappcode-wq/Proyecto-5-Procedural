@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 
 /**
- * TerrainMesher — convierte los datos de altura de un chunk en geometría.
+ * TerrainMesher — convierte los datos de un chunk en geometría.
  *
  * Los datos incluyen un borde de 1 muestra (rejilla "padded") para calcular
- * las normales con diferencias centrales, lo que evita costuras de
- * iluminación entre chunks vecinos.
+ * normales y curvatura con diferencias centrales, lo que evita costuras de
+ * iluminación y color entre chunks vecinos.
  *
  * Triangulación de cada celda (k = eje X, l = eje Z):
  *   a(k,l)  d(k+1,l)
@@ -15,12 +15,13 @@ import * as THREE from 'three';
  */
 export class TerrainMesher {
   /**
-   * @param {(x:number, z:number, height:number, normalY:number, out:THREE.Color) => void} colorizer
+   * @param {(ctx:object, out:THREE.Color) => void} colorizer ver BiomeColorizer
    */
   constructor({ colorizer }) {
     this._colorizer = colorizer;
     this._color = new THREE.Color();
     this._indexCache = new Map();
+    this._ctx = { x: 0, z: 0, height: 0, normalY: 1, concavity: 0, weights: {} };
   }
 
   setColorizer(colorizer) {
@@ -28,13 +29,15 @@ export class TerrainMesher {
   }
 
   build(chunk) {
-    const { res, spacing, originX, originZ, heights } = chunk;
+    const { res, spacing, originX, originZ, heights, biomeWeights } = chunk;
     const stride = res + 3;
     const n = res + 1;
     const positions = new Float32Array(n * n * 3);
     const normals = new Float32Array(n * n * 3);
     const colors = new Float32Array(n * n * 3);
     const c = this._color;
+    const ctx = this._ctx;
+    const ids = Object.keys(biomeWeights);
 
     let v = 0;
     for (let l = 0; l < n; l++) {
@@ -43,17 +46,28 @@ export class TerrainMesher {
         const h = heights[pi];
         const x = originX + k * spacing;
         const z = originZ + l * spacing;
+        const hL = heights[pi - 1];
+        const hR = heights[pi + 1];
+        const hD = heights[pi - stride];
+        const hU = heights[pi + stride];
 
         // Normal por diferencias centrales: (hL - hR, 2s, hD - hU)
-        let nx = heights[pi - 1] - heights[pi + 1];
+        let nx = hL - hR;
         let ny = 2 * spacing;
-        let nz = heights[pi - stride] - heights[pi + stride];
+        let nz = hD - hU;
         const len = Math.hypot(nx, ny, nz);
         nx /= len; ny /= len; nz /= len;
 
         positions[v] = x; positions[v + 1] = h; positions[v + 2] = z;
         normals[v] = nx; normals[v + 1] = ny; normals[v + 2] = nz;
-        this._colorizer(x, z, h, ny, c);
+
+        ctx.x = x;
+        ctx.z = z;
+        ctx.height = h;
+        ctx.normalY = ny;
+        ctx.concavity = (hL + hR + hD + hU) / 4 - h; // >0 hondonada, <0 cresta
+        for (const id of ids) ctx.weights[id] = biomeWeights[id][pi];
+        this._colorizer(ctx, c);
         colors[v] = c.r; colors[v + 1] = c.g; colors[v + 2] = c.b;
         v += 3;
       }

@@ -4,27 +4,30 @@ import * as THREE from 'three';
  * RenderContext — posee el renderer WebGL, la escena y la cámara.
  *
  * Solo gestiona recursos de render y el redimensionado. No sabe nada del
- * juego: la posición de la cámara la decide CameraSystem, la iluminación el
- * mundo (y, más adelante, TimeSystem / CelestialSystem).
+ * juego: la posición de la cámara la decide CameraSystem, la iluminación
+ * SceneLighting y el cielo SkyDome (y, más adelante, TimeSystem / CelestialSystem).
  *
  * Preparado para varias escenas: la Fase 13 (espacio) podrá alternar
  * `activeScene` sin crear un segundo renderer.
  */
 export class RenderContext {
-  constructor({ config, container }) {
+  constructor({ config, skyConfig, container }) {
     this._cfg = config;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: config.ANTIALIAS });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.MAX_PIXEL_RATIO));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.NeutralToneMapping; // conserva tono y saturación
+    this.renderer.toneMappingExposure = config.TONE_MAPPING_EXPOSURE;
     this.renderer.shadowMap.enabled = config.SHADOWS;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap; // suavizado vía light.shadow.radius
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(config.SKY_COLOR);
-    this.scene.fog = new THREE.Fog(config.SKY_COLOR, config.FOG_NEAR, config.FOG_FAR);
+    // Fondo de respaldo; el cielo real lo dibuja SkyDome. La niebla usa el color del horizonte.
+    this.scene.background = new THREE.Color(skyConfig.HORIZON_COLOR);
+    this.scene.fog = new THREE.Fog(skyConfig.HORIZON_COLOR, config.FOG_NEAR, config.FOG_FAR);
 
     this.camera = new THREE.PerspectiveCamera(
       config.FOV,

@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.2.0-fase2',
+    VERSION: '0.3.0-fase3',
   },
 
   RENDER: {
@@ -21,14 +21,35 @@ export const GameConfig = deepFreeze({
     ANTIALIAS: true,
     SHADOWS: true,
     SHADOW_MAP_SIZE: 2048,
-    SHADOW_AREA: 40,          // lado del área (m) cubierta por la sombra del sol, centrada en el jugador
+    SHADOW_AREA: 60,          // lado del área (m) cubierta por la sombra del sol, centrada en el jugador
     FOV: 70,
     NEAR: 0.1,
-    FAR: 600,
+    FAR: 900,
     FOG_NEAR: 90,
     FOG_FAR: 250,             // ≈ VIEW_DISTANCE_CHUNKS × CHUNK_SIZE: oculta la aparición de chunks
-    SKY_COLOR: 0x9fc9e8,
+    TONE_MAPPING_EXPOSURE: 1.0,
+    TERRAIN_FLAT_SHADING: true, // estilo low-poly facetado (coherente con el personaje de bloques)
     MAX_DELTA: 0.1,           // limita saltos de tiempo (pestaña en segundo plano)
+  },
+
+  // Cielo (degradado + disco solar). La niebla usa HORIZON_COLOR para fundirse con él.
+  SKY: {
+    ZENITH_COLOR: 0x4f8fd6,
+    HORIZON_COLOR: 0xbfd9ec,
+    GROUND_COLOR: 0x9db8c9,
+    SUN_COLOR: 0xfff1d0,
+    SUN_SIZE: 0.9994,         // coseno del radio angular del disco solar
+    SUN_GLOW: 0.35,
+  },
+
+  // Iluminación base (en la Fase 11 TimeSystem la hará variar con la hora).
+  LIGHTING: {
+    SUN_DIRECTION: { x: 0.55, y: 0.55, z: 0.3 }, // hacia el sol; sol bajo = más relieve
+    SUN_COLOR: 0xffe8c8,
+    SUN_INTENSITY: 2.6,
+    HEMI_SKY_COLOR: 0xb9d7f0,
+    HEMI_GROUND_COLOR: 0x4c5842,
+    HEMI_INTENSITY: 0.9,
   },
 
   INPUT: {
@@ -122,6 +143,7 @@ export const GameConfig = deepFreeze({
         MOUNTAIN_MASK_END: 0.45,
         MOUNTAIN_FREQUENCY: 1 / 230,
         MOUNTAIN_HEIGHT: 85,
+        MOUNTAIN_OCTAVES: 4,      // menos octavas = crestas menos dentadas
         MOUNTAIN_BASE_LIFT: 12,
         MOUNTAIN_COAST_FADE: 110, // m antes de la costa en los que las montañas se desvanecen
         COAST_NOISE_FREQUENCY: 1 / 170,
@@ -129,19 +151,54 @@ export const GameConfig = deepFreeze({
         COAST_SEA_WIDTH: 20,      // m de mar abierto antes del borde absoluto
         SEA_FLOOR: -9,
       },
+      // Colores comunes a todos los biomas.
       COLORS: {
-        SAND: 0xd8c98f,
-        GRASS: 0x6fa650,
-        GRASS_DARK: 0x4f7f3a,
-        ROCK: 0x8a8580,
-        SNOW: 0xf2f5f8,
+        SAND: 0xdccb8e,
         SEABED: 0x9c8f6a,
+        LOWLAND_ROCK: 0x8e8373,   // roca en pendientes fuertes fuera de las montañas
         SAND_HEIGHT: 1.2,
-        ROCK_HEIGHT: 38,
-        ROCK_SLOPE_NORMAL_Y: 0.78,
-        SNOW_HEIGHT: 62,
-        SEA: 0x2f6f9f,
-        SEA_OPACITY: 0.82,
+        ROCK_SLOPE_NORMAL_Y: 0.8, // por debajo de esta componente vertical de la normal → roca
+        PATCH_FREQUENCY: 1 / 20,  // tamaño de las manchas de color del suelo
+        AO_STRENGTH: 0.22,        // oscurecimiento de valles/hondonadas (oclusión aproximada)
+        SEA: 0x2d6f98,
+        SEA_OPACITY: 0.85,
+      },
+
+      // Reparto de biomas. Las montañas heladas siguen al relieve (factor montaña del
+      // terreno); bosque/explanada se reparten con ruido de la sub-seed "biome".
+      BIOME_DISTRIBUTION: {
+        MOUNTAIN_BIOME_START: 0.3,  // factor montaña del terreno donde empieza el bioma
+        MOUNTAIN_BIOME_END: 0.6,
+        FOREST_FREQUENCY: 1 / 320,
+        FOREST_THRESHOLD: 0.0,      // −1..1: más alto = menos bosque
+        FOREST_BLEND: 0.12,         // anchura de la transición bosque/explanada
+        SPAWN_MIN_PLAINS: 0.8,      // el jugador aparece siempre en explanada
+      },
+
+      BIOMES: {
+        PLAINS: {
+          NAME: 'Explanada',
+          TEMPERATURE: 18,          // °C base (lo usará TemperatureSystem en la Fase 10)
+          HILL_SCALE: 0.35,         // relieve: explanada casi llana
+          DETAIL_SCALE: 0.6,
+          COLORS: { GROUND: 0x86b85a, GROUND_ALT: 0xa9c766, ACCENT: 0xd9d27a },
+        },
+        FOREST: {
+          NAME: 'Bosque',
+          TEMPERATURE: 14,
+          HILL_SCALE: 1.15,         // relieve: más ondulado
+          DETAIL_SCALE: 1.3,
+          COLORS: { GROUND: 0x4a7a35, GROUND_ALT: 0x3a672f, ACCENT: 0x5e6b33 },
+        },
+        FROZEN_MOUNTAINS: {
+          NAME: 'Montañas Heladas',
+          TEMPERATURE: -4,
+          HILL_SCALE: 1.0,
+          DETAIL_SCALE: 1.5,
+          SNOW_START_HEIGHT: 24,    // m: por encima empieza la nieve (con variación)
+          SNOW_MIN_NORMAL_Y: 0.42,  // pendientes más verticales que esto quedan en roca
+          COLORS: { GROUND: 0x6c737f, GROUND_ALT: 0x5a616d, SNOW: 0xf1f5fa, ICE: 0xb4dcf0 },
+        },
       },
     },
   },

@@ -5,17 +5,21 @@ import { WorldSeed } from './WorldSeed.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { TerrainMesher } from './TerrainMesher.js';
 import { ChunkManager } from './ChunkManager.js';
-import { createHeightColorizer } from './HeightColorizer.js';
+import { createBiomeColorizer } from './BiomeColorizer.js';
+import { BiomeSystem } from './BiomeSystem.js';
 
 /**
  * WorldGenerator — mundo procedural finito generado a partir de una seed.
  *
  * Implementa la interfaz de terreno que usan jugador y cámara:
  *   getHeightAt(x, z), getBounds(), getSpawnPoint(), describeAt(x, z)
+ * y la consulta de bioma para otros sistemas:
+ *   getBiomeAt(x, z) → { id, name, weights, temperature }
  *
  * Responsabilidades:
  *   - Crear la WorldSeed y sus sub-seeds.
- *   - Crear el TerrainGenerator del perfil de planeta.
+ *   - Crear el BiomeSystem (sub-seed "biome") y el TerrainGenerator (sub-seed
+ *     "terrain") del perfil de planeta.
  *   - Guardar en caché los datos de altura por chunk (baratos en memoria).
  *   - Delegar las mallas visibles en ChunkManager.
  *   - Calcular la posición inicial a partir de la seed.
@@ -24,7 +28,7 @@ import { createHeightColorizer } from './HeightColorizer.js';
  * (controlador, cámara) no necesita actualizarse.
  */
 export class WorldGenerator {
-  constructor({ scene, config, planet, events }) {
+  constructor({ scene, config, planet, events, flatShading = false }) {
     this.name = 'world';
     this._cfg = config;
     this._planet = planet;
@@ -47,7 +51,7 @@ export class WorldGenerator {
     this._spawn = { x: 0, z: 0 };
     this._stats = { generationMs: 0, chunkDataGenerated: 0 };
 
-    this._material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading });
     this._mesher = new TerrainMesher({ colorizer: () => {} });
     this._chunks = new ChunkManager({
       scene,
@@ -70,18 +74,20 @@ export class WorldGenerator {
   generate(seedInput) {
     const t0 = performance.now();
     this.seed = new WorldSeed(seedInput, this._cfg.SUB_SEEDS);
+    this.biomes = new BiomeSystem({
+      definitions: this._planet.BIOMES,
+      distribution: this._planet.BIOME_DISTRIBUTION,
+      seed: this.seed.sub.biome,
+    });
     this.terrain = new TerrainGenerator({
       profile: this._planet.TERRAIN,
+      biomes: this.biomes,
       seed: this.seed.sub.terrain,
       worldSize: this._cfg.WORLD_SIZE,
       edgeMargin: this._cfg.EDGE_MARGIN,
     });
     this._mesher.setColorizer(
-      createHeightColorizer({
-        colors: this._planet.COLORS,
-        seaLevel: this._cfg.SEA_LEVEL,
-        seed: this.seed.sub.terrain,
-      }),
+      createBiomeColorizer({ planet: this._planet, seaLevel: this._cfg.SEA_LEVEL, seed: this.seed.sub.biome }),
     );
     this._dataCache.clear();
     this._chunks.clear();
@@ -142,15 +148,44 @@ export class WorldGenerator {
     return { ...this._spawn };
   }
 
+  /** Bioma en (x, z): { id, name, weights, temperature }. */
+  getBiomeAt(x, z) {
+    return this.biomes.describe(this.terrain.sample(x, z).biomes);
+  }
+
   describeAt(x, z) {
     const s = this.terrain.sample(x, z);
+    const mountain = s.mountain;
+    const coast = s.coast;
+    const biome = this.biomes.describe(s.biomes);
     return {
       generator: `WorldGenerator · ${this._planet.NAME}`,
-      biome: 'Sin biomas (Fase 3)',
+      biome: biome.name,
+      biomeInfo: biome,
       height: this.getHeightAt(x, z),
-      mountain: s.mountain,
-      coast: s.coast,
+      mountain,
+      coast,
     };
+  }
+
+  /**
+   * Busca el punto jugable más cercano (espiral) donde domine un bioma.
+   * Herramienta de depuración: no forma parte de la generación.
+   */
+  findNearestBiome(biomeId, fromX, fromZ, { step = 24, maxRadius = 600, minWeight = 0.9 } = {}) {
+    const b = this.getBounds();
+    for (let r = 0; r <= maxRadius; r += step) {
+      const n = Math.max(1, Math.round((2 * Math.PI * r) / step));
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const x = fromX + Math.cos(a) * r;
+        const z = fromZ + Math.sin(a) * r;
+        if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) continue;
+        const s = this.terrain.sample(x, z);
+        if (s.height > this._cfg.SEA_LEVEL + 1 && s.biomes[biomeId] >= minWeight) return { x, z };
+      }
+    }
+    return null;
   }
 
   /** Información de depuración para el modo Admin. */
@@ -185,12 +220,17 @@ export class WorldGenerator {
     const originZ = -this._half + cz * this._cfg.CHUNK_SIZE;
     const s = this._stride;
     const heights = new Float32Array(s * s);
+    const biomeWeights = {};
+    for (const id of this.biomes.ids) biomeWeights[id] = new Float32Array(s * s);
     for (let l = 0; l < s; l++) {
       for (let k = 0; k < s; k++) {
-        heights[l * s + k] = this.terrain.heightAt(originX + (k - 1) * sp, originZ + (l - 1) * sp);
+        const i = l * s + k;
+        const sample = this.terrain.sample(originX + (k - 1) * sp, originZ + (l - 1) * sp);
+        heights[i] = sample.height;
+        for (const id in biomeWeights) biomeWeights[id][i] = sample.biomes[id];
       }
     }
-    data = { cx, cz, res, spacing: sp, originX, originZ, heights };
+    data = { cx, cz, res, spacing: sp, originX, originZ, heights, biomeWeights };
     this._dataCache.set(key, data);
     this._stats.chunkDataGenerated++;
     return data;
@@ -198,32 +238,36 @@ export class WorldGenerator {
 
   // ---- Interno -------------------------------------------------------------
 
-  /** Posición inicial determinista: terreno seco, llano y fuera de las montañas. */
+  /** Posición inicial determinista: terreno seco y llano en la Explanada. */
   _findSpawn() {
     const c = this._cfg;
+    const minPlains = this._planet.BIOME_DISTRIBUTION.SPAWN_MIN_PLAINS;
+    const maxRadius = this.getBounds().maxX - 16;
     const rng = new SeededRandom(this.seed.sub.spawn);
-    let best = null;
-    let bestScore = -Infinity;
-    for (let i = 0; i < c.SPAWN_ATTEMPTS; i++) {
-      const angle = rng.range(0, Math.PI * 2);
-      const radius = Math.sqrt(rng.next()) * c.SPAWN_SEARCH_RADIUS;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
-      const s = this.terrain.sample(x, z);
-      const h = s.height;
-      const mountain = s.mountain;
-      const slope = this._slopeAt(x, z);
-      if (h < c.SEA_LEVEL + c.SPAWN_MIN_HEIGHT_ABOVE_SEA) continue;
-      if (slope > c.SPAWN_MAX_SLOPE || mountain > 0.05) continue;
-      // Preferir cerca del centro y terreno llano (la primera válida no siempre es la mejor).
-      const score = -radius / c.SPAWN_SEARCH_RADIUS - slope * 2;
-      if (score > bestScore) {
-        bestScore = score;
-        best = { x, z };
+    // Rondas con radio creciente: si cerca del centro no hay explanada, se busca más lejos.
+    for (let radiusLimit = c.SPAWN_SEARCH_RADIUS; ; radiusLimit = Math.min(maxRadius, radiusLimit * 1.6)) {
+      let best = null;
+      let bestScore = -Infinity;
+      for (let i = 0; i < c.SPAWN_ATTEMPTS; i++) {
+        const angle = rng.range(0, Math.PI * 2);
+        const radius = Math.sqrt(rng.next()) * radiusLimit;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        const s = this.terrain.sample(x, z);
+        if (s.height < c.SEA_LEVEL + c.SPAWN_MIN_HEIGHT_ABOVE_SEA || s.biomes.PLAINS < minPlains) continue;
+        const slope = this._slopeAt(x, z);
+        if (slope > c.SPAWN_MAX_SLOPE) continue;
+        // Preferir cerca del centro y terreno llano (la primera válida no siempre es la mejor).
+        const score = -radius / radiusLimit - slope * 2;
+        if (score > bestScore) {
+          bestScore = score;
+          best = { x, z };
+        }
+        if (i > 40 && best) break;
       }
-      if (i > 40 && best) break;
+      if (best) return best;
+      if (radiusLimit >= maxRadius) return { x: 0, z: 0 };
     }
-    return best ?? { x: 0, z: 0 };
   }
 
   _slopeAt(x, z) {
@@ -239,8 +283,10 @@ export class WorldGenerator {
     const size = this._cfg.WORLD_SIZE * 4;
     const sea = new THREE.Mesh(
       new THREE.PlaneGeometry(size, size),
-      new THREE.MeshLambertMaterial({
+      new THREE.MeshPhongMaterial({
         color: this._planet.COLORS.SEA,
+        specular: 0x9fc4dd,
+        shininess: 60,
         transparent: true,
         opacity: this._planet.COLORS.SEA_OPACITY,
       }),

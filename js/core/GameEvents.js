@@ -19,6 +19,7 @@ export const GameEvents = Object.freeze({
   PLAYER_JUMPED: 'player:jumped',
   PLAYER_LANDED: 'player:landed',                   // { fallSpeed }
   PLAYER_FLY_CHANGED: 'player:flyChanged',          // { flying }
+  PLAYER_BIOME_CHANGED: 'player:biomeChanged',      // { biome: { id, name, weights, temperature }, first }
 
   // Admin
   ADMIN_MODE_CHANGED: 'admin:modeChanged',          // { active }

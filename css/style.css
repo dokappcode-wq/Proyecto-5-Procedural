@@ -43,6 +43,15 @@ kbd {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Viñeta sutil: da profundidad y centra la mirada (debajo del HUD). */
+#vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(8, 14, 24, 0.38) 100%);
+}
+
 /* ---- Pantalla de inicio ---------------------------------------------- */
 .overlay {
   position: fixed;
@@ -135,6 +144,24 @@ kbd {
 }
 #version { font-weight: 700; letter-spacing: 0.08em; }
 
+#biome {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ui-bg);
+  padding: 5px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--biome-color, transparent);
+}
+#biome:empty { display: none; }
+#biome[data-biome="PLAINS"] { --biome-color: #a9c766; }
+#biome[data-biome="FOREST"] { --biome-color: #4d8a3a; }
+#biome[data-biome="FROZEN_MOUNTAINS"] { --biome-color: #bfe1f2; }
+
 #help {
   position: absolute;
   right: 12px;
@@ -185,6 +212,7 @@ kbd {
 .message.visible { opacity: 1; transform: none; }
 .message-admin { color: var(--ui-admin); font-weight: 700; letter-spacing: 0.06em; }
 .message-error { color: var(--ui-error); }
+.message-biome { font-weight: 600; letter-spacing: 0.03em; }
 
 /* ---- Admin ----------------------------------------------------------- */
 #admin-panel {

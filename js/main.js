@@ -12,6 +12,8 @@ import { GameLoop } from './core/GameLoop.js';
 import { InputManager } from './core/InputManager.js';
 import { RenderContext } from './core/RenderContext.js';
 import { SceneLighting } from './world/SceneLighting.js';
+import { SkyDome } from './world/SkyDome.js';
+import { BiomeTracker } from './world/BiomeTracker.js';
 import { WorldGenerator } from './world/WorldGenerator.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -26,12 +28,28 @@ function boot() {
   const events = new EventBus();
 
   // ---- Infraestructura -----------------------------------------------------
-  const render = new RenderContext({ config: cfg.RENDER, container: document.getElementById('game-container') });
+  const render = new RenderContext({
+    config: cfg.RENDER,
+    skyConfig: cfg.SKY,
+    container: document.getElementById('game-container'),
+  });
   const input = new InputManager({ config: cfg.INPUT, domElement: render.domElement, events });
 
   // ---- Mundo procedural (MUNDO 0) -------------------------------------------
-  const world = new WorldGenerator({ scene: render.scene, config: cfg.WORLD, planet: cfg.PLANETS.MUNDO_0, events });
-  const lighting = new SceneLighting({ scene: render.scene, renderConfig: cfg.RENDER });
+  const world = new WorldGenerator({
+    scene: render.scene,
+    config: cfg.WORLD,
+    planet: cfg.PLANETS.MUNDO_0,
+    events,
+    flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
+  });
+  // Seed: ?seed=... en la URL o la seed por defecto de la configuración.
+  const urlSeed = new URLSearchParams(window.location.search).get('seed');
+
+  // ---- Ambiente: luz y cielo comparten la dirección del sol -----------------
+  const lighting = new SceneLighting({ scene: render.scene, renderConfig: cfg.RENDER, config: cfg.LIGHTING });
+  const sky = new SkyDome({ scene: render.scene, camera: render.camera, config: cfg.SKY, radius: cfg.RENDER.FAR * 0.9 });
+  sky.setSunDirection(lighting.sunDirection);
 
   // ---- Jugador y cámara ----------------------------------------------------
   const player = new Player({ config: cfg.PLAYER, scene: render.scene });
@@ -54,6 +72,8 @@ function boot() {
   lighting.follow(player.position);
   world.follow(player.position);
 
+  const biomeTracker = new BiomeTracker({ world, target: player, events });
+
   // Cada vez que se (re)genera el mundo, el jugador aparece en el spawn de esa seed.
   events.on(GameEvents.WORLD_GENERATED, () => controller.spawn());
 
@@ -68,8 +88,12 @@ function boot() {
   const ui = new UIManager({ config: cfg.UI, gameInfo: cfg.GAME, events, input, canvas: render.domElement });
   ui.setInitialCameraMode(camera.mode);
 
+  // Generación inicial: después de crear los oyentes (UI, tracker) y antes de las
+  // herramientas Admin, que leen los biomas del mundo generado.
+  world.generate(urlSeed ?? cfg.WORLD.DEFAULT_SEED);
+
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
-  registerWorldTools(admin, { world, player });
+  registerWorldTools(admin, { world, player, controller });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -78,18 +102,17 @@ function boot() {
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  loop.add(biomeTracker); // bioma actual del jugador
   loop.add(lighting);    // sombra centrada en el jugador
+  loop.add(sky);         // cúpula centrada en la cámara
   loop.add(ui);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
-  // Seed: ?seed=... en la URL o la seed por defecto de la configuración.
-  const urlSeed = new URLSearchParams(window.location.search).get('seed');
-  world.generate(urlSeed ?? cfg.WORLD.DEFAULT_SEED);
   loop.start();
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
-  window.__MUNDO0__ = { config: cfg, events, render, input, world, player, controller, camera, ui, admin, loop };
+  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, player, controller, camera, ui, admin, loop };
 }
 
 try {
