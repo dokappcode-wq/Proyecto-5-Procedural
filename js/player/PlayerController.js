@@ -13,6 +13,8 @@ const COYOTE_TIME = 0.1;       // s: se puede saltar justo después de abandonar
  * - Aceleración suave, carrera, salto con buffer y "coyote time".
  * - Escalones bajos se suben solos; paredes más altas bloquean (por eje, lo que
  *   permite deslizarse a lo largo de ellas).
+ * - Pendientes demasiado inclinadas no se pueden subir caminando.
+ * - Al tocar el límite del mundo finito se emite WORLD_EDGE_REACHED.
  * - Modo vuelo (herramienta de depuración) sin gravedad ni colisiones.
  *
  * El movimiento es relativo al yaw de la mirada del jugador, no a la cámara:
@@ -33,6 +35,9 @@ export class PlayerController {
     this._terrain = terrain;
     this._events = events;
 
+    this._maxSlopeTan = Math.tan(THREE.MathUtils.degToRad(config.MAX_WALKABLE_SLOPE_DEG));
+    this._edgeNoticeCooldown = 0;
+    this._wasAtEdge = false;
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
@@ -97,7 +102,14 @@ export class PlayerController {
       p.bodyYaw = wrapAngle(p.bodyYaw + THREE.MathUtils.clamp(diff, -maxStep, maxStep));
     }
 
-    this._clampToBounds();
+    // Aviso al LLEGAR al límite (no mientras se sigue empujando contra él).
+    this._edgeNoticeCooldown = Math.max(0, this._edgeNoticeCooldown - dt);
+    const atEdge = this._clampToBounds();
+    if (atEdge && !this._wasAtEdge && this._edgeNoticeCooldown === 0) {
+      this._edgeNoticeCooldown = 3;
+      this._events.emit(GameEvents.WORLD_EDGE_REACHED);
+    }
+    this._wasAtEdge = atEdge;
   }
 
   // ---- Modos de movimiento -------------------------------------------------
@@ -126,13 +138,12 @@ export class PlayerController {
 
     v.y = Math.max(v.y - cfg.GRAVITY * dt, -cfg.TERMINAL_VELOCITY);
 
-    // Movimiento horizontal por ejes, con bloqueo por paredes.
-    const feet = p.position.y;
+    // Movimiento horizontal por ejes, con bloqueo por paredes y pendientes.
     const nx = p.position.x + v.x * dt;
-    if (this._groundHeight(nx, p.position.z) > feet + cfg.MAX_STEP_HEIGHT) v.x = 0;
+    if (this._isBlocked(nx, p.position.z)) v.x = 0;
     else p.position.x = nx;
     const nz = p.position.z + v.z * dt;
-    if (this._groundHeight(p.position.x, nz) > feet + cfg.MAX_STEP_HEIGHT) v.z = 0;
+    if (this._isBlocked(p.position.x, nz)) v.z = 0;
     else p.position.z = nz;
 
     // Movimiento vertical y contacto con el suelo.
@@ -184,6 +195,26 @@ export class PlayerController {
     }
   }
 
+  /**
+   * ¿Impide el terreno moverse a (x, z)?
+   * - Pared: el suelo sube más que MAX_STEP_HEIGHT respecto a los pies.
+   * - Pendiente: se sube y la inclinación supera MAX_WALKABLE_SLOPE_DEG.
+   *   Bajar una pendiente siempre está permitido.
+   */
+  _isBlocked(x, z) {
+    const p = this._player;
+    const rise = this._groundHeight(x, z) - p.position.y;
+    if (rise > this._cfg.MAX_STEP_HEIGHT) return true;
+    if (rise > 0.01 && p.state.onGround) {
+      const t = this._terrain;
+      const d = 0.5;
+      const gx = (t.getHeightAt(x + d, z) - t.getHeightAt(x - d, z)) / (2 * d);
+      const gz = (t.getHeightAt(x, z + d) - t.getHeightAt(x, z - d)) / (2 * d);
+      if (Math.hypot(gx, gz) > this._maxSlopeTan) return true;
+    }
+    return false;
+  }
+
   /** Altura del suelo bajo la huella del jugador (centro + 4 puntos del radio). */
   _groundHeight(x, z) {
     const r = this._cfg.RADIUS;
@@ -197,11 +228,16 @@ export class PlayerController {
     );
   }
 
+  /** @returns {boolean} true si el jugador estaba fuera del área jugable */
   _clampToBounds() {
     const b = this._terrain.getBounds();
     const r = this._cfg.RADIUS;
     const pos = this._player.position;
-    pos.x = THREE.MathUtils.clamp(pos.x, b.minX + r, b.maxX - r);
-    pos.z = THREE.MathUtils.clamp(pos.z, b.minZ + r, b.maxZ - r);
+    const x = THREE.MathUtils.clamp(pos.x, b.minX + r, b.maxX - r);
+    const z = THREE.MathUtils.clamp(pos.z, b.minZ + r, b.maxZ - r);
+    const clamped = x !== pos.x || z !== pos.z;
+    pos.x = x;
+    pos.z = z;
+    return clamped;
   }
 }

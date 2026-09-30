@@ -7,6 +7,10 @@ export const GameEvents = Object.freeze({
   GAME_STARTED: 'game:started',
   POINTER_LOCK_CHANGED: 'input:pointerLockChanged', // { locked }
 
+  // Mundo
+  WORLD_GENERATED: 'world:generated',               // { seed, spawn }
+  WORLD_EDGE_REACHED: 'world:edgeReached',
+
   // Cámara
   CAMERA_MODE_CHANGED: 'camera:modeChanged',        // { mode }
   CAMERA_BODY_VISIBILITY: 'camera:bodyVisibility',  // { visible }

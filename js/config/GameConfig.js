@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.1.0-fase1',
+    VERSION: '0.2.0-fase2',
   },
 
   RENDER: {
@@ -25,8 +25,8 @@ export const GameConfig = deepFreeze({
     FOV: 70,
     NEAR: 0.1,
     FAR: 600,
-    FOG_NEAR: 60,
-    FOG_FAR: 260,
+    FOG_NEAR: 90,
+    FOG_FAR: 250,             // ≈ VIEW_DISTANCE_CHUNKS × CHUNK_SIZE: oculta la aparición de chunks
     SKY_COLOR: 0x9fc9e8,
     MAX_DELTA: 0.1,           // limita saltos de tiempo (pestaña en segundo plano)
   },
@@ -63,9 +63,9 @@ export const GameConfig = deepFreeze({
     GRAVITY: 9.81 * 1.0,
     TERMINAL_VELOCITY: 40,
     MAX_STEP_HEIGHT: 0.45,    // escalones que se suben sin saltar
+    MAX_WALKABLE_SLOPE_DEG: 50, // pendientes más inclinadas no se pueden subir caminando
     PITCH_LIMIT: Math.PI / 2 - 0.05,
     BODY_TURN_SPEED: 10,      // rad/s con que el cuerpo gira hacia la dirección de avance
-    SPAWN: { x: 0, z: 6 },    // la Fase 2 lo sustituirá por una posición derivada de la seed
     COLORS: {
       SKIN: 0xe0ac86,
       SHIRT: 0x3f7fbf,
@@ -88,28 +88,62 @@ export const GameConfig = deepFreeze({
     HIDE_BODY_BELOW_BLEND: 0.25,     // en la transición, por debajo de esto se oculta el cuerpo
   },
 
-  // Mundo provisional de la Fase 1. La Fase 2 lo sustituye por la generación procedural.
-  PLACEHOLDER_WORLD: {
-    SIZE: 400,
-    GRID_CELL: 2,
-    GROUND_COLOR_A: 0x6fa650,
-    GROUND_COLOR_B: 0x659a48,
-    // Bloques de referencia para probar salto, escalones y cámara: [x, z, ancho, alto, fondo]
-    BLOCKS: [
-      // Escalera: peldaños de 0.4 m (se suben caminando, MAX_STEP_HEIGHT = 0.45)
-      [6, 0, 2, 0.4, 2],
-      [8, 0, 2, 0.8, 2],
-      [10, 0, 2, 1.2, 2],
-      // Bloques sueltos: 0.4 se sube caminando, 1.0 requiere saltar, 2.0 es una pared
-      [6, 8, 2, 0.4, 2],
-      [10, 8, 2, 1.0, 2],
-      [14, 8, 2, 2.0, 2],
-      [-8, -6, 3, 3, 3],
-      [-14, 10, 4, 6, 4],
-      [18, -18, 6, 1, 6],
-      [0, -25, 12, 0.5, 12],
-    ],
-    BLOCK_COLOR: 0xa39a8c,
+  // Parámetros generales de generación (comunes a cualquier planeta).
+  WORLD: {
+    DEFAULT_SEED: 'mundo0',   // también se puede pasar por URL: index.html?seed=loquesea
+    SUB_SEEDS: ['terrain', 'biome', 'resource', 'animal', 'celestial', 'spawn'],
+    WORLD_SIZE: 1024,         // lado del mundo finito (m); múltiplo de CHUNK_SIZE
+    CHUNK_SIZE: 64,           // m
+    CHUNK_RESOLUTION: 32,     // celdas por lado de chunk (→ 2 m entre vértices)
+    VIEW_DISTANCE_CHUNKS: 4,  // radio de chunks con malla alrededor del jugador
+    CHUNKS_BUILT_PER_FRAME: 2,
+    EDGE_MARGIN: 96,          // franja del borde donde el terreno baja al mar (no jugable)
+    SEA_LEVEL: 0,
+    SPAWN_SEARCH_RADIUS: 160,
+    SPAWN_ATTEMPTS: 300,
+    SPAWN_MIN_HEIGHT_ABOVE_SEA: 1.5,
+    SPAWN_MAX_SLOPE: 0.25,    // desnivel/distancia
+  },
+
+  // Perfiles de planeta: cada planeta futuro tendrá su propio perfil.
+  PLANETS: {
+    MUNDO_0: {
+      NAME: 'MUNDO 0',
+      TERRAIN: {
+        BASE_HEIGHT: 7,
+        CONTINENT_FREQUENCY: 1 / 600,
+        CONTINENT_AMPLITUDE: 6,
+        HILL_FREQUENCY: 1 / 150,
+        HILL_AMPLITUDE: 7,
+        DETAIL_FREQUENCY: 1 / 22,
+        DETAIL_AMPLITUDE: 0.5,
+        MOUNTAIN_MASK_FREQUENCY: 1 / 480,
+        MOUNTAIN_MASK_START: 0.1,  // umbrales del ruido (−1..1) donde empiezan/culminan las montañas
+        MOUNTAIN_MASK_END: 0.45,
+        MOUNTAIN_FREQUENCY: 1 / 230,
+        MOUNTAIN_HEIGHT: 85,
+        MOUNTAIN_BASE_LIFT: 12,
+        MOUNTAIN_COAST_FADE: 110, // m antes de la costa en los que las montañas se desvanecen
+        COAST_NOISE_FREQUENCY: 1 / 170,
+        COAST_NOISE_AMPLITUDE: 22,
+        COAST_SEA_WIDTH: 20,      // m de mar abierto antes del borde absoluto
+        SEA_FLOOR: -9,
+      },
+      COLORS: {
+        SAND: 0xd8c98f,
+        GRASS: 0x6fa650,
+        GRASS_DARK: 0x4f7f3a,
+        ROCK: 0x8a8580,
+        SNOW: 0xf2f5f8,
+        SEABED: 0x9c8f6a,
+        SAND_HEIGHT: 1.2,
+        ROCK_HEIGHT: 38,
+        ROCK_SLOPE_NORMAL_Y: 0.78,
+        SNOW_HEIGHT: 62,
+        SEA: 0x2f6f9f,
+        SEA_OPACITY: 0.82,
+      },
+    },
   },
 
   ADMIN: {

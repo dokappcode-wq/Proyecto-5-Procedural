@@ -1,25 +1,11 @@
 /**
- * Herramientas de depuración de la FASE 1 (jugador, cámara, mundo provisional).
+ * Herramientas de depuración básicas: jugador y cámara.
  *
- * Cada fase añadirá su propio archivo en admin/tools/ (WorldTools, SurvivalTools,
+ * Cada fase añade su propio archivo en admin/tools/ (WorldTools, SurvivalTools,
  * InventoryTools, TimeTools, ...) con una función register*(admin, deps).
  */
-export function registerCoreDebugTools(admin, { player, controller, camera, terrain }) {
+export function registerCoreDebugTools(admin, { player, controller, camera }) {
   const fmt = (n) => n.toFixed(2);
-
-  // ---- Mundo ---------------------------------------------------------------
-  admin.registerTool({
-    category: 'Mundo',
-    type: 'info',
-    label: 'Generador',
-    read: () => terrain().describeAt(player.position.x, player.position.z).generator,
-  });
-  admin.registerTool({
-    category: 'Mundo',
-    type: 'info',
-    label: 'Bioma actual',
-    read: () => terrain().describeAt(player.position.x, player.position.z).biome,
-  });
 
   // ---- Jugador -------------------------------------------------------------
   admin.registerTool({

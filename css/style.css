@@ -189,11 +189,11 @@ kbd {
 /* ---- Admin ----------------------------------------------------------- */
 #admin-panel {
   position: fixed;
-  top: 76px; /* bajo las etiquetas del HUD */
+  top: 104px; /* bajo las etiquetas del HUD */
   left: 12px;
   z-index: 30;
-  width: min(340px, calc(100vw - 24px));
-  max-height: calc(100vh - 88px);
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 116px);
   display: flex;
   flex-direction: column;
   background: var(--ui-bg-strong);
@@ -248,3 +248,4 @@ kbd {
   border-radius: var(--radius);
   z-index: 50;
 }
+.admin-info .value { overflow-wrap: anywhere; }

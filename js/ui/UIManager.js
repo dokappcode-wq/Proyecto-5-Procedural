@@ -33,6 +33,7 @@ export class UIManager {
       lockHint: $('lock-hint'),
       messages: $('messages'),
       version: $('version'),
+      seed: $('seed'),
     };
 
     this.el.title.textContent = gameInfo.TITLE;
@@ -57,6 +58,11 @@ export class UIManager {
       this.showMessage(flying ? 'Vuelo activado (Espacio sube, C baja)' : 'Vuelo desactivado'),
     );
     events.on(GameEvents.UI_MESSAGE, ({ text, type }) => this.showMessage(text, type));
+    events.on(GameEvents.WORLD_GENERATED, ({ seed }) => {
+      this.el.seed.textContent = `Seed: ${seed}`;
+      if (this._started) this.showMessage(`Mundo generado · seed "${seed}"`);
+    });
+    events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
   }
 
   setInitialCameraMode(mode) {
