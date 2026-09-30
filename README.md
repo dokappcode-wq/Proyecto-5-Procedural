@@ -3,10 +3,10 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: FASE 5** — inventario y recogida: talar árboles, picar rocas, coger manzanas y
-golpear animales (carne, lana, cuero). Cada animal tiene un temperamento (huir / curiosidad /
-neutral) y una reacción al golpe (huir / defenderse). Sobre las Fases 1–4: mundo finito por seed
-con biomas, recursos, charcas y rebaños, en estilo low-poly.
+**Estado actual: FASE 6** — supervivencia: vida, hambre, sed y energía con sus barras, daño por
+hambre, sed, caídas y animales, curación lenta, muerte y reaparición, y beber de las charcas.
+Sobre las Fases 1–5: mundo finito por seed con biomas, recursos, charcas y rebaños con
+temperamento, inventario y recogida, en estilo low-poly.
 
 ## Cómo ejecutarlo
 
@@ -33,7 +33,7 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | `C` | Bajar (solo en vuelo) |
 | Ratón | Mirar (clic en el juego para capturarlo, `Esc` para liberarlo) |
 | `V` | Alternar 1ª / 3ª persona |
-| `E` | Recoger (talar, picar, coger manzanas) |
+| `E` | Recoger (talar, picar, coger manzanas) / beber (mirando al agua) |
 | Clic izquierdo / `F` | Golpear animal (o recoger) |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
@@ -84,6 +84,11 @@ js/
 ├── interaction/InteractionSystem.js  Objetivo de la mira + recoger / golpear
 ├── player/
 │   ├── Player.js            Estado del jugador (posición, mirada, flags)
+│   ├── VitalStat.js         Base de las estadísticas: valor, máximo, umbrales, eventos
+│   ├── HealthSystem.js      Vida: daño (evento), caídas, curación, muerte, reaparición
+│   ├── HungerSystem.js      Hambre: desgaste; a 0 hace daño vía evento
+│   ├── ThirstSystem.js      Sed: desgaste, beber (evento PLAYER_DRANK)
+│   ├── EnergySystem.js      Energía: tiempo + actividad; limita correr y velocidad
 │   ├── PlayerController.js  Entrada → física (gravedad, salto, escalones, colisión)
 │   └── PlayerModel.js       Personaje de bloques animado
 ├── camera/CameraSystem.js   1ª/3ª persona con transición suave
@@ -91,7 +96,7 @@ js/
 │   ├── AdminSystem.js       Activación por secuencia + registro de herramientas
 │   ├── AdminPanel.js        Vista DOM del panel
 │   ├── KeySequenceDetector.js
-│   └── tools/               CoreDebugTools, WorldTools, LifeTools, InventoryTools
+│   └── tools/               CoreDebugTools, WorldTools, LifeTools, InventoryTools, SurvivalTools
 └── ui/UIManager.js          HUD provisional (reacciona a eventos)
 tests/                       Tests de Node (`npm test`)
 ```
@@ -118,6 +123,9 @@ Principios:
 - **Animales con carácter.** Cada animal recibe al azar (derivado de la seed y según las
   probabilidades de su especie) un temperamento ante el jugador y una reacción al golpe. Los
   ataques emiten `PLAYER_DAMAGED`, que en la Fase 6 consumirá HealthSystem.
+- **Supervivencia por eventos.** Cada estadística es un sistema independiente. Todo el daño
+  (animales, hambre, sed, caídas y, en la Fase 10, frío) llega a HealthSystem por el evento
+  `PLAYER_DAMAGED`; la UI solo escucha `PLAYER_STAT_CHANGED` / `PLAYER_STAT_LEVEL`.
 - **Interacción desacoplada.** InteractionSystem solo decide el objetivo y delega en
   ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
 - **Mundo finito.** 1024 × 1024 m en chunks de 64 m. Los datos de altura se generan bajo demanda

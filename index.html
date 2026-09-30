@@ -40,6 +40,7 @@
     <div id="crosshair"></div>
     <div id="interaction-prompt" class="hidden"></div>
     <div id="inventory-bar"></div>
+    <div id="stats" aria-label="Estado del jugador"></div>
     <div id="biome"></div>
     <div id="top-left">
       <div id="version"></div>
@@ -51,13 +52,22 @@
       <div class="help-body">
         <div><kbd>WASD</kbd> moverse · <kbd>Shift</kbd> correr</div>
         <div><kbd>Espacio</kbd> saltar · <kbd>V</kbd> cámara</div>
-        <div><kbd>E</kbd> recoger · <kbd>Clic</kbd>/<kbd>F</kbd> golpear</div>
+        <div><kbd>E</kbd> recoger / beber · <kbd>Clic</kbd>/<kbd>F</kbd> golpear</div>
         <div><kbd>Rueda</kbd> zoom (3ª persona)</div>
         <div><kbd>Esc</kbd> liberar ratón · clic para volver</div>
       </div>
     </div>
     <div id="lock-hint" class="hidden">Haz clic para controlar la cámara</div>
     <div id="messages"></div>
+  </div>
+
+  <!-- Muerte -->
+  <div id="death-screen" class="overlay hidden">
+    <div class="start-card death-card">
+      <h2>Has muerto</h2>
+      <p id="death-cause" class="subtitle"></p>
+      <button id="respawn-button" disabled>Reaparecer</button>
+    </div>
   </div>
 
   <div id="fatal-error" class="hidden"></div>

@@ -40,6 +40,7 @@ export class PlayerController {
     this._maxSlopeTan = Math.tan(THREE.MathUtils.degToRad(config.MAX_WALKABLE_SLOPE_DEG));
     this._edgeNoticeCooldown = 0;
     this._wasAtEdge = false;
+    this._mods = { canRun: true, speedMultiplier: 1 };
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
@@ -75,6 +76,14 @@ export class PlayerController {
     }
   }
 
+  /**
+   * Modificadores de movimiento que imponen otros sistemas (p. ej. la energía).
+   * @param {{ canRun?: boolean, speedMultiplier?: number }} mods
+   */
+  setMovementModifiers(mods) {
+    Object.assign(this._mods, mods);
+  }
+
   /** Coloca al jugador sobre el suelo en (x, z). */
   placeAt(x, z) {
     const y = this._groundHeight(x, z);
@@ -108,7 +117,7 @@ export class PlayerController {
     if (moving) this._wish.normalize();
 
     p.state.isMoving = moving;
-    p.state.isRunning = moving && input.isDown('RUN') && !p.state.isFlying;
+    p.state.isRunning = moving && input.isDown('RUN') && !p.state.isFlying && this._mods.canRun;
 
     if (p.state.isFlying) this._updateFlying(dt);
     else this._updateWalking(dt);
@@ -138,7 +147,7 @@ export class PlayerController {
     const cfg = this._cfg;
     const v = p.velocity;
 
-    const speed = p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED;
+    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
     this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, accel * dt);
 

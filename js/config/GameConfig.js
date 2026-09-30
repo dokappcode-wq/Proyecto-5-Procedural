@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.5.0-fase5',
+    VERSION: '0.6.0-fase6',
   },
 
   RENDER: {
@@ -240,6 +240,45 @@ export const GameConfig = deepFreeze({
         NEAR_SPAWN_DISTANCE: [35, 120], // un rebaño de cada especie cerca del inicio
       },
     },
+  },
+
+  // Supervivencia (Fase 6). Valores por segundo de juego.
+  // Duraciones aproximadas de 100 → 0: hambre 25 min, sed 15 min, energía 40 min.
+  SURVIVAL: {
+    MAX_HEALTH: 100,
+    MAX_HUNGER: 100,
+    MAX_THIRST: 100,
+    MAX_ENERGY: 100,
+
+    HUNGER_DECAY: 100 / 1500,
+    THIRST_DECAY: 100 / 900,
+    ENERGY_DECAY: 100 / 2400,
+
+    STARVING_DAMAGE: 0.8,           // vida/s con hambre a 0
+    DEHYDRATION_DAMAGE: 1.2,        // vida/s con sed a 0
+    STAT_DAMAGE_TICK: 2,            // s entre golpes de daño por hambre/sed
+
+    HEALTH_REGEN: 0.4,              // vida/s si hambre y sed están bien
+    HEALTH_REGEN_DELAY: 6,          // s sin recibir daño antes de curarse
+    HEALTH_REGEN_MIN_RATIO: 0.4,    // hambre y sed por encima de este % para curarse
+
+    FALL_DAMAGE_MIN_SPEED: 13,      // m/s de caída a partir de los que duele (~8.6 m)
+    FALL_DAMAGE_PER_MS: 6,          // vida por cada m/s por encima del mínimo
+
+    DRINK_AMOUNT: 20,               // sed recuperada por trago en una fuente
+
+    ENERGY_RUN_EXTRA: 0.35,         // energía/s extra corriendo
+    ENERGY_ACTION_COST: 0.6,        // por golpear o recoger
+    ENERGY_JUMP_COST: 0.3,
+    ENERGY_NO_RUN_RATIO: 0.15,      // por debajo no se puede correr
+    EXHAUSTED_SPEED_MULTIPLIER: 0.7, // velocidad con energía a 0
+
+    LOW_RATIO: 0.25,                // aviso "tienes sed/hambre/estás cansado"
+    CRITICAL_RATIO: 0.1,            // aviso más fuerte y barra parpadeando
+
+    RESPAWN_DELAY: 3,               // s antes de poder reaparecer
+    RESPAWN_VALUES: { HEALTH: 100, HUNGER: 70, THIRST: 70, ENERGY: 70 },
+    KEEP_INVENTORY_ON_DEATH: true,
   },
 
   // Tipos de recurso: qué dan al recogerlos, colisión y tamaño.

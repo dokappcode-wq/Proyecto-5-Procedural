@@ -351,6 +351,72 @@ kbd {
 .admin-button button { width: 100%; text-align: left; }
 .admin-input input { flex: 1; min-width: 0; }
 
+/* ---- Estadísticas del jugador ---------------------------------------- */
+#stats {
+  position: absolute;
+  left: 12px;
+  bottom: 14px;
+  display: grid;
+  gap: 5px;
+  padding: 8px 10px;
+  background: var(--ui-bg);
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+}
+.stat {
+  display: grid;
+  grid-template-columns: 1.3em 4.6em 110px 2.2em;
+  align-items: center;
+  gap: 6px;
+}
+.stat-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.stat-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.stat-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 4px;
+  background: var(--stat-color);
+  transition: width 0.25s linear;
+}
+.stat[data-stat="HEALTH"] { --stat-color: #e0504a; }
+.stat[data-stat="HUNGER"] { --stat-color: #d9913f; }
+.stat[data-stat="THIRST"] { --stat-color: #4aa3df; }
+.stat[data-stat="ENERGY"] { --stat-color: #e6c84a; }
+.stat[data-level="low"] .stat-value { color: #ffcf7a; }
+.stat[data-level="critical"] .stat-value { color: #ff8a80; }
+.stat[data-level="critical"] .stat-bar { animation: stat-blink 0.9s ease-in-out infinite; }
+@keyframes stat-blink { 50% { background: rgba(255, 90, 80, 0.45); } }
+@media (max-width: 640px) {
+  .stat { grid-template-columns: 1.3em 70px 2.2em; }
+  .stat-name { display: none; }
+  #inventory-bar { bottom: 130px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat[data-level="critical"] .stat-bar { animation: none; background: rgba(255, 90, 80, 0.45); }
+}
+
+/* ---- Muerte ---------------------------------------------------------- */
+#death-screen { background: radial-gradient(ellipse at center, rgba(60, 0, 0, 0.55), rgba(10, 0, 0, 0.88)); z-index: 25; }
+.death-card h2 { margin: 0; font-size: 2rem; letter-spacing: 0.08em; color: #ff8a80; }
+#respawn-button {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 10px 26px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ui-accent);
+  color: #06121f;
+  cursor: pointer;
+}
+#respawn-button:disabled { opacity: 0.5; cursor: default; }
+
 #fatal-error {
   position: fixed;
   inset: auto 16px 16px;

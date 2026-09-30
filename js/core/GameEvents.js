@@ -23,7 +23,13 @@ export const GameEvents = Object.freeze({
   PLAYER_FLY_CHANGED: 'player:flyChanged',          // { flying }
   PLAYER_BIOME_CHANGED: 'player:biomeChanged',      // { biome: { id, name, weights, temperature }, first }
   PLAYER_DAMAGED: 'player:damaged',                 // { amount, source, sourceName, fromX, fromZ }
-  PLAYER_ACTION: 'player:action',                   // { kind: 'hit' | 'harvest' | 'miss' }
+  PLAYER_ACTION: 'player:action',                   // { kind: 'hit' | 'harvest' | 'drink' | 'miss' }
+  PLAYER_DRANK: 'player:drank',                     // { source: 'POND' }
+  PLAYER_STAT_CHANGED: 'player:statChanged',        // { stat, value, max, ratio, delta }
+  PLAYER_STAT_LEVEL: 'player:statLevel',            // { stat, level: 'ok' | 'low' | 'critical', previous }
+  PLAYER_DIED: 'player:died',                       // { cause, causeName }
+  PLAYER_RESPAWN_REQUEST: 'player:respawnRequest',
+  PLAYER_RESPAWNED: 'player:respawned',
 
   // Interacción, animales e inventario
   INTERACTION_TARGET_CHANGED: 'interaction:targetChanged', // { target: { kind, label, action } | null }

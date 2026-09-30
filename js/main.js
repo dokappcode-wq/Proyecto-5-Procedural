@@ -18,6 +18,11 @@ import { DiscoveryTracker } from './world/DiscoveryTracker.js';
 import { AnimalSystem } from './animals/AnimalSystem.js';
 import { InventorySystem } from './inventory/InventorySystem.js';
 import { InteractionSystem } from './interaction/InteractionSystem.js';
+import { HealthSystem } from './player/HealthSystem.js';
+import { HungerSystem } from './player/HungerSystem.js';
+import { ThirstSystem } from './player/ThirstSystem.js';
+import { EnergySystem } from './player/EnergySystem.js';
+import { registerSurvivalTools } from './admin/tools/SurvivalTools.js';
 import { WorldGenerator } from './world/WorldGenerator.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -119,16 +124,52 @@ function boot() {
     inventory,
     events,
   });
-  events.on(GameEvents.PLAYER_ACTION, () => player.playAction());
-  // Daño recibido: por ahora solo empujón + efectos de UI; la Fase 6 (HealthSystem)
-  // escuchará este mismo evento para restar vida.
-  events.on(GameEvents.PLAYER_DAMAGED, ({ fromX, fromZ }) =>
-    controller.applyKnockback(fromX, fromZ, cfg.INTERACTION.DAMAGE_KNOCKBACK),
-  );
+  events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
-  // Sin entrada de juego hasta pulsar "Entrar".
+  // ---- Supervivencia: cuatro sistemas independientes -----------------------
+  const S = cfg.SURVIVAL;
+  const hunger = new HungerSystem({ config: S, events });
+  const thirst = new ThirstSystem({ config: S, events });
+  const energy = new EnergySystem({ config: S, events, player });
+  const health = new HealthSystem({
+    config: S,
+    events,
+    // Solo se cura si está bien alimentado e hidratado.
+    canRegenerate: () => hunger.ratio >= S.HEALTH_REGEN_MIN_RATIO && thirst.ratio >= S.HEALTH_REGEN_MIN_RATIO,
+  });
+  const needs = [hunger, thirst, energy];
+  const setNeedsPaused = (paused) => needs.forEach((n) => (n.paused = paused));
+
+  // Los ataques con origen (animales) empujan al jugador.
+  events.on(GameEvents.PLAYER_DAMAGED, ({ fromX, fromZ }) => {
+    if (fromX !== undefined && !health.dead) controller.applyKnockback(fromX, fromZ, cfg.INTERACTION.DAMAGE_KNOCKBACK);
+  });
+  // La energía decide si se puede correr y a qué velocidad.
+  events.on(GameEvents.PLAYER_STAT_CHANGED, ({ stat }) => {
+    if (stat === 'ENERGY') controller.setMovementModifiers(energy.getMovementModifiers());
+  });
+  // Muerte y reaparición.
+  events.on(GameEvents.PLAYER_DIED, () => {
+    input.setBlocked('dead', true);
+    setNeedsPaused(true);
+  });
+  events.on(GameEvents.PLAYER_RESPAWNED, () => {
+    controller.spawn();
+    hunger.set(S.RESPAWN_VALUES.HUNGER);
+    thirst.set(S.RESPAWN_VALUES.THIRST);
+    energy.set(S.RESPAWN_VALUES.ENERGY);
+    if (!S.KEEP_INVENTORY_ON_DEATH) inventory.clear();
+    setNeedsPaused(false);
+    input.setBlocked('dead', false);
+  });
+
+  // Sin entrada de juego ni desgaste hasta pulsar "Entrar".
   input.setBlocked('start-screen', true);
-  events.on(GameEvents.GAME_STARTED, () => input.setBlocked('start-screen', false));
+  setNeedsPaused(true);
+  events.on(GameEvents.GAME_STARTED, () => {
+    input.setBlocked('start-screen', false);
+    setNeedsPaused(false);
+  });
 
   // Presentación: el cuerpo se oculta cuando la cámara está "dentro" de la cabeza.
   events.on(GameEvents.CAMERA_BODY_VISIBILITY, ({ visible }) => player.setBodyVisible(visible));
@@ -143,6 +184,7 @@ function boot() {
     canvas: render.domElement,
   });
   ui.setInitialCameraMode(camera.mode);
+  [health, hunger, thirst, energy].forEach((s) => s.emitState()); // pinta las barras iniciales
 
   // Generación inicial: después de crear los oyentes (UI, tracker) y antes de las
   // herramientas Admin, que leen los biomas del mundo generado.
@@ -152,6 +194,7 @@ function boot() {
   registerWorldTools(admin, { world, player, controller });
   registerLifeTools(admin, { world, animals, player, controller, species: cfg.ANIMALS.SPECIES });
   registerInventoryTools(admin, { inventory, items: cfg.ITEMS });
+  registerSurvivalTools(admin, { health, hunger, thirst, energy, events });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -162,6 +205,10 @@ function boot() {
   loop.add(camera);      // coloca la cámara a partir del jugador
   loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(animals);     // simula y dibuja animales cercanos
+  loop.add(hunger);      // supervivencia: desgaste por tiempo y actividad
+  loop.add(thirst);
+  loop.add(energy);
+  loop.add(health);      // curación, cuenta atrás de reaparición
   loop.add(biomeTracker); // bioma actual del jugador
   loop.add(discovery);   // agua y animales descubiertos
   loop.add(lighting);    // sombra centrada en el jugador
@@ -173,7 +220,7 @@ function boot() {
   loop.start();
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
-  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction, player, controller, camera, ui, admin, loop };
+  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction, health, hunger, thirst, energy, player, controller, camera, ui, admin, loop };
 }
 
 try {

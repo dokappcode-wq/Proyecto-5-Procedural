@@ -9,9 +9,25 @@ const MODE_LABELS = { FIRST_PERSON: '1ª persona', THIRD_PERSON: '3ª persona' }
  * solo lectura. No modifica el estado de otros sistemas (excepto pedir el
  * pointer lock al pulsar "Entrar", que es interacción de interfaz).
  *
- * Las barras de Vida/Hambre/Sed/Energía y los efectos de temperatura se
- * añadirán aquí en las fases 6 y 10, alimentados por eventos.
+ * Barras de Vida/Hambre/Sed/Energía (PLAYER_STAT_CHANGED), avisos al cruzar
+ * umbrales (PLAYER_STAT_LEVEL) y pantalla de muerte. Los efectos de
+ * temperatura (Fase 10) se añadirán aquí, también alimentados por eventos.
  */
+const STAT_UI = [
+  { id: 'HEALTH', icon: '❤️', name: 'Vida' },
+  { id: 'HUNGER', icon: '🍗', name: 'Hambre' },
+  { id: 'THIRST', icon: '💧', name: 'Sed' },
+  { id: 'ENERGY', icon: '⚡', name: 'Energía' },
+];
+
+const STAT_WARNINGS = {
+  HEALTH: { low: 'Estás herido.', critical: 'Estás a punto de morir.' },
+  HUNGER: { low: 'Tienes hambre.', critical: 'Te mueres de hambre.' },
+  THIRST: { low: 'Tienes sed.', critical: 'Te estás deshidratando.' },
+  ENERGY: { low: 'Estás cansado.', critical: 'Estás agotado: no puedes correr.' },
+};
+
+const LEVEL_ORDER = { ok: 0, low: 1, critical: 2 };
 export class UIManager {
   constructor({ config, gameInfo, items, events, input, canvas, root = document }) {
     this.name = 'ui';
@@ -39,7 +55,14 @@ export class UIManager {
       prompt: $('interaction-prompt'),
       inventory: $('inventory-bar'),
       damageFlash: $('damage-flash'),
+      stats: $('stats'),
+      deathScreen: $('death-screen'),
+      deathCause: $('death-cause'),
+      respawnButton: $('respawn-button'),
     };
+    this._statRows = this._buildStatBars();
+    this._respawnTimer = 0;
+    this.el.respawnButton.addEventListener('click', () => events.emit(GameEvents.PLAYER_RESPAWN_REQUEST));
 
     this.el.title.textContent = gameInfo.TITLE;
     this.el.version.textContent = `${gameInfo.TITLE} · v${gameInfo.VERSION}`;
@@ -81,9 +104,31 @@ export class UIManager {
     events.on(GameEvents.INTERACTION_TARGET_CHANGED, ({ target }) => this._showTarget(target));
     events.on(GameEvents.PLAYER_ACTION, () => this._pulseCrosshair());
     events.on(GameEvents.INVENTORY_CHANGED, (e) => this._renderInventory(e));
-    events.on(GameEvents.PLAYER_DAMAGED, ({ amount, sourceName }) => {
+    events.on(GameEvents.PLAYER_DAMAGED, ({ amount, source, sourceName }) => {
+      if (!this.el.deathScreen.classList.contains('hidden')) return; // muerto: sin efectos
       this._flashDamage();
-      this.showMessage(`${sourceName ?? 'Algo'} te ha atacado (−${amount})`, 'danger');
+      const n = Math.round(amount);
+      if (sourceName) this.showMessage(`${sourceName} te ha atacado (−${n})`, 'danger');
+      else if (source === 'FALL') this.showMessage(`Te has hecho daño en la caída (−${n})`, 'danger');
+    });
+    events.on(GameEvents.PLAYER_STAT_CHANGED, (e) => this._updateStat(e));
+    events.on(GameEvents.PLAYER_STAT_LEVEL, ({ stat, level, previous, value }) => {
+      // Solo se avisa cuando la situación empeora (y no al morir: ya lo dice la pantalla de muerte).
+      if (stat === 'HEALTH' && value <= 0) return;
+      if (LEVEL_ORDER[level] > LEVEL_ORDER[previous]) this.showMessage(STAT_WARNINGS[stat][level], 'danger');
+    });
+    events.on(GameEvents.PLAYER_DRANK, () => this.showMessage('Bebes agua.', 'pickup'));
+    events.on(GameEvents.PLAYER_DIED, ({ causeName, respawnDelay }) => {
+      this.el.deathCause.textContent = `Causa: ${causeName}`;
+      this.el.deathScreen.classList.remove('hidden');
+      this._respawnTimer = respawnDelay;
+      this._input.exitPointerLock();
+      this._updateRespawnButton();
+    });
+    events.on(GameEvents.PLAYER_RESPAWNED, () => {
+      this.el.deathScreen.classList.add('hidden');
+      this.showMessage('Has reaparecido.');
+      this._input.requestPointerLock();
     });
     events.on(GameEvents.ANIMAL_KILLED, ({ animal }) => this.showMessage(`Has abatido: ${animal.def.NAME}`));
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
@@ -93,8 +138,46 @@ export class UIManager {
     this._setCameraLabel(mode);
   }
 
-  update() {
+  update(dt) {
     if (this._input.wasPressed('TOGGLE_HELP')) this.el.help.classList.toggle('collapsed');
+    if (this._respawnTimer > 0) {
+      this._respawnTimer = Math.max(0, this._respawnTimer - dt);
+      this._updateRespawnButton();
+    }
+  }
+
+  // ---- Estadísticas -----------------------------------------------------------
+
+  _buildStatBars() {
+    const rows = {};
+    for (const s of STAT_UI) {
+      const row = document.createElement('div');
+      row.className = 'stat';
+      row.dataset.level = 'ok';
+      row.innerHTML = `<span class="stat-icon" aria-hidden="true"></span><span class="stat-name"></span>
+        <span class="stat-bar"><span class="stat-fill"></span></span><span class="stat-value">100</span>`;
+      row.querySelector('.stat-icon').textContent = s.icon;
+      row.querySelector('.stat-name').textContent = s.name;
+      row.dataset.stat = s.id;
+      this.el.stats.appendChild(row);
+      rows[s.id] = { row, fill: row.querySelector('.stat-fill'), value: row.querySelector('.stat-value') };
+    }
+    return rows;
+  }
+
+  _updateStat({ stat, value, ratio, level }) {
+    const r = this._statRows[stat];
+    if (!r) return;
+    r.fill.style.width = `${(ratio * 100).toFixed(1)}%`;
+    r.value.textContent = Math.ceil(value);
+    r.row.dataset.level = level;
+  }
+
+  _updateRespawnButton() {
+    const b = this.el.respawnButton;
+    const wait = Math.ceil(this._respawnTimer);
+    b.disabled = wait > 0;
+    b.textContent = wait > 0 ? `Reaparecer (${wait})` : 'Reaparecer';
   }
 
   showMessage(text, type = 'info') {

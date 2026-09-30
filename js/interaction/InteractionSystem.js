@@ -10,7 +10,7 @@ import { GameEvents } from '../core/GameEvents.js';
  * desde el jugador.
  *
  * Acciones:
- *   INTERACT (E)          recoger del recurso señalado
+ *   INTERACT (E)          recoger del recurso señalado / beber del agua señalada
  *   ATTACK   (clic / F)   golpear al animal señalado (o recoger si es un recurso)
  *
  * No contiene reglas de los recursos ni de los animales: delega en
@@ -63,6 +63,9 @@ export class InteractionSystem {
     this._cooldown = this._cfg.ACTION_COOLDOWN;
     if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
+    } else if (target?.kind === 'water' && button === 'INTERACT') {
+      this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'drink' });
+      this._events.emit(GameEvents.PLAYER_DRANK, { source: 'POND' });
     } else if (target?.kind === 'animal' && button === 'ATTACK') {
       this._hit(target.ref);
     } else if (button === 'ATTACK') {
@@ -127,11 +130,28 @@ export class InteractionSystem {
     for (const a of this._animals.getAnimalsNear(p.x, p.z, range + 2)) {
       consider({ kind: 'animal', id: a.id, ref: a }, a.x, a.y + 0.8 * a.scale, a.z, 0.75 * a.scale, 0.5 * a.scale);
     }
+
+    // Agua: punto donde la mira corta la lámina de la charca más cercana.
+    const water = this._world.water?.nearestPond(p.x, p.z);
+    if (water && water.distance <= range + 1 && this._dir.y < -0.05) {
+      const pond = water.pond;
+      const t = (pond.level - this._origin.y) / this._dir.y;
+      if (t > 0 && t < bestT) {
+        const hx = this._origin.x + this._dir.x * t;
+        const hz = this._origin.z + this._dir.z * t;
+        const inPond = Math.hypot(hx - pond.x, hz - pond.z) <= pond.radius;
+        if (inPond && Math.hypot(hx - p.x, hz - p.z) <= range + 1) {
+          best = { kind: 'water', id: `pond-${pond.id}`, ref: pond };
+          bestT = t;
+        }
+      }
+    }
     return best ? this._describe(best) : null;
   }
 
   /** Añade el texto que mostrará la UI: { label, action }. */
   _describe(t) {
+    if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
     if (t.kind === 'animal') {
       return { ...t, label: t.ref.def.NAME, action: 'Golpear', key: 'Clic' };
     }

@@ -41,7 +41,9 @@ export class GameLoop {
 
   _frame(now) {
     if (!this._running) return;
-    const dt = Math.min((now - this._lastTime) / 1000, this._maxDelta);
+    // El primer timestamp de requestAnimationFrame puede ser ANTERIOR al
+    // performance.now() de start(): sin el Math.max, el primer dt sería negativo.
+    const dt = Math.max(0, Math.min((now - this._lastTime) / 1000, this._maxDelta));
     this._lastTime = now;
     this._elapsed += dt;
 
