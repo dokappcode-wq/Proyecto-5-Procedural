@@ -7,28 +7,34 @@ import { TerrainMesher } from './TerrainMesher.js';
 import { ChunkManager } from './ChunkManager.js';
 import { createBiomeColorizer } from './BiomeColorizer.js';
 import { BiomeSystem } from './BiomeSystem.js';
+import { WaterSystem } from './WaterSystem.js';
+import { ResourceSystem } from './ResourceSystem.js';
+import { PropMesher } from './props/PropMesher.js';
 
 /**
  * WorldGenerator — mundo procedural finito generado a partir de una seed.
  *
  * Implementa la interfaz de terreno que usan jugador y cámara:
  *   getHeightAt(x, z), getBounds(), getSpawnPoint(), describeAt(x, z)
- * y la consulta de bioma para otros sistemas:
+ * y consultas para otros sistemas:
  *   getBiomeAt(x, z) → { id, name, weights, temperature }
+ *   water      → WaterSystem (charcas: beber, llenar el odre...)
+ *   resources  → ResourceSystem (árboles, rocas...: recoger, colisiones)
  *
  * Responsabilidades:
  *   - Crear la WorldSeed y sus sub-seeds.
  *   - Crear el BiomeSystem (sub-seed "biome") y el TerrainGenerator (sub-seed
  *     "terrain") del perfil de planeta.
+ *   - Crear WaterSystem y ResourceSystem (sub-seed "resource").
  *   - Guardar en caché los datos de altura por chunk (baratos en memoria).
- *   - Delegar las mallas visibles en ChunkManager.
+ *   - Delegar las mallas visibles en ChunkManager (capas: terreno, recursos).
  *   - Calcular la posición inicial a partir de la seed.
  *
  * El mismo objeto sobrevive a `generate(nuevaSeed)`: quien lo referencia
  * (controlador, cámara) no necesita actualizarse.
  */
 export class WorldGenerator {
-  constructor({ scene, config, planet, events, flatShading = false }) {
+  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false }) {
     this.name = 'world';
     this._cfg = config;
     this._planet = planet;
@@ -51,17 +57,46 @@ export class WorldGenerator {
     this._spawn = { x: 0, z: 0 };
     this._stats = { generationMs: 0, chunkDataGenerated: 0 };
 
+    this._resourceTypes = resourceTypes;
+    this.water = new WaterSystem({ config: planet.WATER, seaLevel: config.SEA_LEVEL });
+    this.resources = null;
+
+    // ---- Capas de chunk -------------------------------------------------------
     this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading });
+    this._propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    this._grassMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     this._mesher = new TerrainMesher({ colorizer: () => {} });
+    this._propMesher = new PropMesher({ colors: propColors });
     this._chunks = new ChunkManager({
       scene,
       config,
       chunkCount: this._chunkCount,
-      getChunkData: (cx, cz) => this.getChunkData(cx, cz),
-      mesher: this._mesher,
-      material: this._material,
+      layers: [
+        {
+          name: 'terrain',
+          viewDistance: config.VIEW_DISTANCE_CHUNKS,
+          build: (cx, cz) => {
+            const mesh = new THREE.Mesh(this._mesher.build(this.getChunkData(cx, cz)), this._material);
+            mesh.receiveShadow = mesh.castShadow = true;
+            return mesh;
+          },
+          dispose: (mesh) => {
+            mesh.geometry.index = null; // el índice es compartido entre chunks
+            mesh.geometry.dispose();
+          },
+        },
+        {
+          name: 'props',
+          viewDistance: Math.min(config.PROPS_VIEW_DISTANCE_CHUNKS, config.VIEW_DISTANCE_CHUNKS),
+          build: (cx, cz) => this._buildPropsLayer(cx, cz),
+          dispose: (group) => group.children.forEach((m) => m.geometry.dispose()),
+        },
+      ],
     });
 
+    this._pondGroup = new THREE.Group();
+    this._pondGroup.name = 'Ponds';
+    scene.add(this._pondGroup);
     this._buildSea();
   }
 
@@ -92,7 +127,31 @@ export class WorldGenerator {
     this._dataCache.clear();
     this._chunks.clear();
     this._stats.chunkDataGenerated = 0;
+
+    // Orden: spawn y charcas se eligen sobre el terreno sin excavar; después se
+    // activa la excavación (la caché de alturas está vacía, así que todo lo que
+    // se genere a partir de aquí ya incluye las charcas).
     this._spawn = this._findSpawn();
+    this.water.generate({ seed: this.seed.sub.resource, terrain: this.terrain, spawn: this._spawn, bounds: this.getBounds() });
+    this.terrain.setWater(this.water);
+    this._buildPonds();
+
+    this.resources = new ResourceSystem({
+      config: this._planet.RESOURCES,
+      types: this._resourceTypes,
+      seed: this.seed.sub.resource,
+      world: {
+        chunkSize: this._cfg.CHUNK_SIZE,
+        half: this._half,
+        chunkCount: this._chunkCount,
+        seaLevel: this._cfg.SEA_LEVEL,
+        spawn: this._spawn,
+        heightAt: (x, z) => this.getHeightAt(x, z),
+        sample: (x, z) => this.terrain.sample(x, z),
+        isWater: (x, z, m) => this.water.isWater(x, z, m),
+      },
+    });
+    this.resources.onChunkChanged = (cx, cz) => this._chunks.rebuild(cx, cz);
     this._stats.generationMs = performance.now() - t0;
 
     this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
@@ -136,6 +195,10 @@ export class WorldGenerator {
 
     if (fx + fz <= 1) return ha + (hd - ha) * fx + (hb - ha) * fz;
     return hc + (hb - hc) * (1 - fx) + (hd - hc) * (1 - fz);
+  }
+
+  get seaLevel() {
+    return this._cfg.SEA_LEVEL;
   }
 
   /** Área jugable (el mar del borde queda fuera). */
@@ -192,6 +255,8 @@ export class WorldGenerator {
   getInfo() {
     return {
       planet: this._planet.NAME,
+      ponds: this.water.ponds.length,
+      resourceChunksCached: this.resources.cachedChunkCount,
       seedText: this.seed.text,
       seedValue: this.seed.value,
       subSeeds: this.seed.sub,
@@ -222,21 +287,65 @@ export class WorldGenerator {
     const heights = new Float32Array(s * s);
     const biomeWeights = {};
     for (const id of this.biomes.ids) biomeWeights[id] = new Float32Array(s * s);
+    const shore = new Float32Array(s * s);
     for (let l = 0; l < s; l++) {
       for (let k = 0; k < s; k++) {
         const i = l * s + k;
-        const sample = this.terrain.sample(originX + (k - 1) * sp, originZ + (l - 1) * sp);
+        const x = originX + (k - 1) * sp;
+        const z = originZ + (l - 1) * sp;
+        const sample = this.terrain.sample(x, z);
         heights[i] = sample.height;
         for (const id in biomeWeights) biomeWeights[id][i] = sample.biomes[id];
+        shore[i] = this.water.shoreFactor(x, z);
       }
     }
-    data = { cx, cz, res, spacing: sp, originX, originZ, heights, biomeWeights };
+    data = { cx, cz, res, spacing: sp, originX, originZ, heights, biomeWeights, shore };
     this._dataCache.set(key, data);
     this._stats.chunkDataGenerated++;
     return data;
   }
 
   // ---- Interno -------------------------------------------------------------
+
+  _buildPropsLayer(cx, cz) {
+    const { props, grass } = this._propMesher.build(this.resources.getChunk(cx, cz));
+    if (!props && !grass) return null;
+    const group = new THREE.Group();
+    if (props) {
+      const mesh = new THREE.Mesh(props, this._propMaterial);
+      mesh.castShadow = mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    if (grass) {
+      const mesh = new THREE.Mesh(grass, this._grassMaterial);
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    return group;
+  }
+
+  /** Láminas de agua de las charcas (disco low-poly al nivel del agua). */
+  _buildPonds() {
+    for (const m of this._pondGroup.children) m.geometry.dispose();
+    this._pondGroup.clear();
+    const W = this._planet.WATER;
+    this._pondMaterial ??= new THREE.MeshPhongMaterial({
+      color: W.COLOR,
+      specular: 0xaad4ee,
+      shininess: 80,
+      transparent: true,
+      opacity: W.OPACITY,
+      flatShading: true,
+    });
+    for (const p of this.water.ponds) {
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(p.radius + 0.4, 14), this._pondMaterial);
+      disc.rotation.x = -Math.PI / 2;
+      disc.position.set(p.x, p.level, p.z);
+      disc.receiveShadow = true;
+      disc.name = `pond_${p.id}`;
+      this._pondGroup.add(disc);
+    }
+  }
 
   /** Posición inicial determinista: terreno seco y llano en la Explanada. */
   _findSpawn() {

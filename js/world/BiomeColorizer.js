@@ -7,13 +7,13 @@ import { clamp01, smoothstep } from '../core/MathUtils.js';
  * Colorea el terreno por vértice a partir de los pesos de bioma.
  *
  * Firma: colorize(ctx, outColor), con
- *   ctx = { x, z, height, normalY, concavity, weights: { PLAINS, FOREST, FROZEN_MOUNTAINS } }
+ *   ctx = { x, z, height, normalY, concavity, shore, weights: { PLAINS, FOREST, FROZEN_MOUNTAINS } }
  *
  * Capas:
  *   1. Color de cada bioma con manchas (ruido de baja frecuencia).
  *   2. Mezcla ponderada por los pesos de bioma → transiciones suaves.
  *   3. Montañas: roca → nieve según altura y pendiente, placas de hielo en zonas llanas.
- *   4. Roca en pendientes fuertes, arena en la orilla, fondo marino.
+ *   4. Roca en pendientes fuertes, arena en la orilla, fondo marino, barro en charcas.
  *   5. Oclusión aproximada: hondonadas más oscuras, crestas algo más claras.
  *   6. Pequeña variación determinista por vértice.
  */
@@ -35,6 +35,7 @@ export function createBiomeColorizer({ planet, seaLevel, seed }) {
   const sand = col(C.SAND);
   const seabed = col(C.SEABED);
   const rock = col(C.LOWLAND_ROCK);
+  const mud = col(planet.WATER.MUD_COLOR);
 
   const patches = new SimplexNoise(deriveSeed(seed, 'colorPatches'));
   const fine = new SimplexNoise(deriveSeed(seed, 'colorFine'));
@@ -43,7 +44,7 @@ export function createBiomeColorizer({ planet, seaLevel, seed }) {
   const cM = new THREE.Color();
 
   return function colorize(ctx, out) {
-    const { x, z, height, normalY, concavity, weights } = ctx;
+    const { x, z, height, normalY, concavity, shore, weights } = ctx;
     const f = C.PATCH_FREQUENCY;
     const patch = smoothstep(-0.35, 0.35, patches.noise2D(x * f, z * f));
     const speck = fine.noise2D(x * 0.21, z * 0.21);
@@ -77,6 +78,7 @@ export function createBiomeColorizer({ planet, seaLevel, seed }) {
     out.lerp(rock, steep);
     if (height < seaLevel - 0.3) out.copy(seabed);
     else out.lerp(sand, smoothstep(seaLevel + C.SAND_HEIGHT, seaLevel + C.SAND_HEIGHT * 0.4, height));
+    if (shore > 0) out.lerp(mud, shore * 0.85);
 
     // 5. Oclusión aproximada por curvatura (concavity > 0 = hondonada).
     const shade = 1 - clamp01(concavity * C.AO_STRENGTH) * 0.45 + clamp01(-concavity * C.AO_STRENGTH) * 0.08;

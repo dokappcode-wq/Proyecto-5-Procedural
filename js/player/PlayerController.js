@@ -14,6 +14,7 @@ const COYOTE_TIME = 0.1;       // s: se puede saltar justo después de abandonar
  * - Escalones bajos se suben solos; paredes más altas bloquean (por eje, lo que
  *   permite deslizarse a lo largo de ellas).
  * - Pendientes demasiado inclinadas no se pueden subir caminando.
+ * - Troncos y rocas bloquean el paso (obstacles.resolveCollisions).
  * - Al tocar el límite del mundo finito se emite WORLD_EDGE_REACHED.
  * - Modo vuelo (herramienta de depuración) sin gravedad ni colisiones.
  *
@@ -25,7 +26,7 @@ export class PlayerController {
    * @param {object} config  sección PLAYER
    * @param {object} look    { sensitivity, invertY } (de la sección INPUT)
    */
-  constructor({ config, look, input, player, terrain, events }) {
+  constructor({ config, look, input, player, terrain, obstacles = null, events }) {
     this.name = 'playerController';
     this._cfg = config;
     this._lookSensitivity = look.sensitivity;
@@ -33,6 +34,7 @@ export class PlayerController {
     this._input = input;
     this._player = player;
     this._terrain = terrain;
+    this._obstacles = obstacles; // { resolveCollisions(pos, radius) } — troncos, rocas...
     this._events = events;
 
     this._maxSlopeTan = Math.tan(THREE.MathUtils.degToRad(config.MAX_WALKABLE_SLOPE_DEG));
@@ -145,6 +147,16 @@ export class PlayerController {
     const nz = p.position.z + v.z * dt;
     if (this._isBlocked(p.position.x, nz)) v.z = 0;
     else p.position.z = nz;
+
+    // Obstáculos (troncos, rocas): empujar fuera sin atravesarlos.
+    if (this._obstacles) {
+      const px = p.position.x;
+      const pz = p.position.z;
+      if (this._obstacles.resolveCollisions(p.position, cfg.RADIUS) && this._isBlocked(p.position.x, p.position.z)) {
+        p.position.x = px;
+        p.position.z = pz;
+      }
+    }
 
     // Movimiento vertical y contacto con el suelo.
     const wasOnGround = p.state.onGround;

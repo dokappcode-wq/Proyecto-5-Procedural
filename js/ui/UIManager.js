@@ -68,6 +68,12 @@ export class UIManager {
       this.el.biome.dataset.biome = biome.id;
       if (!first && this._started) this.showMessage(`Has entrado en: ${biome.name}`, 'biome');
     });
+    events.on(GameEvents.WATER_DISCOVERED, ({ first }) =>
+      this.showMessage(first ? 'Has encontrado agua.' : 'Has encontrado otra fuente de agua.', 'biome'),
+    );
+    events.on(GameEvents.ANIMAL_DISCOVERED, ({ namePlural }) =>
+      this.showMessage(`Has encontrado ${namePlural.toLowerCase()}.`, 'biome'),
+    );
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
   }
 

@@ -20,6 +20,7 @@ import { smoothstep } from '../core/MathUtils.js';
  *   5. Costa: el terreno desciende hacia el fondo marino en el borde del
  *      mundo finito (línea de costa irregular). Las montañas se atenúan
  *      antes de llegar a la costa para que el borde sea siempre tierra baja.
+ *   6. Charcas: si hay WaterSystem, excava las fuentes de agua.
  */
 export class TerrainGenerator {
   constructor({ profile, biomes, seed, worldSize, edgeMargin }) {
@@ -43,6 +44,15 @@ export class TerrainGenerator {
     this._coast = new SimplexNoise(deriveSeed(seed, 'coast'));
 
     this._sample = { height: 0, mountain: 0, coast: 0, biomes: {} };
+    this._water = null;
+  }
+
+  /**
+   * Activa la excavación de charcas (WaterSystem.carve). Se llama después de
+   * elegir las charcas, que a su vez se eligen sobre el terreno sin excavar.
+   */
+  setWater(water) {
+    this._water = water;
   }
 
   heightAt(x, z) {
@@ -95,6 +105,7 @@ export class TerrainGenerator {
 
     // Costa: el terreno desciende hacia el fondo marino.
     height += (p.SEA_FLOOR - height) * coast;
+    if (this._water) height = this._water.carve(x, z, height);
 
     const s = this._sample;
     s.height = height;

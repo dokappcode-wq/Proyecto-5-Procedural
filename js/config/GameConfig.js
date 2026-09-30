@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.3.0-fase3',
+    VERSION: '0.4.0-fase4',
   },
 
   RENDER: {
@@ -120,6 +120,7 @@ export const GameConfig = deepFreeze({
     CHUNKS_BUILT_PER_FRAME: 2,
     EDGE_MARGIN: 96,          // franja del borde donde el terreno baja al mar (no jugable)
     SEA_LEVEL: 0,
+    PROPS_VIEW_DISTANCE_CHUNKS: 3, // radio con árboles/rocas/hierba (≤ VIEW_DISTANCE_CHUNKS)
     SPAWN_SEARCH_RADIUS: 160,
     SPAWN_ATTEMPTS: 300,
     SPAWN_MIN_HEIGHT_ABOVE_SEA: 1.5,
@@ -199,6 +200,118 @@ export const GameConfig = deepFreeze({
           SNOW_MIN_NORMAL_Y: 0.42,  // pendientes más verticales que esto quedan en roca
           COLORS: { GROUND: 0x6c737f, GROUND_ALT: 0x5a616d, SNOW: 0xf1f5fa, ICE: 0xb4dcf0 },
         },
+      },
+
+      // Charcas de agua dulce (fuentes de agua). Sub-seed "resource".
+      WATER: {
+        DISCOVERY_DISTANCE: 7,      // m a la orilla: "Has encontrado agua."
+        POND_COUNT: 16,
+        RADIUS: [5, 10],            // m (radio de la lámina de agua)
+        DEPTH: 1.4,                 // m en el centro
+        SHORE_WIDTH: 0.6,           // fracción del radio con orilla en pendiente suave
+        MIN_SPACING: 70,            // m entre charcas
+        MAX_SLOPE: 0.18,            // solo en terreno casi llano
+        BIOMES: ['PLAINS', 'FOREST'],
+        NEAR_SPAWN_DISTANCE: [25, 55], // siempre hay una charca cerca del inicio
+        COLOR: 0x3a7fa8,
+        OPACITY: 0.82,
+        MUD_COLOR: 0x7a6b4c,        // orilla húmeda
+      },
+
+      // Recursos por bioma: probabilidad de que una celda de CELL_SIZE² contenga cada tipo.
+      RESOURCES: {
+        CELL_SIZE: 4,
+        SPAWN_CLEAR_RADIUS: 8,
+        MAX_SLOPE: 0.75,
+        TREE_MAX_HEIGHT: 38,        // sin árboles por encima (zona de nieve)
+        DENSITY: {
+          PLAINS: { TREE: 0.01, APPLE_TREE: 0.008, BUSH: 0.05, ROCK: 0.025 },
+          FOREST: { TREE: 0.26, PINE: 0.07, APPLE_TREE: 0.045, BUSH: 0.09, ROCK: 0.02 },
+          FROZEN_MOUNTAINS: { PINE: 0.025, ROCK: 0.07 },
+        },
+        GRASS_TUFTS_PER_CHUNK: { PLAINS: 520, FOREST: 220, FROZEN_MOUNTAINS: 0 },
+      },
+
+      // Rebaños por especie (sub-seed "animal"). Especies en GameConfig.ANIMALS.
+      FAUNA: {
+        HERDS: { DEER: 10, GOAT: 10, COW: 9 },
+        HERD_RADIUS: 24,            // m: zona en la que se mueve cada rebaño
+        NEAR_SPAWN_DISTANCE: [35, 120], // un rebaño de cada especie cerca del inicio
+      },
+    },
+  },
+
+  // Tipos de recurso: lo que da cada uno al recogerlo (Fase 5+), colisión y tamaño.
+  // Los IDs de objeto (WOOD, STONE, APPLE...) serán los del inventario.
+  RESOURCE_TYPES: {
+    TREE: { NAME: 'Árbol', DROPS: { WOOD: 3 }, COLLISION_RADIUS: 0.35, SCALE: [0.85, 1.3] },
+    PINE: { NAME: 'Pino', DROPS: { WOOD: 3 }, COLLISION_RADIUS: 0.3, SCALE: [0.8, 1.35] },
+    APPLE_TREE: { NAME: 'Manzano', DROPS: { WOOD: 2, APPLE: 3 }, COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1] },
+    ROCK: { NAME: 'Roca', DROPS: { STONE: 2 }, COLLISION_RADIUS: 0.75, SCALE: [0.5, 1.4] },
+    BUSH: { NAME: 'Arbusto', DROPS: {}, COLLISION_RADIUS: 0, SCALE: [0.7, 1.3] },
+  },
+
+  // Colores de los elementos del mundo (estilo low-poly con color por vértice).
+  PROPS: {
+    TRUNK: 0x6b4a2f,
+    LEAVES: 0x4f8a3a,
+    LEAVES_ALT: 0x5f9a3f,
+    PINE_LEAVES: 0x2f5f3a,
+    APPLE_LEAVES: 0x6aa446,
+    APPLE: 0xc8302a,
+    ROCK: 0x8d8b88,
+    BUSH: 0x4d8a3c,
+    GRASS: 0x7fb050,
+    GRASS_TIP: 0xb9cf6a,
+    COLOR_JITTER: 0.12,
+  },
+
+  // Especies animales. Comportamiento sencillo: pastar, pasear, mirar, huir.
+  ANIMALS: {
+    DISCOVERY_DISTANCE: 28,       // m: aviso "Has encontrado cabras." la primera vez
+    ACTIVE_RADIUS: 170,           // m: solo se simulan y dibujan animales cercanos
+    MAX_PER_SPECIES: 80,
+    TURN_SPEED: 3,                // rad/s
+    MAX_SLOPE: 0.6,
+    SPECIES: {
+      DEER: {
+        NAME: 'Ciervo',            // "animal de pradera"
+        NAME_PLURAL: 'Ciervos',
+        DROPS: { MEAT: 2 },
+        WALK_SPEED: 1.3,
+        FLEE_SPEED: 7,
+        ALERT_DISTANCE: 22,         // m: se queda mirando al jugador
+        FLEE_DISTANCE: 13,          // m: huye (×1.6 si el jugador corre)
+        HERD_SIZE: [3, 5],
+        BIOMES: { PLAINS: 1, FOREST: 0.8 },
+        SCALE: [0.9, 1.1],
+        COLORS: { BODY: 0x9a6a3e, BELLY: 0xd9c3a0, DARK: 0x4a3423 },
+      },
+      GOAT: {
+        NAME: 'Cabra',
+        NAME_PLURAL: 'Cabras',
+        DROPS: { MEAT: 1, WOOL: 2 },
+        WALK_SPEED: 1.1,
+        FLEE_SPEED: 5.5,
+        ALERT_DISTANCE: 16,
+        FLEE_DISTANCE: 9,
+        HERD_SIZE: [3, 6],
+        BIOMES: { PLAINS: 1 },
+        SCALE: [0.9, 1.1],
+        COLORS: { BODY: 0xe8e2d4, BELLY: 0xd2c9b6, DARK: 0x5b5048 },
+      },
+      COW: {
+        NAME: 'Vaca',
+        NAME_PLURAL: 'Vacas',
+        DROPS: { MEAT: 3, LEATHER: 2 },
+        WALK_SPEED: 0.8,
+        FLEE_SPEED: 3.5,
+        ALERT_DISTANCE: 10,
+        FLEE_DISTANCE: 4.5,
+        HERD_SIZE: [2, 4],
+        BIOMES: { PLAINS: 1 },
+        SCALE: [0.95, 1.1],
+        COLORS: { BODY: 0xf2eee6, BELLY: 0x3b3230, DARK: 0x2b2522 },
       },
     },
   },

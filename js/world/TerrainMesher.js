@@ -21,7 +21,7 @@ export class TerrainMesher {
     this._colorizer = colorizer;
     this._color = new THREE.Color();
     this._indexCache = new Map();
-    this._ctx = { x: 0, z: 0, height: 0, normalY: 1, concavity: 0, weights: {} };
+    this._ctx = { x: 0, z: 0, height: 0, normalY: 1, concavity: 0, shore: 0, weights: {} };
   }
 
   setColorizer(colorizer) {
@@ -29,7 +29,7 @@ export class TerrainMesher {
   }
 
   build(chunk) {
-    const { res, spacing, originX, originZ, heights, biomeWeights } = chunk;
+    const { res, spacing, originX, originZ, heights, biomeWeights, shore } = chunk;
     const stride = res + 3;
     const n = res + 1;
     const positions = new Float32Array(n * n * 3);
@@ -66,6 +66,7 @@ export class TerrainMesher {
         ctx.height = h;
         ctx.normalY = ny;
         ctx.concavity = (hL + hR + hD + hU) / 4 - h; // >0 hondonada, <0 cresta
+        ctx.shore = shore ? shore[pi] : 0;
         for (const id of ids) ctx.weights[id] = biomeWeights[id][pi];
         this._colorizer(ctx, c);
         colors[v] = c.r; colors[v + 1] = c.g; colors[v + 2] = c.b;

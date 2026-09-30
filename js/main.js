@@ -14,6 +14,8 @@ import { RenderContext } from './core/RenderContext.js';
 import { SceneLighting } from './world/SceneLighting.js';
 import { SkyDome } from './world/SkyDome.js';
 import { BiomeTracker } from './world/BiomeTracker.js';
+import { DiscoveryTracker } from './world/DiscoveryTracker.js';
+import { AnimalSystem } from './animals/AnimalSystem.js';
 import { WorldGenerator } from './world/WorldGenerator.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -22,6 +24,7 @@ import { UIManager } from './ui/UIManager.js';
 import { AdminSystem } from './admin/AdminSystem.js';
 import { registerCoreDebugTools } from './admin/tools/CoreDebugTools.js';
 import { registerWorldTools } from './admin/tools/WorldTools.js';
+import { registerLifeTools } from './admin/tools/LifeTools.js';
 
 function boot() {
   const cfg = GameConfig;
@@ -41,6 +44,8 @@ function boot() {
     config: cfg.WORLD,
     planet: cfg.PLANETS.MUNDO_0,
     events,
+    resourceTypes: cfg.RESOURCE_TYPES,
+    propColors: cfg.PROPS,
     flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
   });
   // Seed: ?seed=... en la URL o la seed por defecto de la configuración.
@@ -59,6 +64,7 @@ function boot() {
     input,
     player,
     terrain: world,
+    obstacles: { resolveCollisions: (pos, r) => world.resources?.resolveCollisions(pos, r) ?? false },
     events,
   });
   const camera = new CameraSystem({
@@ -73,6 +79,25 @@ function boot() {
   world.follow(player.position);
 
   const biomeTracker = new BiomeTracker({ world, target: player, events });
+
+  // ---- Mundo vivo: animales y descubrimientos ------------------------------
+  const animals = new AnimalSystem({
+    config: cfg.ANIMALS,
+    fauna: cfg.PLANETS.MUNDO_0.FAUNA,
+    scene: render.scene,
+    world,
+    player,
+    events,
+  });
+  const discovery = new DiscoveryTracker({
+    world,
+    animals,
+    target: player,
+    events,
+    waterDistance: cfg.PLANETS.MUNDO_0.WATER.DISCOVERY_DISTANCE,
+    animalDistance: cfg.ANIMALS.DISCOVERY_DISTANCE,
+    species: cfg.ANIMALS.SPECIES,
+  });
 
   // Cada vez que se (re)genera el mundo, el jugador aparece en el spawn de esa seed.
   events.on(GameEvents.WORLD_GENERATED, () => controller.spawn());
@@ -94,6 +119,7 @@ function boot() {
 
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
+  registerLifeTools(admin, { world, animals, player, controller, species: cfg.ANIMALS.SPECIES });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -102,7 +128,9 @@ function boot() {
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(biomeTracker); // bioma actual del jugador
+  loop.add(discovery);   // agua y animales descubiertos
   loop.add(lighting);    // sombra centrada en el jugador
   loop.add(sky);         // cúpula centrada en la cámara
   loop.add(ui);
@@ -112,7 +140,7 @@ function boot() {
   loop.start();
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
-  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, player, controller, camera, ui, admin, loop };
+  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, player, controller, camera, ui, admin, loop };
 }
 
 try {

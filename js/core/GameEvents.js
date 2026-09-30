@@ -10,6 +10,8 @@ export const GameEvents = Object.freeze({
   // Mundo
   WORLD_GENERATED: 'world:generated',               // { seed, spawn }
   WORLD_EDGE_REACHED: 'world:edgeReached',
+  WATER_DISCOVERED: 'world:waterDiscovered',        // { pond, first }
+  ANIMAL_DISCOVERED: 'world:animalDiscovered',      // { species, name, namePlural }
 
   // Cámara
   CAMERA_MODE_CHANGED: 'camera:modeChanged',        // { mode }
