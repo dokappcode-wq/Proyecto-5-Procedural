@@ -49,8 +49,12 @@ export const GameEvents = Object.freeze({
   CRAFT_REQUEST: 'crafting:request',                // { recipeId }
   ITEM_CRAFTED: 'crafting:crafted',                 // { recipeId, result, amount }
   CRAFTING_PANEL_TOGGLED: 'crafting:panelToggled',  // { open }
+  BUILD_MODE_CHANGED: 'construction:mode',          // { active, pieceId }
+  BUILD_SELECTION_CHANGED: 'construction:selection', // { pieceId }
+  PLACEMENT_CHANGED: 'construction:placement',      // { active, valid, reason, pieceId }
   STRUCTURE_PLACED: 'construction:placed',          // { structure }
-  PLACEMENT_CHANGED: 'construction:placement',      // { active, valid, type }
+  STRUCTURE_REMOVED: 'construction:removed',        // { structure }
+  STRUCTURE_INTERACT: 'construction:interact',      // { structure }  (E sobre puerta/cama)
   SLEEP_REQUEST: 'sleep:request',                   // { bed }
   PLAYER_SLEEP_STARTED: 'sleep:started',            // { bed }
   PLAYER_SLEPT: 'sleep:finished',                   // { hours, bed }

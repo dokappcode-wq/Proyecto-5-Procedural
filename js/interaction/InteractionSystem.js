@@ -39,12 +39,17 @@ export class InteractionSystem {
     this._v = new THREE.Vector3();
   }
 
+  /** Olvida el objetivo actual para volver a anunciarlo (p. ej. al salir del modo construcción). */
+  resetTarget() {
+    this._targetKey = null;
+  }
+
   update(dt) {
     this._cooldown = Math.max(0, this._cooldown - dt);
     this.target = this._findTarget();
 
     const t = this.target;
-    const key = t ? `${t.kind}:${t.id}:${t.label}:${t.action}:${t.remaining ?? ''}` : null;
+    const key = t ? `${t.kind}:${t.id}:${t.label}:${t.action}:${t.remaining ?? ''}:${t.open ?? ''}` : null;
     if (key !== this._targetKey) {
       this._targetKey = key;
       this._events.emit(GameEvents.INTERACTION_TARGET_CHANGED, { target: this.target });
@@ -65,7 +70,7 @@ export class InteractionSystem {
     if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
     } else if (target?.kind === 'structure' && target.action && button === 'INTERACT') {
-      if (target.ref.def.INTERACT === 'SLEEP') this._events.emit(GameEvents.SLEEP_REQUEST, { bed: target.ref });
+      this._events.emit(GameEvents.STRUCTURE_INTERACT, { structure: target.ref });
     } else if (target?.kind === 'water' && button === 'INTERACT') {
       this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'drink' });
       this._events.emit(GameEvents.PLAYER_DRANK, { source: 'POND' });
@@ -134,12 +139,14 @@ export class InteractionSystem {
       consider({ kind: 'animal', id: a.id, ref: a }, a.x, a.y + 0.8 * a.scale, a.z, 0.75 * a.scale, 0.5 * a.scale);
     }
 
-    for (const st of this._construction?.getStructuresNear(p.x, p.z, range + 3) ?? []) {
+    // Piezas construidas con las que se interactúa (puertas, camas).
+    for (const st of this._construction?.getInteractablesNear(p.x, p.z, range + 3) ?? []) {
+      const door = st.type === 'DOOR';
       consider(
         { kind: 'structure', id: `st-${st.id}`, ref: st },
-        st.x, st.y + st.def.AIM_HEIGHT, st.z,
-        st.def.AIM_RADIUS,
-        st.def.CLEARANCE * 0.8,
+        st.x, st.y + (door ? 1.1 : 0.4), st.z,
+        door ? 0.9 : 1.0,
+        door ? 0.3 : 0.9,
       );
     }
 
@@ -165,8 +172,8 @@ export class InteractionSystem {
   _describe(t) {
     if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
     if (t.kind === 'structure') {
-      const action = t.ref.def.INTERACT === 'SLEEP' ? 'Dormir' : null;
-      return { ...t, label: t.ref.def.NAME, action, key: 'E' };
+      const action = t.ref.type === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : 'Dormir';
+      return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };
     }
     if (t.kind === 'animal') {
       return { ...t, label: t.ref.def.NAME, action: 'Golpear', key: 'Clic' };

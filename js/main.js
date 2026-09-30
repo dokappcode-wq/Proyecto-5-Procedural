@@ -81,13 +81,19 @@ function boot() {
     input,
     player,
     terrain: world,
-    // Obstáculos: recursos (troncos, rocas) + construcciones (postes del refugio).
+    // Obstáculos: recursos (troncos, rocas) + construcciones (paredes, vallas, pilares...).
     obstacles: {
-      resolveCollisions: (pos, r) => {
+      resolveCollisions: (pos, r, y0, y1) => {
         const a = world.resources?.resolveCollisions(pos, r) ?? false;
-        const b = construction?.resolveCollisions(pos, r) ?? false;
+        const b = construction.resolveCollisions(pos, r, y0, y1);
         return a || b;
       },
+    },
+    // Superficies construidas: suelos, cimientos, escaleras, tejados.
+    structures: {
+      surfaceAt: (x, z, maxY) => construction.surfaceAt(x, z, maxY),
+      blocksAt: (x, z, r, y0, y1) => construction.blocksAt(x, z, r, y0, y1),
+      ceilingAt: (x, z, y) => construction.ceilingAt(x, z, y),
     },
     events,
   });
@@ -98,6 +104,7 @@ function boot() {
     target: player,
     terrain: world,
     events,
+    occluders: { raycastDistance: (o, d, max) => construction.raycastDistance(o, d, max) },
   });
   lighting.follow(player.position);
   world.follow(player.position);
@@ -132,18 +139,19 @@ function boot() {
   const hotbar = new HotbarSystem({ input, inventory, events });
   const equipment = new EquipmentSystem({ items: cfg.ITEMS, config: cfg.EQUIPMENT, inventory, events });
   const crafting = new CraftingSystem({ recipes: cfg.RECIPES, items: cfg.ITEMS, inventory, events });
+  // Construcción modular (B): paredes, suelos, puertas, ventanas, vallas, pilares...
   const construction = new ConstructionSystem({
     scene: render.scene,
-    config: cfg.CONSTRUCTION,
-    structures: cfg.STRUCTURES,
-    items: cfg.ITEMS,
+    camera: render.camera,
+    config: cfg.BUILD,
     world,
     player,
     input,
-    hotbar,
     inventory,
+    items: cfg.ITEMS,
     events,
   });
+  animals.setObstacles(construction); // las vallas y paredes también frenan a los animales
   events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId }) => {
     if (slot === 'BODY') player.model.setArmor(itemId === 'LEATHER_ARMOR');
   });
@@ -189,10 +197,17 @@ function boot() {
     inventory,
     nutrition,
     equipment,
-    construction,
     interaction,
     thirst,
     events,
+  });
+  // En modo construcción el clic coloca/quita piezas: se pausan la barra de
+  // objetos, "usar" y la interacción normal (recoger, golpear).
+  events.on(GameEvents.BUILD_MODE_CHANGED, ({ active }) => {
+    hotbar.enabled = !active;
+    itemUse.enabled = !active;
+    interaction.enabled = !active;
+    if (!active) interaction.resetTarget();
   });
   const sleep = new SleepSystem({ config: cfg.SLEEP, energy, hunger, thirst, input, events });
   // Dormir en una cama la convierte en punto de reaparición.
@@ -248,6 +263,7 @@ function boot() {
     gameInfo: cfg.GAME,
     items: cfg.ITEMS,
     equipmentConfig: cfg.EQUIPMENT,
+    buildConfig: cfg.BUILD,
     events,
     input,
     canvas: render.domElement,
@@ -265,7 +281,7 @@ function boot() {
   registerLifeTools(admin, { world, animals, player, controller, species: cfg.ANIMALS.SPECIES });
   registerInventoryTools(admin, { inventory, items: cfg.ITEMS });
   registerSurvivalTools(admin, { health, hunger, thirst, energy, events });
-  registerCraftTools(admin, { nutrition, equipment, construction, player, events });
+  registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -275,7 +291,7 @@ function boot() {
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
   loop.add(hotbar);      // teclas 1–9
-  loop.add(construction); // vista previa de colocación
+  loop.add(construction); // modo construcción: apuntar, vista previa, colocar/quitar
   loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos

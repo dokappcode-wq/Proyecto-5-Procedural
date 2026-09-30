@@ -14,7 +14,9 @@ const COYOTE_TIME = 0.1;       // s: se puede saltar justo después de abandonar
  * - Escalones bajos se suben solos; paredes más altas bloquean (por eje, lo que
  *   permite deslizarse a lo largo de ellas).
  * - Pendientes demasiado inclinadas no se pueden subir caminando.
- * - Troncos y rocas bloquean el paso (obstacles.resolveCollisions).
+ * - Troncos, rocas, paredes, vallas... bloquean el paso (obstacles.resolveCollisions).
+ * - Construcciones (structures): se camina sobre suelos, cimientos, escaleras y
+ *   tejados; sus bordes altos bloquean y los techos frenan el salto.
  * - Al tocar el límite del mundo finito se emite WORLD_EDGE_REACHED.
  * - Modo vuelo (herramienta de depuración) sin gravedad ni colisiones.
  *
@@ -26,7 +28,7 @@ export class PlayerController {
    * @param {object} config  sección PLAYER
    * @param {object} look    { sensitivity, invertY } (de la sección INPUT)
    */
-  constructor({ config, look, input, player, terrain, obstacles = null, events }) {
+  constructor({ config, look, input, player, terrain, obstacles = null, structures = null, events }) {
     this.name = 'playerController';
     this._cfg = config;
     this._lookSensitivity = look.sensitivity;
@@ -34,7 +36,8 @@ export class PlayerController {
     this._input = input;
     this._player = player;
     this._terrain = terrain;
-    this._obstacles = obstacles; // { resolveCollisions(pos, radius) } — troncos, rocas...
+    this._obstacles = obstacles; // { resolveCollisions(pos, radius, y0, y1) } — troncos, rocas, paredes...
+    this._structures = structures; // { surfaceAt, blocksAt, ceilingAt } — construcciones
     this._events = events;
 
     this._maxSlopeTan = Math.tan(THREE.MathUtils.degToRad(config.MAX_WALKABLE_SLOPE_DEG));
@@ -86,7 +89,7 @@ export class PlayerController {
 
   /** Coloca al jugador sobre el suelo en (x, z). */
   placeAt(x, z) {
-    const y = this._groundHeight(x, z);
+    const y = this._groundHeight(x, z, this._terrain.getHeightAt(x, z) + 0.5);
     this._player.teleport(x, y, z);
   }
 
@@ -174,11 +177,12 @@ export class PlayerController {
     if (this._isBlocked(p.position.x, nz)) v.z = 0;
     else p.position.z = nz;
 
-    // Obstáculos (troncos, rocas): empujar fuera sin atravesarlos.
+    // Obstáculos (troncos, rocas, paredes...): empujar fuera sin atravesarlos.
     if (this._obstacles) {
       const px = p.position.x;
       const pz = p.position.z;
-      if (this._obstacles.resolveCollisions(p.position, cfg.RADIUS) && this._isBlocked(p.position.x, p.position.z)) {
+      const hit = this._obstacles.resolveCollisions(p.position, cfg.RADIUS, p.position.y + 0.05, p.position.y + cfg.HEIGHT);
+      if (hit && this._isBlocked(p.position.x, p.position.z)) {
         p.position.x = px;
         p.position.z = pz;
       }
@@ -186,8 +190,18 @@ export class PlayerController {
 
     // Movimiento vertical y contacto con el suelo.
     const wasOnGround = p.state.onGround;
+    const feetBefore = p.position.y;
     const ground = this._groundHeight(p.position.x, p.position.z);
     p.position.y += v.y * dt;
+
+    // Techo de una construcción: la cabeza no lo atraviesa al saltar.
+    if (v.y > 0 && this._structures) {
+      const ceiling = this._structures.ceilingAt(p.position.x, p.position.z, feetBefore + cfg.HEIGHT - 0.3);
+      if (p.position.y + cfg.HEIGHT > ceiling) {
+        p.position.y = Math.max(feetBefore, ceiling - cfg.HEIGHT);
+        v.y = 0;
+      }
+    }
 
     if (p.position.y <= ground) {
       // Aterrizaje o subida de escalón.
@@ -241,9 +255,16 @@ export class PlayerController {
    */
   _isBlocked(x, z) {
     const p = this._player;
-    const rise = this._groundHeight(x, z) - p.position.y;
-    if (rise > this._cfg.MAX_STEP_HEIGHT) return true;
-    if (rise > 0.01 && p.state.onGround) {
+    const cfg = this._cfg;
+    const feet = p.position.y;
+    const rise = this._groundHeight(x, z) - feet;
+    if (rise > cfg.MAX_STEP_HEIGHT) return true;
+    // Bordes de suelos/cimientos más altos que un escalón actúan como muro.
+    const st = this._structures;
+    if (st?.blocksAt(x, z, cfg.RADIUS, feet + cfg.MAX_STEP_HEIGHT, feet + cfg.HEIGHT)) return true;
+    // Sobre una construcción no cuenta la pendiente del terreno de debajo.
+    const onStructure = st && st.surfaceAt(x, z, feet + cfg.MAX_STEP_HEIGHT) !== null;
+    if (rise > 0.01 && p.state.onGround && !onStructure) {
       const t = this._terrain;
       const d = 0.5;
       const gx = (t.getHeightAt(x + d, z) - t.getHeightAt(x - d, z)) / (2 * d);
@@ -253,17 +274,25 @@ export class PlayerController {
     return false;
   }
 
-  /** Altura del suelo bajo la huella del jugador (centro + 4 puntos del radio). */
-  _groundHeight(x, z) {
+  /**
+   * Altura del suelo bajo la huella del jugador (centro + 4 puntos del radio):
+   * terreno o superficie construida, sin contar las que están por encima de
+   * los pies + un escalón (un piso superior no es "suelo" desde abajo).
+   */
+  _groundHeight(x, z, feet = this._player.position.y) {
     const r = this._cfg.RADIUS;
-    const t = this._terrain;
-    return Math.max(
-      t.getHeightAt(x, z),
-      t.getHeightAt(x + r, z),
-      t.getHeightAt(x - r, z),
-      t.getHeightAt(x, z + r),
-      t.getHeightAt(x, z - r),
-    );
+    const maxY = feet + this._cfg.MAX_STEP_HEIGHT;
+    let h = -Infinity;
+    for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) {
+      h = Math.max(h, this._groundAt(x + dx, z + dz, maxY));
+    }
+    return h;
+  }
+
+  _groundAt(x, z, maxY) {
+    const terrain = this._terrain.getHeightAt(x, z);
+    const built = this._structures?.surfaceAt(x, z, maxY) ?? null;
+    return built !== null && built > terrain ? built : terrain;
   }
 
   /** @returns {boolean} true si el jugador estaba fuera del área jugable */

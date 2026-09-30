@@ -36,7 +36,7 @@ const DIET_LABELS = {
   TOO_MUCH_PLANT: 'desequilibrada (demasiada fruta)',
 };
 export class UIManager {
-  constructor({ config, gameInfo, items, equipmentConfig, events, input, canvas, root = document }) {
+  constructor({ config, gameInfo, items, equipmentConfig, buildConfig, events, input, canvas, root = document }) {
     this.name = 'ui';
     this._cfg = config;
     this._events = events;
@@ -49,6 +49,9 @@ export class UIManager {
     this._selectedId = null;
     this._equippedId = null;
     this._placement = null;
+    this._build = buildConfig;
+    this._buildMode = false;
+    this._buildPiece = Object.keys(buildConfig.PIECES)[0];
     this._craftingOpen = false;
 
     const $ = (id) => root.getElementById(id);
@@ -169,12 +172,26 @@ export class UIManager {
       else if (e.state !== 'UNKNOWN') this.showMessage(`Tu dieta está desequilibrada: ${DIET_LABELS[e.state].replace('desequilibrada ', '')}.`, 'danger');
     });
     events.on(GameEvents.ITEM_CRAFTED, ({ result }) => this.showMessage(`Has fabricado: ${this._items[result].NAME}`, 'biome'));
-    events.on(GameEvents.STRUCTURE_PLACED, ({ structure }) =>
-      this.showMessage(`Has construido ${structure.def.NAME_WITH_ARTICLE ?? structure.def.NAME}.`, 'biome'),
-    );
+    events.on(GameEvents.STRUCTURE_PLACED, ({ structure }) => {
+      if (structure.type === 'BED') this.showMessage('Has construido una cama.', 'biome');
+    });
     events.on(GameEvents.PLACEMENT_CHANGED, (pl) => {
       this._placement = pl;
       this._drawUseHint();
+    });
+    events.on(GameEvents.BUILD_MODE_CHANGED, ({ active, pieceId }) => {
+      this._buildMode = active;
+      this._buildPiece = pieceId;
+      document.body.classList.toggle('build-mode', active);
+      if (active) {
+        this._showTarget(null);
+        this.showMessage('Modo construcción: [1–0] pieza · [Clic] colocar · [Clic dcho] quitar · [Q] girar · [B] salir', 'biome');
+      }
+      this._drawHotbar();
+    });
+    events.on(GameEvents.BUILD_SELECTION_CHANGED, ({ pieceId }) => {
+      this._buildPiece = pieceId;
+      this._drawHotbar();
     });
     events.on(GameEvents.CRAFTING_PANEL_TOGGLED, ({ open }) => {
       this._craftingOpen = open;
@@ -304,6 +321,11 @@ export class UIManager {
   _drawHotbar(bumpId = null) {
     const bar = this.el.inventory;
     bar.replaceChildren();
+    if (this._buildMode) {
+      this._drawBuildBar(bar);
+      this._drawUseHint();
+      return;
+    }
     this._invItems.forEach((it, i) => {
       const slot = document.createElement('div');
       slot.className = 'inv-slot';
@@ -324,12 +346,45 @@ export class UIManager {
     this._drawUseHint();
   }
 
+  /** Modo construcción: barra de piezas con tecla, icono y coste. */
+  _drawBuildBar(bar) {
+    Object.entries(this._build.PIECES).forEach(([id, def], i) => {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot build-slot';
+      if (id === this._buildPiece) slot.classList.add('selected');
+      if (!this._canAfford(def)) slot.classList.add('unaffordable');
+      slot.title = `${def.NAME} · ${this._costText(def)}`;
+      slot.innerHTML = `<span class="label"></span><span class="key"></span><span class="icon"></span>`;
+      slot.querySelector('.label').textContent = def.NAME;
+      slot.querySelector('.key').textContent = i < 9 ? i + 1 : 0;
+      slot.querySelector('.icon').textContent = def.ICON;
+      bar.appendChild(slot);
+    });
+  }
+
+  _canAfford(def) {
+    return Object.entries(def.COST).every(([item, n]) => this._count(item) >= n);
+  }
+
+  _costText(def) {
+    return Object.entries(def.COST).map(([item, n]) => `${n} ${this._items[item].ICON}`).join(' ');
+  }
+
   /** Texto sobre la barra: qué hace "usar" con el objeto seleccionado. */
   _drawUseHint() {
     const el = this.el.useHint;
     const id = this._selectedId;
     const pl = this._placement;
     el.classList.remove('invalid');
+    if (this._buildMode) {
+      const def = this._build.PIECES[this._buildPiece];
+      const invalid = pl?.active && !pl.valid;
+      el.textContent = `${def.ICON} ${def.NAME} (${this._costText(def)}) — ` +
+        (invalid ? pl.reason : '[Clic] Colocar · [Clic dcho] Quitar · [Q] Girar · [B] Salir');
+      el.classList.toggle('invalid', !!invalid);
+      el.classList.remove('hidden');
+      return;
+    }
     if (!id) {
       el.classList.add('hidden');
       return;
@@ -347,13 +402,7 @@ export class UIManager {
         break;
       }
       case 'EQUIP': text = `${key} ${this._equippedId === id ? 'Quitar' : 'Equipar'}`; break;
-      case 'PLACE':
-        if (pl?.active && !pl.valid) {
-          text = pl.reason ?? 'No se puede colocar aquí';
-          el.classList.add('invalid');
-        } else text = `${key} Colocar · [Q] Girar`;
-        break;
-      default: text = 'Material de fabricación · [Tab] Fabricar';
+      default: text = 'Material · [Tab] Fabricar · [B] Construir';
     }
     el.textContent = `${def.ICON} ${def.NAME} — ${text}`;
     el.classList.remove('hidden');

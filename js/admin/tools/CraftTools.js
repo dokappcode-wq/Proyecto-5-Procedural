@@ -2,9 +2,9 @@ import { GameEvents } from '../../core/GameEvents.js';
 
 /**
  * Herramientas de depuración de las FASES 7–9: nutrición, equipamiento,
- * fabricación, construcción y sueño. (Los objetos se añaden desde "Inventario".)
+ * construcción modular y sueño. (Los objetos se añaden desde "Inventario".)
  */
-export function registerCraftTools(admin, { nutrition, equipment, construction, player, events }) {
+export function registerCraftTools(admin, { nutrition, equipment, construction, inventory, events }) {
   admin.registerTool({
     category: 'Alimentación',
     type: 'info',
@@ -16,23 +16,25 @@ export function registerCraftTools(admin, { nutrition, equipment, construction, 
   admin.registerTool({
     category: 'Construcción',
     type: 'info',
-    label: 'Construcciones / armadura / resistencia al frío',
-    read: () => `${construction.structures.length} · ${equipment.slots.BODY ?? 'sin armadura'} · ×${equipment.getColdLossMultiplier()}`,
+    label: 'Piezas / armadura / pérdida de frío',
+    read: () =>
+      `${construction.pieces.length} · ${equipment.slots.BODY ?? 'sin armadura'} · ×${equipment.getColdLossMultiplier()}` +
+      (construction.freeBuild ? ' · gratis' : ''),
   });
-  for (const type of ['BED', 'SHELTER']) {
-    admin.registerTool({
-      category: 'Construcción',
-      label: `Colocar ${type === 'BED' ? 'cama' : 'refugio'} delante (gratis)`,
-      run: () => {
-        const p = player.position;
-        const x = p.x - Math.sin(player.yaw) * 3.2;
-        const z = p.z - Math.cos(player.yaw) * 3.2;
-        const check = construction.canPlace(type, x, z);
-        if (!check.ok) throw new Error(check.reason);
-        construction.addStructure(type, x, z, player.yaw, check.y);
-      },
-    });
-  }
+  admin.registerTool({
+    category: 'Construcción',
+    label: 'Materiales de construcción (+40 🪵 +20 🪨 +6 🧶)',
+    run: () => {
+      inventory.addItem('WOOD', 40);
+      inventory.addItem('STONE', 20);
+      inventory.addItem('WOOL', 6);
+    },
+  });
+  admin.registerTool({
+    category: 'Construcción',
+    label: 'Construcción gratis ON/OFF',
+    run: () => (construction.freeBuild = !construction.freeBuild),
+  });
   admin.registerTool({ category: 'Construcción', label: 'Quitar todas las construcciones', run: () => construction.clear() });
   admin.registerTool({
     category: 'Construcción',

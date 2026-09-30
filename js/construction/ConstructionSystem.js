@@ -1,204 +1,457 @@
 import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
-import { STRUCTURE_MODELS, toGeometry } from './StructureModels.js';
+import { BUILD_MODELS, toGeometry } from './BuildModels.js';
+import {
+  SHAPES, snapXZ, slotKey, terrainBaseY, isSupported, worldColliders, footprint, surfaceAt,
+  pushOutOfBox, circleOverlapsBox, boxesOverlap, shelterAt,
+} from './BuildRules.js';
 
 /**
- * ConstructionSystem — colocar construcciones en el mundo (cama, refugio).
+ * ConstructionSystem — construcción modular: el jugador levanta su casa pieza
+ * a pieza (cimientos, suelos, paredes, puertas, ventanas, vallas, pilares,
+ * escaleras, tejados y muebles como la cama).
  *
- * - Con un objeto colocable seleccionado en la barra (ITEMS.*.USE = 'PLACE')
- *   se muestra una vista previa delante del jugador: verde si se puede colocar,
- *   roja si no. ROTATE (Q) la gira; ItemUseSystem llama a place().
- * - Validación: dentro del mundo, fuera del agua, terreno poco inclinado y sin
- *   solaparse con árboles, rocas u otras construcciones.
- * - Colisiones (postes del refugio) mediante resolveCollisions(), igual que
- *   los recursos. isSheltered() lo usará TemperatureSystem (Fase 10).
+ * Modo construcción (B):
+ *   1–9, 0     elegir pieza (orden de GameConfig.BUILD.PIECES)
+ *   Clic       colocar (gasta los materiales)
+ *   Clic dcho  quitar la pieza apuntada (devuelve los materiales)
+ *   Q          girar / cambiar el lado de la puerta
  *
- * Preparado para crecer: cada construcción es datos (GameConfig.STRUCTURES) +
- * un modelo (StructureModels). Paredes, suelos, cofres o estaciones de trabajo
- * se añadirían igual.
+ * La mira apunta con un rayo contra las piezas y el terreno; la pieza se ancla
+ * a la rejilla (BuildRules.snapXZ) y a la altura de lo apuntado, así que se
+ * pueden hacer varios pisos. La geometría, las colisiones y las superficies
+ * caminables son datos de BuildRules (sin Three.js); aquí solo hay escena,
+ * entrada y validación.
+ *
+ * Consultas para otros sistemas:
+ *   surfaceAt(x, z, maxY)            suelo caminable (controlador del jugador)
+ *   blocksAt(x, z, r, y0, y1)        superficie que actúa como muro (bordes altos)
+ *   ceilingAt(x, z, y)               techo por encima (al saltar)
+ *   resolveCollisions(pos, r, y0, y1) paredes, puertas, vallas, pilares, camas
+ *   getShelterAt(x, y, z)            techo + paredes alrededor (Fase 10)
+ *   raycastDistance(origin, dir, max) oclusión de la cámara
  */
 export class ConstructionSystem {
-  constructor({ scene, config, structures, items, world, player, input, hotbar, inventory, events }) {
+  constructor({ scene, camera, config, world, player, input, inventory, items, events }) {
     this.name = 'construction';
     this._cfg = config;
-    this._defs = structures;
-    this._items = items;
+    this._camera = camera;
     this._world = world;
     this._player = player;
     this._input = input;
-    this._hotbar = hotbar;
     this._inventory = inventory;
+    this._items = items;
     this._events = events;
 
-    this.structures = [];
+    this.pieceIds = Object.keys(config.PIECES);
+    this.active = false;
+    this.selected = this.pieceIds[0];
+    this.freeBuild = false; // herramienta Admin
+    this.pieces = [];
+    this._slots = new Map();
     this._nextId = 1;
-    this._rotationOffset = 0;
-    this._placement = { active: false, valid: false, type: null, x: 0, y: 0, z: 0, rotation: 0 };
+    this._rotSteps = 0;
+    this._placement = { active: false, valid: false, reason: null, piece: null };
+    this._target = null; // pieza apuntada (para quitar)
 
     this.group = new THREE.Group();
-    this.group.name = 'Structures';
+    this.group.name = 'Buildings';
     scene.add(this.group);
 
     this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this._geometries = {};
-    for (const type of Object.keys(structures)) this._geometries[type] = toGeometry(STRUCTURE_MODELS[type]());
+    for (const type of Object.keys(SHAPES)) this._geometries[type] = toGeometry(BUILD_MODELS[type]());
+    this._geometries.DOOR_LEAF = toGeometry(BUILD_MODELS.DOOR_LEAF());
 
-    this._ghostMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 0.45, depthWrite: false });
-    this._ghost = new THREE.Mesh(this._geometries.BED, this._ghostMaterial);
+    this._ghostMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 0.42, depthWrite: false });
+    this._ghost = new THREE.Mesh(this._geometries.FLOOR, this._ghostMaterial);
     this._ghost.visible = false;
     this._ghost.renderOrder = 2;
     scene.add(this._ghost);
 
+    this._removeMaterial = new THREE.MeshBasicMaterial({ color: 0xff5a4a, transparent: true, opacity: 0.22, depthWrite: false });
+    this._removeHighlight = new THREE.Mesh(this._geometries.FLOOR, this._removeMaterial);
+    this._removeHighlight.visible = false;
+    this._removeHighlight.renderOrder = 3;
+    scene.add(this._removeHighlight);
+
+    this._raycaster = new THREE.Raycaster();
+    this._origin = new THREE.Vector3();
+    this._dir = new THREE.Vector3();
+    this._normal = new THREE.Vector3();
+
     events.on(GameEvents.WORLD_GENERATED, () => this.clear());
+    events.on(GameEvents.STRUCTURE_INTERACT, ({ structure }) => this.interact(structure));
   }
 
   get placement() {
     return this._placement;
   }
 
-  // ---- Colocación ------------------------------------------------------------
+  // ---- Modo construcción ---------------------------------------------------------
+
+  setActive(active) {
+    if (this.active === active) return;
+    this.active = active;
+    if (!active) {
+      this._ghost.visible = false;
+      this._removeHighlight.visible = false;
+      this._setPlacement(false, false, null, null);
+    }
+    this._events.emit(GameEvents.BUILD_MODE_CHANGED, { active, pieceId: this.selected });
+  }
+
+  select(pieceId) {
+    if (!this._cfg.PIECES[pieceId]) return;
+    this.selected = pieceId;
+    this._rotSteps = 0;
+    this._events.emit(GameEvents.BUILD_SELECTION_CHANGED, { pieceId });
+  }
+
+  canAfford(pieceId) {
+    if (this.freeBuild) return true;
+    return Object.entries(this._cfg.PIECES[pieceId].COST).every(([item, n]) => this._inventory.hasItem(item, n));
+  }
 
   update() {
-    const itemId = this._hotbar.selectedId;
-    const type = this._items[itemId]?.USE === 'PLACE' ? this._items[itemId].STRUCTURE : null;
-    const pl = this._placement;
-
-    if (!type || this._input.blocked) {
+    const input = this._input;
+    if (input.wasPressed('BUILD_MODE')) this.setActive(!this.active);
+    if (!this.active) return;
+    if (input.blocked) {
       this._ghost.visible = false;
-      this._setPlacement(false, false, null);
+      this._removeHighlight.visible = false;
       return;
     }
-    if (this._input.wasPressed('ROTATE')) this._rotationOffset += this._cfg.ROTATION_STEP;
 
-    const p = this._player.position;
-    const yaw = this._player.yaw;
-    pl.x = p.x - Math.sin(yaw) * this._cfg.PLACE_DISTANCE;
-    pl.z = p.z - Math.cos(yaw) * this._cfg.PLACE_DISTANCE;
-    pl.rotation = yaw + this._rotationOffset;
-    const check = this.canPlace(type, pl.x, pl.z);
-    pl.y = check.y;
+    for (let i = 1; i <= 10; i++) {
+      if (input.wasPressed(`HOTBAR_${i}`) && this.pieceIds[i - 1]) this.select(this.pieceIds[i - 1]);
+    }
+    if (input.wasPressed('ROTATE')) this._rotSteps++;
 
-    this._ghost.geometry = this._geometries[type];
-    this._ghost.position.set(pl.x, pl.y + 0.02, pl.z);
-    this._ghost.rotation.set(0, pl.rotation, 0);
-    this._ghostMaterial.color.set(check.ok ? 0x66ff88 : 0xff5a4a);
-    this._ghost.visible = true;
-    this._setPlacement(true, check.ok, type, check.reason);
+    const hit = this._aim();
+    this._updateRemoveTarget(hit);
+    const candidate = hit ? this._candidate(this.selected, hit) : null;
+    const check = candidate ? this.validate(candidate) : { ok: false, reason: 'Apunta al suelo o a una pieza' };
+
+    if (candidate) {
+      this._ghost.geometry = this._geometries[candidate.type];
+      this._ghost.position.set(candidate.x, candidate.y + 0.01, candidate.z);
+      this._ghost.rotation.set(0, candidate.rotation, 0);
+      this._ghostMaterial.color.set(check.ok ? 0x66ff88 : 0xff5a4a);
+      this._ghost.visible = true;
+    } else {
+      this._ghost.visible = false;
+    }
+    this._setPlacement(true, check.ok, check.reason ?? null, candidate);
+
+    if (input.wasPressed('ATTACK')) this.place();
+    else if (input.wasPressed('USE')) this.removeTarget();
   }
 
-  /**
-   * ¿Se puede colocar `type` centrado en (x, z)?
-   * @returns {{ ok: boolean, reason?: string, y: number }}
-   */
-  canPlace(type, x, z) {
-    const def = this._defs[type];
-    const r = def.CLEARANCE;
-    const w = this._world;
-    const b = w.getBounds();
-    const samples = [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].map(([dx, dz]) => w.getHeightAt(x + dx, z + dz));
-    const y = Math.min(...samples);
-    const fail = (reason) => ({ ok: false, reason, y });
+  // ---- Colocar / quitar ------------------------------------------------------------
 
-    if (x - r < b.minX || x + r > b.maxX || z - r < b.minZ || z + r > b.maxZ) return fail('Fuera del mundo');
-    if (w.water.isWater(x, z, r) || y < w.seaLevel + 0.3) return fail('No se puede construir en el agua');
-    if ((Math.max(...samples) - y) / (2 * r) > this._cfg.MAX_SLOPE) return fail('El terreno es demasiado inclinado');
-    for (const n of w.resources.getNodesNear(x, z, r + 2)) {
-      if (n.radius > 0 && Math.hypot(n.x - x, n.z - z) < r + n.radius) return fail('Hay árboles o rocas en medio');
-    }
-    for (const s of this.structures) {
-      if (Math.hypot(s.x - x, s.z - z) < r + this._defs[s.type].CLEARANCE) return fail('Choca con otra construcción');
-    }
-    return { ok: true, y };
-  }
-
-  /** Coloca la construcción de la vista previa, consumiendo el objeto. */
+  /** Coloca la pieza de la vista previa. */
   place() {
     const pl = this._placement;
-    if (!pl.active) return false;
+    if (!pl.active || !pl.piece) return false;
     if (!pl.valid) {
       this._events.emit(GameEvents.UI_MESSAGE, { text: pl.reason ?? 'No se puede colocar aquí', type: 'danger' });
       return false;
     }
-    const itemId = this._defs[pl.type].ITEM;
-    if (!this._inventory.removeItem(itemId, 1)) return false;
-    const structure = this.addStructure(pl.type, pl.x, pl.z, pl.rotation, pl.y);
+    const cost = this._cfg.PIECES[pl.piece.type].COST;
+    if (!this.freeBuild) for (const [item, n] of Object.entries(cost)) this._inventory.removeItem(item, n);
+    const structure = this.addPiece(pl.piece);
     this._events.emit(GameEvents.STRUCTURE_PLACED, { structure });
+    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
     return true;
   }
 
-  /** Añade una construcción (también la usan las herramientas Admin). */
-  addStructure(type, x, z, rotation = 0, y = this._world.getHeightAt(x, z)) {
-    const structure = { id: this._nextId++, type, x, y, z, rotation, def: this._defs[type] };
+  /** Quita la pieza apuntada y devuelve los materiales. */
+  removeTarget() {
+    const piece = this._target;
+    if (!piece) return false;
+    this.removePiece(piece);
+    if (!this.freeBuild) {
+      for (const [item, n] of Object.entries(this._cfg.PIECES[piece.type].COST)) {
+        const back = Math.floor(n * this._cfg.REFUND);
+        if (back > 0) this._inventory.addItem(item, back);
+      }
+    }
+    this._events.emit(GameEvents.STRUCTURE_REMOVED, { structure: piece });
+    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
+    return true;
+  }
+
+  /** Añade una pieza ya validada (también la usan las herramientas Admin). */
+  addPiece({ type, x, y, z, rotation, slot }) {
+    const piece = { id: this._nextId++, type, x, y, z, rotation, slot, open: false, def: this._cfg.PIECES[type] };
+    piece.key = slotKey(slot, y);
+    const root = new THREE.Group();
+    root.position.set(x, y, z);
+    root.rotation.y = rotation;
     const mesh = new THREE.Mesh(this._geometries[type], this._material);
-    mesh.position.set(x, y, z);
-    mesh.rotation.y = rotation;
     mesh.castShadow = mesh.receiveShadow = true;
-    mesh.name = `structure_${type}_${structure.id}`;
-    structure.mesh = mesh;
-    this.group.add(mesh);
-    this.structures.push(structure);
-    return structure;
+    root.add(mesh);
+    if (type === 'DOOR') {
+      const leaf = new THREE.Mesh(this._geometries.DOOR_LEAF, this._material);
+      leaf.position.x = -0.5;
+      leaf.castShadow = leaf.receiveShadow = true;
+      root.add(leaf);
+      piece.leaf = leaf;
+    }
+    root.traverse((o) => (o.userData.pieceId = piece.id));
+    root.name = `piece_${type}_${piece.id}`;
+    piece.object = root;
+    this.group.add(root);
+    root.updateMatrixWorld(true); // apuntable desde ya, sin esperar al siguiente render
+    this.pieces.push(piece);
+    if (piece.key) this._slots.set(piece.key, piece);
+    return piece;
+  }
+
+  removePiece(piece) {
+    this.group.remove(piece.object);
+    this.pieces = this.pieces.filter((p) => p !== piece);
+    if (piece.key) this._slots.delete(piece.key);
+    if (this._target === piece) this._target = null;
   }
 
   clear() {
-    for (const s of this.structures) this.group.remove(s.mesh);
-    this.structures = [];
+    for (const p of this.pieces) this.group.remove(p.object);
+    this.pieces = [];
+    this._slots.clear();
+    this._target = null;
   }
 
-  // ---- Consultas ---------------------------------------------------------------
-
-  getStructuresNear(x, z, radius) {
-    return this.structures.filter((s) => Math.hypot(s.x - x, s.z - z) <= radius);
+  /** E sobre una pieza interactiva: puerta (abrir/cerrar) o cama (dormir). */
+  interact(piece) {
+    if (!this.exists(piece)) return;
+    const kind = SHAPES[piece.type].interact;
+    if (kind === 'DOOR') {
+      if (piece.open) {
+        // No cerrar la puerta encima del jugador.
+        const p = this._player.position;
+        const leaf = worldColliders({ ...piece, open: false }).at(-1);
+        if (circleOverlapsBox(p.x, p.z, 0.35, leaf)) return;
+      }
+      piece.open = !piece.open;
+      piece.leaf.rotation.y = piece.open ? -Math.PI / 2 : 0;
+      piece.object.updateMatrixWorld(true);
+    } else if (kind === 'SLEEP') {
+      this._events.emit(GameEvents.SLEEP_REQUEST, { bed: piece });
+    }
   }
 
-  exists(structure) {
-    return this.structures.includes(structure);
+  // ---- Validación --------------------------------------------------------------------
+
+  /** @returns {{ ok: boolean, reason?: string }} */
+  validate(candidate) {
+    const w = this._world;
+    const p = this._player.position;
+    const fp = footprint(candidate);
+    const b = w.getBounds();
+    if (Math.hypot(candidate.x - p.x, candidate.z - p.z) > this._cfg.RANGE) return { ok: false, reason: 'Demasiado lejos' };
+    if (fp.minX < b.minX || fp.maxX > b.maxX || fp.minZ < b.minZ || fp.maxZ > b.maxZ) return { ok: false, reason: 'Fuera del mundo' };
+    if (!this.canAfford(candidate.type)) return { ok: false, reason: `Te faltan materiales (${this._costText(candidate.type)})` };
+    const key = slotKey(candidate.slot, candidate.y);
+    if (key && this._slots.has(key)) return { ok: false, reason: 'Ya hay una pieza ahí' };
+    if (w.water.isWater(candidate.x, candidate.z, 0.3)) return { ok: false, reason: 'No se puede construir en el agua' };
+
+    // Solapes con otras piezas (muebles y piezas libres).
+    const boxes = worldColliders(candidate);
+    if (SHAPES[candidate.type].slot === 'FREE') {
+      for (const o of this.pieces) {
+        for (const ob of worldColliders(o)) if (boxesOverlap(fp, ob, 0.02)) return { ok: false, reason: 'Choca con otra pieza' };
+      }
+    }
+    // Árboles y rocas.
+    for (const n of w.resources.getNodesNear(candidate.x, candidate.z, 3)) {
+      if (n.radius > 0 && circleOverlapsBox(n.x, n.z, n.radius, fp)) return { ok: false, reason: 'Hay árboles o rocas en medio' };
+    }
+    // No encerrar al jugador dentro de la pieza.
+    const solid = boxes.concat(SHAPES[candidate.type].surfaces.length && candidate.y + SHAPES[candidate.type].top > p.y + 0.45 ? [fp] : []);
+    for (const box of solid) {
+      if (box.maxY > p.y + 0.05 && box.minY < p.y + 1.8 && circleOverlapsBox(p.x, p.z, 0.4, box)) {
+        return { ok: false, reason: 'Estás en medio' };
+      }
+    }
+    if (!isSupported(candidate, this.pieces, (x, z) => w.getHeightAt(x, z), this._cfg.GRID)) {
+      return { ok: false, reason: 'Necesita apoyo (suelo u otra pieza)' };
+    }
+    return { ok: true };
   }
 
-  /** ¿Está (x, z) bajo techo? (Fase 10: protección contra el frío) */
-  isSheltered(x, z) {
-    return this.structures.some((s) => s.def.SHELTER_RADIUS && Math.hypot(s.x - x, s.z - z) <= s.def.SHELTER_RADIUS);
+  _costText(type) {
+    return Object.entries(this._cfg.PIECES[type].COST)
+      .map(([item, n]) => `${n} ${this._items[item].NAME.toLowerCase()}`)
+      .join(', ');
   }
 
-  /** Empuja un círculo fuera de los colisionadores de las construcciones. */
-  resolveCollisions(pos, radius) {
+  // ---- Apuntar y anclar --------------------------------------------------------------
+
+  /** Rayo desde la cámara contra piezas y terreno. */
+  _aim() {
+    this._camera.getWorldPosition(this._origin);
+    this._camera.getWorldDirection(this._dir);
+    const camToPlayer = this._origin.distanceTo(this._player.position);
+    const maxDist = camToPlayer + this._cfg.RANGE + 1;
+
+    this._raycaster.set(this._origin, this._dir);
+    this._raycaster.far = maxDist;
+    const hits = this._raycaster.intersectObjects(this.group.children, true);
+    const pieceHit = hits.find((h) => h.distance > 0.05);
+    const terrainDist = this._raycastTerrain(this._origin, this._dir, pieceHit ? pieceHit.distance : maxDist);
+
+    if (pieceHit && (terrainDist === null || pieceHit.distance <= terrainDist)) {
+      const piece = this.pieces.find((p) => p.id === pieceHit.object.userData.pieceId);
+      this._normal.copy(pieceHit.face.normal).transformDirection(pieceHit.object.matrixWorld);
+      return { point: pieceHit.point.clone(), normal: this._normal.clone(), piece };
+    }
+    if (terrainDist !== null) {
+      return { point: this._origin.clone().addScaledVector(this._dir, terrainDist), normal: new THREE.Vector3(0, 1, 0), piece: null };
+    }
+    return null;
+  }
+
+  /** Marcha a lo largo del rayo hasta cruzar el terreno. @returns distancia o null */
+  _raycastTerrain(origin, dir, maxDist) {
+    const w = this._world;
+    const step = 0.25;
+    let prev = 0;
+    for (let t = step; t <= maxDist; t += step) {
+      const y = origin.y + dir.y * t;
+      if (y <= w.getHeightAt(origin.x + dir.x * t, origin.z + dir.z * t)) {
+        let lo = prev;
+        let hi = t;
+        for (let i = 0; i < 8; i++) {
+          const mid = (lo + hi) / 2;
+          const my = origin.y + dir.y * mid;
+          if (my <= w.getHeightAt(origin.x + dir.x * mid, origin.z + dir.z * mid)) hi = mid;
+          else lo = mid;
+        }
+        return hi;
+      }
+      prev = t;
+    }
+    return null;
+  }
+
+  /** Pieza candidata a partir de lo apuntado. */
+  _candidate(type, hit) {
+    const point = hit.point.clone();
+    let baseY = null;
+    if (hit.piece) {
+      if (hit.normal.y > 0.7) {
+        baseY = hit.point.y; // cara superior: se construye encima
+      } else {
+        // Cara lateral: la nueva pieza va del lado desde el que se mira.
+        const top = SHAPES[hit.piece.type].top;
+        const upperHalf = top > 1 && hit.point.y > hit.piece.y + top * 0.6;
+        point.x += hit.normal.x * (upperHalf ? 0.05 : 0.3);
+        point.z += hit.normal.z * (upperHalf ? 0.05 : 0.3);
+        // Parte alta de una pared/pilar → encima (techo, segundo piso);
+        // parte baja → al mismo nivel, en la casilla de al lado.
+        baseY = upperHalf ? hit.piece.y + top : hit.piece.y;
+      }
+    }
+    const snapped = snapXZ(type, point.x, point.z, { grid: this._cfg.GRID, yaw: this._player.yaw, rotSteps: this._rotSteps });
+    const piece = { type, ...snapped, y: 0 };
+    piece.y = baseY !== null ? Math.round(baseY * 20) / 20 : terrainBaseY(piece, (x, z) => this._world.getHeightAt(x, z));
+    return piece;
+  }
+
+  _updateRemoveTarget(hit) {
+    this._target = hit?.piece ?? null;
+    const t = this._target;
+    if (t) {
+      this._removeHighlight.geometry = this._geometries[t.type];
+      this._removeHighlight.position.copy(t.object.position);
+      this._removeHighlight.rotation.copy(t.object.rotation);
+      this._removeHighlight.scale.setScalar(1.01);
+    }
+    this._removeHighlight.visible = !!t; // lo que quitaría el clic derecho
+  }
+
+  _setPlacement(active, valid, reason, piece) {
+    const pl = this._placement;
+    const changed = pl.active !== active || pl.valid !== valid || pl.reason !== reason || pl.pieceId !== piece?.type;
+    pl.active = active;
+    pl.valid = valid;
+    pl.reason = reason;
+    pl.piece = piece;
+    pl.pieceId = piece?.type ?? null;
+    if (changed) this._events.emit(GameEvents.PLACEMENT_CHANGED, { active, valid, reason, pieceId: pl.pieceId });
+  }
+
+  // ---- Consultas ---------------------------------------------------------------------
+
+  exists(piece) {
+    return this.pieces.includes(piece);
+  }
+
+  _near(x, z, r) {
+    return this.pieces.filter((p) => Math.abs(p.x - x) < r && Math.abs(p.z - z) < r);
+  }
+
+  /** Superficie caminable más alta en (x, z) que no supere maxY, o null. */
+  surfaceAt(x, z, maxY) {
+    let best = null;
+    for (const p of this._near(x, z, 2)) {
+      const s = surfaceAt(p, x, z);
+      if (s && s.top <= maxY && (best === null || s.top > best)) best = s.top;
+    }
+    return best;
+  }
+
+  /** ¿Alguna superficie en el círculo actúa como muro entre y0 e y1? (bordes altos de suelos) */
+  blocksAt(x, z, r, y0, y1) {
+    for (const p of this._near(x, z, 2 + r)) {
+      if (!SHAPES[p.type].surfaces.length) continue;
+      for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) {
+        const s = surfaceAt(p, x + dx, z + dz);
+        if (s && s.top > y0 && s.bottom < y1) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Parte inferior de la superficie más baja por encima de y en (x, z), o Infinity. */
+  ceilingAt(x, z, y) {
+    let ceiling = Infinity;
+    for (const p of this._near(x, z, 2)) {
+      const s = surfaceAt(p, x, z);
+      if (s && s.bottom >= y && s.bottom < ceiling) ceiling = s.bottom;
+    }
+    return ceiling;
+  }
+
+  /** Paredes, puertas cerradas, vallas, pilares, camas: empuja el círculo fuera. */
+  resolveCollisions(pos, r, y0 = -Infinity, y1 = Infinity) {
     let hit = false;
-    for (const s of this.structures) {
-      if (!s.def.COLLIDERS.length || Math.hypot(s.x - pos.x, s.z - pos.z) > 6) continue;
-      const cos = Math.cos(s.rotation);
-      const sin = Math.sin(s.rotation);
-      for (const [lx, lz, r] of s.def.COLLIDERS) {
-        const cx = s.x + lx * cos + lz * sin;
-        const cz = s.z - lx * sin + lz * cos;
-        const dx = pos.x - cx;
-        const dz = pos.z - cz;
-        const min = r + radius;
-        const d2 = dx * dx + dz * dz;
-        if (d2 >= min * min) continue;
-        const d = Math.sqrt(d2) || 1e-4;
-        pos.x = cx + (dx / d) * min;
-        pos.z = cz + (dz / d) * min;
-        hit = true;
+    for (const p of this._near(pos.x, pos.z, 2 + r)) {
+      for (const box of worldColliders(p)) {
+        if (box.maxY <= y0 || box.minY >= y1) continue;
+        if (pushOutOfBox(pos, r, box)) hit = true;
       }
     }
     return hit;
   }
 
-  _setPlacement(active, valid, type, reason = null) {
-    const pl = this._placement;
-    const changed = pl.active !== active || pl.valid !== valid || pl.type !== type || pl.reason !== reason;
-    pl.active = active;
-    pl.valid = valid;
-    pl.type = type;
-    pl.reason = reason;
-    if (changed) {
-      this._events.emit(GameEvents.PLACEMENT_CHANGED, {
-        active,
-        valid,
-        type,
-        reason,
-        name: type ? this._defs[type].NAME : null,
-      });
-    }
+  getShelterAt(x, y, z) {
+    return shelterAt(this._near(x, z, 10), x, y, z);
+  }
+
+  /** Piezas con las que se puede interactuar (puertas, camas) cerca de (x, z). */
+  getInteractablesNear(x, z, radius) {
+    return this.pieces.filter((p) => SHAPES[p.type].interact && Math.hypot(p.x - x, p.z - z) <= radius);
+  }
+
+  /** Distancia a la primera pieza a lo largo de un rayo (cámara en 3ª persona), o null. */
+  raycastDistance(origin, dir, maxDist) {
+    if (!this.pieces.length) return null;
+    this._raycaster.set(origin, dir);
+    this._raycaster.far = maxDist;
+    const hit = this._raycaster.intersectObjects(this.group.children, true)[0];
+    return hit ? hit.distance : null;
   }
 }

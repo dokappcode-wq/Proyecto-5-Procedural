@@ -4,7 +4,8 @@ Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Thr
 Sin motores externos y sin paso de compilación.
 
 **Estado actual: FASE 9** — alimentación con equilibrio animal/vegetal (7), odre, armadura de
-cuero y cama para dormir (8), fabricación con recetas y construcción de cama y refugio (9).
+cuero y cama para dormir (8), fabricación con recetas y **construcción modular libre** (9):
+cimientos, suelos, paredes, puertas, ventanas, vallas, pilares, escaleras, tejados y cama.
 Sobre las Fases 1–6: mundo finito por seed con biomas, recursos, charcas, rebaños con
 temperamento, inventario, recogida y supervivencia (vida, hambre, sed, energía), en estilo low-poly.
 
@@ -36,10 +37,10 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | `E` | Recoger (talar, picar, coger manzanas) / beber (mirando al agua) |
 | Clic izquierdo / `F` | Golpear animal (o recoger) |
 | `1`–`9` | Seleccionar objeto de la barra |
-| Clic derecho / `R` | Usar el objeto seleccionado: comer, beber del odre, llenarlo (mirando al agua), equipar, colocar |
-| `Q` | Girar la construcción antes de colocarla |
-| `Tab` | Panel de fabricación |
-| `E` sobre una cama | Dormir |
+| Clic derecho / `R` | Usar el objeto seleccionado: comer, beber del odre, llenarlo (mirando al agua), equipar |
+| `Tab` | Panel de fabricación (odre, armadura) |
+| `B` | Modo construcción: `1`–`0` pieza · clic colocar · clic derecho quitar · `Q` girar |
+| `E` sobre una puerta / cama | Abrir o cerrar / dormir |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -93,8 +94,9 @@ js/
 ├── nutrition/NutritionSystem.js  Equilibrio comida animal/vegetal (sin Three.js)
 ├── crafting/CraftingSystem.js    Recetas de GameConfig.RECIPES (sin Three.js)
 ├── construction/
-│   ├── ConstructionSystem.js     Vista previa, validación, colocación, colisiones, refugio
-│   └── StructureModels.js        Modelos low-poly de cama y refugio
+│   ├── ConstructionSystem.js     Modo construcción: apuntar, anclar, validar, colocar/quitar, puertas
+│   ├── BuildRules.js             Reglas puras: formas, rejilla, colisiones, superficies, apoyo, refugio
+│   └── BuildModels.js            Modelos low-poly de cada pieza
 ├── interaction/InteractionSystem.js  Objetivo de la mira + recoger / golpear
 ├── player/
 │   ├── Player.js            Estado del jugador (posición, mirada, flags)
@@ -143,8 +145,12 @@ Principios:
   (animales, hambre, sed, caídas y, en la Fase 10, frío) llega a HealthSystem por el evento
   `PLAYER_DAMAGED`; la UI solo escucha `PLAYER_STAT_CHANGED` / `PLAYER_STAT_LEVEL`.
 - **Objetos por datos.** Cada objeto declara en `GameConfig.ITEMS` qué hace al usarlo (`USE`);
-  recetas en `RECIPES`, construcciones en `STRUCTURES`. Añadir un objeto, receta o construcción
-  es sobre todo configuración (+ un modelo para las construcciones).
+  recetas en `RECIPES`; piezas de construcción (nombre, icono, coste) en `BUILD.PIECES`.
+- **Construcción modular.** Rejilla de 2 m: suelos/escaleras/tejados en casillas, paredes/puertas/
+  ventanas/vallas en bordes, pilares en esquinas, muebles libres. Se ancla a lo que se apunta
+  (varios pisos). Se camina sobre suelos y escaleras; paredes, vallas y puertas cerradas bloquean
+  al jugador y a los animales; `getShelterAt()` dirá a la temperatura (Fase 10) si estás a cubierto.
+  Nueva pieza = forma en `BuildRules` + modelo en `BuildModels` + entrada en `BUILD.PIECES`.
 - **Nutrición separada del hambre.** El hambre es cuánto has comido; NutritionSystem, qué.
   Con dieta desequilibrada el hambre baja más rápido y la vida no se regenera.
 - **Interacción desacoplada.** InteractionSystem solo decide el objetivo y delega en

@@ -278,7 +278,7 @@ export class Animal {
   _tryMoveTo(nx, nz, env) {
     if (!env.isWalkable(nx, nz)) return false;
     const pos = { x: nx, z: nz };
-    env.resolveCollisions(pos, BODY_RADIUS * this.scale);
+    env.resolveCollisions(pos, BODY_RADIUS * this.scale, this.y + 0.1, this.y + 1.2 * this.scale);
     if (!env.isWalkable(pos.x, pos.z)) return false;
     this.x = pos.x;
     this.z = pos.z;

@@ -9,12 +9,12 @@ import { GameEvents } from '../core/GameEvents.js';
  *   DRINK      → beber una unidad de agua       (agua del odre)
  *   WATERSKIN  → llenar mirando al agua / beber (odre)
  *   EQUIP      → EquipmentSystem.toggle()       (armadura de cuero)
- *   PLACE      → ConstructionSystem.place()     (cama, refugio)
+ * (Las construcciones no son objetos: se colocan en el modo construcción, B.)
  */
 const USE_COOLDOWN = 0.35;
 
 export class ItemUseSystem {
-  constructor({ items, equipmentConfig, input, hotbar, inventory, nutrition, equipment, construction, interaction, thirst, events }) {
+  constructor({ items, equipmentConfig, input, hotbar, inventory, nutrition, equipment, interaction, thirst, events }) {
     this.name = 'itemUse';
     this._items = items;
     this._eqCfg = equipmentConfig;
@@ -23,7 +23,6 @@ export class ItemUseSystem {
     this._inventory = inventory;
     this._nutrition = nutrition;
     this._equipment = equipment;
-    this._construction = construction;
     this._interaction = interaction;
     this._thirst = thirst;
     this._events = events;
@@ -64,10 +63,6 @@ export class ItemUseSystem {
       case 'EQUIP':
         this._equipment.toggle(itemId);
         ok = true;
-        break;
-      case 'PLACE':
-        ok = this._construction.place();
-        if (ok) this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
         break;
       default:
         this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);

@@ -23,7 +23,7 @@ const OCCLUSION_STEPS = 16;
  * "sobre el hombro"), de forma que la mira central sirve en ambos modos.
  */
 export class CameraSystem {
-  constructor({ config, camera, input, target, terrain, events }) {
+  constructor({ config, camera, input, target, terrain, events, occluders = null }) {
     this.name = 'camera';
     this._cfg = config;
     this._camera = camera;
@@ -46,6 +46,8 @@ export class CameraSystem {
     this._right = new THREE.Vector3();
     this._third = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
+    this._back = new THREE.Vector3();
+    this._occluders = occluders; // { raycastDistance(origin, dir, max) } — p. ej. paredes construidas
   }
 
   setTerrain(terrain) {
@@ -105,7 +107,13 @@ export class CameraSystem {
     // Posición ideal en 3ª persona: detrás, un poco por encima y al hombro.
     this._pivot.copy(this._eye).addScaledVector(this._right, cfg.THIRD_PERSON_SHOULDER_OFFSET * this._blend);
     this._pivot.y += cfg.THIRD_PERSON_HEIGHT_OFFSET;
-    const dist = this._occlusionDistance(this._pivot, this._distance);
+    let dist = this._occlusionDistance(this._pivot, this._distance);
+    // Paredes y techos construidos: la cámara se acerca para no quedar detrás.
+    if (this._occluders && this._blend > 0.01) {
+      this._back.copy(this._fwd).negate();
+      const hit = this._occluders.raycastDistance(this._pivot, this._back, dist + 0.3);
+      if (hit !== null) dist = Math.max(0, hit - 0.3);
+    }
     this._third.copy(this._pivot).addScaledVector(this._fwd, -dist);
 
     // Mezcla entre ojos y posición de 3ª persona (curva suave).

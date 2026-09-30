@@ -438,6 +438,16 @@ kbd {
 #use-hint.invalid { color: #ff8a80; }
 #messages { bottom: 124px; }
 
+.build-slot.unaffordable .icon { opacity: 0.35; }
+.build-slot.unaffordable::after {
+  content: 'faltan';
+  position: absolute;
+  bottom: -15px;
+  font-size: 0.6rem;
+  color: #ff8a80;
+}
+body.build-mode #crosshair::before, body.build-mode #crosshair::after { background: #7fd3ff; }
+
 /* ---- Dieta ---------------------------------------------------------- */
 .diet {
   display: grid;

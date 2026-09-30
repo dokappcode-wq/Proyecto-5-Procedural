@@ -67,7 +67,12 @@ export class AnimalSystem {
       playerRunning: false,
       turnSpeed: config.TURN_SPEED,
       groundAt: (x, z) => world.getHeightAt(x, z),
-      resolveCollisions: (pos, r) => world.resources.resolveCollisions(pos, r),
+      // Recursos + obstáculos extra (paredes y vallas construidas: corrales).
+      resolveCollisions: (pos, r, y0, y1) => {
+        const a = world.resources.resolveCollisions(pos, r);
+        const b = this._obstacles?.resolveCollisions(pos, r, y0, y1) ?? false;
+        return a || b;
+      },
       isWalkable: (x, z) => {
         const b = bounds();
         if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return false;
@@ -81,6 +86,11 @@ export class AnimalSystem {
     };
 
     events.on(GameEvents.WORLD_GENERATED, () => this.generate());
+  }
+
+  /** Obstáculos adicionales ({ resolveCollisions(pos, r, y0, y1) }), p. ej. construcciones. */
+  setObstacles(obstacles) {
+    this._obstacles = obstacles;
   }
 
   generate() {

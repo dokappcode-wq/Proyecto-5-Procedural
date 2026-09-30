@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.9.0-fase9',
+    VERSION: '0.9.1-construccion',
   },
 
   RENDER: {
@@ -69,12 +69,14 @@ export const GameConfig = deepFreeze({
       TOGGLE_HELP: ['KeyH'],
       INTERACT: ['KeyE'],               // recoger / interactuar
       ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
-      USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado (comer, beber, equipar, colocar)
-      ROTATE: ['KeyQ'],                 // girar la construcción antes de colocarla
+      USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado · en modo construcción: quitar pieza
+      ROTATE: ['KeyQ'],                 // girar la pieza antes de colocarla
       CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
+      BUILD_MODE: ['KeyB'],             // entrar/salir del modo construcción
       HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
       HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
       HOTBAR_7: ['Digit7'], HOTBAR_8: ['Digit8'], HOTBAR_9: ['Digit9'],
+      HOTBAR_10: ['Digit0'],
     },
   },
 
@@ -314,7 +316,8 @@ export const GameConfig = deepFreeze({
   // Objetos del inventario. FOOD: tipo de comida para la nutrición (Fase 7).
   // USE: qué hace "usar" (clic derecho / R) con el objeto seleccionado:
   //   EAT (NutritionSystem), DRINK (agua del odre), WATERSKIN (llenar/beber),
-  //   EQUIP (EquipmentSystem), PLACE (ConstructionSystem → STRUCTURE).
+  //   EQUIP (EquipmentSystem). Las construcciones NO son objetos: se colocan en el
+  //   modo construcción (B) gastando materiales (ver BUILD).
   ITEMS: {
     WOOD: { NAME: 'Madera', ICON: '🪵' },
     STONE: { NAME: 'Piedra', ICON: '🪨' },
@@ -325,8 +328,6 @@ export const GameConfig = deepFreeze({
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN' },
     LEATHER_ARMOR: { NAME: 'Armadura de cuero', ICON: '🦺', USE: 'EQUIP', SLOT: 'BODY' },
-    BED: { NAME: 'Cama', ICON: '🛏️', USE: 'PLACE', STRUCTURE: 'BED' },
-    SHELTER: { NAME: 'Refugio', ICON: '🛖', USE: 'PLACE', STRUCTURE: 'SHELTER' },
   },
 
   // Alimentación (Fase 7). Equilibrio entre comida animal y vegetal.
@@ -349,31 +350,34 @@ export const GameConfig = deepFreeze({
   },
 
   // Recetas (Fase 9): ingredientes → resultado. Solo configuración.
+  // (La cama y las piezas de casa se construyen en el modo construcción: BUILD.)
   RECIPES: {
-    BED: { RESULT: 'BED', AMOUNT: 1, INGREDIENTS: { WOOL: 3, WOOD: 3 } },
     WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
     LEATHER_ARMOR: { RESULT: 'LEATHER_ARMOR', AMOUNT: 1, INGREDIENTS: { LEATHER: 4 } },
-    SHELTER: { RESULT: 'SHELTER', AMOUNT: 1, INGREDIENTS: { WOOD: 12, STONE: 2 } },
   },
 
-  // Construcciones colocables (Fase 9). Futuro: paredes, suelos, cofres, estaciones...
-  //   CLEARANCE: radio libre necesario para colocarla.
-  //   COLLIDERS: círculos [x, z, radio] en coordenadas locales (bloquean al jugador).
-  //   INTERACT: acción con E (SLEEP = dormir).
-  //   SHELTER_RADIUS: radio bajo techo (protección, Fase 10).
-  STRUCTURES: {
-    BED: { NAME: 'Cama', NAME_WITH_ARTICLE: 'una cama', ITEM: 'BED', CLEARANCE: 1.1, COLLIDERS: [], INTERACT: 'SLEEP', AIM_HEIGHT: 0.4, AIM_RADIUS: 1 },
-    SHELTER: {
-      NAME: 'Refugio', NAME_WITH_ARTICLE: 'un refugio', ITEM: 'SHELTER', CLEARANCE: 2.2, INTERACT: null, AIM_HEIGHT: 1.2, AIM_RADIUS: 1.6,
-      COLLIDERS: [[-1.35, -1.35, 0.14], [1.35, -1.35, 0.14], [-1.35, 1.35, 0.14], [1.35, 1.35, 0.14]],
-      SHELTER_RADIUS: 1.6,
+  // Construcción modular (Fase 9): el jugador construye pieza a pieza.
+  //   GRID: tamaño de casilla (m). Suelos/escaleras/tejados ocupan una casilla;
+  //   paredes/puertas/ventanas/vallas van en los bordes; pilares en las esquinas;
+  //   la cama se coloca libre. La forma, colisiones y superficies de cada pieza
+  //   están en construction/BuildRules.js; aquí solo nombre, icono y coste.
+  //   El orden de PIECES es el de las teclas 1, 2, … 9, 0.
+  BUILD: {
+    GRID: 2,
+    RANGE: 7,               // m máximos desde el jugador
+    REFUND: 1,              // fracción de materiales devuelta al quitar una pieza
+    PIECES: {
+      FOUNDATION: { NAME: 'Cimiento', ICON: '🪨', COST: { STONE: 4 } },
+      FLOOR: { NAME: 'Suelo', ICON: '🟫', COST: { WOOD: 2 } },
+      WALL: { NAME: 'Pared', ICON: '🧱', COST: { WOOD: 3 } },
+      DOOR: { NAME: 'Puerta', ICON: '🚪', COST: { WOOD: 4 } },
+      WINDOW: { NAME: 'Ventana', ICON: '🪟', COST: { WOOD: 3 } },
+      FENCE: { NAME: 'Valla', ICON: '🚧', COST: { WOOD: 1 } },
+      PILLAR: { NAME: 'Pilar', ICON: '🏛️', COST: { WOOD: 1 } },
+      STAIRS: { NAME: 'Escalera', ICON: '🪜', COST: { WOOD: 4 } },
+      ROOF: { NAME: 'Tejado', ICON: '🔺', COST: { WOOD: 3 } },
+      BED: { NAME: 'Cama', ICON: '🛏️', COST: { WOOL: 3, WOOD: 3 } },
     },
-  },
-
-  CONSTRUCTION: {
-    PLACE_DISTANCE: 3.2,   // m delante del jugador
-    MAX_SLOPE: 0.35,       // desnivel máximo del terreno para colocar
-    ROTATION_STEP: Math.PI / 4,
   },
 
   // Dormir (Fase 8). El avance real del reloj llegará con TimeSystem (Fase 11).

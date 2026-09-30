@@ -17,6 +17,7 @@ import { EquipmentSystem } from '../js/inventory/EquipmentSystem.js';
 import { HotbarSystem } from '../js/inventory/HotbarSystem.js';
 import { ItemUseSystem } from '../js/inventory/ItemUseSystem.js';
 import { SleepSystem } from '../js/player/SleepSystem.js';
+import { SHAPES } from '../js/construction/BuildRules.js';
 
 const C = GameConfig;
 
@@ -40,10 +41,9 @@ function world() {
   const equipment = new EquipmentSystem({ items: C.ITEMS, config: C.EQUIPMENT, inventory, events });
   const hotbar = new HotbarSystem({ input, inventory, events });
   const interaction = { target: null };
-  const construction = { place: () => true };
   const itemUse = new ItemUseSystem({
     items: C.ITEMS, equipmentConfig: C.EQUIPMENT, input, hotbar, inventory, nutrition, equipment,
-    construction, interaction, thirst, events,
+    interaction, thirst, events,
   });
   return { events, messages, pressed, input, inventory, hunger, thirst, energy, nutrition, crafting, equipment, hotbar, interaction, itemUse };
 }
@@ -98,15 +98,15 @@ test('dieta: poca comida reciente no se juzga y el tiempo la olvida', () => {
 
 test('fabricar consume los ingredientes de la receta y da el resultado', () => {
   const w = world();
-  assert.ok(!w.crafting.canCraft('BED'));
-  w.inventory.addItem('WOOL', 3);
+  assert.ok(!w.crafting.canCraft('WATERSKIN'));
+  w.inventory.addItem('LEATHER', 3);
   w.inventory.addItem('WOOD', 5);
-  w.events.emit(GameEvents.CRAFT_REQUEST, { recipeId: 'BED' });
-  assert.equal(w.inventory.getItemCount('BED'), 1);
-  assert.equal(w.inventory.getItemCount('WOOL'), 0);
-  assert.equal(w.inventory.getItemCount('WOOD'), 2);
-  assert.ok(!w.crafting.craft('BED'), 'sin materiales no fabrica');
-  assert.equal(w.inventory.getItemCount('BED'), 1);
+  w.events.emit(GameEvents.CRAFT_REQUEST, { recipeId: 'WATERSKIN' });
+  assert.equal(w.inventory.getItemCount('WATERSKIN'), 1);
+  assert.equal(w.inventory.getItemCount('LEATHER'), 1);
+  assert.equal(w.inventory.getItemCount('WOOD'), 4);
+  assert.ok(!w.crafting.craft('WATERSKIN'), 'sin materiales no fabrica');
+  assert.equal(w.inventory.getItemCount('WATERSKIN'), 1);
 });
 
 test('todas las recetas producen objetos definidos con ingredientes definidos', () => {
@@ -114,8 +114,9 @@ test('todas las recetas producen objetos definidos con ingredientes definidos', 
     assert.ok(C.ITEMS[r.RESULT], `${id}: resultado desconocido`);
     for (const ing of Object.keys(r.INGREDIENTS)) assert.ok(C.ITEMS[ing], `${id}: ingrediente ${ing}`);
   }
-  for (const [id, def] of Object.entries(C.ITEMS)) {
-    if (def.USE === 'PLACE') assert.ok(C.STRUCTURES[def.STRUCTURE], `${id}: estructura desconocida`);
+  for (const [id, piece] of Object.entries(C.BUILD.PIECES)) {
+    assert.ok(SHAPES[id], `${id}: pieza sin forma en BuildRules`);
+    for (const item of Object.keys(piece.COST)) assert.ok(C.ITEMS[item], `${id}: material ${item}`);
   }
 });
 
