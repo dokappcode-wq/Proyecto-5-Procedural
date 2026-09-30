@@ -938,3 +938,4 @@ body.in-space #clock { top: 170px; }
 }
 #ai-panel .ai-log p { margin: 0 0 6px; }
 #ai-panel .ai-log p.warn { color: #ffb0a8; }
+.stat[data-stat="GAS"] { --stat-color: #c8d0da; }

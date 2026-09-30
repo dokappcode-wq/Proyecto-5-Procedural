@@ -518,6 +518,7 @@ export const GameConfig = deepFreeze({
     SUFFOCATION_DAMAGE: 8,       // vida por segundo sin aire
     SUIT_OXYGEN_TIME: 300,       // s de oxígeno con el depósito lleno
     SUIT_BATTERY_TIME: 600,      // s que dura una batería plank en el traje
+    JETPACK_TIME: 90,            // s de empuje del jetpack con el depósito de gas lleno
     LOW_RATIO: 0.25,             // aviso de oxígeno/batería bajos
     BUBBLE_RADIUS: 14,           // m de radio de la burbuja de oxígeno
     BUBBLE_BATTERY_TIME: 1800,   // s que dura una batería plank en la burbuja
@@ -653,6 +654,36 @@ export const GameConfig = deepFreeze({
     TEXTURE_WIDTH: 512,        // textura equirectangular del planeta (se genera al subir)
     ORBIT_MIN_ALTITUDE: 60,    // m sobre el suelo para poder salir al espacio con la nave
     ORBIT_COST: 12,            // carga de batería que cuesta salir de la atmósfera
+    // Meteoritos (Etapa 5): aparecen de vez en cuando cerca del rumbo. La nave no puede
+    // aterrizar en ellos: se detiene cerca y se baja con el traje y el jetpack de gas.
+    METEORS: {
+      FIRST_DELAY: 6,            // s en el espacio hasta que aparece el primero
+      INTERVAL: [25, 50],        // s entre apariciones
+      MAX: 2,                    // a la vez
+      SPAWN_DISTANCE_KM: [18, 40],
+      SPAWN_CONE: 0.6,           // rad alrededor del rumbo de la nave
+      DESPAWN_KM: 250,
+      STOP_DISTANCE_M: 120,      // el rumbo automático (tecla 4) se detiene a esta distancia de la superficie
+      MIN_DISTANCE_M: 70,        // la nave nunca se acerca más (no se aterriza)
+      APPROACH_RANGE_KM: 5,      // más cerca, la velocidad máxima baja
+      GRAVITY: 2.2,              // m/s² hacia el centro del meteorito
+      GRAVITY_RANGE_M: 100,      // m sobre la superficie en los que atrae
+      RADIUS: [26, 48],          // m
+      CRYSTALS: [5, 8],          // cúmulos de mineral
+      YIELD: 3,                  // veces que se pica cada cúmulo
+      MINERAL_PER_HIT: 2,
+      VIEW_DISTANCE: 600,        // m a los que se dibuja como impostor si está más lejos
+    },
+    // Paseo espacial (EVA) con el traje y el jetpack de gas.
+    EVA: {
+      THRUST: 4,                 // m/s² del jetpack
+      BOOST: 2,                  // ×Shift
+      MAX_SPEED: 14,             // m/s
+      DAMPING: 0.25,             // estabilizador del traje (1/s)
+      WALK_SPEED: 3.2,           // m/s sobre un meteorito
+      JUMP: 3.2,                 // m/s
+      CAMERA_DISTANCE: 5.5,
+    },
     ORBIT_SPIN_HOURS: 24,      // una vuelta del planeta por día
   },
 

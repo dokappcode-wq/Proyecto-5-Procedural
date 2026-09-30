@@ -9,6 +9,7 @@ const ROWS = [
   { id: 'AIR', icon: '🫁', name: 'Aire' },
   { id: 'SUIT_O2', icon: '🧑‍🚀', name: 'O₂ traje' },
   { id: 'SUIT_BAT', icon: '🔋', name: 'Traje' },
+  { id: 'GAS', icon: '💨', name: 'Jetpack' },
 ];
 
 export class LifeSupportHUD {
@@ -32,6 +33,7 @@ export class LifeSupportHUD {
     this._set('AIR', s.lungs, !s.breathable && !(s.powered && s.oxygen > 0) || s.lungs < 0.999);
     this._set('SUIT_O2', s.oxygen, s.wearing);
     this._set('SUIT_BAT', s.battery, s.wearing);
+    this._set('GAS', s.gas, s.wearing);
   }
 
   _set(id, ratio, visible) {

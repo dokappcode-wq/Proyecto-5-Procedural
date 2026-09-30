@@ -23,6 +23,7 @@ Sin motores externos y sin paso de compilación.
 | E2 | Espacio explorable: se pilota la nave (cámara detrás) entre MUNDO 0 y las lunas |
 | E3 | Nodo espacial caído en MUNDO 0 (con mapa); al instalarlo la nave se amplía |
 | IA | Nodo de IA en la sala de controles: IA con el nombre que quieras, datos del sistema y avisos de la nave |
+| E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
 
 ## Cómo ejecutarlo
@@ -68,6 +69,8 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | Mapa de la señal + clic derecho / `R` | Abrir el mapa con la posición del nodo espacial |
 | Burbuja de oxígeno + clic derecho / `R` | Desplegarla delante (`E` en el generador: poner/quitar batería, recogerla) |
 | Batería plank + clic derecho / `R` (con el traje) | Cambiar la batería del traje |
+| En el espacio, a los mandos: `4` | Rumbo al meteorito más cercano (se detiene a ~120 m) |
+| Paseo espacial: `W`/`S` · `A`/`D` · `Espacio`/`C` · `Shift` | Jetpack adelante/atrás · lados · subir/bajar · más empuje (sobre un meteorito: caminar y saltar) |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -267,7 +270,14 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   mineral (pica las rocas con cristales); en vez de valla y cama hay estación de carga (carga una
   batería vacía en 60 s) y estación de oxígeno. Atajos: Admin → Soporte vital.
 
-Limitaciones: todavía no hay meteoritos, jetpack utilizable, nodo galáctico ni cápsulas de
-escape operativas (etapas siguientes); salir por la compuerta en el espacio aún no tiene EVA; las baterías no se
+- **Meteoritos**: en el espacio aparecen de vez en cuando cerca del rumbo (la IA avisa). A los
+  mandos pulsa `4`: la nave apunta, frena y se detiene a ~120 m (no se puede aterrizar en ellos).
+  Levántate, ponte el traje, cierra la puerta interior, vacía la cámara con su panel y abre la
+  compuerta. Baja de la rampa: estás en ingravidez. El jetpack empuja hacia donde miras; cerca
+  del meteorito su gravedad te atrae y caminas alrededor de él. `E` en los cristales azules da
+  mineral. Para volver, acércate al pie de la rampa (te agarras solo). Atajos: Admin → Espacio →
+  "Meteorito junto a la nave" / "Salir al exterior con traje (EVA)".
+
+Limitaciones: todavía no hay nodo galáctico ni cápsulas de escape operativas (Etapa 6); las baterías no se
 recargan todavía (Admin → Nave → Recargar); la nave no choca con árboles en vuelo; la
 temperatura no se muestra como número (es oculta; el Admin sí la muestra).

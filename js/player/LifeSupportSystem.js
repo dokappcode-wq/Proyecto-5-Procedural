@@ -40,6 +40,7 @@ export class LifeSupportSystem {
     this.oxygen = 1;   // depósito del traje (0..1)
     this.battery = 1;  // batería plank del traje (0..1); null = sin batería
     this.lungs = 1;    // aire retenido (0..1)
+    this.gas = 1;      // gas del jetpack (0..1)
     this.breathable = true;
     this._damageTimer = 0;
     this._warned = {};
@@ -68,13 +69,15 @@ export class LifeSupportSystem {
     return true;
   }
 
-  /** Estación de oxígeno: llena el depósito del traje. */
+  /** Estación de oxígeno: llena el depósito del traje (y el gas del jetpack). */
   refillOxygen() {
     if (!this.wearing) return this._msg('Ponte el traje (taquilla del laboratorio) para recargar su oxígeno.');
     this.oxygen = 1;
+    this.gas = 1;
     this.lungs = 1;
     this._warned.oxygen = false;
-    this._msg('Depósito de oxígeno del traje lleno.', 'biome');
+    this._warned.gas = false;
+    this._msg('Depósitos de oxígeno y de gas del jetpack llenos.', 'biome');
     this._emit(true);
     return true;
   }
@@ -92,6 +95,17 @@ export class LifeSupportSystem {
     this._msg('Batería del traje cambiada.', 'biome');
     this._emit(true);
     return true;
+  }
+
+  /** Gasta gas del jetpack (EVASystem). */
+  useGas(seconds) {
+    if (this.gas <= 0) return;
+    this.gas = Math.max(0, this.gas - seconds / this._cfg.JETPACK_TIME);
+    if (this.gas < this._cfg.LOW_RATIO && !this._warned.gas) {
+      this._warned.gas = true;
+      this._msg(`Gas del jetpack bajo (${pct(this.gas)}): vuelve a la nave.`, 'danger');
+    }
+    if (this.gas === 0) this._msg('¡Sin gas en el jetpack! Vas a la deriva.', 'danger');
   }
 
   // ---- Bucle ------------------------------------------------------------------------
@@ -159,6 +173,7 @@ export class LifeSupportSystem {
       lungs: this.lungs,
       oxygen: this.oxygen,
       battery: this.battery ?? 0,
+      gas: this.gas,
     };
   }
 

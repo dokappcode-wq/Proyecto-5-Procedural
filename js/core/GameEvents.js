@@ -109,6 +109,10 @@ export const GameEvents = Object.freeze({
   BUBBLE_CHANGED: 'bubble:changed',                 // { id, powered }
   BATTERY_USE_REQUEST: 'battery:use',               // { itemId }  (usar una batería plank)
 
+  // Meteoritos y paseo espacial (Etapa 5)
+  METEOR_SPAWNED: 'meteor:spawned',                 // { id, distanceKm }
+  EVA_CHANGED: 'eva:changed',                       // { active }
+
   // IA de la nave
   AI_SAY: 'ai:say',                                 // { text, type? }  mensaje de la IA
   AI_PANEL_REQUEST: 'ai:panel',                     // {}

@@ -69,8 +69,8 @@ export class SpaceHUD {
     this._speed.classList.toggle('low', !n.powered || n.charge < 0.15);
     const names = { MUNDO_0: 'MUNDO 0', MOON_A: 'Luna A', MOON_B: 'Luna B' };
     this._auto.innerHTML = n.autopilot
-      ? `🧭 Rumbo automático: <b>${names[n.autopilot]}</b> (A/D/Espacio/C lo cancelan)`
-      : '🧭 Rumbo: <kbd>1</kbd> MUNDO 0 · <kbd>2</kbd> Luna A · <kbd>3</kbd> Luna B';
+      ? `🧭 Rumbo automático: <b>${names[n.autopilot] ?? 'meteorito'}</b> (A/D/Espacio/C lo cancelan)`
+      : `🧭 Rumbo: <kbd>1</kbd> MUNDO 0 · <kbd>2</kbd> Luna A · <kbd>3</kbd> Luna B${n.meteor ? ' · <kbd>4</kbd> meteorito' : ''}`;
     const fmt = (km) => (km >= 10000 ? `${(km / 1000).toFixed(1)} mil km` : `${Math.round(km).toLocaleString('es-ES')} km`);
     this._bodies.innerHTML = n.bodies.map((b) => `<div><span>${b.name}</span><span>${fmt(Math.max(0, b.altitude))}</span></div>`).join('');
     for (const b of n.bodies) this._dist[b.id] = b.altitude;
@@ -80,11 +80,27 @@ export class SpaceHUD {
     this._warn.textContent = 'Te acercas al límite del sistema.';
   }
 
+  /** Paseo espacial: marca la nave en pantalla con su distancia. */
+  setEVA(eva, ship, camera) {
+    this._eva = eva;
+    this._ship = ship;
+    this._camera = camera;
+  }
+
   update() {
     if (!this._travel.inSpace) return;
     const w = window.innerWidth;
     const h = window.innerHeight;
-    for (const l of this._travel.bodyScreenPositions(w, h)) {
+    const labels = this._travel.bodyScreenPositions(w, h);
+    if (this._eva?.active) {
+      const s = this._ship.ship;
+      const v = { x: s.x, y: s.y + 4, z: s.z };
+      const p = this._project(v, w, h);
+      labels.push({ id: 'SHIP', text: `🚀 Nave · ${Math.round(this._eva.distanceToShip())} m`, ...p });
+    }
+    const seen = new Set();
+    for (const l of labels) {
+      seen.add(l.id);
       let node = this._labelNodes[l.id];
       if (!node) {
         node = document.createElement('div');
@@ -93,9 +109,23 @@ export class SpaceHUD {
         this._labelNodes[l.id] = node;
       }
       const d = this._dist[l.id];
-      node.textContent = d === undefined ? l.name : `${l.name} · ${Math.round(Math.max(0, d)).toLocaleString('es-ES')} km`;
+      node.textContent = l.text ?? (d === undefined ? l.name : `${l.name} · ${Math.round(Math.max(0, d)).toLocaleString('es-ES')} km`);
       node.style.display = l.visible ? 'block' : 'none';
       node.style.transform = `translate(${l.x}px, ${l.y}px) translate(-50%, -100%)`;
     }
+    for (const [id, node] of Object.entries(this._labelNodes)) if (!seen.has(id)) node.style.display = 'none';
+  }
+
+  _project(v, w, h) {
+    const cam = this._camera;
+    const vec = { x: v.x, y: v.y, z: v.z };
+    // Proyección sin crear objetos de Three.js (vector temporal de la cámara).
+    this._tmp ??= cam.position.clone();
+    this._tmp.set(vec.x, vec.y, vec.z).project(cam);
+    return {
+      x: (this._tmp.x * 0.5 + 0.5) * w,
+      y: (-this._tmp.y * 0.5 + 0.5) * h,
+      visible: this._tmp.z < 1 && Math.abs(this._tmp.x) < 1.1 && Math.abs(this._tmp.y) < 1.1,
+    };
   }
 }

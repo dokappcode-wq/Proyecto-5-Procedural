@@ -184,6 +184,9 @@ export class ShipAI {
       if (planet?.KIND === 'MOON') this.say(`Llegada a la ${planet.NAME}. ${planet.DATA?.SURFACE ?? ''} ${planet.DATA?.ATMOSPHERE ?? ''}`.trim(), 'ai-warn');
       else if (id === 'MUNDO_0' && previous && previous !== 'MUNDO_0') this.say('De vuelta en MUNDO 0. Aire respirable, gravedad normal.');
     });
+    ev.on(G.METEOR_SPAWNED, ({ distanceKm }) => {
+      this.say(`Meteorito detectado a ${Math.round(distanceKm)} km, con cristales minerales. Pulsa 4 a los mandos para acercarnos (no se puede aterrizar: habrá que bajar con el traje).`);
+    });
     ev.on(G.SHIP_DECOMPRESSION, ({ ejected }) => {
       this.say(ejected ? '¡Descompresión explosiva! La cámara no estaba vacía antes de abrir la compuerta.' : 'Pérdida de presión en la cámara de descompresión.', 'ai-warn');
     });

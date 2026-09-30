@@ -465,7 +465,7 @@ export class ShipSystem {
     if (input.wasPressed('SHIP_ORBIT')) this.command('ORBIT');
     if (input.wasPressed('STAR_MAP')) this._events.emit(GameEvents.STAR_MAP_REQUEST, {});
     if (this.flight.state === FlightState.SPACE) {
-      ['MUNDO_0', 'MOON_A', 'MOON_B'].forEach((id, i) => {
+      ['MUNDO_0', 'MOON_A', 'MOON_B', 'METEOR'].forEach((id, i) => {
         if (input.wasPressed(`HOTBAR_${i + 1}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { target: id });
       });
     }

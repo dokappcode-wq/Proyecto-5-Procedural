@@ -64,6 +64,8 @@ import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
 import { LifeSupportHUD } from './ui/LifeSupportHUD.js';
 import { ShipAI } from './ship/ShipAI.js';
+import { MeteorSystem } from './space/MeteorSystem.js';
+import { EVASystem } from './player/EVASystem.js';
 import { AIPanel } from './ui/AIPanel.js';
 import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
 import { ShipMapPanel } from './ui/ShipMapPanel.js';
@@ -269,6 +271,7 @@ function boot() {
   events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId }) => {
     if (slot === 'BODY') player.model.setArmor(itemId === 'LEATHER_ARMOR');
   });
+  const interactionProviders = [ship, pickups, bubbles];
   const interaction = new InteractionSystem({
     config: cfg.INTERACTION,
     resourceTypes: cfg.RESOURCE_TYPES,
@@ -280,7 +283,7 @@ function boot() {
     inventory,
     events,
     construction,
-    providers: [ship, pickups, bubbles], // nave (botones, puertas, asiento, tecnologías), objetos sueltos y burbujas
+    providers: interactionProviders, // nave (botones, puertas, asiento, tecnologías), objetos sueltos, burbujas, meteoritos
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -326,11 +329,13 @@ function boot() {
   });
   // Control a pie del jugador: se suspende a los mandos de la nave y en el espacio.
   const controlLocks = new Set();
+  let eva = null; // EVASystem (se crea con el espacio, más abajo)
   const setControlLock = (reason, locked) => {
     if (locked) controlLocks.add(reason);
     else controlLocks.delete(reason);
     if (locked) construction.setActive(false);
     for (const s of [controller, hotbar, itemUse, interaction, construction, craftingPanel]) s.enabled = controlLocks.size === 0;
+    if (eva?.active) controller.enabled = false; // en el paseo espacial manda EVASystem
     if (!controlLocks.size) interaction.resetTarget();
   };
   // A los mandos de la nave: el jugador no camina ni usa objetos; la cámara sigue a la nave.
@@ -656,6 +661,35 @@ function boot() {
   // Solo durante los fundidos se suspende el control (en el espacio se pilota o se camina por la nave).
   events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => setControlLock('space', state === 'ASCENDING' || state === 'DESCENDING'));
   const spaceHUD = new SpaceHUD({ container: hudRoot, events, travel: spaceTravel });
+  // Meteoritos (Etapa 5): aparecen de vez en cuando; no se aterriza, se baja con el traje.
+  const meteors = new MeteorSystem({
+    scene: render.scene,
+    config: cfg.SPACE.METEORS,
+    events,
+    inventory,
+    items: cfg.ITEMS,
+    getNav: () => spaceTravel.nav,
+    isInSpace: () => spaceTravel.inSpace,
+    getSeed: () => worlds.home.seed.value,
+  });
+  spaceTravel.meteors = meteors;
+  interactionProviders.push(meteors);
+  // Paseo espacial: fuera de la nave en el espacio (ingravidez, jetpack, gravedad de los meteoritos).
+  eva = new EVASystem({
+    config: cfg.SPACE.EVA,
+    input,
+    look: { sensitivity: cfg.INPUT.MOUSE_SENSITIVITY, invertY: cfg.INPUT.INVERT_Y },
+    player,
+    controller,
+    cameraSystem: camera,
+    camera: render.camera,
+    ship,
+    meteors,
+    worlds,
+    lifeSupport,
+    events,
+  });
+  spaceHUD.setEVA(eva, ship, render.camera);
 
   // Mapa estelar 3D (tecnología Mapa): la escena espacial "de mapa".
   const starMap = new StarMap({
@@ -702,7 +736,7 @@ function boot() {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups });
+  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
@@ -713,6 +747,7 @@ function boot() {
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  loop.add(eva);         // paseo espacial: mueve al jugador y coloca la cámara (sustituye a los dos anteriores)
   loop.add(hotbar);      // teclas 1–9
   loop.add(construction); // modo construcción: apuntar, vista previa, colocar/quitar
   loop.add(interaction); // objetivo de la mira + recoger/golpear
@@ -736,6 +771,7 @@ function boot() {
   loop.add(sky);         // cúpula centrada en la cámara
   loop.add(celestial);   // lunas en el cielo (tras la cámara: se colocan respecto a ella)
   loop.add(spaceTravel); // viaje por el espacio (tras la cámara: dibuja los cuerpos respecto a ella)
+  loop.add(meteors);     // meteoritos cerca del rumbo
   loop.add(starMap);     // mapa estelar 3D
   loop.add(maps);        // mapas de MUNDO 0 y de la luna actual (se dibujan poco a poco)
   loop.add(ui);
@@ -757,7 +793,7 @@ function boot() {
     config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
-    worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel,
+    worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
   };
 }

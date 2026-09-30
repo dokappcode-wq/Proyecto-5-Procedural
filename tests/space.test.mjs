@@ -59,3 +59,22 @@ test('girar a mano cancela el rumbo automático', () => {
   n.update(0.1, { ...idle, turn: 1 });
   assert.equal(n.autopilotTarget, null);
 });
+
+test('rumbo automático a un meteorito: se detiene a su lado sin atravesarlo', async () => {
+  const { SpaceNavigation } = await import('../js/space/SpaceNavigation.js');
+  const { GameConfig } = await import('../js/config/GameConfig.js');
+  const C = GameConfig.SPACE;
+  const meteor = { id: 'M1', name: 'Meteorito', position: { x: 12, y: 3, z: -30 }, radiusKm: 0.04, stopKm: 0.12, minKm: 0.07 };
+  const nav = new SpaceNavigation({ config: C, bodies: () => [{ id: 'MUNDO_0', name: 'MUNDO 0', radiusKm: 1, position: { x: 5000, y: 0, z: 0 } }], extras: () => [meteor] });
+  const events = [];
+  nav.onEvent = (t) => events.push(t);
+  nav.setAutopilot('M1');
+  for (let i = 0; i < 60 * 120 && nav.autopilotTarget; i++) nav.update(1 / 60, { forward: 1, turn: 0, vertical: 0, boost: false });
+  const d = Math.hypot(nav.pos.x - 12, nav.pos.y - 3, nav.pos.z + 30) - meteor.radiusKm;
+  assert.ok(events.includes('EXTRA_ARRIVED'), 'llega');
+  assert.ok(d > meteor.minKm - 1e-6 && d < meteor.stopKm + 0.03, `distancia a la superficie ${d} km`);
+  // Empujar hacia él no lo atraviesa.
+  for (let i = 0; i < 600; i++) nav.update(1 / 60, { forward: 1, turn: 0, vertical: 0, boost: true });
+  const d2 = Math.hypot(nav.pos.x - 12, nav.pos.y - 3, nav.pos.z + 30) - meteor.radiusKm;
+  assert.ok(d2 >= meteor.minKm - 1e-6, `no atraviesa: ${d2}`);
+});

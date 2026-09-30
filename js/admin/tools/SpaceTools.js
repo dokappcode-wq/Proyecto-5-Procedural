@@ -1,7 +1,7 @@
 /**
  * Herramientas de depuración del cielo (Fase 12) y del espacio (Fase 13).
  */
-export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups }) {
+export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups, meteors, lifeSupport }) {
   // ---- Cuerpos (viaje directo, sin nave: depuración) ----
   admin.registerTool({ category: 'Cuerpos', type: 'info', label: 'Cuerpo actual', read: () => worlds.profile()?.NAME ?? worlds.activeId });
   for (const [id, name] of [['MUNDO_0', 'MUNDO 0'], ['MOON_A', 'la Luna A'], ['MOON_B', 'la Luna B']]) {
@@ -103,5 +103,29 @@ export function registerSpaceTools(admin, { celestial, travel, starMap, ship, ti
       },
     });
   }
+  // ---- Meteoritos y paseo espacial (Etapa 5) ----
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Meteorito junto a la nave (a 120 m)',
+    run: () => {
+      if (!travel.inSpace) throw new Error('Primero sal al espacio');
+      const f = travel.nav.forward;
+      const m = meteors.spawn(f, 0.5);
+      const d = m.radius / 1000 + 0.12;
+      travel.nav.pos = { x: m.position.x - f.x * d, y: m.position.y - f.y * d, z: m.position.z - f.z * d };
+      travel.nav.speed = 0;
+    },
+  });
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Salir al exterior con traje (EVA)',
+    run: () => {
+      if (!travel.inSpace) throw new Error('Primero sal al espacio');
+      if (ship.piloting) ship.exitPilot();
+      if (!lifeSupport.wearing) lifeSupport.toggleSuit();
+      const s = ship.ship;
+      player.teleport(s.x, s.y - 3, s.z); // bajo el casco: fuera de la nave
+    },
+  });
   admin.registerTool({ category: 'Espacio', label: 'Mapa estelar 3D', run: () => events.emit('starMap:request', { open: true }) });
 }

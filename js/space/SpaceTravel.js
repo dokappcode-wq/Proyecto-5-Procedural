@@ -34,9 +34,18 @@ export class SpaceTravel {
     this._target = null;
     this._infoTimer = 0;
     this.galacticNode = false; // Etapa 6
-    this.nav = new SpaceNavigation({ config, bodies: () => view.bodyPositions(time.totalHours) });
+    this.meteors = null; // MeteorSystem (se conecta en main)
+    this.nav = new SpaceNavigation({ config, bodies: () => view.bodyPositions(time.totalHours), extras: () => this.meteors?.extras() ?? [] });
+    this._blockNotice = 0;
     this.nav.onEvent = (type) => {
       if (type === 'ZONE_LIMIT') this._message('Límite del sistema: el nodo espacial no alcanza más allá.', 'danger');
+      if (type === 'EXTRA_ARRIVED') {
+        this._message('Detenidos junto al meteorito. No se puede aterrizar en él: ponte el traje, descomprime la cámara y sal con el jetpack.', 'biome');
+      }
+      if (type === 'EXTRA_BLOCKED' && this._blockNotice <= 0) {
+        this._blockNotice = 4;
+        this._message('No se puede aterrizar en un meteorito: detente cerca y baja con el traje.', 'danger');
+      }
     };
 
     events.on(GameEvents.SPACE_ENTER_REQUEST, () => this.enter());
@@ -44,7 +53,17 @@ export class SpaceTravel {
     events.on(GameEvents.WORLD_GENERATED, () => this._reset());
     events.on(GameEvents.SPACE_AUTOPILOT, ({ target }) => {
       if (!this.inSpace) return;
-      this.nav.autopilotTarget = target;
+      if (target === 'METEOR') {
+        const near = this.meteors?.nearest();
+        if (!near) {
+          this._message('No hay ningún meteorito a la vista.', 'danger');
+          return;
+        }
+        this.nav.setAutopilot(near.meteor.id);
+        this._message('Rumbo al meteorito: acelera con W; la nave se detendrá a su lado.', 'biome');
+        return;
+      }
+      this.nav.setAutopilot(target);
       const name = { MUNDO_0: 'MUNDO 0', MOON_A: 'la Luna A', MOON_B: 'la Luna B' }[target];
       this._message(`Rumbo fijado a ${name}: acelera con W (Shift = impulso).`, 'biome');
     });
@@ -139,10 +158,12 @@ export class SpaceTravel {
     ship.syncSpace(nav.yaw, nav.pitch, Math.min(1, thrust));
     this._view.update(dt, nav, this._camera.position, this._time.totalHours, this._src.noonHour);
 
+    this._blockNotice -= dt;
     this._infoTimer -= dt;
     if (this._infoTimer <= 0) {
       this._infoTimer = 0.2;
       const survey = nav.survey();
+      const meteor = this.meteors?.nearest();
       this._events.emit(GameEvents.SPACE_NAV_UPDATE, {
         speed: nav.speed,
         bodies: survey.bodies,
@@ -151,6 +172,7 @@ export class SpaceTravel {
         powered,
         charge: ship.batteries.ratio,
         autopilot: nav.autopilotTarget,
+        meteor: meteor ? { id: meteor.meteor.id, distanceM: meteor.distanceM } : null,
       });
     }
   }
@@ -158,7 +180,7 @@ export class SpaceTravel {
   /** Posición en pantalla (0..1) de cada cuerpo, para las etiquetas del HUD. */
   bodyScreenPositions(width, height) {
     if (!this.inSpace) return [];
-    return this._view.screenLabels(this._camera, width, height);
+    return this._view.screenLabels(this._camera, width, height).concat(this.meteors?.screenLabels(this._camera, width, height) ?? []);
   }
 
   _reset() {
