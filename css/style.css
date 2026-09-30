@@ -401,6 +401,133 @@ kbd {
   .stat[data-level="critical"] .stat-bar { animation: none; background: rgba(255, 90, 80, 0.45); }
 }
 
+/* ---- Barra rápida y uso de objetos ---------------------------------- */
+.inv-slot .key {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-size: 0.66rem;
+  color: var(--ui-muted);
+  font-weight: 700;
+}
+.inv-slot.selected { border-color: #ffe38a; box-shadow: 0 0 0 2px rgba(255, 227, 138, 0.45); }
+/* Nombres solo en la casilla seleccionada: evita que los nombres largos se solapen. */
+.inv-slot .label { display: none; }
+.inv-slot.selected .label { display: block; color: #ffe38a; }
+.inv-slot.equipped::after {
+  content: 'equipado';
+  position: absolute;
+  bottom: -15px;
+  font-size: 0.6rem;
+  color: #d8f5b0;
+}
+#use-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  background: var(--ui-bg);
+  padding: 5px 14px;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#use-hint.invalid { color: #ff8a80; }
+#messages { bottom: 124px; }
+
+/* ---- Dieta ---------------------------------------------------------- */
+.diet {
+  display: grid;
+  grid-template-columns: 1.3em 4.6em 1fr;
+  gap: 6px;
+  align-items: center;
+  padding-top: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.diet .diet-value { color: var(--ui-muted); }
+.diet[data-state="BALANCED"] .diet-value { color: #b6e59a; }
+.diet[data-state="TOO_MUCH_ANIMAL"] .diet-value,
+.diet[data-state="TOO_MUCH_PLANT"] .diet-value { color: #ffcf7a; }
+
+/* ---- Fabricación ---------------------------------------------------- */
+#crafting-panel {
+  pointer-events: auto; /* vive dentro del HUD, que ignora el ratón */
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 28;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-bg-strong);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+}
+#crafting-panel header, #crafting-panel footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+}
+#crafting-panel header { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.85rem; }
+#crafting-panel footer { display: block; text-align: center; color: var(--ui-muted); font-size: 0.75rem; }
+#crafting-panel .close { background: none; border: 0; color: var(--ui-fg); font-size: 1rem; cursor: pointer; }
+#crafting-panel .recipes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  padding: 0 14px;
+  overflow-y: auto;
+}
+.recipe {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.recipe.ready { border-color: rgba(216, 245, 176, 0.45); }
+.recipe-title { font-weight: 700; }
+.ingredients { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 0.82rem; }
+.ingredients .ok { color: #d8f5b0; }
+.ingredients .missing { color: #ff8a80; }
+.recipe button {
+  font: inherit;
+  font-weight: 600;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ui-accent);
+  color: #06121f;
+  cursor: pointer;
+}
+.recipe button:disabled { opacity: 0.4; cursor: default; }
+.recipe button:focus-visible, #crafting-panel .close:focus-visible { outline: 2px solid #ffe38a; outline-offset: 2px; }
+
+/* ---- Sueño ---------------------------------------------------------- */
+#sleep-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  display: grid;
+  place-items: center;
+  background: #03060b;
+  color: var(--ui-muted);
+  letter-spacing: 0.2em;
+  font-size: 0.9rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+#sleep-overlay.active { opacity: 1; }
+
 /* ---- Muerte ---------------------------------------------------------- */
 #death-screen { background: radial-gradient(ellipse at center, rgba(60, 0, 0, 0.55), rgba(10, 0, 0, 0.88)); z-index: 25; }
 .death-card h2 { margin: 0; font-size: 2rem; letter-spacing: 0.08em; color: #ff8a80; }

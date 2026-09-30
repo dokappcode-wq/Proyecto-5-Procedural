@@ -28,8 +28,15 @@ const STAT_WARNINGS = {
 };
 
 const LEVEL_ORDER = { ok: 0, low: 1, critical: 2 };
+
+const DIET_LABELS = {
+  UNKNOWN: 'sin datos aún',
+  BALANCED: 'equilibrada',
+  TOO_MUCH_ANIMAL: 'desequilibrada (demasiada carne)',
+  TOO_MUCH_PLANT: 'desequilibrada (demasiada fruta)',
+};
 export class UIManager {
-  constructor({ config, gameInfo, items, events, input, canvas, root = document }) {
+  constructor({ config, gameInfo, items, equipmentConfig, events, input, canvas, root = document }) {
     this.name = 'ui';
     this._cfg = config;
     this._events = events;
@@ -37,6 +44,12 @@ export class UIManager {
     this._started = false;
     this._adminPanelOpen = false;
     this._items = items;
+    this._equipmentCfg = equipmentConfig;
+    this._invItems = [];
+    this._selectedId = null;
+    this._equippedId = null;
+    this._placement = null;
+    this._craftingOpen = false;
 
     const $ = (id) => root.getElementById(id);
     this.el = {
@@ -59,8 +72,11 @@ export class UIManager {
       deathScreen: $('death-screen'),
       deathCause: $('death-cause'),
       respawnButton: $('respawn-button'),
+      useHint: $('use-hint'),
+      sleepOverlay: $('sleep-overlay'),
     };
     this._statRows = this._buildStatBars();
+    this.el.diet = this._buildDietRow();
     this._respawnTimer = 0;
     this.el.respawnButton.addEventListener('click', () => events.emit(GameEvents.PLAYER_RESPAWN_REQUEST));
 
@@ -70,7 +86,7 @@ export class UIManager {
     this.el.startButton.addEventListener('click', () => this._start());
     // Clic en el juego = recuperar el control del ratón.
     canvas.addEventListener('mousedown', () => {
-      if (this._started && !this._adminPanelOpen) input.requestPointerLock();
+      if (this._started && !this._adminPanelOpen && !this._craftingOpen) input.requestPointerLock();
     });
 
     events.on(GameEvents.CAMERA_MODE_CHANGED, ({ mode }) => {
@@ -131,6 +147,48 @@ export class UIManager {
       this._input.requestPointerLock();
     });
     events.on(GameEvents.ANIMAL_KILLED, ({ animal }) => this.showMessage(`Has abatido: ${animal.def.NAME}`));
+
+    // ---- Fases 7–9: barra rápida, comida, fabricación, construcción, sueño ----
+    events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => {
+      this._selectedId = selectedId;
+      this._drawHotbar();
+    });
+    events.on(GameEvents.EQUIPMENT_CHANGED, ({ itemId }) => {
+      const prev = this._equippedId;
+      this._equippedId = itemId;
+      this._drawHotbar();
+      if (itemId) this.showMessage(`Te pones: ${this._items[itemId].NAME}`);
+      else if (prev) this.showMessage(`Te quitas: ${this._items[prev].NAME}`);
+    });
+    events.on(GameEvents.FOOD_EATEN, ({ itemId, hunger }) =>
+      this.showMessage(`Comes ${this._items[itemId].NAME.toLowerCase()} (+${Math.round(hunger)} 🍗)`, 'pickup'),
+    );
+    events.on(GameEvents.DIET_CHANGED, (e) => {
+      this._updateDiet(e);
+      if (e.state === 'BALANCED') this.showMessage('Tu dieta está equilibrada.', 'biome');
+      else if (e.state !== 'UNKNOWN') this.showMessage(`Tu dieta está desequilibrada: ${DIET_LABELS[e.state].replace('desequilibrada ', '')}.`, 'danger');
+    });
+    events.on(GameEvents.ITEM_CRAFTED, ({ result }) => this.showMessage(`Has fabricado: ${this._items[result].NAME}`, 'biome'));
+    events.on(GameEvents.STRUCTURE_PLACED, ({ structure }) =>
+      this.showMessage(`Has construido ${structure.def.NAME_WITH_ARTICLE ?? structure.def.NAME}.`, 'biome'),
+    );
+    events.on(GameEvents.PLACEMENT_CHANGED, (pl) => {
+      this._placement = pl;
+      this._drawUseHint();
+    });
+    events.on(GameEvents.CRAFTING_PANEL_TOGGLED, ({ open }) => {
+      this._craftingOpen = open;
+      this._updateLockHint();
+    });
+    events.on(GameEvents.PLAYER_SLEEP_STARTED, ({ fadeTime }) => {
+      const o = this.el.sleepOverlay;
+      o.style.transitionDuration = `${fadeTime}s`;
+      o.classList.add('active');
+    });
+    events.on(GameEvents.PLAYER_SLEPT, ({ hours }) => {
+      this.el.sleepOverlay.classList.remove('active');
+      this.showMessage(`Has dormido ${hours} horas. Energía recuperada.`, 'biome');
+    });
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
   }
 
@@ -147,6 +205,16 @@ export class UIManager {
   }
 
   // ---- Estadísticas -----------------------------------------------------------
+
+  _buildDietRow() {
+    const row = document.createElement('div');
+    row.className = 'diet';
+    row.dataset.state = 'UNKNOWN';
+    row.innerHTML = `<span aria-hidden="true">🥗</span><span class="diet-name">Dieta</span><span class="diet-value"></span>`;
+    row.querySelector('.diet-value').textContent = DIET_LABELS.UNKNOWN;
+    this.el.stats.appendChild(row);
+    return row;
+  }
 
   _buildStatBars() {
     const rows = {};
@@ -224,26 +292,81 @@ export class UIManager {
   }
 
   _renderInventory({ itemId, delta, items }) {
-    const bar = this.el.inventory;
-    bar.replaceChildren();
-    for (const it of items) {
-      const slot = document.createElement('div');
-      slot.className = 'inv-slot';
-      slot.title = it.NAME;
-      slot.innerHTML = `<span class="label"></span><span class="icon"></span><span class="count"></span>`;
-      slot.querySelector('.label').textContent = it.NAME;
-      slot.querySelector('.icon').textContent = it.ICON;
-      slot.querySelector('.count').textContent = it.count;
-      if (it.id === itemId && delta > 0) {
-        slot.classList.add('bump');
-        setTimeout(() => slot.classList.remove('bump'), 200);
-      }
-      bar.appendChild(slot);
-    }
+    this._invItems = items;
+    this._drawHotbar(delta > 0 ? itemId : null);
     if (delta > 0) {
       const def = this._items[itemId];
       this.showMessage(`+${delta} ${def.ICON} ${def.NAME}`, 'pickup');
     }
+  }
+
+  /** Barra de inventario: número de tecla, selección y objeto equipado. */
+  _drawHotbar(bumpId = null) {
+    const bar = this.el.inventory;
+    bar.replaceChildren();
+    this._invItems.forEach((it, i) => {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot';
+      if (it.id === this._selectedId) slot.classList.add('selected');
+      if (it.id === this._equippedId) slot.classList.add('equipped');
+      slot.title = it.NAME;
+      slot.innerHTML = `<span class="label"></span><span class="key"></span><span class="icon"></span><span class="count"></span>`;
+      slot.querySelector('.label').textContent = it.NAME;
+      slot.querySelector('.key').textContent = i < 9 ? i + 1 : '';
+      slot.querySelector('.icon').textContent = it.ICON;
+      slot.querySelector('.count').textContent = it.count;
+      if (it.id === bumpId) {
+        slot.classList.add('bump');
+        setTimeout(() => slot.classList.remove('bump'), 200);
+      }
+      bar.appendChild(slot);
+    });
+    this._drawUseHint();
+  }
+
+  /** Texto sobre la barra: qué hace "usar" con el objeto seleccionado. */
+  _drawUseHint() {
+    const el = this.el.useHint;
+    const id = this._selectedId;
+    const pl = this._placement;
+    el.classList.remove('invalid');
+    if (!id) {
+      el.classList.add('hidden');
+      return;
+    }
+    const def = this._items[id];
+    const key = '[Clic dcho / R]';
+    let text;
+    switch (def.USE) {
+      case 'EAT': text = `${key} Comer`; break;
+      case 'DRINK': text = `${key} Beber`; break;
+      case 'WATERSKIN': {
+        const water = this._count('WATER');
+        const cap = this._count('WATERSKIN') * this._equipmentCfg.WATER_CAPACITY;
+        text = `${key} Llenar (mirando al agua) o beber · ${water}/${cap}`;
+        break;
+      }
+      case 'EQUIP': text = `${key} ${this._equippedId === id ? 'Quitar' : 'Equipar'}`; break;
+      case 'PLACE':
+        if (pl?.active && !pl.valid) {
+          text = pl.reason ?? 'No se puede colocar aquí';
+          el.classList.add('invalid');
+        } else text = `${key} Colocar · [Q] Girar`;
+        break;
+      default: text = 'Material de fabricación · [Tab] Fabricar';
+    }
+    el.textContent = `${def.ICON} ${def.NAME} — ${text}`;
+    el.classList.remove('hidden');
+  }
+
+  _count(id) {
+    return this._invItems.find((i) => i.id === id)?.count ?? 0;
+  }
+
+  _updateDiet({ state }) {
+    const el = this.el.diet;
+    el.dataset.state = state;
+    el.querySelector('.diet-value').textContent = DIET_LABELS[state];
   }
 
   _pulseCrosshair() {
@@ -275,7 +398,7 @@ export class UIManager {
   }
 
   _updateLockHint() {
-    const show = this._started && !this._adminPanelOpen && !this._input.isPointerLocked();
+    const show = this._started && !this._adminPanelOpen && !this._craftingOpen && !this._input.isPointerLocked();
     this.el.lockHint.classList.toggle('hidden', !show);
   }
 }

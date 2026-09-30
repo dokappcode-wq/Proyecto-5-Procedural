@@ -14,6 +14,7 @@
   <div id="game-container"></div>
   <div id="vignette"></div>
   <div id="damage-flash"></div>
+  <div id="sleep-overlay"><span>Durmiendo…</span></div>
 
   <!-- Pantalla de inicio -->
   <div id="start-screen" class="overlay">
@@ -29,6 +30,9 @@
         <li><kbd>V</kbd> 1ª / 3ª persona</li>
         <li><kbd>E</kbd> recoger</li>
         <li><kbd>Clic</kbd> golpear</li>
+        <li><kbd>1–9</kbd> elegir objeto</li>
+        <li><kbd>Clic dcho</kbd>/<kbd>R</kbd> usar</li>
+        <li><kbd>Tab</kbd> fabricar</li>
         <li><kbd>Rueda</kbd> distancia de cámara (3ª)</li>
         <li><kbd>Esc</kbd> liberar ratón</li>
       </ul>
@@ -39,6 +43,7 @@
   <div id="hud" class="hidden">
     <div id="crosshair"></div>
     <div id="interaction-prompt" class="hidden"></div>
+    <div id="use-hint" class="hidden"></div>
     <div id="inventory-bar"></div>
     <div id="stats" aria-label="Estado del jugador"></div>
     <div id="biome"></div>
@@ -52,7 +57,9 @@
       <div class="help-body">
         <div><kbd>WASD</kbd> moverse · <kbd>Shift</kbd> correr</div>
         <div><kbd>Espacio</kbd> saltar · <kbd>V</kbd> cámara</div>
-        <div><kbd>E</kbd> recoger / beber · <kbd>Clic</kbd>/<kbd>F</kbd> golpear</div>
+        <div><kbd>E</kbd> recoger / beber / dormir · <kbd>Clic</kbd>/<kbd>F</kbd> golpear</div>
+        <div><kbd>1–9</kbd> elegir · <kbd>Clic dcho</kbd>/<kbd>R</kbd> usar · <kbd>Q</kbd> girar</div>
+        <div><kbd>Tab</kbd> fabricar</div>
         <div><kbd>Rueda</kbd> zoom (3ª persona)</div>
         <div><kbd>Esc</kbd> liberar ratón · clic para volver</div>
       </div>

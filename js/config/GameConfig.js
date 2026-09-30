@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.6.0-fase6',
+    VERSION: '0.9.0-fase9',
   },
 
   RENDER: {
@@ -69,6 +69,12 @@ export const GameConfig = deepFreeze({
       TOGGLE_HELP: ['KeyH'],
       INTERACT: ['KeyE'],               // recoger / interactuar
       ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
+      USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado (comer, beber, equipar, colocar)
+      ROTATE: ['KeyQ'],                 // girar la construcción antes de colocarla
+      CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
+      HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
+      HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
+      HOTBAR_7: ['Digit7'], HOTBAR_8: ['Digit8'], HOTBAR_9: ['Digit9'],
     },
   },
 
@@ -306,14 +312,79 @@ export const GameConfig = deepFreeze({
   },
 
   // Objetos del inventario. FOOD: tipo de comida para la nutrición (Fase 7).
+  // USE: qué hace "usar" (clic derecho / R) con el objeto seleccionado:
+  //   EAT (NutritionSystem), DRINK (agua del odre), WATERSKIN (llenar/beber),
+  //   EQUIP (EquipmentSystem), PLACE (ConstructionSystem → STRUCTURE).
   ITEMS: {
     WOOD: { NAME: 'Madera', ICON: '🪵' },
     STONE: { NAME: 'Piedra', ICON: '🪨' },
     WOOL: { NAME: 'Lana', ICON: '🧶' },
     LEATHER: { NAME: 'Cuero', ICON: '🟫' },
-    MEAT: { NAME: 'Carne', ICON: '🍖', FOOD: 'ANIMAL' },
-    APPLE: { NAME: 'Manzana', ICON: '🍎', FOOD: 'PLANT' },
-    WATER: { NAME: 'Agua', ICON: '💧' },
+    MEAT: { NAME: 'Carne', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION' },
+    APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
+    WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
+    WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN' },
+    LEATHER_ARMOR: { NAME: 'Armadura de cuero', ICON: '🦺', USE: 'EQUIP', SLOT: 'BODY' },
+    BED: { NAME: 'Cama', ICON: '🛏️', USE: 'PLACE', STRUCTURE: 'BED' },
+    SHELTER: { NAME: 'Refugio', ICON: '🛖', USE: 'PLACE', STRUCTURE: 'SHELTER' },
+  },
+
+  // Alimentación (Fase 7). Equilibrio entre comida animal y vegetal.
+  NUTRITION: {
+    MEAT_NUTRITION: 30,        // hambre recuperada por unidad (ITEMS.MEAT.NUTRITION apunta aquí)
+    APPLE_NUTRITION: 14,
+    ANIMAL_FOOD_WEIGHT: 1,     // proporción deseada animal : vegetal (1 : 1)
+    PLANT_FOOD_WEIGHT: 1,
+    BALANCE_TOLERANCE: 0.2,    // desviación admitida respecto a la proporción deseada (0..1)
+    DIET_MEMORY: 600,          // s: vida media de lo comido en el cálculo del equilibrio
+    MIN_INTAKE_TO_JUDGE: 40,   // nutrición reciente mínima antes de juzgar la dieta
+    UNBALANCED_HUNGER_DECAY_MULTIPLIER: 1.4, // el hambre baja más rápido con dieta desequilibrada
+    UNBALANCED_BLOCKS_REGEN: true,          // sin dieta equilibrada no se regenera vida
+  },
+
+  // Equipamiento sencillo (Fase 8).
+  EQUIPMENT: {
+    ARMOR_COLD_RESISTANCE: 0.7, // multiplicador de pérdida de temperatura con armadura (1 = sin efecto)
+    WATER_CAPACITY: 3,          // unidades de agua por odre
+  },
+
+  // Recetas (Fase 9): ingredientes → resultado. Solo configuración.
+  RECIPES: {
+    BED: { RESULT: 'BED', AMOUNT: 1, INGREDIENTS: { WOOL: 3, WOOD: 3 } },
+    WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
+    LEATHER_ARMOR: { RESULT: 'LEATHER_ARMOR', AMOUNT: 1, INGREDIENTS: { LEATHER: 4 } },
+    SHELTER: { RESULT: 'SHELTER', AMOUNT: 1, INGREDIENTS: { WOOD: 12, STONE: 2 } },
+  },
+
+  // Construcciones colocables (Fase 9). Futuro: paredes, suelos, cofres, estaciones...
+  //   CLEARANCE: radio libre necesario para colocarla.
+  //   COLLIDERS: círculos [x, z, radio] en coordenadas locales (bloquean al jugador).
+  //   INTERACT: acción con E (SLEEP = dormir).
+  //   SHELTER_RADIUS: radio bajo techo (protección, Fase 10).
+  STRUCTURES: {
+    BED: { NAME: 'Cama', NAME_WITH_ARTICLE: 'una cama', ITEM: 'BED', CLEARANCE: 1.1, COLLIDERS: [], INTERACT: 'SLEEP', AIM_HEIGHT: 0.4, AIM_RADIUS: 1 },
+    SHELTER: {
+      NAME: 'Refugio', NAME_WITH_ARTICLE: 'un refugio', ITEM: 'SHELTER', CLEARANCE: 2.2, INTERACT: null, AIM_HEIGHT: 1.2, AIM_RADIUS: 1.6,
+      COLLIDERS: [[-1.35, -1.35, 0.14], [1.35, -1.35, 0.14], [-1.35, 1.35, 0.14], [1.35, 1.35, 0.14]],
+      SHELTER_RADIUS: 1.6,
+    },
+  },
+
+  CONSTRUCTION: {
+    PLACE_DISTANCE: 3.2,   // m delante del jugador
+    MAX_SLOPE: 0.35,       // desnivel máximo del terreno para colocar
+    ROTATION_STEP: Math.PI / 4,
+  },
+
+  // Dormir (Fase 8). El avance real del reloj llegará con TimeSystem (Fase 11).
+  SLEEP: {
+    FADE_TIME: 1.2,        // s de fundido a negro
+    DURATION: 2.5,         // s de pantalla negra
+    HOURS: 8,              // horas que pasarán (TimeSystem, Fase 11)
+    ENERGY_RESTORED: 100,
+    HUNGER_COST: 15,
+    THIRST_COST: 20,
+    SETS_RESPAWN: true,    // dormir en una cama la convierte en punto de reaparición
   },
 
   // Interacción del jugador con el mundo (recoger, golpear).

@@ -37,6 +37,23 @@ export const GameEvents = Object.freeze({
   ANIMAL_KILLED: 'animal:killed',                   // { animal, drops }
   RESOURCE_HARVESTED: 'resource:harvested',         // { node, item, amount, depleted }
   INVENTORY_CHANGED: 'inventory:changed',           // { itemId, count, delta, items }
+  HOTBAR_CHANGED: 'inventory:hotbarChanged',        // { selectedId }
+  ITEM_USED: 'inventory:itemUsed',                  // { itemId, use }
+  EQUIPMENT_CHANGED: 'inventory:equipmentChanged',  // { slot, itemId|null }
+
+  // Alimentación
+  FOOD_EATEN: 'nutrition:foodEaten',                // { itemId, foodType, hunger }
+  DIET_CHANGED: 'nutrition:dietChanged',            // { state: 'UNKNOWN'|'BALANCED'|'TOO_MUCH_ANIMAL'|'TOO_MUCH_PLANT', share }
+
+  // Fabricación, construcción y sueño
+  CRAFT_REQUEST: 'crafting:request',                // { recipeId }
+  ITEM_CRAFTED: 'crafting:crafted',                 // { recipeId, result, amount }
+  CRAFTING_PANEL_TOGGLED: 'crafting:panelToggled',  // { open }
+  STRUCTURE_PLACED: 'construction:placed',          // { structure }
+  PLACEMENT_CHANGED: 'construction:placement',      // { active, valid, type }
+  SLEEP_REQUEST: 'sleep:request',                   // { bed }
+  PLAYER_SLEEP_STARTED: 'sleep:started',            // { bed }
+  PLAYER_SLEPT: 'sleep:finished',                   // { hours, bed }
 
   // Admin
   ADMIN_MODE_CHANGED: 'admin:modeChanged',          // { active }

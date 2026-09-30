@@ -59,6 +59,8 @@ export class InputManager {
     document.addEventListener('mouseup', this._onMouseUp);
     document.addEventListener('pointerlockchange', this._onPointerLockChange);
     this._dom.addEventListener('wheel', this._onWheel, { passive: false });
+    // El clic derecho es "usar": sin menú contextual del navegador.
+    this._dom.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   // ---- Bloqueo -----------------------------------------------------------

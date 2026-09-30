@@ -1,0 +1,125 @@
+import { GameEvents } from '../core/GameEvents.js';
+
+/**
+ * ItemUseSystem — "usar" (clic derecho / R) el objeto seleccionado en la barra.
+ *
+ * Solo decide QUÉ sistema se encarga según ITEMS.*.USE; las reglas viven en
+ * cada sistema:
+ *   EAT        → NutritionSystem.eat()          (carne, manzana)
+ *   DRINK      → beber una unidad de agua       (agua del odre)
+ *   WATERSKIN  → llenar mirando al agua / beber (odre)
+ *   EQUIP      → EquipmentSystem.toggle()       (armadura de cuero)
+ *   PLACE      → ConstructionSystem.place()     (cama, refugio)
+ */
+const USE_COOLDOWN = 0.35;
+
+export class ItemUseSystem {
+  constructor({ items, equipmentConfig, input, hotbar, inventory, nutrition, equipment, construction, interaction, thirst, events }) {
+    this.name = 'itemUse';
+    this._items = items;
+    this._eqCfg = equipmentConfig;
+    this._input = input;
+    this._hotbar = hotbar;
+    this._inventory = inventory;
+    this._nutrition = nutrition;
+    this._equipment = equipment;
+    this._construction = construction;
+    this._interaction = interaction;
+    this._thirst = thirst;
+    this._events = events;
+    this._cooldown = 0;
+    this._queued = false;
+  }
+
+  update(dt) {
+    this._cooldown = Math.max(0, this._cooldown - dt);
+    // Una pulsación durante el enfriamiento queda en cola (no se pierde).
+    if (this._input.wasPressed('USE')) this._queued = true;
+    if (this._cooldown > 0 || !this._queued) return;
+    this._queued = false;
+    const itemId = this._hotbar.selectedId;
+    if (!itemId) {
+      this._message('Selecciona un objeto con las teclas 1–9 para usarlo.');
+      return;
+    }
+    this._cooldown = USE_COOLDOWN;
+    this.use(itemId);
+  }
+
+  /** @returns {boolean} si se usó */
+  use(itemId) {
+    const def = this._items[itemId];
+    if (!def || !this._inventory.hasItem(itemId)) return false;
+    let ok = false;
+    switch (def.USE) {
+      case 'EAT':
+        ok = this._eat(itemId);
+        break;
+      case 'DRINK':
+        ok = this._drinkCarried();
+        break;
+      case 'WATERSKIN':
+        ok = this._interaction.target?.kind === 'water' ? this._fillWaterskin() : this._drinkCarried();
+        break;
+      case 'EQUIP':
+        this._equipment.toggle(itemId);
+        ok = true;
+        break;
+      case 'PLACE':
+        ok = this._construction.place();
+        if (ok) this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
+        break;
+      default:
+        this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
+    }
+    if (ok) this._events.emit(GameEvents.ITEM_USED, { itemId, use: def.USE });
+    return ok;
+  }
+
+  // ---- Capacidad del odre -----------------------------------------------------
+
+  /** Agua máxima que se puede llevar: odres × capacidad. */
+  get waterCapacity() {
+    return this._inventory.getItemCount('WATERSKIN') * this._eqCfg.WATER_CAPACITY;
+  }
+
+  _eat(itemId) {
+    const result = this._nutrition.eat(itemId);
+    if (!result.ok) {
+      if (result.reason === 'full') this._message('No tienes hambre.');
+      return false;
+    }
+    this._inventory.removeItem(itemId, 1);
+    return true;
+  }
+
+  _fillWaterskin() {
+    const capacity = this.waterCapacity;
+    const have = this._inventory.getItemCount('WATER');
+    if (have >= capacity) {
+      this._message('El odre ya está lleno.');
+      return false;
+    }
+    this._inventory.addItem('WATER', capacity - have);
+    this._message(`Has llenado el odre (${capacity}/${capacity}).`, 'pickup');
+    return true;
+  }
+
+  _drinkCarried() {
+    if (!this._inventory.hasItem('WATER')) {
+      this._message(this._inventory.hasItem('WATERSKIN') ? 'El odre está vacío: llénalo mirando al agua.' : 'No llevas agua.');
+      return false;
+    }
+    if (this._thirst.ratio >= 1) {
+      this._message('No tienes sed.');
+      return false;
+    }
+    this._inventory.removeItem('WATER', 1);
+    this._events.emit(GameEvents.PLAYER_DRANK, { source: 'WATERSKIN' });
+    return true;
+  }
+
+  _message(text, type = 'info') {
+    this._events.emit(GameEvents.UI_MESSAGE, { text, type });
+  }
+}

@@ -23,6 +23,15 @@ import { HungerSystem } from './player/HungerSystem.js';
 import { ThirstSystem } from './player/ThirstSystem.js';
 import { EnergySystem } from './player/EnergySystem.js';
 import { registerSurvivalTools } from './admin/tools/SurvivalTools.js';
+import { NutritionSystem } from './nutrition/NutritionSystem.js';
+import { CraftingSystem } from './crafting/CraftingSystem.js';
+import { ConstructionSystem } from './construction/ConstructionSystem.js';
+import { EquipmentSystem } from './inventory/EquipmentSystem.js';
+import { HotbarSystem } from './inventory/HotbarSystem.js';
+import { ItemUseSystem } from './inventory/ItemUseSystem.js';
+import { SleepSystem } from './player/SleepSystem.js';
+import { CraftingPanel } from './ui/CraftingPanel.js';
+import { registerCraftTools } from './admin/tools/CraftTools.js';
 import { WorldGenerator } from './world/WorldGenerator.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -72,7 +81,14 @@ function boot() {
     input,
     player,
     terrain: world,
-    obstacles: { resolveCollisions: (pos, r) => world.resources?.resolveCollisions(pos, r) ?? false },
+    // Obstáculos: recursos (troncos, rocas) + construcciones (postes del refugio).
+    obstacles: {
+      resolveCollisions: (pos, r) => {
+        const a = world.resources?.resolveCollisions(pos, r) ?? false;
+        const b = construction?.resolveCollisions(pos, r) ?? false;
+        return a || b;
+      },
+    },
     events,
   });
   const camera = new CameraSystem({
@@ -113,6 +129,24 @@ function boot() {
 
   // ---- Inventario e interacción (recoger, golpear) --------------------------
   const inventory = new InventorySystem({ items: cfg.ITEMS, events });
+  const hotbar = new HotbarSystem({ input, inventory, events });
+  const equipment = new EquipmentSystem({ items: cfg.ITEMS, config: cfg.EQUIPMENT, inventory, events });
+  const crafting = new CraftingSystem({ recipes: cfg.RECIPES, items: cfg.ITEMS, inventory, events });
+  const construction = new ConstructionSystem({
+    scene: render.scene,
+    config: cfg.CONSTRUCTION,
+    structures: cfg.STRUCTURES,
+    items: cfg.ITEMS,
+    world,
+    player,
+    input,
+    hotbar,
+    inventory,
+    events,
+  });
+  events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId }) => {
+    if (slot === 'BODY') player.model.setArmor(itemId === 'LEATHER_ARMOR');
+  });
   const interaction = new InteractionSystem({
     config: cfg.INTERACTION,
     resourceTypes: cfg.RESOURCE_TYPES,
@@ -123,6 +157,7 @@ function boot() {
     animals,
     inventory,
     events,
+    construction,
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -134,9 +169,38 @@ function boot() {
   const health = new HealthSystem({
     config: S,
     events,
-    // Solo se cura si está bien alimentado e hidratado.
-    canRegenerate: () => hunger.ratio >= S.HEALTH_REGEN_MIN_RATIO && thirst.ratio >= S.HEALTH_REGEN_MIN_RATIO,
+    // Solo se cura si está bien alimentado, hidratado y (Fase 7) con dieta equilibrada.
+    canRegenerate: () =>
+      hunger.ratio >= S.HEALTH_REGEN_MIN_RATIO &&
+      thirst.ratio >= S.HEALTH_REGEN_MIN_RATIO &&
+      !(cfg.NUTRITION.UNBALANCED_BLOCKS_REGEN && nutrition.isUnbalanced),
   });
+
+  // ---- Alimentación, uso de objetos y sueño (Fases 7–9) ----------------------
+  const nutrition = new NutritionSystem({ config: cfg.NUTRITION, items: cfg.ITEMS, hunger, events });
+  events.on(GameEvents.DIET_CHANGED, () => {
+    hunger.decayMultiplier = nutrition.isUnbalanced ? cfg.NUTRITION.UNBALANCED_HUNGER_DECAY_MULTIPLIER : 1;
+  });
+  const itemUse = new ItemUseSystem({
+    items: cfg.ITEMS,
+    equipmentConfig: cfg.EQUIPMENT,
+    input,
+    hotbar,
+    inventory,
+    nutrition,
+    equipment,
+    construction,
+    interaction,
+    thirst,
+    events,
+  });
+  const sleep = new SleepSystem({ config: cfg.SLEEP, energy, hunger, thirst, input, events });
+  // Dormir en una cama la convierte en punto de reaparición.
+  let respawnBed = null;
+  events.on(GameEvents.PLAYER_SLEPT, ({ bed }) => {
+    if (bed && cfg.SLEEP.SETS_RESPAWN) respawnBed = bed;
+  });
+  events.on(GameEvents.WORLD_GENERATED, () => (respawnBed = null));
   const needs = [hunger, thirst, energy];
   const setNeedsPaused = (paused) => needs.forEach((n) => (n.paused = paused));
 
@@ -154,7 +218,11 @@ function boot() {
     setNeedsPaused(true);
   });
   events.on(GameEvents.PLAYER_RESPAWNED, () => {
-    controller.spawn();
+    if (respawnBed && construction.exists(respawnBed)) {
+      controller.placeAt(respawnBed.x + Math.cos(respawnBed.rotation) * 1.4, respawnBed.z - Math.sin(respawnBed.rotation) * 1.4);
+    } else {
+      controller.spawn();
+    }
     hunger.set(S.RESPAWN_VALUES.HUNGER);
     thirst.set(S.RESPAWN_VALUES.THIRST);
     energy.set(S.RESPAWN_VALUES.ENERGY);
@@ -179,10 +247,12 @@ function boot() {
     config: cfg.UI,
     gameInfo: cfg.GAME,
     items: cfg.ITEMS,
+    equipmentConfig: cfg.EQUIPMENT,
     events,
     input,
     canvas: render.domElement,
   });
+  const craftingPanel = new CraftingPanel({ container: document.getElementById('hud'), crafting, input, events });
   ui.setInitialCameraMode(camera.mode);
   [health, hunger, thirst, energy].forEach((s) => s.emitState()); // pinta las barras iniciales
 
@@ -195,6 +265,7 @@ function boot() {
   registerLifeTools(admin, { world, animals, player, controller, species: cfg.ANIMALS.SPECIES });
   registerInventoryTools(admin, { inventory, items: cfg.ITEMS });
   registerSurvivalTools(admin, { health, hunger, thirst, energy, events });
+  registerCraftTools(admin, { nutrition, equipment, construction, player, events });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -203,24 +274,30 @@ function boot() {
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  loop.add(hotbar);      // teclas 1–9
+  loop.add(construction); // vista previa de colocación
   loop.add(interaction); // objetivo de la mira + recoger/golpear
+  loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(hunger);      // supervivencia: desgaste por tiempo y actividad
   loop.add(thirst);
   loop.add(energy);
   loop.add(health);      // curación, cuenta atrás de reaparición
+  loop.add(nutrition);   // la dieta "olvida" poco a poco lo comido
+  loop.add(sleep);
   loop.add(biomeTracker); // bioma actual del jugador
   loop.add(discovery);   // agua y animales descubiertos
   loop.add(lighting);    // sombra centrada en el jugador
   loop.add(sky);         // cúpula centrada en la cámara
   loop.add(ui);
+  loop.add(craftingPanel);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
   loop.start();
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
-  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction, health, hunger, thirst, energy, player, controller, camera, ui, admin, loop };
+  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction, health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player, controller, camera, ui, admin, loop };
 }
 
 try {

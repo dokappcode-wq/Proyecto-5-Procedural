@@ -17,7 +17,7 @@ import { GameEvents } from '../core/GameEvents.js';
  * ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -28,6 +28,7 @@ export class InteractionSystem {
     this._animals = animals;
     this._inventory = inventory;
     this._events = events;
+    this._construction = construction;
 
     this._cooldown = 0;
     this._queued = null; // acción pulsada durante el enfriamiento (se ejecuta al terminar)
@@ -63,6 +64,8 @@ export class InteractionSystem {
     this._cooldown = this._cfg.ACTION_COOLDOWN;
     if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
+    } else if (target?.kind === 'structure' && target.action && button === 'INTERACT') {
+      if (target.ref.def.INTERACT === 'SLEEP') this._events.emit(GameEvents.SLEEP_REQUEST, { bed: target.ref });
     } else if (target?.kind === 'water' && button === 'INTERACT') {
       this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'drink' });
       this._events.emit(GameEvents.PLAYER_DRANK, { source: 'POND' });
@@ -131,6 +134,15 @@ export class InteractionSystem {
       consider({ kind: 'animal', id: a.id, ref: a }, a.x, a.y + 0.8 * a.scale, a.z, 0.75 * a.scale, 0.5 * a.scale);
     }
 
+    for (const st of this._construction?.getStructuresNear(p.x, p.z, range + 3) ?? []) {
+      consider(
+        { kind: 'structure', id: `st-${st.id}`, ref: st },
+        st.x, st.y + st.def.AIM_HEIGHT, st.z,
+        st.def.AIM_RADIUS,
+        st.def.CLEARANCE * 0.8,
+      );
+    }
+
     // Agua: punto donde la mira corta la lámina de la charca más cercana.
     const water = this._world.water?.nearestPond(p.x, p.z);
     if (water && water.distance <= range + 1 && this._dir.y < -0.05) {
@@ -152,6 +164,10 @@ export class InteractionSystem {
   /** Añade el texto que mostrará la UI: { label, action }. */
   _describe(t) {
     if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
+    if (t.kind === 'structure') {
+      const action = t.ref.def.INTERACT === 'SLEEP' ? 'Dormir' : null;
+      return { ...t, label: t.ref.def.NAME, action, key: 'E' };
+    }
     if (t.kind === 'animal') {
       return { ...t, label: t.ref.def.NAME, action: 'Golpear', key: 'Clic' };
     }

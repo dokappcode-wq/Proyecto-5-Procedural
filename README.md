@@ -3,10 +3,10 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: FASE 6** — supervivencia: vida, hambre, sed y energía con sus barras, daño por
-hambre, sed, caídas y animales, curación lenta, muerte y reaparición, y beber de las charcas.
-Sobre las Fases 1–5: mundo finito por seed con biomas, recursos, charcas y rebaños con
-temperamento, inventario y recogida, en estilo low-poly.
+**Estado actual: FASE 9** — alimentación con equilibrio animal/vegetal (7), odre, armadura de
+cuero y cama para dormir (8), fabricación con recetas y construcción de cama y refugio (9).
+Sobre las Fases 1–6: mundo finito por seed con biomas, recursos, charcas, rebaños con
+temperamento, inventario, recogida y supervivencia (vida, hambre, sed, energía), en estilo low-poly.
 
 ## Cómo ejecutarlo
 
@@ -35,6 +35,11 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | `V` | Alternar 1ª / 3ª persona |
 | `E` | Recoger (talar, picar, coger manzanas) / beber (mirando al agua) |
 | Clic izquierdo / `F` | Golpear animal (o recoger) |
+| `1`–`9` | Seleccionar objeto de la barra |
+| Clic derecho / `R` | Usar el objeto seleccionado: comer, beber del odre, llenarlo (mirando al agua), equipar, colocar |
+| `Q` | Girar la construcción antes de colocarla |
+| `Tab` | Panel de fabricación |
+| `E` sobre una cama | Dormir |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -80,7 +85,16 @@ js/
 │   ├── Deer.js / Goat.js / Cow.js  Especies (modelo + ajustes de comportamiento)
 │   └── AnimalRenderer.js    InstancedMesh cuerpo + patas animadas (2 draw calls/especie)
 ├── render/PartsBuilder.js   Geometría low-poly por piezas con color por vértice
-├── inventory/InventorySystem.js   AddItem/RemoveItem/HasItem/GetItemCount (sin Three.js)
+├── inventory/
+│   ├── InventorySystem.js   AddItem/RemoveItem/HasItem/GetItemCount (sin Three.js)
+│   ├── HotbarSystem.js      Objeto seleccionado (teclas 1–9)
+│   ├── ItemUseSystem.js     "Usar": delega en nutrición, odre, equipamiento o construcción
+│   └── EquipmentSystem.js   Armadura (ranura BODY) → multiplicador de pérdida de frío
+├── nutrition/NutritionSystem.js  Equilibrio comida animal/vegetal (sin Three.js)
+├── crafting/CraftingSystem.js    Recetas de GameConfig.RECIPES (sin Three.js)
+├── construction/
+│   ├── ConstructionSystem.js     Vista previa, validación, colocación, colisiones, refugio
+│   └── StructureModels.js        Modelos low-poly de cama y refugio
 ├── interaction/InteractionSystem.js  Objetivo de la mira + recoger / golpear
 ├── player/
 │   ├── Player.js            Estado del jugador (posición, mirada, flags)
@@ -89,6 +103,7 @@ js/
 │   ├── HungerSystem.js      Hambre: desgaste; a 0 hace daño vía evento
 │   ├── ThirstSystem.js      Sed: desgaste, beber (evento PLAYER_DRANK)
 │   ├── EnergySystem.js      Energía: tiempo + actividad; limita correr y velocidad
+│   ├── SleepSystem.js       Dormir: energía, coste de hambre/sed, evento de horas (Fase 11)
 │   ├── PlayerController.js  Entrada → física (gravedad, salto, escalones, colisión)
 │   └── PlayerModel.js       Personaje de bloques animado
 ├── camera/CameraSystem.js   1ª/3ª persona con transición suave
@@ -96,8 +111,9 @@ js/
 │   ├── AdminSystem.js       Activación por secuencia + registro de herramientas
 │   ├── AdminPanel.js        Vista DOM del panel
 │   ├── KeySequenceDetector.js
-│   └── tools/               CoreDebugTools, WorldTools, LifeTools, InventoryTools, SurvivalTools
-└── ui/UIManager.js          HUD provisional (reacciona a eventos)
+│   └── tools/               Core, World, Life, Inventory, Survival y Craft tools
+├── ui/UIManager.js          HUD provisional (reacciona a eventos)
+└── ui/CraftingPanel.js      Panel de fabricación (pide fabricar con CRAFT_REQUEST)
 tests/                       Tests de Node (`npm test`)
 ```
 
@@ -126,6 +142,11 @@ Principios:
 - **Supervivencia por eventos.** Cada estadística es un sistema independiente. Todo el daño
   (animales, hambre, sed, caídas y, en la Fase 10, frío) llega a HealthSystem por el evento
   `PLAYER_DAMAGED`; la UI solo escucha `PLAYER_STAT_CHANGED` / `PLAYER_STAT_LEVEL`.
+- **Objetos por datos.** Cada objeto declara en `GameConfig.ITEMS` qué hace al usarlo (`USE`);
+  recetas en `RECIPES`, construcciones en `STRUCTURES`. Añadir un objeto, receta o construcción
+  es sobre todo configuración (+ un modelo para las construcciones).
+- **Nutrición separada del hambre.** El hambre es cuánto has comido; NutritionSystem, qué.
+  Con dieta desequilibrada el hambre baja más rápido y la vida no se regenera.
 - **Interacción desacoplada.** InteractionSystem solo decide el objetivo y delega en
   ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
 - **Mundo finito.** 1024 × 1024 m en chunks de 64 m. Los datos de altura se generan bajo demanda

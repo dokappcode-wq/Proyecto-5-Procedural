@@ -18,6 +18,8 @@ export class PlayerModel {
     const mat = (color) => new THREE.MeshLambertMaterial({ color });
     const skin = mat(colors.SKIN);
     const shirt = mat(colors.SHIRT);
+    this._shirt = shirt;
+    this._shirtColor = colors.SHIRT;
     const pants = mat(colors.PANTS);
     const boots = mat(colors.BOOTS);
     const hair = mat(colors.HAIR);
@@ -62,6 +64,11 @@ export class PlayerModel {
     this._walkPhase = 0;
     this._swing = 0;
     this._actionTime = 0; // >0 durante la animación de golpear/recoger
+  }
+
+  /** Armadura de cuero: el torso y las mangas pasan a color cuero. */
+  setArmor(on) {
+    this._shirt.color.set(on ? 0x8b5a2b : this._shirtColor);
   }
 
   /** Animación corta del brazo derecho (golpear, recoger). */

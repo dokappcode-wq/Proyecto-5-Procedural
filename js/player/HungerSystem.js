@@ -22,6 +22,8 @@ export class HungerSystem extends VitalStat {
     this._cfg = config;
     this._damageTimer = 0;
     this.paused = false;
+    /** Otros sistemas pueden acelerar el hambre (p. ej. dieta desequilibrada). */
+    this.decayMultiplier = 1;
   }
 
   eat(amount) {
@@ -30,7 +32,7 @@ export class HungerSystem extends VitalStat {
 
   update(dt) {
     if (this.paused) return;
-    this.consume(this._cfg.HUNGER_DECAY * dt);
+    this.consume(this._cfg.HUNGER_DECAY * this.decayMultiplier * dt);
     this._damageTimer = starvationTick(this, dt, this._damageTimer, this._cfg.STARVING_DAMAGE, 'HUNGER', this._cfg, this._events);
   }
 }
