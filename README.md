@@ -3,14 +3,22 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: FASE 11 + nave** — temperatura oculta con escarcha progresiva, congelación y
-daño por frío (10), ciclo de día y noche con sol, estrellas y noches más frías (11), y una
-**nave pequeña** en la que se entra: botón exterior → compuerta inferior con rampa, sala de
-estar/laboratorio (mapa, puesto de carga, ranuras libres), puerta y sala de controles con el
-asiento del piloto. Se puede volar por MUNDO 0, levantarse en el aire (la nave flota), abrir
-la compuerta y saltar (la nave aterriza sola), y llevar el reloj de la nave para localizarla.
-Sobre las Fases 1–9: mundo finito por seed con biomas, recursos, charcas, rebaños con
-temperamento, inventario, supervivencia, alimentación, fabricación y construcción modular.
+**Estado actual: v1.0.0 — las 14 fases completas.**
+
+| Fase | Contenido |
+|---|---|
+| 1–2 | Motor base: jugador, cámara 1ª/3ª persona, mundo finito procedural por seed |
+| 3 | Biomas por pesos: Explanada, Bosque y Montañas Heladas (estilo low-poly) |
+| 4 | Mundo vivo: árboles, rocas, charcas, ciervos, cabras y vacas |
+| 5 | Inventario, recogida y animales con temperamento y reacción al golpe |
+| 6 | Supervivencia: vida, hambre, sed y energía |
+| 7–9 | Dieta equilibrada, odre, armadura, cama, fabricación y construcción modular |
+| 10 | Temperatura oculta: frío, congelación, escarcha progresiva y daño |
+| 11 | Día y noche: sol, crepúsculos, estrellas, noches más frías, dormir adelanta el reloj |
+| 12 | Sistema celestial: sol, Luna A y Luna B en el cielo, con fases y luz de luna |
+| 13 | Espacio: salir del planeta con la nave, ver MUNDO 0 y las lunas desde fuera, regresar |
+| 14 | Modo Admin plegable con buscador, interfaz revisada y limpieza general |
+| + | Nave pequeña: compuerta, laboratorio, sala de controles, vuelo, mapa, puesto de carga, reloj |
 
 ## Cómo ejecutarlo
 
@@ -49,6 +57,8 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | A los mandos: `W` `S` · `A` `D` · `Espacio` `C` · `Shift` | Adelante/atrás · girar · subir/bajar · turbo |
 | A los mandos: ratón / rueda / `E` | Girar la cámara / distancia / levantarse (en el aire la nave se queda flotando) |
 | Reloj de la nave + clic derecho / `R` | Ver dónde está la nave (distancia, dirección, estado) |
+| A los mandos: `O` | Salir al espacio (en vuelo, compuerta cerrada, a más de 60 m del suelo) |
+| En el espacio: `1`–`4` · ratón · rueda · `T` | Enfocar MUNDO 0 / Luna A / Luna B / nave · girar · acercar · regresar |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -102,7 +112,13 @@ js/
 ├── time/
 │   ├── TimeSystem.js        Reloj, día, dirección del sol, luz de día, frío nocturno (sin Three.js)
 │   └── AtmosphereSystem.js  Aplica la hora: sol/luna, luz ambiente, cielo, estrellas, niebla
-├── celestial/CelestialCatalog.js  Lunas A y B por seed + configuración (sin Three.js)
+├── celestial/
+│   ├── CelestialCatalog.js  Lunas A y B por seed + configuración, órbitas, fases (sin Three.js)
+│   └── CelestialSystem.js   Lunas en el cielo (cráteres, fases por la luz del sol), luz de luna
+├── space/
+│   ├── SpaceSystem.js       Transición superficie ↔ espacio, cámara orbital, enfoque
+│   ├── SpaceScene.js        Escena espacial: planeta, nubes, atmósfera, lunas, sol, estrellas
+│   └── PlanetTexture.js     Textura del planeta: mapa real de MUNDO 0 + resto inventado por seed
 ├── ship/
 │   ├── ShipSystem.js        Nave: compone vuelo, modelo, mandos, interacción, colisiones, refugio
 │   ├── ShipLayout.js        Forma: salas, colisiones, suelos, rampa, ranuras (sin Three.js)
@@ -138,6 +154,7 @@ js/
 ├── ui/ModalPanel.js         Base de los paneles que liberan el ratón
 ├── ui/ShipMapPanel.js       Mapa de MUNDO 0 + mapa planetario (lunas) · PlanetMapRenderer.js
 ├── ui/ShipChargerPanel.js   Puesto de carga · ShipPilotHUD.js mandos · ShipWatchHUD.js reloj
+├── ui/SpaceHUD.js           Fundidos, etiquetas y panel del espacio
 tests/                       Tests de Node (`npm test`)
 ```
 
@@ -187,8 +204,13 @@ Principios:
   Normal → Frío → Congelación → Crítico; solo emite eventos: la escarcha y la bruma las dibuja la
   UI y la distancia de visión la reduce AtmosphereSystem, siempre de forma gradual.
 - **Día y noche (Fase 11).** TimeSystem solo calcula (hora, sol, luz, frío nocturno) y
-  AtmosphereSystem lo aplica. Dormir adelanta el reloj. La posición de las lunas ya se calcula
-  (CelestialCatalog) y la mostrará el cielo en la Fase 12.
+  AtmosphereSystem lo aplica. Dormir adelanta el reloj.
+- **Cielo (Fase 12).** Las lunas salen y se ponen con la rotación del planeta y avanzan en su
+  órbita (cada día salen más tarde; la Luna B solo cada 5 días). Sus fases salen solas: cada
+  esfera se ilumina con la dirección real del sol. De noche la luz viene de la luna visible.
+- **Espacio (Fase 13).** Escena aparte con el mismo renderer (`RenderContext.setActive`): la
+  superficie queda congelada y se recupera igual al volver. Misma seed, mismas lunas y misma
+  hora que en el cielo; la isla del mapa mira al sol a mediodía.
 - **Nave.** Forma, vuelo y baterías son lógica pura probada en Node; las colisiones se resuelven
   en coordenadas locales de la nave (sirven con cualquier orientación y a cualquier altura).
   Construcciones y nave comparten la misma interfaz (`surfaceAt`, `blocksAt`, `ceilingAt`,
@@ -199,7 +221,7 @@ Principios:
 
 Depuración desde la consola del navegador: `window.__MUNDO0__` expone los sistemas.
 
-## Cómo probar las Fases 10–11 y la nave
+## Cómo probar las últimas fases
 
 - **Nave**: aparece aterrizada a 20–45 m del inicio (el mapa la marca). Botón rojo bajo la cola
   → `E` abre la compuerta; sube por la rampa. Dentro: mapa, puesto de carga, ranuras libres,
@@ -209,9 +231,13 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 - **Flotar y saltar**: en el aire pulsa `E` para levantarte; la nave queda quieta gastando
   batería. Abre la compuerta con el botón interior y baja por la rampa: al dejar la nave, busca
   un sitio despejado y aterriza sola. ¡La caída hace daño!
-- **Frío**: Admin → Tiempo → Medianoche y sube a las Montañas Heladas (o Admin → Temperatura →
-  Enfriar). Con la armadura de cuero te enfrías más despacio; dentro de la nave cerrada, no.
+- **Frío**: Admin → Tiempo → Medianoche y sube a las Montañas Heladas (o Admin → Temperatura).
+  Con la armadura de cuero te enfrías más despacio; dentro de la nave cerrada, no.
+- **Lunas**: Admin → Cielo → "Ir a una noche con las dos lunas" y "Mirar a la Luna A/B".
+- **Espacio**: vuela por encima de 60 m y pulsa `O` (o Admin → Espacio). `1`–`4` para enfocar,
+  `T` para volver: la nave reaparece donde estaba.
 
-Limitaciones: las lunas aún no se dibujan en el cielo (Fase 12) ni se pueden visitar (falta el
-nodo espacial); las baterías no se recargan todavía (Admin → Nave → Recargar); la nave no choca
-con árboles en vuelo; la temperatura no se muestra como número (es oculta; el Admin sí la muestra).
+Limitaciones: las lunas no se pueden visitar (falta el nodo espacial) ni hay navegación
+orbital; el resto del planeta visto desde el espacio es decorativo; las baterías no se
+recargan todavía (Admin → Nave → Recargar); la nave no choca con árboles en vuelo; la
+temperatura no se muestra como número (es oculta; el Admin sí la muestra).

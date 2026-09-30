@@ -10,8 +10,8 @@ import { SeededRandom } from '../core/SeededRandom.js';
  * La posición de una luna es una órbita circular inclinada (sin física):
  *     ángulo = fase inicial + 2π · velocidad · horas de juego
  *
- * Hoy lo usa el mapa planetario de la nave; en la Fase 12 CelestialSystem
- * dibujará estas mismas lunas en el cielo, y la Fase 13 las mostrará desde el
+ * Lo usan el mapa planetario de la nave, CelestialSystem (las lunas en el cielo)
+ * y SpaceScene (las mismas lunas vistas desde el
  * espacio. Añadir lunas/planetas = añadir entradas a `bodies`.
  */
 export function createCelestialCatalog(config, celestialSeed) {
@@ -36,6 +36,21 @@ export function createCelestialCatalog(config, celestialSeed) {
     planet: { id: 'MUNDO_0', name: config.PLANET_NAME, radiusKm: config.PLANET_RADIUS_KM },
     bodies: [moon('MOON_A', 'Luna A', 'MOON_A'), moon('MOON_B', 'Luna B', 'MOON_B')],
   };
+}
+
+/**
+ * Ángulo del cuerpo en el cielo de MUNDO 0 (como `TimeSystem.sunAngle`: 0 sale,
+ * π/2 culmina, π se pone): la rotación del planeta menos lo que ha avanzado en su
+ * órbita. Por eso cada día sale un poco más tarde.
+ */
+export function skyAngle(body, rotationAngle, totalHours) {
+  return rotationAngle - orbitAngle(body, totalHours);
+}
+
+/** Fracción iluminada (0 = nueva, 1 = llena) según el ángulo con el sol visto desde el planeta. */
+export function illumination(moonDir, sunDir) {
+  const d = moonDir.x * sunDir.x + moonDir.y * sunDir.y + moonDir.z * sunDir.z;
+  return (1 - d) / 2;
 }
 
 /** Ángulo orbital de un cuerpo tras `totalHours` horas de juego. */

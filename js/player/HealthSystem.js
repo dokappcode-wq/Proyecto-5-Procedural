@@ -4,7 +4,7 @@ import { VitalStat } from './VitalStat.js';
 /**
  * HealthSystem — vida del jugador: daño, curación, muerte y reaparición.
  *
- * - Daño: escucha PLAYER_DAMAGED (animales, hambre, sed y, más adelante, frío).
+ * - Daño: escucha PLAYER_DAMAGED (animales, hambre, sed, caídas y frío).
  *   Cualquier sistema puede hacer daño emitiendo ese evento sin conocer a este.
  * - Caídas: escucha PLAYER_LANDED y hace daño por encima de una velocidad.
  * - Curación lenta si no ha recibido daño recientemente y `canRegenerate()`

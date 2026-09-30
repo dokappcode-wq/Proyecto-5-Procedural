@@ -9,7 +9,7 @@ import { VitalStat } from './VitalStat.js';
  * - Efectos: por debajo de ENERGY_NO_RUN_RATIO no se puede correr; a 0 se camina
  *   más despacio. Se exponen con `getMovementModifiers()`; el controlador los
  *   aplica sin saber de dónde vienen.
- * - `rest(amount)`: recuperación (la cama de la Fase 8 lo usará al dormir).
+ * - `rest(amount)`: recuperación (la usa SleepSystem al dormir).
  */
 export class EnergySystem extends VitalStat {
   constructor({ config, events, player }) {

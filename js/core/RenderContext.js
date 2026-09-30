@@ -5,10 +5,10 @@ import * as THREE from 'three';
  *
  * Solo gestiona recursos de render y el redimensionado. No sabe nada del
  * juego: la posición de la cámara la decide CameraSystem, la iluminación
- * SceneLighting y el cielo SkyDome (y, más adelante, TimeSystem / CelestialSystem).
+ * SceneLighting y el cielo SkyDome (con la hora de TimeSystem / AtmosphereSystem).
  *
- * Preparado para varias escenas: la Fase 13 (espacio) podrá alternar
- * `activeScene` sin crear un segundo renderer.
+ * Varias escenas con un solo renderer: el espacio (Fase 13) cambia
+ * `activeScene` y `activeCamera` (setActive) y vuelve a la superficie igual.
  */
 export class RenderContext {
   constructor({ config, skyConfig, container }) {
@@ -38,6 +38,8 @@ export class RenderContext {
     this.scene.add(this.camera);
 
     this.activeScene = this.scene;
+    this.activeCamera = this.camera;
+    this._cameras = [this.camera]; // todas se ajustan al redimensionar
 
     this._onResize = this._onResize.bind(this);
     window.addEventListener('resize', this._onResize);
@@ -47,13 +49,28 @@ export class RenderContext {
     return this.renderer.domElement;
   }
 
+  /** Registra otra cámara (se ajusta al redimensionar la ventana). */
+  addCamera(camera) {
+    this._cameras.push(camera);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  }
+
+  /** Escena y cámara que se dibujan (null = la superficie). */
+  setActive(scene = null, camera = null) {
+    this.activeScene = scene ?? this.scene;
+    this.activeCamera = camera ?? this.camera;
+  }
+
   render() {
-    this.renderer.render(this.activeScene, this.camera);
+    this.renderer.render(this.activeScene, this.activeCamera);
   }
 
   _onResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
+    for (const cam of this._cameras) {
+      cam.aspect = window.innerWidth / window.innerHeight;
+      cam.updateProjectionMatrix();
+    }
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 }

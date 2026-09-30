@@ -31,9 +31,10 @@ import { ShipModel } from './ShipModel.js';
  *   overlapsBox (no construir encima de la nave).
  */
 export class ShipSystem {
-  constructor({ config, scene, world, player, input, events, landingBlocked = () => null }) {
+  constructor({ config, spaceConfig, scene, world, player, input, events, landingBlocked = () => null }) {
     this.name = 'ship';
     this._cfg = config;
+    this._spaceCfg = spaceConfig; // ORBIT_MIN_ALTITUDE, ORBIT_COST
     this._world = world;
     this._player = player;
     this._input = input;
@@ -95,6 +96,30 @@ export class ShipSystem {
     });
     events.on(GameEvents.SHIP_BATTERY_REQUEST, (e) => this._batteryRequest(e));
     events.on(GameEvents.PLAYER_DIED, () => this._forceExit());
+    // Espacio (Fase 13): al subir, la nave asciende tras el fundido; en órbita se
+    // queda congelada donde estaba y al volver sigue flotando en el mismo sitio.
+    this.spaceMode = 'SURFACE';
+    events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => this._onSpaceState(state));
+  }
+
+  _onSpaceState(state) {
+    if (state === 'ASCENDING' && this.piloting) this._spaceY = this.ship.y;
+    if (state === 'SURFACE' && this._spaceY !== undefined) {
+      this.ship.y = this._spaceY;
+      this._spaceY = undefined;
+      this.flight.hover();
+    }
+    this.spaceMode = state;
+  }
+
+  /** ¿Se puede salir al espacio ahora? @returns motivo o null */
+  orbitBlocked() {
+    if (!this.piloting) return 'Siéntate a los mandos';
+    if (this.flight.state !== FlightState.FLYING) return 'Despega primero';
+    if (this.flight.hatchTarget > 0 || this.ship.hatch > 0.01) return 'Cierra la compuerta antes de salir al espacio';
+    if (this.ship.y - this._world.getHeightAt(this.ship.x, this.ship.z) < this._spaceCfg.ORBIT_MIN_ALTITUDE) return `Sube por encima de ${this._spaceCfg.ORBIT_MIN_ALTITUDE} m para salir al espacio`;
+    if (this.batteries.total < this._spaceCfg.ORBIT_COST) return 'No queda batería suficiente para salir de la atmósfera';
+    return null;
   }
 
   /** Inventario (baterías y reloj); se inyecta desde main. */
@@ -146,6 +171,16 @@ export class ShipSystem {
 
   command(cmd) {
     if (cmd === 'STAND_UP') return this.exitPilot();
+    if (cmd === 'ORBIT') {
+      const reason = this.orbitBlocked();
+      if (reason) {
+        this._message(reason, 'danger');
+        return false;
+      }
+      this.batteries.drain(this._spaceCfg.ORBIT_COST);
+      this._events.emit(GameEvents.SPACE_ENTER_REQUEST, { source: 'SHIP' });
+      return true;
+    }
     if (cmd === 'TAKEOFF_OR_LAND') cmd = this.flight.state === FlightState.LANDED ? 'TAKEOFF' : 'LAND';
     if (cmd === 'TOGGLE_LEGS') cmd = this.flight.legsTarget > 0 ? 'RETRACT_LEGS' : 'DEPLOY_LEGS';
     const r = this.flight.command(cmd);
@@ -200,6 +235,13 @@ export class ShipSystem {
   // ---- Bucle ----------------------------------------------------------------------
 
   update(dt) {
+    if (this.spaceMode !== 'SURFACE') {
+      // Saliendo de la atmósfera: sube deprisa (tras el fundido). En órbita: congelada.
+      if (this.spaceMode === 'ASCENDING' && this._spaceY !== undefined) this.ship.y += 45 * dt;
+      if (this.piloting) this._placePlayerInSeat();
+      this.model.update(this.ship, dt, { airborne: true, thrust: 1, batteries: this.batteries.snapshot().slots });
+      return;
+    }
     let controls = null;
     if (this.piloting) controls = this._readPilotInput();
     this.flight.autopilot = !this.piloting;
@@ -224,6 +266,7 @@ export class ShipSystem {
     if (input.wasPressed('SHIP_TAKEOFF')) this.command('TAKEOFF_OR_LAND');
     if (input.wasPressed('SHIP_HATCH')) this.command('TOGGLE_HATCH');
     if (input.wasPressed('SHIP_LEGS')) this.command('TOGGLE_LEGS');
+    if (input.wasPressed('SHIP_ORBIT')) this.command('ORBIT');
     if (input.wasPressed('INTERACT')) {
       input.consume('INTERACT'); // que la interacción no vuelva a sentarte con la misma pulsación
       this.exitPilot();
@@ -393,6 +436,7 @@ export class ShipSystem {
       aboard: this.isAboard(),
       vertical: this.flight.verticalSpeed,
       charge: this.batteries.ratio,
+      canOrbit: this.piloting && !this.orbitBlocked(),
       position: { x: s.x, z: s.z, yaw: s.yaw },
     };
   }

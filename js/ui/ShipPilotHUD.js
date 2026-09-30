@@ -5,7 +5,7 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  * Muestra el estado de la nave (SHIP_STATE_CHANGED) y botones con su tecla:
  * despegar/aterrizar, compuerta, recoger/sacar patas, adelante, atrás, arriba,
- * abajo, girar y levantarse (en el aire la nave se queda flotando). Los botones emiten SHIP_COMMAND y, los de
+ * abajo, girar, salir al espacio y levantarse (en el aire la nave se queda flotando). Los botones emiten SHIP_COMMAND y, los de
  * movimiento, SHIP_CONTROL_HOLD mientras se mantienen pulsados. Con el ratón
  * capturado se usan las teclas; con Esc se libera el ratón para pulsar botones.
  */
@@ -40,6 +40,7 @@ export class ShipPilotHUD {
         <button type="button" data-hold="DOWN"><kbd>C</kbd> Abajo</button>
         <button type="button" data-hold="LEFT"><kbd>A</kbd> Girar izq.</button>
         <button type="button" data-hold="RIGHT"><kbd>D</kbd> Girar dcha.</button>
+        <button type="button" data-cmd="ORBIT" class="wide"><kbd>O</kbd> Salir al espacio</button>
         <button type="button" data-cmd="STAND_UP" class="wide"><kbd>E</kbd> Levantarse</button>
       </div>
       <div class="ship-hint">Ratón: girar la cámara · Rueda: distancia · <kbd>Shift</kbd> turbo · <kbd>Esc</kbd> soltar el ratón para usar los botones</div>`;
@@ -85,6 +86,8 @@ export class ShipPilotHUD {
     b.TOGGLE_HATCH.disabled = t.flight === 'TAKING_OFF';
     b.RETRACT_LEGS.disabled = landed || t.legs !== 'DEPLOYED';
     b.DEPLOY_LEGS.disabled = t.legs === 'DEPLOYED';
+    b.ORBIT.disabled = !t.canOrbit;
+    b.ORBIT.title = t.canOrbit ? '' : 'En vuelo, con la compuerta cerrada y a bastante altura';
     b.STAND_UP.disabled = t.flight === 'TAKING_OFF' || t.flight === 'LANDING';
     this.el.querySelectorAll('[data-hold]').forEach((btn) => (btn.disabled = t.flight !== 'FLYING'));
   }

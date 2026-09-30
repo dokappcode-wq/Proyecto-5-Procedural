@@ -49,7 +49,7 @@ export class PlayerController {
     this._wish = new THREE.Vector3();
   }
 
-  /** Cambia el terreno activo (p. ej. al regenerar el mundo en fases posteriores). */
+  /** Cambia el terreno activo (p. ej. otro planeta en el futuro). */
   setTerrain(terrain) {
     this._terrain = terrain;
   }

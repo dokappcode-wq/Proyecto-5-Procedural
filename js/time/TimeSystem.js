@@ -8,7 +8,7 @@ import { smoothstep } from '../core/MathUtils.js';
  * cuánto frío añade la noche. Quien lo aplica:
  *   - AtmosphereSystem: luz, cielo, niebla y estrellas.
  *   - TemperatureSystem: penalización nocturna (`nightFactor`).
- *   - CelestialSystem (Fase 12): posición de las lunas a partir de `totalHours`.
+ *   - CelestialSystem (Fase 12): posición de las lunas (`rotationAngle`, `skyDirection`).
  *
  * El sol sale a SUNRISE_HOUR y se pone a SUNSET_HOUR: de día recorre medio
  * círculo por encima del horizonte y de noche el otro medio por debajo, así el
@@ -75,11 +75,34 @@ export class TimeSystem {
 
   /** Dirección HACIA el sol (unitaria). `out` puede ser un Vector3 o un objeto {x,y,z}. */
   getSunDirection(out = this._sun) {
-    const a = this.sunAngle;
-    // En el plano del sol: sale por +X, culmina hacia +Z inclinado, se pone por −X.
-    const px = Math.cos(a);
-    const py = Math.sin(a) * this._sinTilt;
-    const pz = Math.sin(a) * this._cosTilt;
+    return this.skyDirection(this.sunAngle, 0, out);
+  }
+
+  /**
+   * Rotación uniforme del planeta (rad): 0 al amanecer, una vuelta cada 24 h.
+   * Las lunas la usan para salir y ponerse (Fase 12).
+   */
+  get rotationAngle() {
+    return (Math.PI * 2 * (this.totalHours - this._cfg.SUNRISE_HOUR)) / 24;
+  }
+
+  /**
+   * Dirección en el cielo de un astro con ángulo `angle` en un plano como el del
+   * sol inclinado `extraTilt` rad más (lunas con órbita inclinada).
+   * 0 = sale por el este, π/2 = culmina, π = se pone.
+   */
+  skyDirection(angle, extraTilt = 0, out = {}) {
+    let sinT = this._sinTilt;
+    let cosT = this._cosTilt;
+    if (extraTilt) {
+      const t = Math.min(1.45, Math.max(0.1, Math.asin(this._sinTilt) + extraTilt));
+      sinT = Math.sin(t);
+      cosT = Math.cos(t);
+    }
+    // En el plano del astro: sale por +X, culmina hacia +Z inclinado, se pone por −X.
+    const px = Math.cos(angle);
+    const py = Math.sin(angle) * sinT;
+    const pz = Math.sin(angle) * cosT;
     out.x = px * this._cosAz + pz * this._sinAz;
     out.y = py;
     out.z = -px * this._sinAz + pz * this._cosAz;

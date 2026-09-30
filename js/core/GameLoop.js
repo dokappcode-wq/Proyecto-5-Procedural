@@ -15,6 +15,10 @@ export class GameLoop {
     this._lastTime = 0;
     this._elapsed = 0;
     this._frame = this._frame.bind(this);
+    /** Fotogramas por segundo (media del último medio segundo); lo muestra el Admin. */
+    this.fps = 0;
+    this._fpsFrames = 0;
+    this._fpsTime = 0;
   }
 
   /** @param {{name:string, update?:Function, lateUpdate?:Function}} system */
@@ -43,9 +47,17 @@ export class GameLoop {
     if (!this._running) return;
     // El primer timestamp de requestAnimationFrame puede ser ANTERIOR al
     // performance.now() de start(): sin el Math.max, el primer dt sería negativo.
-    const dt = Math.max(0, Math.min((now - this._lastTime) / 1000, this._maxDelta));
+    const real = Math.max(0, (now - this._lastTime) / 1000);
+    const dt = Math.min(real, this._maxDelta);
     this._lastTime = now;
     this._elapsed += dt;
+    this._fpsFrames++;
+    this._fpsTime += real; // tiempo real (dt está limitado)
+    if (this._fpsTime >= 0.5) {
+      this.fps = this._fpsFrames / this._fpsTime;
+      this._fpsFrames = 0;
+      this._fpsTime = 0;
+    }
 
     for (const s of this._systems) if (s.enabled !== false) s.update?.(dt, this._elapsed);
     this._render();

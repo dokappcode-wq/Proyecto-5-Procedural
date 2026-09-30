@@ -6,8 +6,8 @@ import * as THREE from 'three';
  * La sombra del sol se centra en un punto de interés (el jugador) para que un
  * shadow map pequeño dé buena calidad en un mundo grande.
  *
- * En la Fase 11, TimeSystem controlará la dirección/color/intensidad a través
- * de `setSun()` y `setAmbient()`; este módulo no calcula la hora.
+ * AtmosphereSystem (con la hora de TimeSystem) controla la dirección, el color y
+ * la intensidad a través de `setSun()` y `setAmbient()`; este módulo no calcula la hora.
  */
 export class SceneLighting {
   constructor({ scene, renderConfig, config }) {

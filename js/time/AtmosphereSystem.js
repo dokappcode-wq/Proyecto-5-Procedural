@@ -6,7 +6,8 @@ import { smoothstep, clamp01 } from '../core/MathUtils.js';
  *
  * Lee TimeSystem (dirección del sol, luz de día) y mezcla la paleta de
  * GameConfig.TIME.PALETTE: día → crepúsculo → noche. Controla:
- *   - SceneLighting: sol (de noche, luz de luna en la dirección opuesta) y luz ambiente.
+ *   - SceneLighting: sol; de noche, luz de la luna visible que más ilumina
+ *     (CelestialSystem) o, sin lunas, una luz tenue de estrellas.
  *   - SkyDome: colores del cielo, disco solar y estrellas.
  *   - Niebla y fondo de la escena (siempre del color del horizonte).
  *
@@ -15,9 +16,10 @@ import { smoothstep, clamp01 } from '../core/MathUtils.js';
  * No sabe nada de la hora "de reloj": solo de la posición del sol.
  */
 export class AtmosphereSystem {
-  constructor({ time, lighting, sky, scene, palette, renderConfig }) {
+  constructor({ time, lighting, sky, scene, palette, renderConfig, celestial = null }) {
     this.name = 'atmosphere';
     this._time = time;
+    this._celestial = celestial; // { getNightLight() } (Fase 12): la luz de noche viene de la luna visible
     this._lighting = lighting;
     this._sky = sky;
     this._scene = scene;
@@ -90,11 +92,15 @@ export class AtmosphereSystem {
         intensity: P.DAY.SUN_INTENSITY * smoothstep(-0.01, 0.22, h),
       });
     } else {
-      this._lightDir.copy(sun).negate();
+      // Noche: luz de la luna que más ilumina; sin luna, un resto de luz de estrellas.
+      const moon = this._celestial?.getNightLight();
+      const strength = moon ? 0.3 + 0.7 * moon.strength : 0.3;
+      if (moon && moon.strength > 0.02) this._lightDir.copy(moon.direction);
+      else this._lightDir.copy(sun).negate();
       this._lighting.setSun({
         direction: this._lightDir,
         color: p.night.moon,
-        intensity: P.NIGHT.MOON_INTENSITY * smoothstep(0.0, 0.2, -h),
+        intensity: P.NIGHT.MOON_INTENSITY * strength * smoothstep(0.0, 0.2, -h),
       });
     }
 

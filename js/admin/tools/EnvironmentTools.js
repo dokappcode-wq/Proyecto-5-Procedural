@@ -53,7 +53,16 @@ export function registerEnvironmentTools(admin, { time, temperature }) {
         (temperature.immune ? ' · inmune' : '');
     },
   });
-  admin.registerTool({ category: 'Temperatura', label: 'Enfriar a −12 °C', run: () => temperature.set(-12) });
-  admin.registerTool({ category: 'Temperatura', label: 'Calentar a 20 °C', run: () => temperature.set(20) });
+  // Un botón por estado (valores justo dentro de cada tramo de la configuración).
+  const c = temperature._cfg;
+  const presets = [
+    ['Normal', 20],
+    ['Frío', (c.COLD_THRESHOLD + c.FREEZING_THRESHOLD) / 2],
+    ['Congelación', (c.FREEZING_THRESHOLD + c.DAMAGE_THRESHOLD) / 2],
+    ['Crítico', c.DAMAGE_THRESHOLD - 3],
+  ];
+  for (const [name, value] of presets) {
+    admin.registerTool({ category: 'Temperatura', label: `${name} (${value.toFixed(0)} °C)`, run: () => temperature.set(value) });
+  }
   admin.registerTool({ category: 'Temperatura', label: 'Inmune al frío ON/OFF', run: () => (temperature.immune = !temperature.immune) });
 }

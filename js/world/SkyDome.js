@@ -9,7 +9,7 @@ import * as THREE from 'three';
  *
  * AtmosphereSystem (Fase 11) cambia colores, dirección y color del sol y la
  * cantidad de estrellas con `setColors()`, `setSunDirection()`, `setSunColor()`
- * y `setStars()`; en la Fase 12, CelestialSystem dibujará las lunas delante.
+ * y `setStars()`; CelestialSystem dibuja las lunas delante de este fondo.
  */
 export class SkyDome {
   constructor({ scene, camera, config, radius }) {

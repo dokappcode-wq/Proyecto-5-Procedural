@@ -6,8 +6,8 @@ import { GameEvents } from '../core/GameEvents.js';
  * - Consulta `world.getBiomeAt()` unas pocas veces por segundo (no cada frame).
  * - Histéresis: solo cambia de bioma cuando el nuevo supera SWITCH_WEIGHT,
  *   así no hay avisos repetidos al caminar por una frontera.
- * - Emite PLAYER_BIOME_CHANGED { biome }. UIManager lo muestra; en la Fase 10
- *   TemperatureSystem podrá leer `current` (incluye la temperatura base).
+ * - Emite PLAYER_BIOME_CHANGED { biome }. UIManager lo muestra. (TemperatureSystem
+ *   mezcla las temperaturas por pesos con world.getBiomeAt, sin histéresis.)
  */
 const CHECK_INTERVAL = 0.4; // s
 const SWITCH_WEIGHT = 0.65;

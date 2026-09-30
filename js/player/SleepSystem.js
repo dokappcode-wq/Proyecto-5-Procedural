@@ -8,7 +8,7 @@ import { GameEvents } from '../core/GameEvents.js';
  *   1. Bloquea la entrada y emite PLAYER_SLEEP_STARTED (la UI funde a negro).
  *   2. A mitad del sueño aplica los efectos: recupera energía y gasta algo de
  *      hambre y sed (han pasado horas), y emite PLAYER_SLEPT { hours, bed }.
- *      TimeSystem (Fase 11) escuchará ese evento para adelantar el reloj.
+ *      TimeSystem escucha ese evento para adelantar el reloj.
  *   3. Devuelve el control.
  */
 export class SleepSystem {

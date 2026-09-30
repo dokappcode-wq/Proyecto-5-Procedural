@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.11.0-nave',
+    VERSION: '1.0.0',
   },
 
   RENDER: {
@@ -77,6 +77,7 @@ export const GameConfig = deepFreeze({
       SHIP_TAKEOFF: ['KeyT'],           // nave (a los mandos): despegar / aterrizar
       SHIP_HATCH: ['KeyG'],             // nave: abrir / cerrar la compuerta
       SHIP_LEGS: ['KeyL'],              // nave: recoger / sacar las patas de aterrizaje
+      SHIP_ORBIT: ['KeyO'],             // nave: salir al espacio (en vuelo, a bastante altura)
       HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
       HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
       HOTBAR_7: ['Digit7'], HOTBAR_8: ['Digit8'], HOTBAR_9: ['Digit9'],
@@ -459,8 +460,8 @@ export const GameConfig = deepFreeze({
     FREEZING_VISIBILITY: 0.45, // la distancia de visión baja hasta este factor al congelarse
   },
 
-  // Cuerpos celestes (se verán en el cielo en la Fase 12; ya aparecen en el mapa
-  // planetario de la nave). La posición inicial y la inclinación dependen de la
+  // Cuerpos celestes (Fase 12): Luna A y Luna B en el cielo, en el mapa planetario y
+  // en el espacio. La posición inicial, la inclinación y el aspecto dependen de la
   // sub-seed "celestial"; tamaño, distancia y velocidad son fijos aquí.
   CELESTIAL: {
     PLANET_NAME: 'MUNDO 0',
@@ -474,6 +475,25 @@ export const GameConfig = deepFreeze({
     MOON_A_COLOR: 0xd8d2c4,
     MOON_B_COLOR: 0xc98f6a,
     MAX_INCLINATION_DEG: 18,
+    // Cómo se ven desde la superficie (tamaño aparente exagerado para que se lean bien).
+    MOON_A_SKY_SIZE_DEG: 7,
+    MOON_B_SKY_SIZE_DEG: 3.6,
+    SKY_DISTANCE: 700,         // m: se dibujan a esta distancia de la cámara (dentro de RENDER.FAR)
+    DAY_OPACITY: 0.55,         // de día las lunas se ven pálidas
+    MOON_RISE_MESSAGES: true,  // "Sale la Luna A."
+  },
+
+  // Espacio (Fase 13): escena separada a la que se sube con la nave.
+  SPACE: {
+    FADE_TIME: 1.4,            // s de fundido al salir/entrar de la atmósfera
+    PLANET_RADIUS: 60,         // unidades de la escena espacial (el resto se escala a partir de aquí)
+    MOON_VISUAL_SCALE: 2.2,    // las lunas se ven más grandes que a escala real
+    STAR_COUNT: 3500,
+    CAMERA_FOV: 55,
+    TEXTURE_WIDTH: 512,        // textura equirectangular del planeta (se genera al subir)
+    ORBIT_MIN_ALTITUDE: 60,    // m sobre el suelo para poder salir al espacio con la nave
+    ORBIT_COST: 12,            // carga de batería que cuesta salir de la atmósfera
+    ORBIT_SPIN_HOURS: 24,      // una vuelta del planeta por día
   },
 
   // Nave pequeña de MUNDO 0. La forma (salas, colisiones, suelos, rampa) está en

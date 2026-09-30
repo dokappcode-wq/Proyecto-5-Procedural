@@ -2,10 +2,30 @@
  * Herramientas de depuración básicas: jugador y cámara.
  *
  * Cada fase añade su propio archivo en admin/tools/ (WorldTools, SurvivalTools,
- * InventoryTools, TimeTools, ...) con una función register*(admin, deps).
+ * InventoryTools, EnvironmentTools, ShipTools, SpaceTools...) con una función
+ * register*(admin, deps).
  */
-export function registerCoreDebugTools(admin, { player, controller, camera }) {
+export function registerCoreDebugTools(admin, { player, controller, camera, loop = null, renderer = null }) {
   const fmt = (n) => n.toFixed(2);
+
+  // ---- Rendimiento (Fase 14) --------------------------------------------------
+  if (loop && renderer) {
+    admin.registerTool({
+      category: 'Rendimiento',
+      type: 'info',
+      label: 'FPS · dibujos · triángulos',
+      read: () => {
+        const r = renderer.info.render;
+        return `${Math.round(loop.fps)} fps · ${r.calls} dibujos · ${(r.triangles / 1000).toFixed(0)} k triángulos`;
+      },
+    });
+    admin.registerTool({
+      category: 'Rendimiento',
+      type: 'info',
+      label: 'Memoria GPU (geometrías / texturas)',
+      read: () => `${renderer.info.memory.geometries} / ${renderer.info.memory.textures}`,
+    });
+  }
 
   // ---- Jugador -------------------------------------------------------------
   admin.registerTool({

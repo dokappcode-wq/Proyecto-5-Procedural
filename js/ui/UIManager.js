@@ -232,6 +232,7 @@ export class UIManager {
       else if (state === 'NORMAL') this.showMessage('Vuelves a entrar en calor.', 'biome');
     });
     events.on(GameEvents.TIME_CHANGED, (t) => this._updateClock(t));
+    events.on(GameEvents.MOON_RISE, ({ name }) => this._started && this.showMessage(`Sale la ${name}.`, 'biome'));
     events.on(GameEvents.TIME_PERIOD_CHANGED, ({ period, jumped }) => {
       if (!jumped && this._started && PERIOD_MESSAGES[period]) this.showMessage(PERIOD_MESSAGES[period], 'biome');
     });

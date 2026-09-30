@@ -194,7 +194,7 @@ export class AnimalSystem {
     for (const id in this._renderers) this._renderers[id].update(this._visible[id]);
   }
 
-  // ---- Consultas (fases posteriores) ----------------------------------------
+  // ---- Consultas ---------------------------------------------------------------
 
   /** Animales VIVOS en un radio. */
   getAnimalsNear(x, z, radius, species = null) {
@@ -216,7 +216,7 @@ export class AnimalSystem {
     return { killed: true, drops: animal.drops };
   }
 
-  /** Retira un animal inmediatamente (depuración / fases posteriores). */
+  /** Retira un animal inmediatamente (depuración). */
   removeAnimal(id) {
     const a = this.animals.find((an) => an.id === id && !an.removed);
     if (a) a.removed = true;

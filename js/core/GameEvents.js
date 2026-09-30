@@ -64,6 +64,14 @@ export const GameEvents = Object.freeze({
   TIME_PERIOD_CHANGED: 'time:period',               // { period: 'DAWN'|'DAY'|'DUSK'|'NIGHT', previous }
   TEMPERATURE_CHANGED: 'temperature:changed',       // { value, ambient, target, state, frost, visibility }
   TEMPERATURE_STATE_CHANGED: 'temperature:state',   // { state: 'NORMAL'|'COLD'|'FREEZING'|'CRITICAL', previous }
+  MOON_RISE: 'celestial:moonRise',                  // { id, name }
+
+  // Espacio (Fase 13)
+  SPACE_ENTER_REQUEST: 'space:enterRequest',        // { source: 'SHIP'|'ADMIN' }
+  SPACE_EXIT_REQUEST: 'space:exitRequest',
+  SPACE_STATE_CHANGED: 'space:state',               // { state: 'SURFACE'|'ASCENDING'|'SPACE'|'DESCENDING', previous }
+  SPACE_FOCUS_CHANGED: 'space:focus',               // { id, name }
+  SPACE_FOCUS_REQUEST: 'space:focusRequest',        // { id }
 
   // Nave
   SHIP_STATE_CHANGED: 'ship:state',                 // { flight, hatch, legs, door, piloting, charge }
