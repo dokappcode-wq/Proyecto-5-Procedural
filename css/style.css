@@ -1,0 +1,250 @@
+/* MUNDO 0 — estilos provisionales del prototipo */
+
+:root {
+  --ui-bg: rgba(12, 18, 28, 0.62);
+  --ui-bg-strong: rgba(12, 18, 28, 0.88);
+  --ui-fg: #eef3f8;
+  --ui-muted: #a9b6c4;
+  --ui-accent: #7cc4ff;
+  --ui-admin: #ffb347;
+  --ui-error: #ff7a7a;
+  --radius: 8px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1018;
+  color: var(--ui-fg);
+  user-select: none;
+}
+
+#game-container, #game-container canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hidden { display: none !important; }
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font: 600 0.78em ui-monospace, monospace;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Pantalla de inicio ---------------------------------------------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, rgba(10, 20, 35, 0.55), rgba(5, 8, 14, 0.9));
+  z-index: 20;
+  padding: 16px;
+}
+
+.start-card {
+  text-align: center;
+  max-width: 440px;
+  width: 100%;
+  padding: 32px 28px;
+  border-radius: 14px;
+  background: var(--ui-bg-strong);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.start-card h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 8vw, 3.4rem);
+  letter-spacing: 0.18em;
+}
+
+.subtitle { color: var(--ui-muted); margin: 6px 0 24px; }
+
+#start-button {
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 12px 28px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ui-accent);
+  color: #06121f;
+  cursor: pointer;
+}
+#start-button:hover { filter: brightness(1.1); }
+
+.controls {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--ui-muted);
+}
+
+/* ---- HUD ------------------------------------------------------------- */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  opacity: 0.8;
+}
+#crosshair::before, #crosshair::after {
+  content: '';
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+#crosshair::before { left: 7px; top: 0; width: 2px; height: 16px; }
+#crosshair::after { top: 7px; left: 0; height: 2px; width: 16px; }
+
+#top-left {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+#top-left > div {
+  background: var(--ui-bg);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  width: fit-content;
+}
+#version { font-weight: 700; letter-spacing: 0.08em; }
+
+#help {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: var(--ui-bg);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  max-width: calc(100vw - 24px);
+}
+#help.collapsed .help-body { display: none; }
+.help-title { font-weight: 600; }
+
+#lock-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 34px);
+  transform: translateX(-50%);
+  background: var(--ui-bg);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+#messages {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(560px, calc(100vw - 32px));
+}
+.message {
+  background: var(--ui-bg);
+  padding: 7px 16px;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.message.visible { opacity: 1; transform: none; }
+.message-admin { color: var(--ui-admin); font-weight: 700; letter-spacing: 0.06em; }
+.message-error { color: var(--ui-error); }
+
+/* ---- Admin ----------------------------------------------------------- */
+#admin-panel {
+  position: fixed;
+  top: 76px; /* bajo las etiquetas del HUD */
+  left: 12px;
+  z-index: 30;
+  width: min(340px, calc(100vw - 24px));
+  max-height: calc(100vh - 88px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-bg-strong);
+  border: 1px solid var(--ui-admin);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  user-select: text;
+}
+#admin-panel header, #admin-panel footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+}
+#admin-panel header {
+  color: var(--ui-admin);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid rgba(255, 179, 71, 0.3);
+}
+#admin-panel footer { color: var(--ui-muted); font-size: 0.72rem; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.admin-actions { display: flex; gap: 6px; }
+.admin-body { overflow-y: auto; padding: 4px 10px 10px; }
+#admin-panel h3 {
+  margin: 10px 0 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ui-muted);
+}
+.admin-tool { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+.admin-info { justify-content: space-between; }
+.admin-info .value { font-family: ui-monospace, monospace; color: var(--ui-accent); text-align: right; }
+#admin-panel button, #admin-panel input {
+  font: inherit;
+  color: var(--ui-fg);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  padding: 4px 9px;
+}
+#admin-panel button { cursor: pointer; }
+#admin-panel button:hover { background: rgba(255, 179, 71, 0.2); }
+.admin-button button { width: 100%; text-align: left; }
+.admin-input input { flex: 1; min-width: 0; }
+
+#fatal-error {
+  position: fixed;
+  inset: auto 16px 16px;
+  padding: 12px 16px;
+  background: #5a1a1a;
+  border-radius: var(--radius);
+  z-index: 50;
+}

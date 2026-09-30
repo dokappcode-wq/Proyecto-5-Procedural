@@ -1,0 +1,9 @@
+{
+  "name": "mundo-0",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prototipo conceptual 3D procedural de supervivencia y exploración (Three.js, sin build)",
+  "scripts": {
+    "start": "npx --yes http-server -p 8080 -c-1 ."
+  }
+}
