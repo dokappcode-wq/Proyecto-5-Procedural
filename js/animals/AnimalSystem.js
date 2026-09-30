@@ -26,7 +26,7 @@ const SPECIES_CLASSES = { DEER: Deer, GOAT: Goat, COW: Cow };
  *   emiten PLAYER_DAMAGED (lo consumirá HealthSystem en la Fase 6).
  */
 export class AnimalSystem {
-  constructor({ config, fauna, scene, world, player, events, hitKnockback }) {
+  constructor({ config, fauna, scene, world, player, events, hitKnockback, bodyId = null }) {
     this.name = 'animals';
     this._cfg = config;
     this._events = events;
@@ -52,7 +52,7 @@ export class AnimalSystem {
     }
 
     // Entorno que consultan los animales (sin acoplarlos a WorldGenerator).
-    const bounds = () => world.getBounds();
+    const bounds = () => this._world.getBounds();
     this._env = {
       cfg: config,
       player: { x: 0, z: 0 },
@@ -66,16 +66,17 @@ export class AnimalSystem {
         }),
       playerRunning: false,
       turnSpeed: config.TURN_SPEED,
-      groundAt: (x, z) => world.getHeightAt(x, z),
+      groundAt: (x, z) => this._world.getHeightAt(x, z),
       // Recursos + obstáculos extra (paredes y vallas construidas: corrales).
       resolveCollisions: (pos, r, y0, y1) => {
-        const a = world.resources.resolveCollisions(pos, r);
+        const a = this._world.resources.resolveCollisions(pos, r);
         const b = this._obstacles?.resolveCollisions(pos, r, y0, y1) ?? false;
         return a || b;
       },
       isWalkable: (x, z) => {
         const b = bounds();
         if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return false;
+        const world = this._world;
         if (world.water.isWater(x, z, 0.6)) return false;
         const h = world.getHeightAt(x, z);
         if (h < world.seaLevel + 0.3) return false;
@@ -85,11 +86,40 @@ export class AnimalSystem {
       },
     };
 
-    events.on(GameEvents.WORLD_GENERATED, () => this.generate());
+    // Rebaños de cada cuerpo (se generan la primera vez que se visita y se conservan).
+    this.bodyId = bodyId;
+    this._saved = new Map();
+    events.on(GameEvents.WORLD_GENERATED, () => {
+      this._saved.clear(); // nueva seed: los demás cuerpos se regenerarán
+      this.generate();
+    });
   }
 
   /**
-   * Los animales viven en el planeta de inicio: en las lunas o en el espacio se pausan y se ocultan.
+   * Cambia al cuerpo `id` (su mundo y su fauna). Los animales del anterior se
+   * guardan tal cual (heridos, muertos, dónde estaban) y los del nuevo se generan
+   * la primera vez. Sin fauna, el sistema se apaga y no dibuja nada.
+   */
+  setBody(id, world, fauna) {
+    if (id === this.bodyId) return;
+    if (this.bodyId !== null) this._saved.set(this.bodyId, { animals: this.animals, herds: this.herds, world: this._world, fauna: this._fauna });
+    this.bodyId = id;
+    const saved = this._saved.get(id);
+    this._world = world;
+    this._fauna = fauna;
+    if (saved && saved.world === world) {
+      this.animals = saved.animals;
+      this.herds = saved.herds;
+    } else {
+      this.animals = [];
+      this.herds = [];
+      if (world?.seed && fauna && Object.keys(fauna.HERDS).length) this.generate();
+    }
+    this.setActive(!!world && this.animals.length > 0);
+  }
+
+  /**
+   * Sin animales (cuerpos sin fauna, el espacio) el sistema se pausa y no dibuja nada.
    */
   setActive(active) {
     this.enabled = active;

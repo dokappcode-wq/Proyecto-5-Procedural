@@ -18,7 +18,7 @@ export const TravelState = Object.freeze({ SURFACE: 'SURFACE', ASCENDING: 'ASCEN
 
 export class SpaceTravel {
   /**
-   * @param {object} p.sources { getCatalog(), getTextures(), getSeed(), noonHour }
+   * @param {object} p.sources { getLayout(), getTextures(planetId), getSeed(), noonHour, onSunDirection(dir) }
    */
   constructor({ config, system, events, worlds, ship, time, camera, view, sources }) {
     this.name = 'spaceTravel';
@@ -54,8 +54,10 @@ export class SpaceTravel {
     events.on(GameEvents.SPACE_ENTER_REQUEST, () => this.enter());
     events.on(GameEvents.SPACE_EXIT_REQUEST, ({ target } = {}) => this.land(target));
     events.on(GameEvents.WORLD_GENERATED, () => this._reset());
-    events.on(GameEvents.SPACE_AUTOPILOT, ({ target }) => {
+    events.on(GameEvents.SPACE_AUTOPILOT, ({ target, slot }) => {
       if (!this.inSpace) return;
+      if (!target && slot) target = this.targets()[slot - 1]?.id;
+      if (!target) return;
       if (target === 'METEOR') {
         const near = this.meteors?.nearest();
         if (!near) {
@@ -71,13 +73,25 @@ export class SpaceTravel {
     });
   }
 
-  /** Radio del sistema (km): más allá, el nodo espacial no alcanza. */
+  /** Radio del sistema desde la estrella (km): más allá, el nodo espacial no alcanza. */
   get zoneRadiusKm() {
-    return this._cfg.ZONE_RADIUS;
+    return this._src.getLayout?.()?.zoneRadiusKm ?? this._cfg.ZONE_RADIUS;
   }
 
   get inSpace() {
     return this.state === TravelState.SPACE;
+  }
+
+  /** Planeta más cercano a la nave (o el de inicio si aún no está en el espacio). */
+  nearestPlanet() {
+    if (!this.inSpace) return this._system.planetOf(this._ship.body) ?? this._system.homeId;
+    const b = this.nav.survey().bodies.find((x) => x.kind === 'PLANET' || x.kind === 'MOON');
+    return b ? this._system.planetOf(b.id) : this._system.homeId;
+  }
+
+  /** Teclas de rumbo ahora: los planetas, las lunas del planeta cercano y el meteorito. */
+  targets() {
+    return this._system.autopilotTargets(this.nearestPlanet());
   }
 
   /** Dónde está la nave (para el mapa estelar). */
@@ -119,34 +133,45 @@ export class SpaceTravel {
   }
 
   _arriveInSpace() {
-    const catalog = this._src.getCatalog();
-    this._view.build({ catalog, seed: this._src.getSeed(), textures: this._src.getTextures() });
+    const layout = this._src.getLayout();
+    this._view.build({ layout, seed: this._src.getSeed(), textures: (id) => this._src.getTextures(id) });
+    this.nav.zone = { center: { ...layout.star.position }, radius: layout.zoneRadiusKm };
     const bodies = this._view.bodyPositions(this._time.totalHours);
-    const from = bodies.find((b) => b.id === this._from) ?? bodies[0];
+    const from = bodies.find((b) => b.id === this._from) ?? bodies.find((b) => this._system.isHome(b.id));
     let dir;
-    const fromHome = this._system.isHome(from.id);
-    if (fromHome) {
-      // Sobre la región del planeta (mira al sol a mediodía; gira con el planeta).
+    const isPlanet = from.kind === 'PLANET';
+    if (isPlanet) {
+      // Sobre la región del planeta: mira a la estrella a mediodía y gira con el planeta.
       const a = (Math.PI * 2 * (this._time.totalHours - this._src.noonHour)) / 24;
-      dir = { x: Math.cos(a), y: 0.05, z: -Math.sin(a) };
+      let s = { x: 1, z: 0 };
+      if (!this._system.isHome(from.id)) {
+        const S = layout.star.position;
+        const l = Math.hypot(S.x - from.position.x, S.z - from.position.z) || 1;
+        s = { x: (S.x - from.position.x) / l, z: (S.z - from.position.z) / l };
+      }
+      dir = { x: Math.cos(a) * s.x + Math.sin(a) * s.z, y: 0.05, z: Math.cos(a) * s.z - Math.sin(a) * s.x };
     } else {
-      const p = from.position;
+      // Una luna: la cara que mira fuera de su planeta.
+      const parent = bodies.find((b) => b.id === from.parent);
+      const p = { x: from.position.x - parent.position.x, y: from.position.y - parent.position.y, z: from.position.z - parent.position.z };
       const l = Math.hypot(p.x, p.y, p.z) || 1;
-      dir = { x: p.x / l, y: p.y / l, z: p.z / l }; // cara que mira fuera del planeta
+      dir = { x: p.x / l, y: p.y / l, z: p.z / l };
     }
     const l = Math.hypot(dir.x, dir.y, dir.z);
     dir = { x: dir.x / l, y: dir.y / l, z: dir.z / l };
-    this.nav.placeNear(from, dir, fromHome ? this._cfg.EXIT_ALTITUDE_KM : this._cfg.MOON_EXIT_ALTITUDE_KM);
+    this.nav.placeNear(from, dir, isPlanet ? this._cfg.EXIT_ALTITUDE_KM : this._cfg.MOON_EXIT_ALTITUDE_KM);
     this._worlds.setActive('SPACE');
     this._ship.enterSpace(this.nav.yaw);
     this._view.setVisible(true);
     this._setState(TravelState.SPACE);
-    const keys = this._system.autopilotTargets().filter((t) => t.id !== 'METEOR').map((t) => `[${t.key}] ${t.name}`).join(' · ');
-    this._message(`En el espacio, rumbo: ${keys} · [W] avanzar · [Shift] impulso · [T] aterrizar al llegar`, 'biome');
+    const keys = this.targets().filter((t) => t.id !== 'METEOR').map((t) => `[${t.key}] ${t.name}`).join(' · ');
+    const cruise = this._system.planets.length > 1 ? ' (lejos de los planetas: crucero interplanetario)' : '';
+    this._message(`En el espacio, rumbo: ${keys} · [W] avanzar · [Shift] impulso${cruise} · [T] aterrizar al llegar`, 'biome');
   }
 
   _arriveAtBody() {
     const id = this._target;
+    this.nav.setAutopilot(null); // al volver al espacio se elige rumbo de nuevo
     this._view.setVisible(false);
     this._worlds.setActive(id);
     this._ship.arriveAt(id, this._cfg.ARRIVAL_HEIGHT);
@@ -162,7 +187,8 @@ export class SpaceTravel {
     else nav.stop(dt);
     // Batería: mantenerse + empuje (el impulso gasta el doble).
     const thrust = Math.abs(nav.speed) / c.CRUISE_SPEED; // 1 = crucero, BOOST_MULTIPLIER = impulso
-    const effort = thrust <= 1 ? thrust : 1 + (thrust - 1) / (c.BOOST_MULTIPLIER - 1); // impulso = ×2
+    // Impulso = ×2; el crucero interplanetario, ×2,5 (no crece con la velocidad).
+    const effort = Math.min(nav.cruising ? 2.5 : 2, thrust <= 1 ? thrust : 1 + (thrust - 1) / (c.BOOST_MULTIPLIER - 1));
     ship.batteries.drain((c.HOVER_DRAIN + c.THRUST_DRAIN * effort) * dt);
     if (nav.outsideZone) {
       if (this.galacticNode && !this.crippled) {
@@ -176,6 +202,12 @@ export class SpaceTravel {
     }
     ship.syncSpace(nav.yaw, nav.pitch, Math.min(1, thrust));
     this._view.update(dt, nav, this._camera.position, this._time.totalHours, this._src.noonHour);
+    // El sol del cielo (y la luz) viene de la estrella, vista desde la nave.
+    const sun = (this._sunDir = this._view.sunDirectionFrom(nav.pos, this._sunDir));
+    if (!this._lastSun || this._lastSun.dot(sun) < 0.99995) {
+      this._lastSun = (this._lastSun ?? sun.clone()).copy(sun);
+      this._src.onSunDirection?.(sun);
+    }
 
     this._blockNotice -= dt;
     this._infoTimer -= dt;
@@ -187,7 +219,9 @@ export class SpaceTravel {
         speed: nav.speed,
         bodies: survey.bodies,
         landable: survey.landable,
-        zoneWarning: nav.distanceFromCenter > c.ZONE_RADIUS * 0.9,
+        zoneWarning: nav.distanceFromCenter > nav.zone.radius - 16000,
+        cruising: nav.cruising,
+        targets: this.targets(),
         powered,
         charge: ship.batteries.ratio,
         autopilot: nav.autopilotTarget,

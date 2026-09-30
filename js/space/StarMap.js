@@ -13,7 +13,7 @@ import { SpaceScene } from './SpaceScene.js';
  */
 export class StarMap {
   /**
-   * @param {object} p.sources { getCatalog(), getMapCanvas(), getSeed(), planet, noonHour, getShipLocation() }
+   * @param {object} p.sources { getCatalog(), getMapCanvas(id), getSeed(), getProfile(id), getBodyPosition(id), noonHour, getShipLocation() }
    */
   constructor({ config, system, render, input, events, time, sources }) {
     this.name = 'starMap';
@@ -25,7 +25,7 @@ export class StarMap {
     this._src = sources;
     this.isOpen = false;
     this._system = system;
-    this.focusKeys = [...system.visitable.map((b) => b.id), 'SHIP'];
+    this.focusKeys = [system.homeId, ...system.moons.map((b) => b.id), 'SHIP'];
     this.focus = system.homeId;
     this._timer = 0;
     this._space = new SpaceScene({ config, system });
@@ -54,14 +54,18 @@ export class StarMap {
   setOpen(open) {
     if (open === this.isOpen) return;
     if (open) {
+      // Se muestra el grupo del planeta actual (o el último visitado): el planeta y sus lunas.
+      const catalog = this._src.getCatalog();
+      this._catalog = catalog;
       this._space.build({
-        catalog: this._src.getCatalog(),
-        seed: this._src.getSeed(),
-        mapCanvas: this._src.getMapCanvas(),
-        planet: this._src.planet,
+        catalog,
+        seed: this._src.getSeed() ^ (catalog.planet.id === this._system.homeId ? 0 : hashId(catalog.planet.id)),
+        mapCanvas: this._src.getMapCanvas(catalog.planet.id),
+        planet: this._src.getProfile(catalog.planet.id),
       });
+      this.focusKeys = [catalog.planet.id, ...catalog.bodies.map((b) => b.id), 'SHIP'];
       this.isOpen = true;
-      this.focusOn(this._src.getShipLocation?.().body === 'SPACE' ? 'SHIP' : this._system.homeId);
+      this.focusOn(this._src.getShipLocation?.().body === 'SPACE' ? 'SHIP' : catalog.planet.id);
       this._orbit.distance = this._distanceGoal * 1.6;
       this._render.setActive(this._space.scene, this._space.camera);
     } else {
@@ -76,7 +80,7 @@ export class StarMap {
     const b = this._space.bodies[id];
     if (!b) return;
     this.focus = id;
-    this._distanceGoal = Math.max(8, b.radius * (id === this._system.homeId ? 3.4 : id === 'SHIP' ? 14 : 4.5));
+    this._distanceGoal = Math.max(8, b.radius * (id === this._catalog?.planet.id ? 3.4 : id === 'SHIP' ? 14 : 4.5));
     this._events.emit(GameEvents.SPACE_FOCUS_CHANGED, { id, name: b.name });
   }
 
@@ -100,7 +104,8 @@ export class StarMap {
     const wheel = input.getWheel();
     if (wheel) this._distanceGoal = Math.max(this._space.bodies[this.focus].radius * 1.4, this._distanceGoal * (wheel > 0 ? 1.15 : 0.87));
 
-    this._space.update(this._time.totalHours, dt, this._src.noonHour, this._src.getShipLocation?.());
+    const origin = this._src.getBodyPosition?.(this._catalog.planet.id) ?? { x: 0, y: 0, z: 0 };
+    this._space.update(this._time.totalHours, dt, this._src.noonHour, this._src.getShipLocation?.(), origin);
     // La cámara se desliza hacia el cuerpo enfocado.
     this._space.bodies[this.focus].object.getWorldPosition(this._targetGoal);
     const k = 1 - Math.exp(-3 * dt);
@@ -136,9 +141,15 @@ export class StarMap {
 
   /** Datos del cuerpo enfocado para el panel. */
   getFocusInfo() {
-    const catalog = this._src.getCatalog();
-    if (this.focus === this._system.homeId) return { id: this.focus, name: catalog.planet.name, radiusKm: catalog.planet.radiusKm, home: true };
+    const catalog = this._catalog ?? this._src.getCatalog();
+    if (this.focus === catalog.planet.id) return { id: this.focus, name: catalog.planet.name, radiusKm: catalog.planet.radiusKm, home: true };
     if (this.focus === 'SHIP') return { id: 'SHIP', name: 'Tu nave', ship: true, location: this._src.getShipLocation?.() };
     return { ...catalog.bodies.find((b) => b.id === this.focus) };
   }
+}
+
+function hashId(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) | 0;
+  return h >>> 0;
 }

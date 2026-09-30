@@ -1,4 +1,5 @@
 import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
+import { LruCache } from '../core/LruCache.js';
 
 /**
  * ResourceSystem — árboles, manzanos, pinos, rocas, arbustos (y hierba
@@ -27,12 +28,14 @@ export class ResourceSystem {
    * @param {number} p.seed        sub-seed de recursos
    * @param {object} p.world       { chunkSize, half, chunkCount, heightAt(x,z), sample(x,z), isWater(x,z,m), spawn, clearZones?, seaLevel }
    */
-  constructor({ config, types, seed, world }) {
+  constructor({ config, types, seed, world, maxCachedChunks = 1200 }) {
     this._cfg = config;
     this._types = types;
     this._seed = seed;
     this._world = world;
-    this._chunks = new Map();   // key → { nodes, grass }
+    // key → { nodes, grass, dirty }. En regiones grandes se descartan los chunks lejanos
+    // sin cambios (se regeneran iguales); los que tienen algo talado o cogido se guardan.
+    this._chunks = new LruCache(maxCachedChunks, { keep: (c) => c.dirty });
     this._removed = new Set();  // ids retirados
     this._regrowing = [];       // nodos agotados que volverán a dar fruto
     this.onChunkChanged = null; // (cx, cz) => void
@@ -47,6 +50,7 @@ export class ResourceSystem {
     const h = node && this._types[node.type].HARVEST;
     if (!h || node.removed || node.remaining <= 0) return null;
     node.remaining--;
+    this._markDirty(id);
     let removed = false;
     if (node.remaining === 0) {
       if (h.REMOVE_WHEN_EMPTY) {
@@ -110,6 +114,7 @@ export class ResourceSystem {
   removeNode(id) {
     const node = this._findNode(id);
     if (!node || node.removed) return null;
+    this._markDirty(id);
     node.removed = true;
     this._removed.add(id);
     this._notify(id);
@@ -119,6 +124,11 @@ export class ResourceSystem {
   _findNode(id) {
     const [cx, cz] = id.split(':').map(Number);
     return this.getChunk(cx, cz).nodes.find((n) => n.id === id) ?? null;
+  }
+
+  _markDirty(id) {
+    const [cx, cz] = id.split(':').map(Number);
+    this.getChunk(cx, cz).dirty = true;
   }
 
   _notify(id) {

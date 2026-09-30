@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
 import { deriveSeed } from '../core/SeededRandom.js';
 import { WorldGenerator } from './WorldGenerator.js';
+import { regionSize } from '../systemdata/Catalog.js';
 
 /**
  * WorldManager — los cuerpos que se pueden pisar: el planeta de inicio, sus
@@ -25,6 +26,7 @@ export class WorldManager {
   constructor({ scene, system, events, options }) {
     this.name = 'world';
     this._scene = scene;
+    this._system = system;
     this._planets = system.profiles;
     this.homeId = system.homeId;
     this._events = events;
@@ -119,6 +121,8 @@ export class WorldManager {
     const o = this._opts;
     const world = new WorldGenerator({
       ...o,
+      // Cada cuerpo tiene el lado de su categoría de tamaño (0,5 a 20 km).
+      config: { ...o.config, WORLD_SIZE: regionSize(this._system.body(id)?.regionKm ?? 1, o.config.CHUNK_SIZE) },
       scene: root,
       planet,
       events: this._events,
@@ -141,3 +145,4 @@ export class WorldManager {
     this._bodies.delete(id);
   }
 }
+

@@ -4,12 +4,12 @@
  * Es lo que consultan los sistemas del juego en lugar de identificadores fijos:
  *   system.homeId            cuerpo donde se empieza (el primer planeta)
  *   system.home              su descripción ({ id, name, radiusKm, profile… })
- *   system.moons             lunas del planeta de inicio (todas visitables)
- *   system.visitable         [planeta, ...lunas]: los cuerpos a los que se puede ir
+ *   system.moons             lunas del planeta de inicio
+ *   system.planets           todos los planetas (en orden)
+ *   system.visitable         todos los planetas y todas las lunas: se puede ir a cualquiera
  *   system.profiles          id → perfil del motor (lo que antes era GameConfig.PLANETS)
- *   system.body(id), system.nameOf(id), system.isHome(id), system.isMoon(id)
- *
- * Mientras no haya viaje entre planetas, lo visitable es el primer planeta y sus lunas.
+ *   system.body(id), system.nameOf(id), system.isHome(id), system.isMoon(id),
+ *   system.planetOf(id), system.moonsOf(planetId)
  */
 export class SolarSystem {
   constructor(compiled) {
@@ -17,8 +17,9 @@ export class SolarSystem {
     this._byId = new Map(compiled.bodies.map((b) => [b.id, b]));
     this.profiles = Object.freeze(Object.fromEntries(compiled.bodies.map((b) => [b.id, b.profile])));
     this.home = this._byId.get(compiled.homeId);
-    this.moons = compiled.bodies.filter((b) => b.parent === compiled.homeId);
-    this.visitable = [this.home, ...this.moons];
+    this.planets = compiled.bodies.filter((b) => b.kind === 'PLANET');
+    this.moons = this.moonsOf(compiled.homeId);
+    this.visitable = this.planets.flatMap((p) => [p, ...this.moonsOf(p.id)]);
   }
 
   body(id) {
@@ -37,9 +38,27 @@ export class SolarSystem {
     return this._byId.get(id)?.kind === 'MOON';
   }
 
-  /** Teclas de rumbo en el espacio: 1 el planeta, 2… las lunas y la siguiente, el meteorito. */
-  autopilotTargets() {
-    const list = this.visitable.map((b) => ({ id: b.id, name: b.name }));
+  /** Lunas de un planeta. */
+  moonsOf(planetId) {
+    return this.bodies.filter((b) => b.parent === planetId);
+  }
+
+  /** Planeta al que pertenece un cuerpo (él mismo si es un planeta), o null. */
+  planetOf(id) {
+    const b = this._byId.get(id);
+    if (!b) return null;
+    return b.kind === 'PLANET' ? b.id : b.parent;
+  }
+
+  /**
+   * Teclas de rumbo en el espacio: 1… los planetas, después las lunas del planeta
+   * `near` (el más cercano a la nave) y la siguiente, el meteorito. Como mucho 9.
+   * Con un solo planeta: 1 el planeta, 2… sus lunas.
+   */
+  autopilotTargets(near = this.homeId) {
+    const list = [...this.planets, ...this.moonsOf(this.planetOf(near) ?? this.homeId)]
+      .slice(0, 8)
+      .map((b) => ({ id: b.id, name: b.name }));
     list.push({ id: 'METEOR', name: 'meteorito' });
     return list.map((t, i) => ({ ...t, key: String(i + 1) }));
   }

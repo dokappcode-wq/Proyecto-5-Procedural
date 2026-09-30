@@ -56,6 +56,9 @@ export class CelestialSystem {
    */
   setObserver(id, planetTexture = null) {
     this.observer = id;
+    // Otro planeta (o una luna de otro planeta): sus lunas pasan a ser las del cielo.
+    const planetId = this._system.planetOf(id);
+    if (planetId && planetId !== this.catalog?.planet.id && this._seed !== undefined) this._buildGroup(planetId);
     if (this._planetDirFrom(id) && planetTexture) {
       if (!this._planetMesh) this._createPlanetMesh();
       this._planetMesh.material.uniforms.map.value = planetTexture;
@@ -95,14 +98,20 @@ export class CelestialSystem {
     this._group.add(this._planetMesh);
   }
 
-  /** Crea las lunas de una seed (lo llama main al generar el mundo). */
+  /** Crea las lunas de una seed (lo llama main al generar el mundo): las del planeta de inicio. */
   setSeed(celestialSeed) {
+    this._seed = celestialSeed;
+    this._buildGroup(this._system.homeId);
+  }
+
+  /** Lunas del planeta `planetId` (el catálogo de ese grupo). */
+  _buildGroup(planetId) {
     for (const m of this.moons) {
       this._group.remove(m.mesh);
       m.mesh.geometry.dispose();
       m.material.dispose();
     }
-    this.catalog = createCelestialCatalog(this._cfg, celestialSeed, this._system);
+    this.catalog = createCelestialCatalog(this._cfg, this._seed, this._system, planetId);
     this._maxSkySize = Math.max(1, ...this.catalog.bodies.map((b) => b.skySizeDeg));
     this.moons = this.catalog.bodies.map((body) => this._createMoon(body));
     this.update(0);
@@ -160,7 +169,7 @@ export class CelestialSystem {
     if (!this.catalog) return;
     const t = this._time;
     const sun = t.getSunDirection(this._sun);
-    const onPlanet = this.observer === this._system.homeId;
+    const onPlanet = this.observer === this.catalog.planet.id;
     const fromMoon = this._planetDirFrom(this.observer);
     if (this._planetMesh) {
       this._planetMesh.visible = !!fromMoon;
@@ -210,7 +219,7 @@ export class CelestialSystem {
       // Desde una luna: la luz reflejada por el planeta.
       return { direction: fromMoon, strength: illumination(fromMoon, this._sun) };
     }
-    if (this.observer !== this._system.homeId) return null;
+    if (this.observer !== this.catalog?.planet.id) return null;
     let best = null;
     let bestStrength = 0;
     for (const m of this.moons) {

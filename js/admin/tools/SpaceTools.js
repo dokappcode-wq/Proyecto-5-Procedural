@@ -89,7 +89,7 @@ export function registerSpaceTools(admin, { system, celestial, travel, starMap, 
     },
   });
   admin.registerTool({ category: 'Espacio', label: 'Aterrizar en el cuerpo cercano', run: () => travel.land() });
-  for (const { id, name } of [...system.moons, system.home]) {
+  for (const { id, name } of system.visitable) {
     admin.registerTool({
       category: 'Espacio',
       label: `Llevar la nave junto ${withPrep('a', name)}`,
@@ -147,10 +147,12 @@ export function registerSpaceTools(admin, { system, celestial, travel, starMap, 
     run: () => {
       if (!travel.inSpace) throw new Error('Primero sal al espacio');
       const n = travel.nav;
+      const c = n.zone.center;
       const d = n.distanceFromCenter || 1;
-      const k = (travel._cfg.ZONE_RADIUS * 0.97) / d;
-      n.pos = { x: n.pos.x * k, y: n.pos.y * k, z: n.pos.z * k };
-      n.yaw = Math.atan2(-n.pos.x, -n.pos.z); // mirando hacia fuera (forward = −sin, −cos)
+      const k = (n.zone.radius * 0.97) / d;
+      const rel = { x: (n.pos.x - c.x) * k, y: (n.pos.y - c.y) * k, z: (n.pos.z - c.z) * k };
+      n.pos = { x: c.x + rel.x, y: c.y + rel.y, z: c.z + rel.z };
+      n.yaw = Math.atan2(-rel.x, -rel.z); // mirando hacia fuera de la estrella (forward = −sin, −cos)
       n.pitch = 0;
     },
   });

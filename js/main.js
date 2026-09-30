@@ -56,7 +56,7 @@ import { SpaceHUD } from './ui/SpaceHUD.js';
 import { SpaceWorld } from './space/SpaceWorld.js';
 import { SpaceView, SPACE_SUN_DIR } from './space/SpaceView.js';
 import { SpaceTravel } from './space/SpaceTravel.js';
-import { SeededRandom, hashString } from './core/SeededRandom.js';
+import { SeededRandom, hashString, deriveSeed } from './core/SeededRandom.js';
 import { registerSpaceTools } from './admin/tools/SpaceTools.js';
 import { ShipSystem } from './ship/ShipSystem.js';
 import { toWorld as toShipWorld } from './ship/ShipLayout.js';
@@ -70,7 +70,7 @@ import { MeteorSystem } from './space/MeteorSystem.js';
 import { EVASystem } from './player/EVASystem.js';
 import { EscapeSystem } from './space/EscapeSystem.js';
 import { PodPanel, EscapeOverlay } from './ui/EscapeUI.js';
-import { orbitPosition } from './celestial/CelestialCatalog.js';
+import { createSystemLayout, bodyPositions } from './celestial/SystemLayout.js';
 import { AIPanel } from './ui/AIPanel.js';
 import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
 import { ShipMapPanel } from './ui/ShipMapPanel.js';
@@ -189,10 +189,11 @@ function boot(system) {
     config: cfg.ANIMALS,
     fauna: homeProfile.FAUNA,
     scene: render.scene,
-    world: worlds.home, // los animales viven en el planeta de inicio
+    world: worlds.home, // empieza en el planeta de inicio; cada cuerpo con fauna tiene sus rebaños
     player,
     events,
     hitKnockback: cfg.INTERACTION.HIT_KNOCKBACK,
+    bodyId: HOME,
   });
   const discovery = new DiscoveryTracker({
     world,
@@ -463,20 +464,19 @@ function boot(system) {
   new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
 
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
-  const planetMap = new PlanetMapRenderer({
-    world: worlds.home,
-    planet: homeProfile,
-    worldSize: cfg.WORLD.WORLD_SIZE,
-    resolution: cfg.SHIP.MAP_RESOLUTION,
-  });
+  // Resolución del mapa según el tamaño de la región (160 px para 1 km, hasta 320 px).
+  const newMap = (w, planet) => {
+    const size = w.worldSize;
+    const resolution = Math.round(Math.min(320, Math.max(112, cfg.SHIP.MAP_RESOLUTION * Math.sqrt(size / cfg.WORLD.WORLD_SIZE))));
+    return new PlanetMapRenderer({ world: w, planet, worldSize: size, resolution });
+  };
+  const planetMap = newMap(worlds.home, homeProfile);
   // Mapas de las lunas (se dibujan la primera vez que se visitan).
   const moonMaps = new Map();
   const mapOf = (id) => {
     if (id === HOME || !system.profiles[id]) return planetMap;
     if (!moonMaps.has(id)) {
-      moonMaps.set(id, new PlanetMapRenderer({
-        world: worlds.get(id), planet: system.profiles[id], worldSize: cfg.WORLD.WORLD_SIZE, resolution: cfg.SHIP.MAP_RESOLUTION,
-      }));
+      moonMaps.set(id, newMap(worlds.get(id), system.profiles[id]));
     }
     return moonMaps.get(id);
   };
@@ -487,18 +487,33 @@ function boot(system) {
       if (worlds.activeId !== HOME && system.profiles[worlds.activeId]) mapOf(worlds.activeId).update();
     },
   };
-  // Textura del planeta de inicio visto desde fuera (lunas, espacio): se crea una vez por seed.
-  let planetTextures = null;
-  const getPlanetTextures = () => {
-    const seed = worlds.home.seed.sub.celestial;
-    if (!planetTextures || planetTextures.seed !== seed || (!planetTextures.withMap && planetMap.ready)) {
-      const t = createPlanetTextures({
-        width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: planetMap.ready ? planetMap.canvas : null, planet: homeProfile,
-      });
-      const toTex = (c) => Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace });
-      planetTextures = { seed, withMap: planetMap.ready, surface: toTex(t.surface), clouds: toTex(t.clouds) };
+  // Textura de cada planeta visto desde fuera (lunas, espacio): se crea una vez por seed y se
+  // rehace cuando su mapa está listo (la región real aparece pegada en el ecuador).
+  const planetTextures = new Map();
+  const getPlanetTextures = (id = HOME) => {
+    const home = id === HOME;
+    const map = home ? planetMap : moonMaps.get(id) ?? null;
+    const seed = home ? worlds.home.seed.sub.celestial : deriveSeed(worlds.home.seed.sub.celestial, id);
+    const withMap = !!map?.ready;
+    let t = planetTextures.get(id);
+    if (!t || t.seed !== seed || (!t.withMap && withMap)) {
+      const profile = system.profiles[id];
+      const c = createPlanetTextures({ width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: withMap ? map.canvas : null, planet: profile });
+      const toTex = (canvas) => Object.assign(new THREE.CanvasTexture(canvas), { colorSpace: THREE.SRGBColorSpace });
+      t = { seed, withMap, surface: toTex(c.surface), clouds: profile.BREATHABLE ? toTex(c.clouds) : null, atmosphere: profile.BREATHABLE };
+      planetTextures.set(id, t);
     }
-    return planetTextures;
+    return t;
+  };
+  // Dónde está cada cuerpo del sistema (estrella, planetas, lunas): se crea una vez por seed.
+  let layout = null;
+  const getLayout = () => {
+    const seed = worlds.home.seed.sub.celestial;
+    if (!layout || layout.seed !== seed) {
+      layout = createSystemLayout({ ...cfg.CELESTIAL, ZONE_MARGIN_KM: cfg.SPACE.ZONE_MARGIN_KM }, seed, system, cfg.SPACE.SUN_DIRECTION);
+      layout.seed = seed;
+    }
+    return layout;
   };
   events.on(GameEvents.WORLD_GENERATED, () => {
     planetMap.reset();
@@ -526,10 +541,11 @@ function boot(system) {
   // Cambio de cuerpo (planeta ↔ lunas ↔ espacio): cada sistema se adapta a él.
   events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
     construction.setBody(id, planet);
-    animals.setActive(id === HOME);
+    animals.setBody(id, id === 'SPACE' ? null : worlds.get(id), system.profiles[id]?.FAUNA ?? null);
     controller.gravityScale = planet?.GRAVITY_SCALE ?? 1;
     atmosphere.setAirless(planet?.BREATHABLE === false);
-    celestial.setObserver(id, id !== HOME && id !== 'SPACE' ? getPlanetTextures().surface : null);
+    const parent = system.body(id)?.parent;
+    celestial.setObserver(id, parent ? getPlanetTextures(parent).surface : null);
     // Espacio: sol fijo, sin horizonte, nebulosa con colores de la seed.
     const inSpace = id === 'SPACE';
     atmosphere.setFixedSun(inSpace ? SPACE_SUN_DIR : null);
@@ -661,8 +677,9 @@ function boot(system) {
     camera: render.camera,
     view: spaceView,
     sources: {
-      getCatalog: () => celestial.catalog,
-      getTextures: () => getPlanetTextures(),
+      getLayout,
+      getTextures: (id) => getPlanetTextures(id),
+      onSunDirection: (dir) => atmosphere.setFixedSun(dir),
       getSeed: () => worlds.home.seed.sub.celestial,
       noonHour,
     },
@@ -680,6 +697,7 @@ function boot(system) {
     getNav: () => spaceTravel.nav,
     isInSpace: () => spaceTravel.inSpace,
     getSeed: () => worlds.home.seed.value,
+    frequency: system.meteors.frequency,
   });
   spaceTravel.meteors = meteors;
   interactionProviders.push(meteors);
@@ -701,13 +719,7 @@ function boot(system) {
   spaceHUD.setEVA(eva, ship, render.camera);
 
   // ---- Etapa 6: nodo galáctico, salto fallido, cápsulas de escape y fin de la demo ----
-  const bodiesNow = () => {
-    const c = celestial.catalog;
-    return [
-      { id: HOME, name: c.planet.name, radiusKm: c.planet.radiusKm, position: { x: 0, y: 0, z: 0 } },
-      ...c.bodies.map((b) => ({ id: b.id, name: b.name, radiusKm: b.radiusKm, position: orbitPosition(b, time.totalHours, {}) })),
-    ];
-  };
+  const bodiesNow = () => bodyPositions(getLayout(), time.totalHours).filter((b) => b.landable);
   // El nodo galáctico está en una de las lunas (según la seed); aparece al llegar a ella.
   const galacticMoon = () => {
     const moons = system.moons;
@@ -738,7 +750,7 @@ function boot(system) {
     if (!inventory.removeItem(cfg.SHIP.GALACTIC_NODE_ITEM, 1)) return;
     ship.installTech(slot, 'GALACTIC_NODE');
     spaceTravel.galacticNode = true;
-    shipAI.say(`Nodo galáctico instalado. Para intentar el salto, sal del ${system.name}: vuela más allá de ${cfg.SPACE.ZONE_RADIUS.toLocaleString('es-ES')} km ${withPrep('de', homeName)} (Shift = impulso).`);
+    shipAI.say(`Nodo galáctico instalado. Para intentar el salto, sal del ${system.name}: aléjate de la estrella ${system.star.name} hasta más de ${Math.round(getLayout().zoneRadiusKm).toLocaleString('es-ES')} km (Shift = impulso).`);
   });
   // El salto falla: la nave queda inutilizada; solo queda evacuar en una cápsula.
   events.on(GameEvents.GALACTIC_JUMP_ATTEMPT, () => {
@@ -788,9 +800,13 @@ function boot(system) {
     time,
     sources: {
       getCatalog: () => celestial.catalog,
-      getMapCanvas: () => (planetMap.ready ? planetMap.canvas : null),
+      getMapCanvas: (id) => {
+        const m = id === HOME ? planetMap : moonMaps.get(id);
+        return m?.ready ? m.canvas : null;
+      },
       getSeed: () => worlds.home.seed.sub.celestial,
-      planet: homeProfile,
+      getProfile: (id) => system.profiles[id],
+      getBodyPosition: (id) => bodyPositions(getLayout(), time.totalHours).find((b) => b.id === id)?.position,
       noonHour,
       getShipLocation: () => spaceTravel.getShipLocation(),
     },
@@ -896,10 +912,16 @@ function gameSeed() {
   return buf[0] % 1000000000; // hasta 9 cifras: fácil de apuntar y compartir
 }
 
-/** La campaña: El Jardín del Edén, descrito en JSON como cualquier sistema importado. */
+/**
+ * La campaña: El Jardín del Edén, descrito en JSON como cualquier sistema importado.
+ * Para probar otro sistema de la carpeta systems/: ?system=pruebas/tres-mundos
+ * (solo nombres de archivo de esa carpeta; el archivo pasa por el mismo validador).
+ */
 async function loadCampaign() {
-  const res = await fetch(GameConfig.CAMPAIGN.SYSTEM_URL);
-  if (!res.ok) throw new Error(`no se pudo leer ${GameConfig.CAMPAIGN.SYSTEM_URL} (${res.status})`);
+  const param = new URLSearchParams(window.location.search).get('system');
+  const url = param && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*$/.test(param) ? `systems/${param}.system.json` : GameConfig.CAMPAIGN.SYSTEM_URL;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`no se pudo leer ${url} (${res.status})`);
   const result = loadSystem(await res.text(), { seed: gameSeed() });
   if (!result.ok) throw new Error(`el sistema de la campaña no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
   for (const w of result.warnings) console.warn(`[sistema] ${w.path}: ${w.message}`);

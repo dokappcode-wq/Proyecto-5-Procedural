@@ -12,7 +12,6 @@ export class SpaceHUD {
     this.name = 'spaceHUD';
     this._travel = travel;
     this._system = system;
-    this._targets = system.autopilotTargets();
     this._dist = {};
 
     this.fade = document.createElement('div');
@@ -70,7 +69,9 @@ export class SpaceHUD {
 
   _render(n) {
     const kmh = Math.abs(n.speed);
-    this._speed.textContent = `Velocidad ${kmh < 10 ? kmh.toFixed(1) : Math.round(kmh)} km/s · 🔋 ${Math.round(n.charge * 100)} %${n.powered ? '' : ' · SIN BATERÍA'}`;
+    const speed = kmh < 10 ? kmh.toFixed(1) : Math.round(kmh).toLocaleString('es-ES');
+    this._speed.textContent = `${n.cruising ? '🚀 Crucero interplanetario · ' : ''}Velocidad ${speed} km/s · 🔋 ${Math.round(n.charge * 100)} %${n.powered ? '' : ' · SIN BATERÍA'}`;
+    this._speed.classList.toggle('cruise', !!n.cruising);
     this._speed.classList.toggle('low', !n.powered || n.charge < 0.15);
     const fmtM = (m) => (m >= 1000 ? `${Math.round(m / 1000).toLocaleString('es-ES')} km` : `${Math.max(0, Math.round(m))} m`);
     if (n.autopilot) {
@@ -79,14 +80,15 @@ export class SpaceHUD {
       this._auto.replaceChildren('🧭 Rumbo automático: ', b, ' (A/D/Espacio/C lo cancelan)');
     } else {
       const parts = ['🧭 Rumbo:'];
-      for (const t of this._targets) {
+      for (const t of n.targets ?? this._system.autopilotTargets()) {
         if (t.id === 'METEOR' && !n.meteor) continue;
         parts.push(' ', kbd(t.key), ` ${t.id === 'METEOR' ? `meteorito (${fmtM(n.meteor.distanceM)})` : t.name}`);
       }
       this._auto.replaceChildren(...parts);
     }
     const fmt = (km) => (km >= 10000 ? `${(km / 1000).toFixed(1)} mil km` : `${Math.round(km).toLocaleString('es-ES')} km`);
-    this._bodies.replaceChildren(...n.bodies.map((b) => {
+    // Los 7 cuerpos más cercanos (la lista ya viene ordenada por distancia).
+    this._bodies.replaceChildren(...n.bodies.slice(0, 7).map((b) => {
       const row = document.createElement('div');
       const name = document.createElement('span');
       name.textContent = b.name;

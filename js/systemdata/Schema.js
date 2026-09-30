@@ -82,7 +82,7 @@ const flora = arr(obj({
 
 const fauna = arr(obj({
   template: enm(labels(FAUNA_TEMPLATES), 'Tipo de animal.'),
-  herds: int(0, 30, 'Número de rebaños.'),
+  herds: int(0, 30, 'Número de rebaños en toda la región.'),
 }, 'Una especie animal.', ['template', 'herds']), LIMITS.FAUNA, 'Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.');
 
 const lore = obj({
@@ -107,7 +107,7 @@ function bodyProperties(kind) {
     climate: obj({ temperature_c: num(-150, 150, 'Temperatura media de la zona baja en °C.') }, 'Clima.'),
     water: obj({
       sea: bool('¿Hay mar alrededor de la región?'),
-      ponds: int(0, 40, 'Charcas de agua dulce.'),
+      ponds: int(0, LIMITS.PONDS, 'Charcas de agua dulce en toda la región.'),
       sea_color: color('Color del mar.'),
       pond_color: color('Color de las charcas.'),
     }, 'Agua.'),

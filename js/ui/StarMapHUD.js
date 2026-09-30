@@ -12,10 +12,7 @@ export class StarMapHUD {
     this.name = 'starMapHUD';
     this._map = map;
     this._system = system;
-    const bodies = [
-      ...system.visitable.map((b) => ({ id: b.id, label: b.name })),
-      { id: 'SHIP', label: 'Tu nave' },
-    ].map((b, i) => ({ ...b, key: String(i + 1) }));
+
     this._locked = spaceNodeRequired;
 
     this.labels = document.createElement('div');
@@ -32,20 +29,11 @@ export class StarMapHUD {
       <div class="space-bodies"></div>
       <div class="space-info"></div>
       <button type="button" class="space-return"><kbd>M</kbd> Cerrar mapa</button>
-      <div class="space-hint">Ratón: girar · Rueda: acercar/alejar · <kbd>1</kbd>–<kbd>${bodies.length}</kbd> enfocar · <kbd>Esc</kbd> cerrar</div>`;
+      <div class="space-hint">Ratón: girar · Rueda: acercar/alejar · <kbd>1</kbd>–<kbd class="space-lastkey"></kbd> enfocar · <kbd>Esc</kbd> cerrar</div>`;
     this.el.querySelector('.space-system').textContent = system.name;
-    const list = this.el.querySelector('.space-bodies');
+    this._list = this.el.querySelector('.space-bodies');
+    this._events = events;
     this._buttons = {};
-    for (const b of bodies) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      const kbd = document.createElement('kbd');
-      kbd.textContent = b.key;
-      btn.append(kbd, ` ${b.label}`);
-      btn.addEventListener('click', () => events.emit(GameEvents.SPACE_FOCUS_REQUEST, { id: b.id }));
-      list.appendChild(btn);
-      this._buttons[b.id] = btn;
-    }
     this._info = this.el.querySelector('.space-info');
     this.el.querySelector('.space-return').addEventListener('click', () => events.emit(GameEvents.STAR_MAP_REQUEST, { open: false }));
     container.appendChild(this.el);
@@ -54,9 +42,29 @@ export class StarMapHUD {
       this.el.classList.toggle('hidden', !open);
       this.labels.classList.toggle('hidden', !open);
       document.body.classList.toggle('star-map', open);
-      if (open) this._renderInfo();
+      if (open) {
+        this._renderButtons();
+        this._renderInfo();
+      }
     });
     events.on(GameEvents.SPACE_FOCUS_CHANGED, () => this._renderInfo());
+  }
+
+  /** Un botón por cuerpo del grupo que muestra el mapa (planeta, lunas) y la nave. */
+  _renderButtons() {
+    const keys = this._map.focusKeys;
+    this._buttons = {};
+    this._list.replaceChildren(...keys.map((id, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const kbd = document.createElement('kbd');
+      kbd.textContent = String(i + 1);
+      btn.append(kbd, ` ${id === 'SHIP' ? 'Tu nave' : this._system.nameOf(id)}`);
+      btn.addEventListener('click', () => this._events.emit(GameEvents.SPACE_FOCUS_REQUEST, { id }));
+      this._buttons[id] = btn;
+      return btn;
+    }));
+    this.el.querySelector('.space-lastkey').textContent = String(keys.length);
   }
 
   _renderInfo() {
@@ -88,7 +96,9 @@ export class StarMapHUD {
     if (!this._map.active) return;
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const seen = new Set();
     for (const l of this._map.getLabels(w, h)) {
+      seen.add(l.id);
       let node = this._labelNodes[l.id];
       if (!node) {
         node = document.createElement('div');
@@ -101,5 +111,6 @@ export class StarMapHUD {
       node.style.transform = `translate(${l.x}px, ${l.y}px) translate(-50%, -100%)`;
       node.classList.toggle('focused', l.focused);
     }
+    for (const [id, node] of Object.entries(this._labelNodes)) if (!seen.has(id)) node.style.display = 'none';
   }
 }

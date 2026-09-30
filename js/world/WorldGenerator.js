@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
+import { LruCache } from '../core/LruCache.js';
 import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
 import { WorldSeed } from './WorldSeed.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
@@ -56,7 +57,8 @@ export class WorldGenerator {
     this._spacing = config.CHUNK_SIZE / config.CHUNK_RESOLUTION;
     this._stride = this._res + 3;
 
-    this._dataCache = new Map();
+    // Alturas por chunk: se descartan las menos usadas (una región de 20 km tiene 100 000 chunks).
+    this._dataCache = new LruCache(config.CHUNK_DATA_CACHE ?? 900);
     this._focus = null;
     this.seed = null;
     this.terrain = null;
@@ -279,6 +281,11 @@ export class WorldGenerator {
       }
     }
     return null;
+  }
+
+  /** Lado de la región (m). */
+  get worldSize() {
+    return this._cfg.WORLD_SIZE;
   }
 
   /** Información de depuración para el modo Admin. */

@@ -3,7 +3,7 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: v1.2.0 — las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y el bloque 1a de los sistemas solares importables: el juego ya se construye a partir de un sistema descrito en JSON.**
+**Estado actual: v1.3.0 — las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y los bloques 1a y 1b de los sistemas solares importables: el juego se construye a partir de un sistema descrito en JSON, con regiones de 0,5 a 20 km, varios planetas y crucero interplanetario.**
 
 Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El Jardín del Edén** (antes "MUNDO 0"), con sus dos lunas.
 
@@ -28,6 +28,7 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
+| 1b | Regiones de tamaño real (enano 0,5 km · pequeño 1 · mediano 5 · grande 10 · enorme 20) con caché de terreno que descarta lo más antiguo; varios planetas por sistema alrededor de una estrella, todas las lunas visitables, animales en cada cuerpo con fauna, crucero interplanetario y rumbo automático que rodea los planetas |
 | 1a | Sistemas solares como datos: catálogo del motor, esquema v1, lectura segura de JSON, validador con rutas de error, compilador. El Jardín del Edén vive en `systems/jardin-del-eden.system.json` y cada partida tiene una semilla numérica aleatoria |
 
 ## Cómo ejecutarlo
@@ -44,6 +45,7 @@ Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 
 - Cada partida empieza con una **semilla numérica aleatoria** (se ve arriba a la izquierda).
 - Semilla fija por URL: `http://localhost:8080/?seed=12345` (la misma semilla produce el mismo planeta y las mismas lunas).
+- Otro sistema de la carpeta `systems/`: `http://localhost:8080/?system=pruebas/tres-mundos` (sistema de prueba con tres planetas: enano, mediano y enorme).
 - Tests sin navegador (reproducibilidad, secuencia Admin): `npm test`.
 
 ## Controles
@@ -70,7 +72,7 @@ Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 | Reloj de la nave + clic derecho / `R` | Ver dónde está la nave (distancia, dirección, estado) |
 | A los mandos: `O` | Salir al espacio (con el nodo espacial; en vuelo, compuerta cerrada, a más de 60 m) |
 | En el espacio: `W`/`S` · `A`/`D` · `Espacio`/`C` · `Shift` | Acelerar/frenar · girar · cabecear · impulso |
-| En el espacio: `1` `2` `3` · `T` · `M` | Rumbo automático al planeta / Luna A / Luna B (una tecla por cuerpo del sistema) · aterrizar al llegar · mapa estelar 3D |
+| En el espacio: `1`–`9` · `Shift` · `T` · `M` | Rumbo automático (primero los planetas, después las lunas del planeta cercano y el meteorito) · impulso; lejos de los planetas, crucero interplanetario · aterrizar al llegar · mapa estelar 3D |
 | Mapa de la señal + clic derecho / `R` | Abrir el mapa con la posición del nodo espacial |
 | Burbuja de oxígeno + clic derecho / `R` | Desplegarla delante (`E` en el generador: poner/quitar batería, recogerla) |
 | Batería plank + clic derecho / `R` (con el traje) | Cambiar la batería del traje |
@@ -250,6 +252,12 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Varios planetas (1b)**: abre `?system=pruebas/tres-mundos`. Instala el nodo espacial (Admin → Espacio),
+  sal al espacio y pulsa `2` (Thalassa): mantén `W` + `Shift` y, lejos de los planetas, el HUD
+  marca 🚀 *Crucero interplanetario* (hasta 90 000 km/s); frena solo al llegar. Thalassa mide 5 km,
+  tiene mar, cabras y ciervos y dos lunas en su cielo. `3` lleva a Ferrum: 20 km, rojo, sin aire,
+  1,6 g (ponte el traje). Si un planeta queda en medio, el rumbo automático lo rodea. El límite
+  del sistema se mide desde la estrella.
 - **Sistemas como datos (1a)**: el juego carga `systems/jardin-del-eden.system.json`, lo valida
   y lo compila. Recarga dos veces: la semilla (arriba a la izquierda) cambia cada partida. Con
   `?seed=12345` el planeta y las lunas son siempre los mismos. Cambia en el JSON, por ejemplo,

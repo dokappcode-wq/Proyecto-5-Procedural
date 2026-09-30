@@ -5,8 +5,8 @@ import { createMoonGeometry } from '../celestial/CelestialSystem.js';
 import { createPlanetTextures } from './PlanetTexture.js';
 
 /**
- * SpaceScene — escena espacial separada (Fase 13): el planeta de inicio con su
- * mapa real, nubes y atmósfera, sus lunas en sus órbitas, el sol, las estrellas y la nave.
+ * SpaceScene — escena espacial separada (Fase 13): un planeta (el del grupo que
+ * se muestra) con su mapa real, nubes y atmósfera, sus lunas en sus órbitas, el sol, las estrellas y la nave.
  *
  * Unidades: el planeta mide `PLANET_RADIUS`; las distancias de las lunas se
  * escalan con él (km × PLANET_RADIUS / PLANET_RADIUS_KM) y su tamaño se exagera
@@ -19,7 +19,7 @@ export class SpaceScene {
   constructor({ config, system }) {
     this._cfg = config;
     this._system = system;
-    this._kmScale = config.PLANET_RADIUS / system.home.radiusKm;
+    this._kmScale = config.PLANET_RADIUS / system.home.radiusKm; // se recalcula en build()
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x02040a);
     this.camera = new THREE.PerspectiveCamera(config.CAMERA_FOV, window.innerWidth / window.innerHeight, 0.5, 9000);
@@ -107,14 +107,21 @@ export class SpaceScene {
     this.ship.position.set(R * 1.12, R * 0.02, 0);
     this.scene.add(this.ship);
     this.scene.add(this.planet);
-    this.bodies[this._system.homeId] = { object: this.planet, radius: R, name: this._system.home.name };
     this.bodies.SHIP = { object: this.ship, radius: 1.5, name: 'Tu nave' };
   }
 
-  /** Estrellas y lunas según la seed (y la textura del planeta). Solo la primera vez por seed. */
+  /**
+   * Estrellas, planeta y lunas del grupo `catalog` (un planeta y sus lunas) según la
+   * seed. Solo se rehace si cambia la seed o el planeta.
+   */
   build({ catalog, seed, mapCanvas, planet }) {
-    if (this._texturesFor === seed) return;
-    this._texturesFor = seed;
+    const key = `${seed}:${catalog.planet.id}:${mapCanvas ? 1 : 0}`;
+    if (this._texturesFor === key) return;
+    this._texturesFor = key;
+    this._catalog = catalog;
+    this._kmScale = this._cfg.PLANET_RADIUS / catalog.planet.radiusKm;
+    for (const id of Object.keys(this.bodies)) if (id !== 'SHIP' && !this.bodies[id].body) delete this.bodies[id];
+    this.bodies[catalog.planet.id] = { object: this.planet, radius: this._cfg.PLANET_RADIUS, name: catalog.planet.name };
     const textures = createPlanetTextures({ width: this._cfg.TEXTURE_WIDTH, seed, mapCanvas, planet });
     const toTex = (canvas) => {
       const t = new THREE.CanvasTexture(canvas);
@@ -129,7 +136,7 @@ export class SpaceScene {
     this._cloudMaterial.map?.dispose();
     this._cloudMaterial.map = toTex(textures.clouds);
     this._cloudMaterial.needsUpdate = true;
-    this.cloudLayer.visible = true;
+    this.cloudLayer.visible = planet.BREATHABLE !== false;
 
     this._buildStars(seed);
     this._buildMoons(catalog);
@@ -161,12 +168,11 @@ export class SpaceScene {
   }
 
   _buildMoons(catalog) {
-    for (const { id } of this._system.moons) {
-      const old = this.bodies[id];
-      if (old) {
-        this.scene.remove(old.object, old.orbit);
-        old.object.geometry.dispose();
-      }
+    for (const [id, old] of Object.entries(this.bodies)) {
+      if (!old.body) continue; // solo las lunas
+      this.scene.remove(old.object, old.orbit);
+      old.object.geometry.dispose();
+      delete this.bodies[id];
     }
     for (const body of catalog.bodies) {
       const radius = body.radiusKm * this._kmScale * this._cfg.MOON_VISUAL_SCALE;
@@ -192,12 +198,12 @@ export class SpaceScene {
   }
 
   /** Posiciones según la hora: el planeta gira (la isla mira al sol a mediodía) y las lunas orbitan. */
-  update(totalHours, dt, noonHour, shipLocation = null) {
+  update(totalHours, dt, noonHour, shipLocation = null, origin = { x: 0, y: 0, z: 0 }) {
     this.planet.rotation.y = (Math.PI * 2 * (totalHours - noonHour)) / 24;
     this.planet.updateMatrixWorld(true);
     this.cloudLayer.rotation.y += dt * 0.004;
     const p = {};
-    for (const { id } of this._system.moons) {
+    for (const { id } of this._catalog?.bodies ?? []) {
       const b = this.bodies[id];
       if (!b) continue;
       orbitPosition(b.body, totalHours, p);
@@ -206,12 +212,13 @@ export class SpaceScene {
     }
     // La nave: en el espacio, donde esté; en un cuerpo, sobre su zona de aterrizaje.
     const R = this._cfg.PLANET_RADIUS;
-    const home = this._system.homeId;
-    const loc = shipLocation ?? { body: home };
+    const center = this._catalog?.planet.id;
+    const loc = shipLocation ?? { body: center };
     if (loc.body === 'SPACE' && loc.pos) {
-      this.ship.position.set(loc.pos.x, loc.pos.y, loc.pos.z).multiplyScalar(this._kmScale);
+      // Posición de la nave respecto al planeta del grupo (`origin`, en km).
+      this.ship.position.set(loc.pos.x - origin.x, loc.pos.y - origin.y, loc.pos.z - origin.z).multiplyScalar(this._kmScale);
       this.ship.rotation.set(0, loc.yaw ?? 0, 0);
-    } else if (this.bodies[loc.body] && loc.body !== home) {
+    } else if (this.bodies[loc.body] && loc.body !== center) {
       const m = this.bodies[loc.body];
       this.ship.position.copy(m.object.position).add(new THREE.Vector3(m.radius * 1.4, 0, 0));
     } else {

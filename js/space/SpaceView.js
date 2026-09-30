@@ -1,20 +1,34 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { orbitPosition } from '../celestial/CelestialCatalog.js';
+import { bodyPositions } from '../celestial/SystemLayout.js';
 import { createMoonGeometry } from '../celestial/CelestialSystem.js';
 
 /**
  * SpaceView — lo que se ve desde la nave en el espacio (en la escena normal).
  *
- * El sistema mide decenas de miles de km y la nave unos metros. Para no perder
- * precisión, cada cuerpo se dibuja a VIEW_DISTANCE metros de la cámara, en su
- * dirección real y con su TAMAÑO APARENTE real (radio × distancia de dibujo /
- * distancia real). Lo mismo con los asteroides de los cinturones (por seed).
+ * El sistema mide cientos de miles de km y la nave unos metros. Para no perder
+ * precisión, cada cuerpo (estrella, planetas, lunas, asteroides) se dibuja cerca
+ * de la cámara, en su dirección real y con su TAMAÑO APARENTE real: a una distancia
+ * de dibujo que crece con la distancia real (`drawDistance`, siempre ≤ VIEW_DISTANCE),
+ * así lo que está más cerca tapa a lo que está más lejos.
  *
- * Además: polvo que pasa junto a la nave (sensación de velocidad). El sol, las
- * estrellas y la nebulosa los dibuja SkyDome.
+ * Cada planeta usa su textura (el de inicio, con el mapa real de su región) y la
+ * luz de la estrella desde su posición. Además: polvo que pasa junto a la nave.
+ * Las estrellas del fondo y la nebulosa las dibuja SkyDome.
  */
 export const SPACE_SUN_DIR = new THREE.Vector3(1, 0.12, 0.08).normalize();
+
+const PLANET_VERTEX = /* glsl */ `
+  varying vec3 vN; varying vec2 vUv;
+  void main() { vN = normalize(mat3(modelMatrix) * normal); vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const PLANET_FRAGMENT = /* glsl */ `
+  uniform sampler2D map; uniform vec3 sunDir; varying vec3 vN; varying vec2 vUv;
+  void main() {
+    float lit = smoothstep(-0.08, 0.25, dot(normalize(vN), sunDir));
+    gl_FragColor = vec4(texture2D(map, vUv).rgb * (0.03 + 1.1 * lit), 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
 
 export class SpaceView {
   constructor({ scene, config }) {
@@ -29,30 +43,73 @@ export class SpaceView {
     this._s = new THREE.Vector3();
     this._e = new THREE.Euler();
 
-    // Planeta (textura del planeta de inicio iluminada por el sol del espacio).
-    this._planetMat = new THREE.ShaderMaterial({
-      uniforms: { map: { value: null }, sunDir: { value: SPACE_SUN_DIR } },
+    this.planets = {};   // id → { root, planet, clouds, material, cloudMaterial, sunDir }
+    this.moons = {};
+    this.star = this._buildStar();
+    this._layout = null;
+    this._asteroids = null;
+    this._belts = [];
+    this._buildDust();
+  }
+
+  /** El planeta de inicio (compatibilidad). */
+  get planetRoot() {
+    return this._layout ? this.planets[this._layout.planets.find((p) => p.home).id]?.root : null;
+  }
+
+  /**
+   * Cuerpos, asteroides y texturas de una seed.
+   * @param {object} p.layout   SystemLayout (estrella, planetas y lunas)
+   * @param {Function} p.textures (planetId) → { surface, clouds, atmosphere }
+   */
+  build({ layout, seed, textures }) {
+    this._layout = layout;
+    for (const p of layout.planets) {
+      const t = textures(p.id);
+      if (!this.planets[p.id]) this.planets[p.id] = this._makePlanet(p.id);
+      const v = this.planets[p.id];
+      v.material.uniforms.map.value = t.surface;
+      v.cloudMaterial.map = t.clouds;
+      v.cloudMaterial.needsUpdate = true;
+      v.clouds.visible = !!t.clouds;
+      v.halo.visible = !!t.atmosphere;
+    }
+    this.star.core.material.color.setHex(layout.star.color);
+    this.star.glow.material.color.setHex(layout.star.color);
+    if (this._builtFor === seed) return;
+    this._builtFor = seed;
+    for (const m of Object.values(this.moons)) {
+      this.group.remove(m);
+      m.geometry.dispose();
+    }
+    this.moons = {};
+    for (const p of layout.planets) {
+      for (const body of p.catalog.bodies) {
+        const mesh = new THREE.Mesh(createMoonGeometry(body, 4), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }));
+        mesh.frustumCulled = false;
+        this.moons[body.id] = mesh;
+        this.group.add(mesh);
+      }
+    }
+    this._buildAsteroids(seed);
+  }
+
+  _makePlanet(id) {
+    const sunDir = new THREE.Vector3().copy(SPACE_SUN_DIR);
+    const material = new THREE.ShaderMaterial({
+      uniforms: { map: { value: null }, sunDir: { value: sunDir } },
       fog: false,
-      vertexShader: /* glsl */ `
-        varying vec3 vN; varying vec2 vUv;
-        void main() { vN = normalize(mat3(modelMatrix) * normal); vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: /* glsl */ `
-        uniform sampler2D map; uniform vec3 sunDir; varying vec3 vN; varying vec2 vUv;
-        void main() {
-          float lit = smoothstep(-0.08, 0.25, dot(normalize(vN), sunDir));
-          gl_FragColor = vec4(texture2D(map, vUv).rgb * (0.03 + 1.1 * lit), 1.0);
-          #include <tonemapping_fragment>
-          #include <colorspace_fragment>
-        }`,
+      vertexShader: PLANET_VERTEX,
+      fragmentShader: PLANET_FRAGMENT,
     });
-    this.planet = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), this._planetMat);
-    this._cloudMat = new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.8, depthWrite: false, fog: false });
-    this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.012, 64, 48), this._cloudMat);
-    this.clouds.visible = false;
+    const planet = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), material);
+    const cloudMaterial = new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.8, depthWrite: false, fog: false });
+    const clouds = new THREE.Mesh(new THREE.SphereGeometry(1.012, 64, 48), cloudMaterial);
+    clouds.visible = false;
     const halo = new THREE.Mesh(
       new THREE.SphereGeometry(1.08, 64, 48),
       new THREE.ShaderMaterial({
-        uniforms: { sunDir: { value: SPACE_SUN_DIR } },
+        uniforms: { sunDir: { value: sunDir } },
         side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
         vertexShader: /* glsl */ `
           varying vec3 vN; varying vec3 vView;
@@ -65,38 +122,34 @@ export class SpaceView {
             gl_FragColor = vec4(vec3(0.35, 0.62, 1.0) * rim * day * 1.6, rim * day); }`,
       }),
     );
-    this.planetRoot = new THREE.Group();
-    this.planetRoot.add(this.planet, this.clouds, halo);
-    this.group.add(this.planetRoot);
-    this.planetRoot.traverse((o) => (o.frustumCulled = false));
-
-    this.moons = {};
-    this._asteroids = null;
-    this._belts = [];
-    this._buildDust();
+    const root = new THREE.Group();
+    root.name = `Planet_${id}`;
+    root.add(planet, clouds, halo);
+    root.traverse((o) => (o.frustumCulled = false));
+    this.group.add(root);
+    return { root, planet, clouds, halo, material, cloudMaterial, sunDir };
   }
 
-  /** Lunas, asteroides y texturas de una seed. */
-  build({ catalog, seed, textures }) {
-    this._catalog = catalog;
-    this._planetMat.uniforms.map.value = textures.surface;
-    this._cloudMat.map = textures.clouds;
-    this._cloudMat.needsUpdate = true;
-    this.clouds.visible = true;
-    if (this._builtFor === seed) return;
-    this._builtFor = seed;
-    for (const m of Object.values(this.moons)) {
-      this.group.remove(m);
-      m.geometry.dispose();
-    }
-    this.moons = {};
-    for (const body of catalog.bodies) {
-      const mesh = new THREE.Mesh(createMoonGeometry(body, 4), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }));
-      mesh.frustumCulled = false;
-      this.moons[body.id] = mesh;
-      this.group.add(mesh);
-    }
-    this._buildAsteroids(seed);
+  _buildStar() {
+    const core = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), new THREE.MeshBasicMaterial({ color: 0xfff1d0, fog: false }));
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(64, 64, 8, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.3, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    glow.scale.setScalar(5);
+    const root = new THREE.Group();
+    root.name = 'Star';
+    root.add(core, glow);
+    root.traverse((o) => (o.frustumCulled = false));
+    this.group.add(root);
+    return { root, core, glow };
   }
 
   /**
@@ -162,20 +215,26 @@ export class SpaceView {
     this.group.add(this._dust);
   }
 
-  /** Posición (km) de cada cuerpo ahora. */
+  /** Posición (km) de cada cuerpo ahora (la estrella primero). */
   bodyPositions(totalHours) {
-    const out = [{ id: this._catalog.planet.id, name: this._catalog.planet.name, radiusKm: this._catalog.planet.radiusKm, position: { x: 0, y: 0, z: 0 } }];
-    for (const b of this._catalog.bodies) {
-      out.push({ id: b.id, name: b.name, radiusKm: b.radiusKm, position: orbitPosition(b, totalHours, {}) });
-    }
-    return out;
+    return this._layout ? bodyPositions(this._layout, totalHours) : [];
   }
 
-  /** Etiquetas en pantalla (px) del planeta y las lunas: [{ id, name, x, y, visible }]. */
+  /** Dirección (unitaria) hacia la estrella desde un punto (km). */
+  sunDirectionFrom(pos, target = new THREE.Vector3()) {
+    const S = this._layout?.star.position;
+    if (!S) return target.copy(SPACE_SUN_DIR);
+    return target.set(S.x - pos.x, S.y - pos.y, S.z - pos.z).normalize();
+  }
+
+  /** Etiquetas en pantalla (px) de la estrella, los planetas y las lunas: [{ id, name, x, y, visible }]. */
   screenLabels(camera, width, height) {
-    if (!this._catalog || !this.group.visible) return [];
-    const items = [{ id: this._catalog.planet.id, name: this._catalog.planet.name, obj: this.planetRoot }];
-    for (const b of this._catalog.bodies) items.push({ id: b.id, name: b.name, obj: this.moons[b.id] });
+    if (!this._layout || !this.group.visible) return [];
+    const items = [{ id: 'STAR', name: this._layout.star.name, obj: this.star.root }];
+    for (const p of this._layout.planets) {
+      items.push({ id: p.id, name: p.name, obj: this.planets[p.id].root });
+      for (const b of p.catalog.bodies) items.push({ id: b.id, name: b.name, obj: this.moons[b.id] });
+    }
     return items.map(({ id, name, obj }) => {
       this._v.copy(obj.position);
       this._v.y += obj.scale.x * 1.1;
@@ -195,27 +254,45 @@ export class SpaceView {
   }
 
   /**
+   * Distancia de dibujo (m) para un cuerpo a `km` de la nave: crece con la
+   * distancia real (lo cercano tapa lo lejano) y nunca pasa de VIEW_DISTANCE.
+   */
+  drawDistance(km) {
+    const D = this._cfg.VIEW_DISTANCE;
+    return D * Math.min(1, Math.max(0.3, 0.3 + 0.1 * Math.log10(Math.max(1, km / 100))));
+  }
+
+  /**
    * @param {object} nav   SpaceNavigation (posición en km, velocidad)
    * @param {THREE.Vector3} camPos posición de la cámara (m)
    */
   update(dt, nav, camPos, totalHours, noonHour) {
-    if (!this._catalog) return;
-    const D = this._cfg.VIEW_DISTANCE;
-    const place = (obj, px, py, pz, radiusKm) => {
-      this._v.set(px - nav.pos.x, py - nav.pos.y, pz - nav.pos.z);
+    if (!this._layout) return;
+    const place = (obj, p, radiusKm) => {
+      this._v.set(p.x - nav.pos.x, p.y - nav.pos.y, p.z - nav.pos.z);
       const d = this._v.length();
+      const D = this.drawDistance(d);
       this._v.divideScalar(d);
       obj.position.copy(camPos).addScaledVector(this._v, D);
       obj.scale.setScalar((radiusKm * D) / d);
     };
-    const R = this._catalog.planet.radiusKm;
-    place(this.planetRoot, 0, 0, 0, R);
-    this.planet.rotation.y = (Math.PI * 2 * (totalHours - noonHour)) / 24;
-    this.clouds.rotation.y += dt * 0.004;
-    for (const b of this._catalog.bodies) {
-      const p = orbitPosition(b, totalHours, {});
-      place(this.moons[b.id], p.x, p.y, p.z, b.radiusKm);
-      this.moons[b.id].rotation.y = -Math.PI * 2 * b.speed * totalHours;
+    const bodies = bodyPositions(this._layout, totalHours);
+    const byId = Object.fromEntries(bodies.map((b) => [b.id, b]));
+    const S = this._layout.star.position;
+    place(this.star.root, S, this._layout.star.radiusKm);
+    const spin = (Math.PI * 2 * (totalHours - noonHour)) / 24;
+    for (const p of this._layout.planets) {
+      const v = this.planets[p.id];
+      const b = byId[p.id];
+      place(v.root, b.position, p.radiusKm);
+      // Luz desde la estrella; la región del planeta mira a la estrella a mediodía.
+      v.sunDir.set(S.x - b.position.x, S.y - b.position.y, S.z - b.position.z).normalize();
+      v.planet.rotation.y = spin + (p.home ? 0 : Math.atan2(-v.sunDir.z, v.sunDir.x));
+      v.clouds.rotation.y += dt * 0.004;
+      for (const m of p.catalog.bodies) {
+        place(this.moons[m.id], byId[m.id].position, m.radiusKm);
+        this.moons[m.id].rotation.y = -Math.PI * 2 * m.speed * totalHours;
+      }
     }
 
     // Asteroides a menos de 12 000 km (dibujados con su tamaño aparente).
@@ -227,11 +304,12 @@ export class SpaceView {
       const dz = a.z - nav.pos.z;
       const d = Math.hypot(dx, dy, dz);
       if (d > 12000 || d < 1) continue;
+      const D = this.drawDistance(d);
       this._v.set(dx / d, dy / d, dz / d);
       const s = (a.radius * D) / d;
       if (s < 0.02) continue;
       this._q.setFromEuler(this._e.set(a.rot[0] + a.spin * t * 0.001, a.rot[1], a.rot[2]));
-      this._m.compose(this._v.multiplyScalar(D * 0.98).add(camPos), this._q, this._s.setScalar(s));
+      this._m.compose(this._v.multiplyScalar(D).add(camPos), this._q, this._s.setScalar(s));
       this._asteroids.setMatrixAt(n++, this._m);
     }
     this._asteroids.count = n;
@@ -242,13 +320,7 @@ export class SpaceView {
     const v = Math.min(80, Math.abs(nav.speed) * 0.35) * Math.sign(nav.speed);
     const arr = this._dust.geometry.getAttribute('position');
     for (let i = 0; i < arr.count; i++) {
-      let x = arr.getX(i) - f.x * v * dt;
-      let y = arr.getY(i) - f.y * v * dt;
-      let z = arr.getZ(i) - f.z * v * dt;
-      x = wrap(x);
-      y = wrap(y);
-      z = wrap(z);
-      arr.setXYZ(i, x, y, z);
+      arr.setXYZ(i, wrap(arr.getX(i) - f.x * v * dt), wrap(arr.getY(i) - f.y * v * dt), wrap(arr.getZ(i) - f.z * v * dt));
     }
     arr.needsUpdate = true;
     this._dust.position.copy(camPos);

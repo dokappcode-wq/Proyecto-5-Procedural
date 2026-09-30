@@ -12,8 +12,12 @@
  * - Rumbo automático (`autopilotTarget`): gira y cabecea solo hacia el cuerpo elegido.
  * - Objetos menores (`extras`: meteoritos) no se pueden atravesar ni aterrizar en ellos:
  *   al ir hacia uno la velocidad baja y el rumbo automático se detiene a `stopKm` de su superficie.
- * - La zona del sistema tiene un radio: al salir de ella, `zone` lo indica
- *   (sin nodo galáctico la nave no puede pasar; con él, falla: Etapa 6).
+ * - La zona del sistema tiene un radio alrededor de su centro (la estrella):
+ *   al salir de ella, `outsideZone` lo indica (sin nodo galáctico la nave no
+ *   puede pasar; con él, falla: Etapa 6).
+ * - Crucero interplanetario: lejos de todos los cuerpos (más de CRUISE.MIN_ALTITUDE_KM)
+ *   y con impulso (Shift), la velocidad crece en proporción a sí misma hasta
+ *   CRUISE.MAX_SPEED; el frenado de proximidad la baja sola al acercarse a un cuerpo.
  */
 export class SpaceNavigation {
   /**
@@ -30,6 +34,8 @@ export class SpaceNavigation {
     this.speed = 0;      // km/s hacia delante (negativo = marcha atrás)
     this.onEvent = null; // (type, data)
     this.autopilotTarget = null; // id del cuerpo al que apunta el rumbo automático
+    this.cruising = false;       // crucero interplanetario activo
+    this.zone = { center: { x: 0, y: 0, z: 0 }, radius: config.ZONE_RADIUS };
     this._zoneNotice = 0;
   }
 
@@ -72,8 +78,11 @@ export class SpaceNavigation {
     if (ctl.turn || ctl.vertical) this.autopilotTarget = null; // tocar la dirección cancela el rumbo
     // Frenado de proximidad: cuanto más cerca de un cuerpo, menos velocidad máxima.
     const near = this.survey().nearest;
-    const cap = Math.max(c.CRUISE_SPEED * 0.25, near.altitude * c.PROXIMITY_BRAKE);
-    let max = Math.min(cap, c.CRUISE_SPEED * (ctl.boost ? c.BOOST_MULTIPLIER : 1));
+    const brake = c.CRUISE && ctl.boost ? c.CRUISE.PROXIMITY_BRAKE : c.PROXIMITY_BRAKE;
+    const cap = Math.max(c.CRUISE_SPEED * 0.25, near.altitude * brake);
+    const boostSpeed = c.CRUISE_SPEED * c.BOOST_MULTIPLIER;
+    const cruise = c.CRUISE && ctl.boost && near.altitude > c.CRUISE.MIN_ALTITUDE_KM;
+    let max = Math.min(cap, cruise ? c.CRUISE.MAX_SPEED : c.CRUISE_SPEED * (ctl.boost ? c.BOOST_MULTIPLIER : 1));
     // Hacia un meteorito cercano: frenar para detenerse a su lado.
     const f = this.forward;
     for (const e of this._extras()) {
@@ -99,9 +108,16 @@ export class SpaceNavigation {
         }
       }
     }
-    const target = ctl.forward > 0 ? max * ctl.forward : ctl.forward < 0 ? c.CRUISE_SPEED * c.REVERSE_FACTOR * ctl.forward : this.speed * 0.985;
-    const accel = c.ACCELERATION * (ctl.boost ? c.BOOST_MULTIPLIER : 1);
+    let target = ctl.forward > 0 ? max * ctl.forward : ctl.forward < 0 ? c.CRUISE_SPEED * c.REVERSE_FACTOR * ctl.forward : this.speed * 0.985;
+    let accel = c.ACCELERATION * (ctl.boost ? c.BOOST_MULTIPLIER : 1);
+    if (c.CRUISE && Math.abs(this.speed) > boostSpeed * 0.9) {
+      // A velocidades de crucero se acelera y se frena en proporción a la velocidad.
+      target = Math.min(target, cap);
+      const rate = target > this.speed ? c.CRUISE.ACCEL_RATE : c.CRUISE.BRAKE_RATE;
+      accel = Math.max(accel, Math.abs(this.speed) * rate);
+    }
     this.speed = approach(this.speed, target, accel * dt);
+    this.cruising = this.speed > boostSpeed * 1.05;
     if (this.autopilotTarget) this._steer(dt);
     this.yaw -= ctl.turn * c.TURN_RATE * dt;
     this.pitch = Math.max(-c.MAX_PITCH, Math.min(c.MAX_PITCH, this.pitch + ctl.vertical * c.PITCH_RATE * dt));
@@ -115,10 +131,18 @@ export class SpaceNavigation {
       this.autopilotTarget = null;
       return;
     }
-    const dx = b.position.x - this.pos.x;
-    const dy = b.position.y - this.pos.y;
-    const dz = b.position.z - this.pos.z;
-    const d = Math.hypot(dx, dy, dz);
+    let dx = b.position.x - this.pos.x;
+    let dy = b.position.y - this.pos.y;
+    let dz = b.position.z - this.pos.z;
+    let d = Math.hypot(dx, dy, dz);
+    // Si otro cuerpo tapa el camino, apuntar a un lado de él (no atravesar planetas).
+    const aim = this._avoid(b, dx / d, dy / d, dz / d, d);
+    if (aim) {
+      dx = aim.x - this.pos.x;
+      dy = aim.y - this.pos.y;
+      dz = aim.z - this.pos.z;
+      d = Math.hypot(dx, dy, dz);
+    }
     const yaw = Math.atan2(-dx, -dz);
     const pitch = Math.max(-this._cfg.MAX_PITCH, Math.min(this._cfg.MAX_PITCH, Math.asin(dy / d)));
     let dyaw = yaw - this.yaw;
@@ -126,6 +150,71 @@ export class SpaceNavigation {
     const turn = this._cfg.TURN_RATE * 1.5 * dt;
     this.yaw += Math.max(-turn, Math.min(turn, dyaw));
     this.pitch = approach(this.pitch, pitch, this._cfg.PITCH_RATE * 1.5 * dt);
+  }
+
+  /**
+   * Punto al que apuntar para rodear el cuerpo más cercano que se interpone en la
+   * línea recta hacia `target` (dirección t, distancia dist), o null si el camino está libre.
+   */
+  _avoid(target, tx, ty, tz, dist) {
+    let best = null;
+    let bestAlong = Infinity;
+    for (const o of this._bodies()) {
+      if (o.id === target.id) continue;
+      const bx = o.position.x - this.pos.x;
+      const by = o.position.y - this.pos.y;
+      const bz = o.position.z - this.pos.z;
+      const along = bx * tx + by * ty + bz * tz;
+      if (along <= 0 || along >= dist || along >= bestAlong) continue;
+      // Vector desde el punto más cercano del camino hasta el centro del cuerpo.
+      const cx = bx - tx * along;
+      const cy = by - ty * along;
+      const cz = bz - tz * along;
+      const miss = Math.hypot(cx, cy, cz);
+      const clearance = o.radiusKm * 1.6;
+      if (miss >= clearance) continue;
+      // Dirección hacia el lado por el que pasa el camino (perpendicular a la línea nave–cuerpo).
+      const D = Math.hypot(bx, by, bz);
+      const ux = bx / D;
+      const uy = by / D;
+      const uz = bz / D;
+      let wx = -cx;
+      let wy = -cy;
+      let wz = -cz;
+      if (miss < 1e-6) {
+        wx = -uz; // justo en la línea: rodear por un lado (horizontal)
+        wy = 0;
+        wz = ux;
+      }
+      const wu = wx * ux + wy * uy + wz * uz;
+      wx -= ux * wu;
+      wy -= uy * wu;
+      wz -= uz * wu;
+      const wl = Math.hypot(wx, wy, wz) || 1;
+      wx /= wl;
+      wy /= wl;
+      wz /= wl;
+      let ax;
+      let ay;
+      let az;
+      if (D < clearance * 1.05) {
+        // Muy cerca: primero alejarse del cuerpo y hacia un lado.
+        ax = this.pos.x + (-ux + wx) * clearance;
+        ay = this.pos.y + (-uy + wy) * clearance;
+        az = this.pos.z + (-uz + wz) * clearance;
+      } else {
+        // Tangente a la esfera de seguridad.
+        const th = Math.asin(Math.min(1, clearance / D));
+        const c = Math.cos(th) * D;
+        const sn = Math.sin(th) * D;
+        ax = this.pos.x + ux * c + wx * sn;
+        ay = this.pos.y + uy * c + wy * sn;
+        az = this.pos.z + uz * c + wz * sn;
+      }
+      best = { x: ax, y: ay, z: az };
+      bestAlong = along;
+    }
+    return best;
   }
 
   _move(dt) {
@@ -168,25 +257,27 @@ export class SpaceNavigation {
     this._zoneNotice = Math.max(0, this._zoneNotice - dt);
   }
 
-  /** Distancia al centro del sistema (el planeta de inicio). */
+  /** Distancia al centro del sistema (la estrella). */
   get distanceFromCenter() {
-    return Math.hypot(this.pos.x, this.pos.y, this.pos.z);
+    const c = this.zone.center;
+    return Math.hypot(this.pos.x - c.x, this.pos.y - c.y, this.pos.z - c.z);
   }
 
   /** ¿Está fuera de la zona del sistema? */
   get outsideZone() {
-    return this.distanceFromCenter > this._cfg.ZONE_RADIUS;
+    return this.distanceFromCenter > this.zone.radius;
   }
 
   /** Devuelve la nave al borde de la zona (sin nodo galáctico no se puede salir). */
   clampToZone() {
     const d = this.distanceFromCenter;
-    const max = this._cfg.ZONE_RADIUS;
+    const max = this.zone.radius;
     if (d <= max) return false;
     const k = (max * 0.995) / d;
-    this.pos.x *= k;
-    this.pos.y *= k;
-    this.pos.z *= k;
+    const c = this.zone.center;
+    this.pos.x = c.x + (this.pos.x - c.x) * k;
+    this.pos.y = c.y + (this.pos.y - c.y) * k;
+    this.pos.z = c.z + (this.pos.z - c.z) * k;
     this.speed = Math.min(0, this.speed);
     if (this._zoneNotice === 0) {
       this._zoneNotice = 4;
@@ -200,8 +291,8 @@ export class SpaceNavigation {
     const list = this._bodies().map((b) => {
       const d = Math.hypot(this.pos.x - b.position.x, this.pos.y - b.position.y, this.pos.z - b.position.z);
       const altitude = d - b.radiusKm;
-      const canLand = d < b.radiusKm * this._cfg.APPROACH_FACTOR || altitude < this._cfg.LAND_ALTITUDE;
-      return { id: b.id, name: b.name, distance: d, altitude, canLand };
+      const canLand = b.landable !== false && (d < b.radiusKm * this._cfg.APPROACH_FACTOR || altitude < this._cfg.LAND_ALTITUDE);
+      return { id: b.id, name: b.name, kind: b.kind, parent: b.parent, distance: d, altitude, canLand };
     });
     list.sort((a, b) => a.altitude - b.altitude);
     return { bodies: list, nearest: list[0], landable: list.find((b) => b.canLand) ?? null };

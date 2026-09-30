@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.2.0',
+    VERSION: '1.3.0',
   },
 
   RENDER: {
@@ -127,11 +127,12 @@ export const GameConfig = deepFreeze({
   // Parámetros generales de generación (comunes a cualquier planeta).
   WORLD: {
     SUB_SEEDS: ['terrain', 'biome', 'resource', 'animal', 'celestial', 'spawn'],
-    WORLD_SIZE: 1024,         // lado del mundo finito (m); múltiplo de CHUNK_SIZE
+    WORLD_SIZE: 1024,         // lado de una región "pequeña" (m); cada cuerpo usa el de su tamaño (0,5–20 km)
     CHUNK_SIZE: 64,           // m
     CHUNK_RESOLUTION: 32,     // celdas por lado de chunk (→ 2 m entre vértices)
     VIEW_DISTANCE_CHUNKS: 4,  // radio de chunks con malla alrededor del jugador
     CHUNKS_BUILT_PER_FRAME: 2,
+    CHUNK_DATA_CACHE: 900,    // chunks de alturas en memoria (los menos usados se descartan y se regeneran iguales)
     EDGE_MARGIN: 96,          // franja del borde donde el terreno baja al mar (no jugable)
     SEA_LEVEL: 0,
     PROPS_VIEW_DISTANCE_CHUNKS: 3, // radio con árboles/rocas/hierba (≤ VIEW_DISTANCE_CHUNKS)
@@ -416,7 +417,18 @@ export const GameConfig = deepFreeze({
     APPROACH_FACTOR: 1.9,      // radios: por debajo se puede aterrizar / entrar en la atmósfera
     LAND_ALTITUDE: 700,        // km sobre la superficie: también se puede aterrizar
     PROXIMITY_BRAKE: 0.6,      // velocidad máx. (km/s) = altitud (km) × esto cerca de un cuerpo
-    ZONE_RADIUS: 65000,        // km desde el planeta de inicio: límite del sistema
+    ZONE_RADIUS: 65000,        // km: límite por defecto (el sistema calcula el suyo desde la estrella)
+    ZONE_MARGIN_KM: 65000,     // km más allá de la órbita del planeta más lejano: límite del sistema
+    SUN_DIRECTION: { x: 1, y: 0.12, z: 0.08 }, // desde el planeta de inicio hacia la estrella
+    // Crucero interplanetario: con Shift y lejos de todos los cuerpos (distancias comprimidas:
+    // un planeta está a 250 000 km por unidad de órbita).
+    CRUISE: {
+      MIN_ALTITUDE_KM: 3000,   // más cerca de un cuerpo no se entra en crucero
+      MAX_SPEED: 90000,        // km/s
+      ACCEL_RATE: 1.5,         // la velocidad se multiplica ~e^1.5 por segundo
+      BRAKE_RATE: 4,           // y se frena más deprisa (el frenado de proximidad manda)
+      PROXIMITY_BRAKE: 1.5,    // con impulso, velocidad máx. = altitud × esto (sin impulso, PROXIMITY_BRAKE)
+    },
     EXIT_ALTITUDE_KM: 900,     // al salir del planeta, km sobre la superficie
     MOON_EXIT_ALTITUDE_KM: 250,
     ARRIVAL_HEIGHT: 110,       // m sobre el suelo al llegar a un cuerpo

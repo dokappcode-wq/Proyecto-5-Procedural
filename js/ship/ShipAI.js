@@ -79,8 +79,12 @@ export class ShipAI {
   _answer(topic) {
     const { ship, lifeSupport, worlds } = this._src;
     const sys = this._system;
-    const home = sys.home.profile;
-    const homeName = sys.home.name;
+    // El planeta "de aquí": en el que estamos (o el de la luna en la que estamos), o el más cercano.
+    const hereId = sys.planetOf(worlds.activeId) ?? this._src.travel?.nearestPlanet?.() ?? sys.homeId;
+    const here = sys.body(hereId);
+    const home = here.profile;
+    const homeName = here.name;
+    const moons = sys.moonsOf(hereId);
     const catalog = this._src.getCatalog?.();
     const km = (v) => `${Math.round(v).toLocaleString('es-ES')} km`;
     switch (topic) {
@@ -90,8 +94,8 @@ export class ShipAI {
       }
       case 'MOONS': {
         const out = [];
-        if (!sys.moons.length) return [`${homeName} no tiene lunas.`];
-        for (const { id } of sys.moons) {
+        if (!moons.length) return [`${homeName} no tiene lunas.`];
+        for (const { id } of moons) {
           const p = sys.profiles[id];
           const b = catalog?.bodies.find((x) => x.id === id);
           const orbit = b ? ` Radio ${km(b.radiusKm)}, a ${km(b.distanceKm)} ${withPrep('de', homeName)}, órbita de ${Math.round(b.periodHours)} h.` : '';
@@ -101,17 +105,20 @@ export class ShipAI {
         return out;
       }
       case 'SYSTEM': {
-        const n = sys.moons.length;
+        const n = sys.visitable.length - sys.planets.length;
         const lunas = n === 1 ? 'una luna' : `${n} lunas`;
         const breathable = sys.visitable.filter((b) => b.profile.BREATHABLE).map((b) => withPrep('', b.name));
+        const planets = sys.planets.length === 1
+          ? withPrep('', sys.home.name)
+          : `${sys.planets.length} planetas (${sys.planets.map((p) => p.name).join(', ')})`;
         return [
-          `${sys.name}: ${withPrep('', homeName)}${n ? ` y ${lunas}` : ''}, alrededor de la estrella ${sys.star.name}.`,
+          `${sys.name}: ${planets}${n ? ` y ${lunas}` : ''}, alrededor de la estrella ${sys.star.name}.`,
           breathable.length
             ? `Con aire respirable: ${breathable.join(', ')}. El resto necesita traje.`
             : 'Ningún cuerpo tiene aire respirable: siempre con traje.',
           ship.hasSpaceNode
-            ? 'Con el nodo espacial podemos viajar entre ellos. Más allá del sistema no hay ruta conocida…'
-            : `Para salir al espacio necesitamos un nodo espacial: hay una señal ${withPrep('en', homeName)}.`,
+            ? `Con el nodo espacial podemos viajar entre ellos${sys.planets.length > 1 ? ' (lejos de los planetas, Shift activa el crucero interplanetario)' : ''}. Más allá del sistema no hay ruta conocida…`
+            : `Para salir al espacio necesitamos un nodo espacial: hay una señal ${withPrep('en', sys.home.name)}.`,
         ];
       }
       case 'SHIP': {
@@ -162,7 +169,7 @@ export class ShipAI {
       return 'Llevas el nodo espacial: instálalo en una ranura libre de la nave (E sobre la ranura).';
     }
     if (ship.crippled) return `La nave está inutilizada. Ve a la sala de cápsulas de escape y evacúa ${withPrep('a', homeName)}.`;
-    if (this._src.travel?.galacticNode) return `Con el nodo galáctico instalado, sal del sistema: más allá de ${this._zoneKm()} ${withPrep('de', homeName)} (Shift = impulso).`;
+    if (this._src.travel?.galacticNode) return `Con el nodo galáctico instalado, sal del sistema: aléjate de la estrella ${sys.star.name} hasta más de ${this._zoneKm()} (Shift = impulso).`;
     const gnode = pickups?.get('GALACTIC_NODE');
     if (gnode && !gnode.taken) return `La señal galáctica está ${withPrep('en', worlds.profile(gnode.body)?.NAME ?? 'una luna')} (haz violeta, en el mapa).`;
     if (ship.batteries.ratio < 0.3) return 'La batería de la nave está baja: cambia baterías en el puesto de carga antes de volar lejos.';
@@ -212,10 +219,12 @@ export class ShipAI {
       const sys = this._system;
       if (planet?.KIND === 'MOON') this.say(`Llegada ${withPrep('a', planet.NAME)}. ${planet.DATA?.SURFACE ?? ''} ${planet.DATA?.ATMOSPHERE ?? ''}`.trim(), 'ai-warn');
       else if (sys.isHome(id) && previous && !sys.isHome(previous)) this.say(`De vuelta ${withPrep('en', planet?.NAME ?? sys.home.name)}. ${planet?.DATA?.ATMOSPHERE ?? ''}`.trim());
+      else if (planet?.KIND === 'PLANET' && previous) this.say(`Llegada ${withPrep('a', planet.NAME)}. ${planet.DATA?.ATMOSPHERE ?? ''} ${planet.DATA?.SURFACE ?? ''}`.trim(), planet.BREATHABLE ? 'ai' : 'ai-warn');
     });
     ev.on(G.METEOR_SPAWNED, ({ distanceKm }) => {
       if (this._src.ship.crippled) return;
-      const key = this._system.autopilotTargets().find((t) => t.id === 'METEOR').key;
+      const targets = this._src.travel?.targets?.() ?? this._system.autopilotTargets();
+      const key = targets.find((t) => t.id === 'METEOR').key;
       this.say(`Meteorito detectado a ${Math.round(distanceKm)} km, con cristales minerales. Pulsa ${key} a los mandos para acercarnos (no se puede aterrizar: habrá que bajar con el traje).`);
     });
     ev.on(G.SHIP_DECOMPRESSION, ({ ejected }) => {

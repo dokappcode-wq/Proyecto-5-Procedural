@@ -24,6 +24,7 @@ export const LIMITS = Object.freeze({
   FLORA: 12,               // entradas de flora por cuerpo
   FAUNA: 8,                // entradas de fauna por cuerpo
   HERDS_PER_BODY: 60,      // rebaños en total por cuerpo
+  PONDS: 200,              // charcas por cuerpo
   NAME_LENGTH: 40,
   TEXT_LENGTH: 400,
   LORE_LENGTH: 300,
@@ -39,14 +40,19 @@ export const SIZE_CATEGORIES = Object.freeze({
   huge: { label: 'Enorme', regionKm: 20, radiusKm: 6000 },
 });
 
+/** Lado de la región en metros (múltiplo del tamaño de chunk): 1 km → 1024 m. */
+export function regionSize(regionKm, chunkSize = 64) {
+  return Math.max(chunkSize * 4, Math.round((regionKm * 1024) / chunkSize) * chunkSize);
+}
+
 /** Tipos de estrella (color de la luz, para fases posteriores). */
 export const STAR_TYPES = Object.freeze({
-  yellow_dwarf: { label: 'Enana amarilla (como el Sol)', color: 0xfff1d0 },
-  orange_dwarf: { label: 'Enana naranja', color: 0xffd2a0 },
-  red_dwarf: { label: 'Enana roja', color: 0xffa27a },
-  white_dwarf: { label: 'Enana blanca', color: 0xeef4ff },
-  blue_giant: { label: 'Gigante azul', color: 0xb8ccff },
-  red_giant: { label: 'Gigante roja', color: 0xff8a5c },
+  yellow_dwarf: { label: 'Enana amarilla (como el Sol)', color: 0xfff1d0, radiusKm: 6000 },
+  orange_dwarf: { label: 'Enana naranja', color: 0xffd2a0, radiusKm: 4500 },
+  red_dwarf: { label: 'Enana roja', color: 0xffa27a, radiusKm: 3000 },
+  white_dwarf: { label: 'Enana blanca', color: 0xeef4ff, radiusKm: 1200 },
+  blue_giant: { label: 'Gigante azul', color: 0xb8ccff, radiusKm: 14000 },
+  red_giant: { label: 'Gigante roja', color: 0xff8a5c, radiusKm: 20000 },
 });
 
 /** Las tres zonas de bioma de cada cuerpo (de abajo arriba) y su ranura interna. */
@@ -250,5 +256,6 @@ export const BARREN_FLORA = Object.freeze([
 
 /** Órbitas: unidades del archivo → km. */
 export const ORBIT_UNITS = Object.freeze({
-  MOON_KM: 1000,    // la distancia de una luna va en miles de km
+  MOON_KM: 1000,       // la distancia de una luna va en miles de km
+  PLANET_KM: 250000,   // la de un planeta, en unidades de 250 000 km (distancias comprimidas)
 });

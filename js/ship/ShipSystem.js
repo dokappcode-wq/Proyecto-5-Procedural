@@ -499,8 +499,9 @@ export class ShipSystem {
     if (input.wasPressed('SHIP_ORBIT')) this.command('ORBIT');
     if (input.wasPressed('STAR_MAP')) this._events.emit(GameEvents.STAR_MAP_REQUEST, {});
     if (this.flight.state === FlightState.SPACE) {
-      for (const t of this._system.autopilotTargets()) {
-        if (input.wasPressed(`HOTBAR_${t.key}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { target: t.id });
+      // Teclas 1–9: rumbo automático (SpaceTravel sabe a qué cuerpo corresponde cada tecla).
+      for (let slot = 1; slot <= 9; slot++) {
+        if (input.wasPressed(`HOTBAR_${slot}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { slot });
       }
     }
     if (input.wasPressed('INTERACT')) {
@@ -668,7 +669,7 @@ export class ShipSystem {
         this._message('Nodo espacial: permite salir al espacio. A los mandos, vuela alto y pulsa [O].');
         return true;
       case 'GALACTIC_NODE':
-        this._message(`Nodo galáctico: a los mandos, sal del ${this._system.name} (más allá de ${this._spaceCfg.ZONE_RADIUS.toLocaleString('es-ES')} km) para intentar el salto.`);
+        this._message(`Nodo galáctico: a los mandos, sal del ${this._system.name} (aléjate de la estrella ${this._system.star.name}) para intentar el salto.`);
         return true;
       default:
         if (this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1) && !this.isExplorer) {

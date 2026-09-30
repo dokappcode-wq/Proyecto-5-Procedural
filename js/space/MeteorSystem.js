@@ -18,7 +18,8 @@ const tmpQ = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class MeteorSystem {
-  constructor({ scene, config, events, inventory, items, getNav, isInSpace, getSeed }) {
+  constructor({ scene, config, events, inventory, items, getNav, isInSpace, getSeed, frequency = 0.5 }) {
+    this.frequency = frequency; // 0 = sin meteoritos, 0,5 = normal, 1 = el doble
     this.name = 'meteors';
     this._cfg = config;
     this._events = events;
@@ -151,8 +152,9 @@ export class MeteorSystem {
     const nav = this._getNav();
     // Aparición de vez en cuando, por delante de la nave.
     this._timer -= dt;
-    if (this._timer <= 0) {
-      this._timer = this._rng.range(c.INTERVAL[0], c.INTERVAL[1]);
+    if (this._timer <= 0 && !nav.cruising && this.frequency > 0) {
+      // En crucero interplanetario no aparecen (se dejarían atrás al instante).
+      this._timer = this._rng.range(c.INTERVAL[0], c.INTERVAL[1]) * (0.5 / this.frequency);
       const near = this.list.filter((m) => this._distKm(m) < c.SPAWN_DISTANCE_KM[1] * 2).length;
       if (this.list.length < c.MAX && near === 0) {
         const f = nav.forward;

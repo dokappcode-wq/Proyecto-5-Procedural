@@ -33,7 +33,12 @@ export function compileSystem(data, { seed } = {}) {
     const planet = compileBody(p, 'PLANET', { id, path, systemSeed, notes, moonNames: moons.map((m) => m.name) });
     planet.parent = null;
     planet.index = i;
-    planet.orbit = { distance: p.orbit?.distance ?? i + 1, periodHours: p.orbit?.period_hours ?? 24 * 365 };
+    const distance = p.orbit?.distance ?? i + 1;
+    planet.orbit = {
+      distance,
+      distanceKm: distance * ORBIT_UNITS.PLANET_KM,
+      periodHours: p.orbit?.period_hours ?? Math.round(24 * 365 * distance ** 1.5),
+    };
     bodies.push(planet);
     moons.forEach((m, j) => {
       const mid = `${id}M${j + 1}`;
@@ -48,16 +53,13 @@ export function compileSystem(data, { seed } = {}) {
       bodies.push(moon);
     });
   });
-  if (data.planets.length > 1) {
-    notes.push({ path: 'planets', message: `Por ahora solo se visitan el primer planeta y sus lunas; los otros ${data.planets.length - 1} llegarán con el viaje entre planetas.` });
-  }
 
   return {
     name: data.name,
     description: data.description ?? '',
     author: data.author ?? '',
     seed: systemSeed,
-    star: { name: data.star?.name ?? 'Estrella', type: starType, color: STAR_TYPES[starType].color },
+    star: { name: data.star?.name ?? 'Estrella', type: starType, color: STAR_TYPES[starType].color, radiusKm: STAR_TYPES[starType].radiusKm },
     meteors: { frequency: data.meteors?.frequency ?? 0.5, richness: data.meteors?.richness ?? 0.5 },
     unsupported: [...(data.unsupported_requests ?? [])],
     homeId: 'P1',
@@ -70,9 +72,10 @@ function compileBody(b, kind, ctx) {
   const D = BODY_DEFAULTS[kind];
   const { path, notes } = ctx;
   const size = b.size ?? D.size;
-  if (size !== 'small') {
-    notes.push({ path: `${path}.size`, message: `Por ahora todas las regiones miden 1 km: el tamaño "${size}" (${SIZE_CATEGORIES[size].regionKm} km) se aplicará en la siguiente fase.` });
-  }
+  // Lo que no dice el archivo se reparte según el tamaño de la región: por área en las regiones
+  // pequeñas; en las grandes, más despacio (los animales solo viven cerca del jugador).
+  const km = SIZE_CATEGORIES[size].regionKm;
+  const sizeFactor = km < 1 ? km * km : km;
   const breathable = b.physics?.breathable ?? D.breathable;
   const gravity = b.physics?.gravity ?? D.gravity;
   const hasSea = b.water?.sea ?? D.sea;
@@ -132,7 +135,9 @@ function compileBody(b, kind, ctx) {
   const hasWood = floraList.some((f) => FLORA_TEMPLATES[f.template].wood && f.density > 0);
 
   // Fauna.
-  const faunaList = b.fauna ?? (livingDefaults ? DEFAULT_LIFE.fauna : []);
+  const faunaList = b.fauna ?? (livingDefaults
+    ? DEFAULT_LIFE.fauna.map((f) => ({ ...f, herds: Math.max(1, Math.round(f.herds * Math.min(sizeFactor, 2))) }))
+    : []);
   const HERDS = {};
   let herdTotal = 0;
   faunaList.forEach((f, i) => {
@@ -152,7 +157,7 @@ function compileBody(b, kind, ctx) {
   const hasWool = faunaList.some((f) => FAUNA_TEMPLATES[f.template].wool && HERDS[FAUNA_TEMPLATES[f.template].species] > 0);
 
   // Agua.
-  const ponds = b.water?.ponds ?? (livingDefaults ? WATER_DEFAULTS.PONDS_BREATHABLE : 0);
+  const ponds = b.water?.ponds ?? (livingDefaults ? Math.min(LIMITS.PONDS, Math.max(4, Math.round(WATER_DEFAULTS.PONDS_BREATHABLE * sizeFactor))) : 0);
   const mud = palette ? palette.dark : WATER_DEFAULTS.MUD_COLOR;
   const WATER = {
     DISCOVERY_DISTANCE: 7, POND_COUNT: ponds, RADIUS: [5, 10], DEPTH: ponds > 0 ? WATER_DEFAULTS.POND_DEPTH : 1,

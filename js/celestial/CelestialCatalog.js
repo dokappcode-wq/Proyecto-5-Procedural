@@ -1,7 +1,7 @@
-import { SeededRandom } from '../core/SeededRandom.js';
+import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
 
 /**
- * CelestialCatalog — cuerpos celestes del planeta de inicio a partir de su seed. Sin Three.js.
+ * CelestialCatalog — las lunas de un planeta (por defecto, el de inicio) a partir de la seed. Sin Three.js.
  *
  * Tamaño, distancia, velocidad, color y tamaño en el cielo de cada luna vienen
  * del sistema solar (SolarSystem: system.moons); la posición inicial en la
@@ -13,8 +13,9 @@ import { SeededRandom } from '../core/SeededRandom.js';
  * Lo usan el mapa planetario de la nave, CelestialSystem (las lunas en el cielo),
  * SpaceView/SpaceScene (las mismas lunas vistas desde el espacio) y la IA.
  */
-export function createCelestialCatalog(config, celestialSeed, system) {
-  const rng = new SeededRandom(celestialSeed);
+export function createCelestialCatalog(config, celestialSeed, system, planetId = system.homeId) {
+  // El planeta de inicio usa la sub-seed tal cual; cada otro planeta, una derivada de ella.
+  const rng = new SeededRandom(planetId === system.homeId ? celestialSeed : deriveSeed(celestialSeed, planetId));
   const maxInc = (config.MAX_INCLINATION_DEG * Math.PI) / 180;
   const moon = (m, index) => ({
     id: m.id,
@@ -33,10 +34,10 @@ export function createCelestialCatalog(config, celestialSeed, system) {
     craterSeed: Math.floor(rng.next() * 0xffffffff),   // aspecto de la superficie (seed)
     visitable: false,                                  // falta el "nodo espacial"
   });
-  const home = system.home;
+  const planet = system.body(planetId);
   return {
-    planet: { id: home.id, name: home.name, radiusKm: home.radiusKm },
-    bodies: system.moons.map(moon),
+    planet: { id: planet.id, name: planet.name, radiusKm: planet.radiusKm },
+    bodies: system.moonsOf(planetId).map(moon),
   };
 }
 

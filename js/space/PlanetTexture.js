@@ -27,7 +27,8 @@ export function createPlanetTextures({ width, seed, mapCanvas, planet }) {
   surface.height = h;
   const ctx = surface.getContext('2d');
   const img = ctx.createImageData(w, h);
-  const sea = rgb(planet.COLORS.SEA);
+  // Sin mar (lunas, planetas secos), las zonas bajas son llanuras oscuras en vez de océano.
+  const sea = rgb(planet.HAS_SEA === false ? planet.COLORS.SEABED : planet.COLORS.SEA);
   const deep = [sea[0] * 0.45, sea[1] * 0.55, sea[2] * 0.75];
   const B = planet.BIOMES;
   const plains = rgb(B.PLAINS.COLORS.GROUND);
