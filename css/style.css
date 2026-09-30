@@ -97,6 +97,7 @@ kbd {
 }
 
 .subtitle { color: var(--ui-muted); margin: 6px 0 24px; }
+.start-system { color: #ffd98a; font-weight: 600; margin: -14px 0 18px; font-size: 0.95em; }
 
 #start-button {
   font-family: inherit;

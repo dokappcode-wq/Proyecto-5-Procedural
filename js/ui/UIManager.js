@@ -103,6 +103,12 @@ export class UIManager {
     this.el.respawnButton.addEventListener('click', () => events.emit(GameEvents.PLAYER_RESPAWN_REQUEST));
 
     this.el.title.textContent = gameInfo.TITLE;
+    // Qué sistema solar se ha cargado (la campaña o uno de systems/ con ?system=…).
+    const sysInfo = root.getElementById?.('start-system');
+    if (sysInfo) {
+      const planets = system.planets.map((p) => p.name).join(', ');
+      sysInfo.textContent = `${system.name} · ${system.planets.length === 1 ? 'planeta' : 'planetas'}: ${planets} · semilla ${system.seed}`;
+    }
     this.el.version.textContent = `${gameInfo.TITLE} · v${gameInfo.VERSION}`;
 
     this.el.startButton.textContent = `Entrar ${withPrep('en', system.home.name)}`;
