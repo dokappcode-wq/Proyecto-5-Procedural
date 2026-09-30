@@ -69,6 +69,10 @@ export class ItemUseSystem {
         this._events.emit(GameEvents.SHIP_WATCH_TOGGLE, {});
         ok = true;
         break;
+      case 'MAP':
+        this._events.emit(GameEvents.MAP_OPEN_REQUEST, { itemId });
+        ok = true;
+        break;
       default:
         this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
     }

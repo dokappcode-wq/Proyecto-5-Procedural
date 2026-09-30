@@ -57,7 +57,8 @@ import { SpaceTravel } from './space/SpaceTravel.js';
 import { SeededRandom } from './core/SeededRandom.js';
 import { registerSpaceTools } from './admin/tools/SpaceTools.js';
 import { ShipSystem } from './ship/ShipSystem.js';
-import { overlapsFootprint, LEGS, RAMP_FOOT_SAMPLE, toWorld as toShipWorld } from './ship/ShipLayout.js';
+import { toWorld as toShipWorld } from './ship/ShipLayout.js';
+import { PickupSystem, findDropSite } from './world/PickupSystem.js';
 import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
 import { ShipMapPanel } from './ui/ShipMapPanel.js';
 import { ShipChargerPanel } from './ui/ShipChargerPanel.js';
@@ -219,9 +220,10 @@ function boot() {
     events,
     // No aterrizar encima de árboles ni construcciones; una roca solo estorba bajo una pata o la rampa
     // (el casco está a 2,2 m del suelo y las rocas son más bajas).
-    landingBlocked: (s) => {
-      const supports = [...LEGS.map((l) => [l.x, l.z]), RAMP_FOOT_SAMPLE].map(([lx, lz]) => toShipWorld(s, lx, lz));
-      for (const n of world.resources.getNodesNear(s.x, s.z, 12)) {
+    landingBlocked: (s, L) => {
+      const supports = [...L.LEGS.map((l) => [l.x, l.z]), L.RAMP_FOOT_SAMPLE].map(([lx, lz]) => toShipWorld(s, lx, lz));
+      const overlapsFootprint = (ship, box) => L.overlapsFootprint(ship, box);
+      for (const n of world.resources?.getNodesNear(s.x, s.z, 20) ?? []) {
         const r = n.radius;
         if (!(r > 0)) continue;
         if (n.type === 'ROCK') {
@@ -231,7 +233,7 @@ function boot() {
         }
       }
       for (const p of construction.pieces) {
-        if (Math.hypot(p.x - s.x, p.z - s.z) < 12 && overlapsFootprint(s, { minX: p.x - 1, maxX: p.x + 1, minZ: p.z - 1, maxZ: p.z + 1 })) {
+        if (Math.hypot(p.x - s.x, p.z - s.z) < 20 && overlapsFootprint(s, { minX: p.x - 1, maxX: p.x + 1, minZ: p.z - 1, maxZ: p.z + 1 })) {
           return 'Hay construcciones debajo';
         }
       }
@@ -240,6 +242,9 @@ function boot() {
   });
   ship.setInventory(inventory);
   ship.setBodyProvider(() => worlds.activeId);
+  ship.setBreathableProvider(() => worlds.profile()?.BREATHABLE !== false);
+  // Objetos sueltos del mundo (nodo espacial, cofres…): se cogen con E.
+  const pickups = new PickupSystem({ scene: render.scene, worlds, events, inventory, items: cfg.ITEMS });
   construction.addBlocker(ship); // no se construye encima de la nave
   // Las vallas, paredes y patas de la nave también frenan a los animales.
   animals.setObstacles({ resolveCollisions: (pos, r, y0, y1) => combinedStructures.resolveCollisions(pos, r, y0, y1) });
@@ -257,7 +262,7 @@ function boot() {
     inventory,
     events,
     construction,
-    providers: [ship], // botones, puerta, asiento y tecnologías de la nave
+    providers: [ship, pickups], // nave (botones, puertas, asiento, tecnologías) y objetos sueltos
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -321,7 +326,7 @@ function boot() {
   // Dormir en una cama la convierte en punto de reaparición.
   let respawnBed = null;
   events.on(GameEvents.PLAYER_SLEPT, ({ bed }) => {
-    if (bed && cfg.SLEEP.SETS_RESPAWN) respawnBed = bed;
+    if (bed && cfg.SLEEP.SETS_RESPAWN) respawnBed = bed; // el sofá cama de la nave: { ship: true }
   });
   events.on(GameEvents.WORLD_GENERATED, () => (respawnBed = null));
   // Temperatura oculta (Fase 10): bioma, altura, noche, armadura y refugio (casa o nave).
@@ -369,6 +374,9 @@ function boot() {
       } else {
         controller.spawn();
       }
+    } else if (respawnBed?.ship && ship.present) {
+      const r = ship.getRespawnPoint();
+      player.teleport(r.x, r.y, r.z);
     } else if (respawnBed && construction.exists(respawnBed)) {
       controller.placeAt(respawnBed.x + Math.cos(respawnBed.rotation) * 1.4, respawnBed.z - Math.sin(respawnBed.rotation) * 1.4);
     } else {
@@ -488,7 +496,8 @@ function boot() {
         return worlds.profile() ?? cfg.PLANETS.MUNDO_0;
       },
       getCatalog: () => celestial.catalog,
-      getBed: () => (respawnBed && construction.exists(respawnBed) ? respawnBed : null),
+      getBed: () => (respawnBed && !respawnBed.ship && construction.exists(respawnBed) ? respawnBed : null),
+      getMarkers: () => pickups.markers(worlds.activeId),
       spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED,
       hasSpaceNode: () => ship.hasSpaceNode,
     },
@@ -501,6 +510,76 @@ function boot() {
     inventory,
     items: cfg.ITEMS,
     config: cfg.SHIP,
+  });
+  // ---- Nodo espacial: cae en un sitio aleatorio de MUNDO 0 (según la seed) ----------
+  const message = (text, type = 'biome') => events.emit(GameEvents.UI_MESSAGE, { text, type });
+  let gameStarted = false;
+  const dropSpaceNode = () => {
+    pickups.clear(HOME);
+    const home = worlds.home;
+    const rng = new SeededRandom(home.seed.value ^ 0x5bace);
+    const site = findDropSite(home, rng, home.getSpawnPoint(), cfg.SHIP.SPACE_NODE_DROP_DISTANCE);
+    if (!site) return;
+    pickups.add({
+      id: 'SPACE_NODE', body: HOME, x: site.x, z: site.z, model: 'NODE',
+      label: `${cfg.ITEMS.SPACE_NODE.ICON} Nodo espacial`, action: 'Coger',
+      contents: [{ item: cfg.SHIP.SPACE_NODE_ITEM, count: 1 }],
+      mapLabel: 'Señal del nodo espacial', mapColor: '#6fdcff',
+    });
+  };
+  // Mapa de papel con la señal: se recibe al empezar (y otra vez si se pierde).
+  const giveNodeMap = () => {
+    const node = pickups.get('SPACE_NODE');
+    if (!gameStarted || !node || node.taken || ship.hasSpaceNode || inventory.hasItem(cfg.SHIP.NODE_MAP_ITEM, 1)) return;
+    inventory.addItem(cfg.SHIP.NODE_MAP_ITEM, 1);
+    message('📡 Una señal: el nodo espacial ha caído en MUNDO 0. Usa el 📜 mapa (selecciónalo y clic derecho / R) y busca el haz de luz azul.');
+  };
+  events.on(GameEvents.WORLD_GENERATED, () => {
+    dropSpaceNode();
+    giveNodeMap();
+  });
+  events.on(GameEvents.GAME_STARTED, () => {
+    gameStarted = true;
+    giveNodeMap();
+  });
+  events.on(GameEvents.PLAYER_RESPAWNED, giveNodeMap);
+  events.on(GameEvents.PICKUP_TAKEN, ({ id }) => {
+    if (id === 'SPACE_NODE') message('Llévalo a la nave e instálalo en una ranura libre (E sobre la ranura).');
+  });
+  // Instalarlo amplía la nave: alas, propulsores extra y salas nuevas.
+  const installSpaceNode = () => {
+    if (ship.isExplorer) return false;
+    if (inventory.hasItem(cfg.SHIP.SPACE_NODE_ITEM, 1)) inventory.removeItem(cfg.SHIP.SPACE_NODE_ITEM, 1);
+    if (inventory.hasItem(cfg.SHIP.NODE_MAP_ITEM, 1)) inventory.removeItem(cfg.SHIP.NODE_MAP_ITEM, 1);
+    const node = pickups.get('SPACE_NODE');
+    if (node) node.taken = true;
+    ship.upgrade({
+      // Árboles y rocas que queden bajo la nave ampliada desaparecen.
+      removeResourcesUnder: (s, L) => {
+        const res = worlds.get(ship.body)?.resources;
+        for (const n of res?.getNodesNear(s.x, s.z, 26) ?? []) {
+          const r = Math.max(n.radius, 0.4);
+          if (L.overlapsFootprint(s, { minX: n.x - r, maxX: n.x + r, minZ: n.z - r, maxZ: n.z + r }, 1.2)) res.removeNode(n.id);
+        }
+      },
+    });
+    message('🔷 Nodo espacial instalado: la nave se amplía (alas, propulsores y cinco salas). Ya puede salir al espacio: a los mandos, vuela alto y pulsa O.');
+    return true;
+  };
+  events.on(GameEvents.SPACE_NODE_INSTALL_REQUEST, () => {
+    if (inventory.hasItem(cfg.SHIP.SPACE_NODE_ITEM, 1)) installSpaceNode();
+  });
+
+  // Equipos de la nave ampliada que aún no funcionan (etapas siguientes).
+  for (const [ev, text] of [
+    [GameEvents.SUIT_LOCKER_REQUEST, 'Taquilla de trajes: los trajes aún se están preparando.'],
+    [GameEvents.OXYGEN_REFILL_REQUEST, 'Estación de oxígeno: todavía no hay trajes que recargar.'],
+    [GameEvents.ESCAPE_POD_REQUEST, 'Cápsula de escape: sistemas en espera.'],
+  ]) events.on(ev, () => message(text, 'info'));
+
+  events.on(GameEvents.MAP_OPEN_REQUEST, () => {
+    shipMapPanel.showTab('PLANET');
+    shipMapPanel.setOpen(true);
   });
   events.on(GameEvents.SHIP_PANEL_REQUEST, ({ panel }) => {
     if (panel === 'MAP') shipMapPanel.setOpen(true);
@@ -568,7 +647,7 @@ function boot() {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller });
+  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -583,6 +662,7 @@ function boot() {
   loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos
+  loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(hunger);      // supervivencia: desgaste por tiempo y actividad
   loop.add(thirst);
   loop.add(energy);
@@ -616,7 +696,7 @@ function boot() {
     config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
-    worlds,
+    worlds, pickups,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
   };
 }

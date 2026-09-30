@@ -1,51 +1,54 @@
 import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
-import * as Layout from './ShipLayout.js';
+import { createShipLayout, toWorld, toLocal } from './ShipLayout.js';
+import { BLUEPRINTS } from './ShipBlueprints.js';
 import { BatteryBank } from './BatteryBank.js';
 import { ShipFlight, FlightState } from './ShipFlight.js';
 import { ShipModel } from './ShipModel.js';
 
 /**
- * ShipSystem — la nave pequeña de MUNDO 0: una estructura en la que se entra.
+ * ShipSystem — la nave: una estructura en la que se entra y con la que se vuela.
  *
- *   Botón exterior (bajo la cola) → abre la compuerta inferior (rampa).
- *   Sala de estar / laboratorio → Mapa (Tecnología 2), Puesto de carga
- *     (Tecnología 3) y ranuras libres para tecnologías futuras.
- *   Puerta → sala de controles → asiento del piloto (Tecnología 1, vuelo).
+ * Empieza siendo la nave PEQUEÑA (botón exterior → compuerta con rampa → sala de
+ * estar/laboratorio → puerta → sala de controles). Al instalar el NODO ESPACIAL en
+ * una ranura libre se convierte en la nave AMPLIADA (alas, propulsores extra y
+ * salas: mandos, estar con sofá cama, laboratorio + máquinas, cápsulas de escape y
+ * cámara de descompresión) y puede salir al espacio.
  *
- * A los mandos: la cámara pasa a 3ª persona sobre la nave (CameraSystem.setVehicleView)
- * y el jugador queda sentado; W/S adelante/atrás, A/D girar, Espacio/C subir/bajar,
- * T despegar/aterrizar, G compuerta, L patas, E levantarse.
- * Levantarse en el aire: la nave se queda flotando (gasta batería) y se puede
- * recorrer; con la compuerta abierta se puede saltar. Si el jugador deja la nave
- * en el aire, la nave busca un sitio despejado y aterriza sola.
- * Reloj de la nave (en la mesa del laboratorio): al usarlo muestra dónde está la nave.
- * El panel de mandos (ShipPilotHUD) envía los mismos mandos por eventos.
+ * A los mandos: la cámara pasa a 3ª persona sobre la nave (CameraSystem.setVehicleView);
+ * W/S adelante/atrás, A/D girar, Espacio/C subir/bajar (en el espacio, cabecear),
+ * T despegar/aterrizar, G compuerta, L patas, O salir al espacio, M mapa estelar,
+ * E levantarse (en el aire la nave flota; en el espacio se detiene).
  *
- * Reparto: ShipLayout (forma y colisiones), ShipFlight (vuelo), BatteryBank
- * (combustible), ShipModel (dibujo). Este sistema solo compone y habla por eventos.
+ * Cámara de descompresión (nave ampliada, fuera del aire respirable):
+ *   el panel vacía o llena la cámara (unos segundos, con las dos puertas cerradas).
+ *   Abrir la compuerta con la cámara presurizada = descompresión explosiva:
+ *   quien esté en la cámara (o en la nave, con la puerta interior abierta) sale
+ *   disparado; en el espacio, muere.
  *
- * Consultas para otros sistemas (mismas firmas que ConstructionSystem):
- *   surfaceAt, blocksAt, ceilingAt, resolveCollisions, raycastDistance,
- *   getShelterAt (temperatura), getInteractablesNear / interact (interacción),
- *   overlapsBox (no construir encima de la nave).
+ * Reparto: ShipBlueprints/ShipLayout (forma), ShipFlight (vuelo en atmósfera),
+ * SpaceTravel (vuelo espacial), BatteryBank (combustible), ShipModel (dibujo).
  */
 export class ShipSystem {
   constructor({ config, spaceConfig, scene, world, player, input, events, landingBlocked = () => null }) {
     this.name = 'ship';
     this._cfg = config;
-    this._spaceCfg = spaceConfig; // ORBIT_MIN_ALTITUDE, ORBIT_COST
+    this._spaceCfg = spaceConfig;
     this._world = world;
     this._player = player;
     this._input = input;
     this._events = events;
 
-    this.ship = { x: 0, y: 0, z: 0, yaw: 0, hatch: 0, legs: 1, door: 0, legFeet: [0, 0, 0, 0], rampAngle: Layout.rampOpenAngle(0), pitch: 0, roll: 0 };
+    this.layout = createShipLayout(BLUEPRINTS.SMALL);
+    this.installed = { ...config.INSTALLED };
+    this.ship = { x: 0, y: 0, z: 0, yaw: 0, hatch: 0, legs: 1, doors: {}, legFeet: this.layout.LEGS.map(() => 0), rampAngle: this.layout.rampOpenAngle(0), pitch: 0, roll: 0 };
+    this._doorTargets = {};
     this.batteries = new BatteryBank(config.BATTERIES);
     this.flight = new ShipFlight({
       config,
       ship: this.ship,
       batteries: this.batteries,
+      layout: this.layout,
       terrain: {
         heightAt: (x, z) => world.getHeightAt(x, z),
         surfaceAt: (x, z) => {
@@ -58,29 +61,32 @@ export class ShipSystem {
           return world.getBounds();
         },
       },
-      landingBlocked: (ship) => landingBlocked(ship),
+      landingBlocked: (ship) => landingBlocked(ship, this.layout),
     });
     this.flight.onEvent = (type, data) => this._onFlightEvent(type, data);
-    this.model = new ShipModel({ scene });
+    this.model = new ShipModel({ scene, layout: this.layout, installed: this.installed });
 
     this.piloting = false;
-    this.hasSpaceNode = false; // nodo espacial instalado (Etapa 3: la nave crece)
-    this.body = 'MUNDO_0';   // cuerpo en el que está la nave (MUNDO 0, una luna o el espacio)
+    this.hasSpaceNode = false;
+    this.body = 'MUNDO_0';
     this._activeBody = () => 'MUNDO_0';
-    this._held = new Set();  // mandos mantenidos desde el panel (ratón)
+    this._breathableOutside = () => true; // ¿hay aire fuera? (cuerpo activo)
+    this._held = new Set();
     this._raycaster = new THREE.Raycaster();
     this._stateKey = '';
     this._telemetryTimer = 0;
     this._lastCharge = -1;
-    this._seat = new THREE.Vector3();
     this._autoLandRetry = 0;
+    // Cámara de descompresión y aire de la nave.
+    this.airlock = 'PRESSURIZED';   // 'PRESSURIZED' | 'DEPRESSURIZED' | 'CYCLING'
+    this._airlockTimer = 0;
+    this._airlockGoal = null;
+    this.shipAir = true;            // aire dentro de la nave (fuera de la cámara)
 
-    // Vista de la cámara a los mandos: órbita alrededor de la nave.
     const self = this;
     this.view = {
       yawOffset: 0,
       basePitch: config.CAMERA_PITCH,
-      // En el espacio la cámara sigue también el cabeceo de la nave.
       get pitch() {
         return this.basePitch + (self.flight.state === FlightState.SPACE ? self.ship.pitch : 0);
       },
@@ -106,75 +112,31 @@ export class ShipSystem {
     });
     events.on(GameEvents.SHIP_BATTERY_REQUEST, (e) => this._batteryRequest(e));
     events.on(GameEvents.PLAYER_DIED, () => this._forceExit());
-    // Espacio (Fase 13): al subir, la nave asciende tras el fundido; en órbita se
-    // queda congelada donde estaba y al volver sigue flotando en el mismo sitio.
     this.spaceMode = 'SURFACE';
-    events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => this._onSpaceState(state));
+    events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => {
+      this.spaceMode = state === 'ASCENDING' || state === 'DESCENDING' ? state : 'SURFACE';
+    });
   }
 
-  _onSpaceState(state) {
-    // Durante los fundidos la nave queda congelada (al subir, asciende deprisa).
-    this.spaceMode = state === 'ASCENDING' || state === 'DESCENDING' ? state : 'SURFACE';
-  }
+  // ---- Conexiones (main) -------------------------------------------------------------
 
-  /** Entra en el espacio: la nave pasa al origen del mundo "espacio" (se puede recorrer). */
-  enterSpace(yaw) {
-    const s = this.ship;
-    this.body = 'SPACE';
-    Object.assign(s, { x: 0, y: 0, z: 0, yaw, pitch: 0, roll: 0 });
-    s.legFeet = [0, 0, 0, 0];
-    this.flight.state = FlightState.SPACE;
-    this.flight.hover();
-    this.flight.state = FlightState.SPACE;
-  }
-
-  /** Mueve y orienta la nave según la navegación espacial. */
-  syncSpace(yaw, pitch, thrust) {
-    this.ship.yaw = yaw;
-    this.ship.pitch = this.piloting ? pitch : 0;
-    this._spaceThrust = thrust;
-  }
-
-  /** Llega a un cuerpo desde el espacio: flotando sobre su zona de aterrizaje. */
-  arriveAt(bodyId, height) {
-    const s = this.ship;
-    const site = this._world.getLandingSite() ?? { x: 0, z: 0, yaw: 0 };
-    this.body = bodyId;
-    Object.assign(s, { x: site.x, z: site.z, yaw: site.yaw, pitch: 0, roll: 0 });
-    s.y = this._world.getHeightAt(site.x, site.z) + height;
-    s.legFeet = [0, 0, 0, 0];
-    this.flight.state = FlightState.FLYING;
-    this.flight.hover();
-    this.model.update(s, 0, { airborne: true, batteries: this.batteries.snapshot().slots });
-  }
-
-  /** ¿Se puede salir al espacio ahora? @returns motivo o null */
-  orbitBlocked() {
-    if (!this.piloting) return 'Siéntate a los mandos';
-    if (!this.hasSpaceNode) return 'Para salir al espacio hace falta el nodo espacial';
-    if (this.flight.state !== FlightState.FLYING) return 'Despega primero';
-    if (this.flight.hatchTarget > 0 || this.ship.hatch > 0.01) return 'Cierra la compuerta antes de salir al espacio';
-    if (this.ship.y - this._world.getHeightAt(this.ship.x, this.ship.z) < this._spaceCfg.ORBIT_MIN_ALTITUDE) return `Sube por encima de ${this._spaceCfg.ORBIT_MIN_ALTITUDE} m para salir al espacio`;
-    if (this.batteries.total < this._spaceCfg.ORBIT_COST) return 'No queda batería suficiente para salir de la atmósfera';
-    return null;
-  }
-
-  /** Función que dice qué cuerpo está activo (WorldManager). */
   setBodyProvider(fn) {
     this._activeBody = fn;
   }
 
-  /** ¿Está la nave en el cuerpo que se está mostrando? */
-  get present() {
-    return this.body === this._activeBody();
+  /** Función que dice si fuera de la nave hay aire respirable (cuerpo activo). */
+  setBreathableProvider(fn) {
+    this._breathableOutside = fn;
   }
 
-  /** Inventario (baterías y reloj); se inyecta desde main. */
   setInventory(inventory) {
     this._inventory = inventory;
   }
 
-  /** ¿Tiene el jugador el reloj de la nave? */
+  get present() {
+    return this.body === this._activeBody();
+  }
+
   get watchTaken() {
     return !!this._inventory?.hasItem(this._cfg.WATCH_ITEM, 1);
   }
@@ -183,39 +145,126 @@ export class ShipSystem {
     return this.flight.state;
   }
 
-  // ---- Colocación -------------------------------------------------------------
+  get isExplorer() {
+    return this.layout.blueprint.id === 'EXPLORER';
+  }
 
-  /** Nave aterrizada en el lugar de la seed, cerrada y con las baterías llenas. */
+  // ---- Nodo espacial: la nave crece ------------------------------------------------------
+
+  /**
+   * Instala el nodo espacial: la nave pasa a ser la ampliada. Si estaba en tierra
+   * se vuelve a posar (más patas) y se retiran árboles y rocas que queden debajo.
+   */
+  upgrade({ removeResourcesUnder = null } = {}) {
+    if (this.isExplorer) return false;
+    const wasAboard = this.isAboard();
+    const s = this.ship;
+    this._setBlueprint('EXPLORER', this._cfg.INSTALLED_EXPLORER);
+    this.hasSpaceNode = true;
+    removeResourcesUnder?.(s, this.layout);
+    if (this.flight.state === FlightState.LANDED) this.placeLanded(s.x, s.z, s.yaw, { keepHatch: true });
+    if (wasAboard && !this.piloting) {
+      const r = this.getRespawnPoint();
+      this._player.teleport(r.x, r.y, r.z);
+    }
+    this._events.emit(GameEvents.SHIP_UPGRADED, { blueprint: this.layout.blueprint.id });
+    return true;
+  }
+
+  _setBlueprint(id, installed) {
+    const s = this.ship;
+    this.layout = createShipLayout(BLUEPRINTS[id]);
+    this.flight.layout = this.layout;
+    this.installed = { ...installed };
+    s.doors = {};
+    this._doorTargets = {};
+    s.legFeet = this.layout.LEGS.map(() => 0);
+    this.airlock = 'PRESSURIZED';
+    this._airlockGoal = null;
+    this.shipAir = true;
+    this.model.build(this.layout, this.installed);
+  }
+
+  // ---- Espacio -------------------------------------------------------------------------
+
+  enterSpace(yaw) {
+    const s = this.ship;
+    this.body = 'SPACE';
+    Object.assign(s, { x: 0, y: 0, z: 0, yaw, pitch: 0, roll: 0 });
+    s.legFeet = this.layout.LEGS.map(() => 0);
+    this.flight.hover();
+    this.flight.state = FlightState.SPACE;
+  }
+
+  syncSpace(yaw, pitch, thrust) {
+    this.ship.yaw = yaw;
+    this.ship.pitch = this.piloting ? pitch : 0;
+    this._spaceThrust = thrust;
+  }
+
+  arriveAt(bodyId, height) {
+    const s = this.ship;
+    const site = this._world.getLandingSite() ?? { x: 0, z: 0, yaw: 0 };
+    this.body = bodyId;
+    Object.assign(s, { x: site.x, z: site.z, yaw: site.yaw, pitch: 0, roll: 0 });
+    s.y = this._world.getHeightAt(site.x, site.z) + height;
+    s.legFeet = this.layout.LEGS.map(() => 0);
+    this.flight.state = FlightState.FLYING;
+    this.flight.hover();
+    this.model.update(s, 0, { airborne: true, batteries: this.batteries.snapshot().slots });
+  }
+
+  orbitBlocked() {
+    if (!this.piloting) return 'Siéntate a los mandos';
+    if (!this.hasSpaceNode) return 'Para salir al espacio hace falta el nodo espacial';
+    if (this.flight.state !== FlightState.FLYING) return 'Despega primero';
+    if (this.flight.hatchTarget > 0 || this.ship.hatch > 0.01) return 'Cierra la compuerta antes de salir al espacio';
+    if (this.ship.y - this._world.getHeightAt(this.ship.x, this.ship.z) < this._spaceCfg.ORBIT_MIN_ALTITUDE) {
+      return `Sube por encima de ${this._spaceCfg.ORBIT_MIN_ALTITUDE} m para salir al espacio`;
+    }
+    if (this.batteries.total < this._spaceCfg.ORBIT_COST) return 'No queda batería suficiente para salir de la atmósfera';
+    return null;
+  }
+
+  // ---- Colocación ------------------------------------------------------------------------
+
   resetToLandingSite() {
     this._forceExit(true);
     const site = this._world.getLandingSite();
     if (!site) return;
     this.body = 'MUNDO_0';
+    // Mundo nuevo: vuelve a ser la nave pequeña, sin nodo espacial.
+    if (this.isExplorer) this._setBlueprint('SMALL', this._cfg.INSTALLED);
+    this.hasSpaceNode = false;
     this.placeLanded(site.x, site.z, site.yaw);
     this.batteries.fillAll(this._cfg.BATTERIES.START_CHARGE);
     this._emitBatteries(true);
   }
 
-  /** Posa la nave en (x, z) con las patas adaptadas al terreno. */
-  placeLanded(x, z, yaw) {
+  placeLanded(x, z, yaw, { keepHatch = false } = {}) {
     const s = this.ship;
-    Object.assign(s, { x, z, yaw, hatch: 0, legs: 1, door: 0, pitch: 0, roll: 0 });
-    this.flight.hatchTarget = 0;
+    const L = this.layout;
+    Object.assign(s, { x, z, yaw, legs: 1, pitch: 0, roll: 0 });
+    if (!keepHatch) {
+      s.hatch = 0;
+      this.flight.hatchTarget = 0;
+      s.doors = {};
+      this._doorTargets = {};
+    }
     this.flight.legsTarget = 1;
-    this.flight.doorTarget = 0;
     this.flight.state = FlightState.LANDED;
-    const feet = Layout.LEGS.map((l) => {
-      const [wx, wz] = Layout.toWorld(s, l.x, l.z);
+    const feet = L.LEGS.map((l) => {
+      const [wx, wz] = toWorld(s, l.x, l.z);
       return this._world.getHeightAt(wx, wz);
     });
     s.y = Math.max(...feet);
     s.legFeet = feet.map((h) => h - s.y);
-    const [rx, rz] = Layout.toWorld(s, Layout.RAMP_FOOT_SAMPLE[0], Layout.RAMP_FOOT_SAMPLE[1]);
-    s.rampAngle = Layout.rampOpenAngle(this._world.getHeightAt(rx, rz) - s.y);
+    const [rx, rz] = toWorld(s, L.RAMP_FOOT_SAMPLE[0], L.RAMP_FOOT_SAMPLE[1]);
+    s.rampAngle = L.rampOpenAngle(this._world.getHeightAt(rx, rz) - s.y);
     this.model.update(s, 0, { batteries: this.batteries.snapshot().slots });
   }
 
-  // ---- Mandos -------------------------------------------------------------------
+  // ---- Mandos ----------------------------------------------------------------------------
 
   command(cmd) {
     if (cmd === 'STAND_UP') return this.exitPilot();
@@ -233,11 +282,91 @@ export class ShipSystem {
       this._events.emit(GameEvents.SPACE_EXIT_REQUEST, {});
       return true;
     }
+    if (cmd === 'TOGGLE_HATCH') return this._toggleHatch();
     if (cmd === 'TAKEOFF_OR_LAND') cmd = this.flight.state === FlightState.LANDED ? 'TAKEOFF' : 'LAND';
     if (cmd === 'TOGGLE_LEGS') cmd = this.flight.legsTarget > 0 ? 'RETRACT_LEGS' : 'DEPLOY_LEGS';
     const r = this.flight.command(cmd);
     if (r.message) this._message(r.message, r.ok ? 'biome' : 'danger');
     return r.ok;
+  }
+
+  /** Abrir/cerrar la compuerta (con las reglas de la cámara de descompresión). */
+  _toggleHatch() {
+    const opening = this.flight.hatchTarget === 0;
+    const r = this.flight.command('TOGGLE_HATCH');
+    if (r.ok && this.body === 'SPACE') r.message = opening ? 'Abriendo la compuerta al vacío del espacio.' : 'Cerrando la compuerta.';
+    if (r.message) this._message(r.message, r.ok ? 'biome' : 'danger');
+    if (r.ok && opening && this.isExplorer && !this._breathableOutside() && this.airlock !== 'DEPRESSURIZED') {
+      this._explosiveDecompression();
+    }
+    return r.ok;
+  }
+
+  /** Compuerta abierta con la cámara presurizada: el aire sale de golpe. */
+  _explosiveDecompression() {
+    const L = this.layout;
+    const p = this._player.position;
+    const room = L.roomAt(this.ship, p.x, p.y, p.z);
+    const innerOpen = (this.ship.doors.AIRLOCK ?? 0) > 0.1;
+    this.airlock = 'DEPRESSURIZED';
+    this._airlockGoal = null;
+    if (innerOpen) this.shipAir = false;
+    const exposed = room?.airlock || (innerOpen && room && !this.piloting);
+    this._events.emit(GameEvents.SHIP_DECOMPRESSION, { ejected: !!exposed, inSpace: this.body === 'SPACE' });
+    if (!exposed) {
+      this._message('¡Descompresión brusca! La cámara se ha vaciado de golpe.', 'danger');
+      return;
+    }
+    if (this.body === 'SPACE') {
+      this._message('¡Descompresión explosiva! Has salido disparado al espacio.', 'danger');
+      this._events.emit(GameEvents.PLAYER_DAMAGED, { amount: 1000, source: 'DECOMPRESSION' });
+    } else {
+      this._message('¡Descompresión explosiva! El aire te ha lanzado fuera.', 'danger');
+      const [bx, bz] = toWorld(this.ship, 0, L.DIM.REAR + 6);
+      this._player.teleport(bx, this._world.getHeightAt(bx, bz) + 0.5, bz);
+      this._events.emit(GameEvents.PLAYER_DAMAGED, { amount: 30, source: 'DECOMPRESSION' });
+    }
+  }
+
+  /** Panel de la cámara: vaciar (antes de salir) o llenar (al volver). */
+  _cycleAirlock() {
+    if (this.airlock === 'CYCLING') {
+      this._message('La cámara está cambiando de presión…');
+      return;
+    }
+    if (this.ship.hatch > 0.01 || this.flight.hatchTarget > 0) {
+      this._message('Cierra la compuerta exterior antes de usar el panel.', 'danger');
+      return;
+    }
+    if ((this.ship.doors.AIRLOCK ?? 0) > 0.05 || this._doorTargets.AIRLOCK) {
+      this._message('Cierra la puerta interior de la cámara antes de usar el panel.', 'danger');
+      return;
+    }
+    this._airlockGoal = this.airlock === 'PRESSURIZED' ? 'DEPRESSURIZED' : 'PRESSURIZED';
+    this.airlock = 'CYCLING';
+    this._airlockTimer = this._cfg.AIRLOCK_TIME;
+    this._message(this._airlockGoal === 'DEPRESSURIZED' ? 'Descomprimiendo la cámara…' : 'Presurizando la cámara…', 'biome');
+  }
+
+  _updateAirlock(dt) {
+    if (this.airlock !== 'CYCLING') return;
+    this._airlockTimer -= dt;
+    if (this._airlockTimer > 0) return;
+    this.airlock = this._airlockGoal;
+    if (this.airlock === 'PRESSURIZED') this.shipAir = true; // la nave recupera el aire
+    this._message(this.airlock === 'DEPRESSURIZED' ? 'Cámara descomprimida: ya puedes abrir la compuerta.' : 'Cámara presurizada: ya puedes abrir la puerta interior.', 'biome');
+  }
+
+  _toggleDoor(id) {
+    const door = this.layout.DOORS.find((d) => d.id === id);
+    if (!door) return false;
+    const opening = !this._doorTargets[id];
+    if (opening && door.airlock && !this._breathableOutside() && this.airlock !== 'PRESSURIZED') {
+      this._message('Presuriza la cámara antes de abrir la puerta interior.', 'danger');
+      return false;
+    }
+    this._doorTargets[id] = opening ? 1 : 0;
+    return true;
   }
 
   enterPilot() {
@@ -268,8 +397,8 @@ export class ShipSystem {
     this.piloting = false;
     this._held.clear();
     const s = this.ship;
-    const [x, z] = Layout.toWorld(s, Layout.SEAT.standUp[0], Layout.SEAT.standUp[1]);
-    this._player.teleport(x, s.y + Layout.DIM.FLOOR, z);
+    const [x, z] = toWorld(s, this.layout.SEAT.standUp[0], this.layout.SEAT.standUp[1]);
+    this._player.teleport(x, s.y + this.layout.DIM.FLOOR, z);
     this._player.yaw = s.yaw;
     this._player.bodyYaw = s.yaw;
     this._player.pitch = 0;
@@ -277,7 +406,6 @@ export class ShipSystem {
     return true;
   }
 
-  /** Salida forzosa (muerte, regenerar mundo): si vuela, aterriza sola. */
   _forceExit(silent = false) {
     if (!this.piloting) return;
     this.piloting = false;
@@ -286,16 +414,23 @@ export class ShipSystem {
     this._events.emit(GameEvents.SHIP_PILOT_CHANGED, { piloting: false, silent });
   }
 
-  // ---- Bucle ----------------------------------------------------------------------
+  // ---- Bucle -------------------------------------------------------------------------------
 
   update(dt) {
     this.model.root.visible = this.present;
-    if (!this.present) return; // la nave está en otro cuerpo
+    if (!this.present) return;
+    const s = this.ship;
+    // Puertas.
+    for (const d of this.layout.DOORS) {
+      const target = this._doorTargets[d.id] ?? 0;
+      const v = s.doors[d.id] ?? 0;
+      s.doors[d.id] = v < target ? Math.min(target, v + dt / this._cfg.DOOR_TIME) : Math.max(target, v - dt / this._cfg.DOOR_TIME);
+    }
+    this._updateAirlock(dt);
     if (this.spaceMode !== 'SURFACE') {
-      // Saliendo de la atmósfera: sube deprisa (tras el fundido). En órbita: congelada.
-      if (this.spaceMode === 'ASCENDING' && this._spaceY !== undefined) this.ship.y += 45 * dt;
+      if (this.spaceMode === 'ASCENDING') s.y += 45 * dt;
       if (this.piloting) this._placePlayerInSeat();
-      this.model.update(this.ship, dt, { airborne: true, thrust: 1, batteries: this.batteries.snapshot().slots });
+      this.model.update(s, dt, { airborne: true, thrust: 1, batteries: this.batteries.snapshot().slots, airlock: this.airlock });
       return;
     }
     let controls = null;
@@ -309,10 +444,11 @@ export class ShipSystem {
     const snap = this.batteries.snapshot();
     const inSpace = this.flight.state === FlightState.SPACE;
     if (!this.piloting) this.spaceControls = null;
-    this.model.update(this.ship, dt, {
+    this.model.update(s, dt, {
       airborne: this.flight.airborne,
       thrust: inSpace ? this._spaceThrust ?? 0 : Math.min(1, Math.abs(this.flight.forwardSpeed) / this._cfg.MAX_SPEED),
       batteries: snap.slots,
+      airlock: this.airlock,
     });
     this._emitState(dt);
     this._emitBatteries(false, snap);
@@ -327,7 +463,6 @@ export class ShipSystem {
     if (input.wasPressed('SHIP_ORBIT')) this.command('ORBIT');
     if (input.wasPressed('STAR_MAP')) this._events.emit(GameEvents.STAR_MAP_REQUEST, {});
     if (this.flight.state === FlightState.SPACE) {
-      // Rumbo automático: 1 MUNDO 0 · 2 Luna A · 3 Luna B.
       ['MUNDO_0', 'MOON_A', 'MOON_B'].forEach((id, i) => {
         if (input.wasPressed(`HOTBAR_${i + 1}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { target: id });
       });
@@ -336,12 +471,10 @@ export class ShipSystem {
       input.consume('INTERACT'); // que la interacción no vuelva a sentarte con la misma pulsación
       this.exitPilot();
     }
-
-    // Ratón: órbita de la cámara alrededor de la nave. Rueda: distancia.
     const m = input.getMouseDelta();
     const v = this.view;
     v.yawOffset -= m.x * 0.0025;
-    v.pitch = Math.max(-1.25, Math.min(0.45, v.pitch - m.y * 0.0025));
+    v.pitch = Math.max(-1.25, Math.min(0.45, v.basePitch - m.y * 0.0025));
     const wheel = input.getWheel();
     if (wheel) v.distance = Math.max(v.minDistance, Math.min(v.maxDistance, v.distance + wheel * 1.5));
 
@@ -352,27 +485,24 @@ export class ShipSystem {
       vertical: axis(input.isDown('JUMP') || held.has('UP'), input.isDown('DESCEND') || held.has('DOWN')),
       boost: input.isDown('RUN'),
     };
-    // En el espacio los mandos los usa SpaceTravel (navegación en km).
     this.spaceControls = this.flight.state === FlightState.SPACE ? controls : null;
     return this.flight.state === FlightState.SPACE ? null : controls;
   }
 
-  /** Punto dentro de la nave donde reaparecer (en el laboratorio). */
   getRespawnPoint() {
-    const [x, z] = Layout.toWorld(this.ship, -1.6, 3.4);
-    return { x, y: this.ship.y + Layout.DIM.FLOOR, z };
+    const [lx, lz] = this.layout.RESPAWN;
+    const [x, z] = toWorld(this.ship, lx, lz);
+    return { x, y: this.ship.y + this.layout.DIM.FLOOR, z };
   }
 
-  /** ¿Está el jugador dentro de la nave, en la rampa o en el tejado? */
   isAboard(position = this._player.position) {
     const s = this.ship;
-    const [lx, lz] = Layout.toLocal(s, position.x, position.z);
-    const lowest = Math.min(Layout.rampEnd(s).y, Layout.DIM.FLOOR);
-    return Math.abs(lx) <= Layout.DIM.HALF_WIDTH + 0.4 && lz >= Layout.DIM.FRONT - 0.4 && lz <= Layout.DIM.REAR + 0.4 &&
-      position.y >= s.y + lowest - 1.0;
+    const L = this.layout;
+    const [lx, lz] = toLocal(s, position.x, position.z);
+    const lowest = Math.min(L.rampEnd(s).y, L.DIM.FLOOR);
+    return Math.abs(lx) <= L.DIM.HALF_WIDTH + 0.4 && lz >= L.DIM.FRONT - 0.4 && lz <= L.DIM.REAR + 0.4 && position.y >= s.y + lowest - 1.0;
   }
 
-  /** Nave en el aire sin nadie dentro (el jugador ha saltado): aterriza sola. */
   _checkAbandoned(dt) {
     this._autoLandRetry = Math.max(0, this._autoLandRetry - dt);
     if (this.flight.state !== FlightState.FLYING || this._autoLandRetry > 0 || this.isAboard()) return;
@@ -383,8 +513,8 @@ export class ShipSystem {
   _placePlayerInSeat() {
     const s = this.ship;
     const p = this._player;
-    const [x, z] = Layout.toWorld(s, Layout.SEAT.x, Layout.SEAT.z);
-    p.position.set(x, s.y + Layout.DIM.FLOOR + 0.3, z);
+    const [x, z] = toWorld(s, this.layout.SEAT.x, this.layout.SEAT.z);
+    p.position.set(x, s.y + this.layout.DIM.FLOOR + 0.3, z);
     p.velocity.set(0, 0, 0);
     p.state.onGround = true;
     p.state.isMoving = false;
@@ -395,9 +525,7 @@ export class ShipSystem {
 
   _onFlightEvent(type, data) {
     const texts = {
-      TAKEOFF: null,
       AIRBORNE: 'En el aire. [L] recoger patas · [T] aterrizar · [E] levantarse (se queda flotando)',
-      LANDING: null,
       LANDED: 'Aterrizaje completado.',
       EMERGENCY: 'Batería agotada: aterrizaje de emergencia.',
     };
@@ -405,33 +533,43 @@ export class ShipSystem {
     else if (texts[type]) this._message(texts[type], type === 'EMERGENCY' ? 'danger' : 'biome');
   }
 
-  // ---- Interacción (E) -------------------------------------------------------------
+  // ---- Interacción (E) ------------------------------------------------------------------
 
-  /**
-   * Puntos interactivos cerca del jugador, en coordenadas del mundo:
-   * [{ id, x, y, z, aimRadius, reach, label, action, key }]
-   */
   getInteractablesNear(x, y, z, range) {
     if (this.piloting || !this.present) return [];
     const s = this.ship;
-    if (Math.hypot(x - s.x, z - s.z) > range + 12) return [];
+    const L = this.layout;
+    if (Math.hypot(x - s.x, z - s.z) > range + 20) return [];
     const list = [];
     const add = (id, [lx, ly, lz], label, action, aimRadius = 0.5) => {
-      const [wx, wz] = Layout.toWorld(s, lx, lz);
+      const [wx, wz] = toWorld(s, lx, lz);
       const wy = s.y + ly;
       if (Math.abs(wy - (y + 1.2)) > 2.1) return; // otra planta (dentro/fuera)
       list.push({ id, x: wx, y: wy, z: wz, aimRadius, reach: 0.4, label, action, key: 'E' });
     };
     const hatchAction = this.flight.hatchTarget > 0 ? 'Cerrar compuerta' : 'Abrir compuerta';
-    add('EXT_BUTTON', Layout.EXT_BUTTON.aim, 'Nave · botón de la compuerta', hatchAction, 0.4);
-    add('INNER_BUTTON', Layout.INNER_BUTTON.aim, 'Botón de la compuerta', hatchAction, 0.4);
-    add('DOOR', Layout.DOOR_AIM, 'Puerta de la sala de controles', this.flight.doorTarget > 0 ? 'Cerrar' : 'Abrir', 0.8);
-    add('SEAT', Layout.SEAT.aim, 'Asiento del piloto', 'Sentarse a los mandos', 0.6);
-    add('WATCH', Layout.WATCH_AIM, 'Reloj de la nave', this.watchTaken ? 'Dejar el reloj' : 'Coger el reloj', 0.35);
-    for (const [slotId, slot] of Object.entries(Layout.SLOTS)) {
-      const techId = this._cfg.INSTALLED[slotId] ?? null;
+    add('EXT_BUTTON', L.EXT_BUTTON.aim, 'Nave · botón de la compuerta', hatchAction, 0.4);
+    add('INNER_BUTTON', L.INNER_BUTTON.aim, 'Botón de la compuerta', hatchAction, 0.4);
+    for (const d of L.DOORS) add(`DOOR:${d.id}`, d.aim, d.label, this._doorTargets[d.id] ? 'Cerrar' : 'Abrir', 0.8);
+    add('SEAT', L.SEAT.aim, 'Asiento del piloto', 'Sentarse a los mandos', 0.6);
+    add('WATCH', L.WATCH_AIM, 'Reloj de la nave', this.watchTaken ? 'Dejar el reloj' : 'Coger el reloj', 0.35);
+    for (const f of L.blueprint.furniture) {
+      if (!f.interact) continue;
+      let action = f.interact.action;
+      if (f.interact.id === 'AIRLOCK') {
+        action = this.airlock === 'CYCLING' ? 'Cambiando de presión…' : this.airlock === 'PRESSURIZED' ? 'Descomprimir la cámara' : 'Presurizar la cámara';
+      }
+      add(f.interact.id, f.interact.aim, f.interact.label, action, 0.6);
+    }
+    const carryingNode = this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1);
+    for (const [slotId, slot] of Object.entries(L.SLOTS)) {
+      const techId = this.installed[slotId] ?? null;
       const tech = techId ? this._cfg.TECHNOLOGIES[techId] : null;
-      const action = techId === 'PLANET_MAP' ? 'Abrir mapa' : techId === 'CHARGING_STATION' ? 'Ver baterías' : 'Examinar';
+      const actions = {
+        PLANET_MAP: 'Abrir mapa', CHARGING_STATION: 'Ver baterías', SUIT_LOCKER: 'Coger traje y jetpack',
+        OXYGEN_STATION: 'Recargar oxígeno del traje', SPACE_NODE: 'Examinar', GALACTIC_NODE: 'Examinar',
+      };
+      const action = tech ? actions[techId] ?? 'Examinar' : carryingNode ? 'Instalar el nodo espacial' : 'Examinar';
       add(`SLOT:${slotId}`, slot.aim, tech ? `${tech.ICON} ${tech.NAME}` : 'Ranura de tecnología libre', action, 0.6);
     }
     return list;
@@ -439,11 +577,17 @@ export class ShipSystem {
 
   interact(id) {
     if (id === 'EXT_BUTTON' || id === 'INNER_BUTTON') return this.command('TOGGLE_HATCH');
-    if (id === 'DOOR') {
-      this.flight.toggleDoor();
+    if (id.startsWith('DOOR:')) return this._toggleDoor(id.slice(5));
+    if (id === 'SEAT') return this.enterPilot();
+    if (id === 'AIRLOCK') return this._cycleAirlock();
+    if (id === 'BED') {
+      this._events.emit(GameEvents.SLEEP_REQUEST, { bed: { type: 'SHIP_BED', ship: true } });
       return true;
     }
-    if (id === 'SEAT') return this.enterPilot();
+    if (id.startsWith('POD_')) {
+      this._events.emit(GameEvents.ESCAPE_POD_REQUEST, { pod: id });
+      return true;
+    }
     if (id === 'WATCH') {
       const item = this._cfg.WATCH_ITEM;
       if (this.watchTaken) {
@@ -455,18 +599,56 @@ export class ShipSystem {
       }
       return true;
     }
-    if (id.startsWith('SLOT:')) {
-      const techId = this._cfg.INSTALLED[id.slice(5)] ?? null;
-      if (techId === 'PLANET_MAP') this._events.emit(GameEvents.SHIP_PANEL_REQUEST, { panel: 'MAP' });
-      else if (techId === 'CHARGING_STATION') this._events.emit(GameEvents.SHIP_PANEL_REQUEST, { panel: 'CHARGER' });
-      else if (techId === 'FLIGHT_SYSTEM') this._message('Sistema de vuelo: siéntate en el asiento del piloto para volar.');
-      else this._message('Ranura libre: aquí se podrán instalar nuevas tecnologías.');
-      return true;
-    }
+    if (id.startsWith('SLOT:')) return this._slotInteract(id.slice(5));
     return false;
   }
 
-  // ---- Puesto de carga -----------------------------------------------------------
+  _slotInteract(slotId) {
+    const techId = this.installed[slotId] ?? null;
+    switch (techId) {
+      case 'PLANET_MAP':
+        this._events.emit(GameEvents.SHIP_PANEL_REQUEST, { panel: 'MAP' });
+        return true;
+      case 'CHARGING_STATION':
+        this._events.emit(GameEvents.SHIP_PANEL_REQUEST, { panel: 'CHARGER' });
+        return true;
+      case 'FLIGHT_SYSTEM':
+        this._message('Sistema de vuelo: siéntate en el asiento del piloto para volar.');
+        return true;
+      case 'SUIT_LOCKER':
+        this._events.emit(GameEvents.SUIT_LOCKER_REQUEST, {});
+        return true;
+      case 'OXYGEN_STATION':
+        this._events.emit(GameEvents.OXYGEN_REFILL_REQUEST, { source: 'SHIP' });
+        return true;
+      case 'SPACE_NODE':
+        this._message('Nodo espacial: permite salir al espacio. A los mandos, vuela alto y pulsa [O].');
+        return true;
+      case 'GALACTIC_NODE':
+        this._message('Nodo galáctico: permitiría salir del sistema de MUNDO 0…');
+        return true;
+      default:
+        if (this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1) && !this.isExplorer) {
+          this._events.emit(GameEvents.SPACE_NODE_INSTALL_REQUEST, { slot: slotId });
+          return true;
+        }
+        if (this._inventory?.hasItem(this._cfg.GALACTIC_NODE_ITEM, 1) && this.isExplorer) {
+          this._events.emit(GameEvents.GALACTIC_NODE_INSTALL_REQUEST, { slot: slotId });
+          return true;
+        }
+        this._message('Ranura libre: aquí se podrán instalar nuevas tecnologías.');
+        return true;
+    }
+  }
+
+  /** Instala una tecnología en una ranura (p. ej. el nodo galáctico). */
+  installTech(slotId, techId) {
+    this.installed[slotId] = techId;
+    this.model.build(this.layout, this.installed);
+    this.model.update(this.ship, 0, { batteries: this.batteries.snapshot().slots, airlock: this.airlock });
+  }
+
+  // ---- Puesto de carga ------------------------------------------------------------------
 
   _batteryRequest({ slot, action }) {
     const inv = this._inventory;
@@ -491,7 +673,7 @@ export class ShipSystem {
     this._events.emit(GameEvents.SHIP_BATTERIES_CHANGED, snap);
   }
 
-  // ---- Estado para la UI -------------------------------------------------------------
+  // ---- Estado para la UI -------------------------------------------------------------------
 
   getTelemetry() {
     const s = this.ship;
@@ -499,15 +681,18 @@ export class ShipSystem {
     return {
       flight: this.flight.state,
       piloting: this.piloting,
+      body: this.body,
+      present: this.present,
+      explorer: this.isExplorer,
       hatch: this.flight.hatchTarget > 0 ? 'OPEN' : 'CLOSED',
       hatchMoving: s.hatch > 0.001 && s.hatch < 0.999,
       legs: this.flight.legsTarget > 0 ? 'DEPLOYED' : 'RETRACTED',
-      door: this.flight.doorTarget > 0 ? 'OPEN' : 'CLOSED',
+      airlock: this.airlock,
       altitude: Math.max(0, s.y - ground),
       height: s.y,
       speed: Math.abs(this.flight.forwardSpeed),
       autopilot: !this.piloting && this.flight.airborne,
-      aboard: this.isAboard(),
+      aboard: this.present && this.isAboard(),
       vertical: this.flight.verticalSpeed,
       charge: this.batteries.ratio,
       canOrbit: this.piloting && !this.orbitBlocked(),
@@ -517,7 +702,7 @@ export class ShipSystem {
 
   _emitState(dt) {
     const t = this.getTelemetry();
-    const key = `${t.flight}|${t.piloting}|${t.hatch}|${t.legs}|${t.door}`;
+    const key = `${t.flight}|${t.piloting}|${t.hatch}|${t.legs}|${t.airlock}`;
     this._telemetryTimer -= dt;
     if (key === this._stateKey && this._telemetryTimer > 0) return;
     this._stateKey = key;
@@ -529,25 +714,24 @@ export class ShipSystem {
     this._events.emit(GameEvents.UI_MESSAGE, { text, type });
   }
 
-  // ---- Consultas de colisión y entorno ----------------------------------------------
+  // ---- Consultas de colisión y entorno ------------------------------------------------------
 
   surfaceAt(x, z, maxY) {
-    return this.present ? Layout.surfaceAt(this.ship, x, z, maxY) : null;
+    return this.present ? this.layout.surfaceAt(this.ship, x, z, maxY) : null;
   }
 
   blocksAt(x, z, r, y0, y1) {
-    return this.present && Layout.blocksAt(this.ship, x, z, r, y0, y1);
+    return this.present && this.layout.blocksAt(this.ship, x, z, r, y0, y1);
   }
 
   ceilingAt(x, z, y) {
-    return this.present ? Layout.ceilingAt(this.ship, x, z, y) : Infinity;
+    return this.present ? this.layout.ceilingAt(this.ship, x, z, y) : Infinity;
   }
 
   resolveCollisions(pos, r, y0, y1) {
-    return this.present && Layout.resolveCollisions(this.ship, pos, r, y0, y1);
+    return this.present && this.layout.resolveCollisions(this.ship, pos, r, y0, y1);
   }
 
-  /** Oclusión de la cámara (no cuando la cámara orbita la propia nave). */
   raycastDistance(origin, dir, maxDist) {
     if (this.piloting || !this.present) return null;
     this._raycaster.set(origin, dir);
@@ -556,15 +740,30 @@ export class ShipSystem {
     return hit ? hit.distance : null;
   }
 
-  /** Refugio para la temperatura: dentro y con la compuerta cerrada = climatizada. */
-  getShelterAt(x, y, z) {
-    if (!this.present || !Layout.isInside(this.ship, x, y, z)) return { factor: 0, heated: false };
-    const closed = this.ship.hatch < 0.01;
-    return { factor: closed ? 1 : 0.6, heated: closed };
+  /**
+   * ¿Se respira en (x, y, z)? Dentro de la nave: si la nave tiene aire (en la
+   * cámara de descompresión, solo presurizada). null = no está dentro de la nave.
+   */
+  breathableAt(x, y, z) {
+    if (!this.present) return null;
+    const room = this.layout.roomAt(this.ship, x, y, z);
+    if (!room) return null;
+    if (this._breathableOutside()) return true;
+    if (room.airlock) return this.airlock === 'PRESSURIZED' && this.ship.hatch < 0.01;
+    const hatchOpenToShip = this.ship.hatch > 0.01 && (this.ship.doors.AIRLOCK ?? 0) > 0.1;
+    // Nave pequeña (sin cámara): con la compuerta abierta no hay aire.
+    if (!this.isExplorer) return this.ship.hatch < 0.01;
+    return this.shipAir && !hatchOpenToShip;
   }
 
-  /** ¿Choca una caja del mundo (AABB en planta) con la nave? (construcción) */
+  getShelterAt(x, y, z) {
+    if (!this.present || !this.layout.isInside(this.ship, x, y, z)) return { factor: 0, heated: false };
+    const air = this.breathableAt(x, y, z);
+    const closed = this.ship.hatch < 0.01;
+    return { factor: closed ? 1 : 0.6, heated: !!air && (closed || this.isExplorer) };
+  }
+
   overlapsBox(box, margin = 0.2) {
-    return this.present && Layout.overlapsFootprint(this.ship, box, margin);
+    return this.present && this.layout.overlapsFootprint(this.ship, box, margin);
   }
 }

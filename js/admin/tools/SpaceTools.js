@@ -1,7 +1,7 @@
 /**
  * Herramientas de depuración del cielo (Fase 12) y del espacio (Fase 13).
  */
-export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events }) {
+export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups }) {
   // ---- Cuerpos (viaje directo, sin nave: depuración) ----
   admin.registerTool({ category: 'Cuerpos', type: 'info', label: 'Cuerpo actual', read: () => worlds.profile()?.NAME ?? worlds.activeId });
   for (const [id, name] of [['MUNDO_0', 'MUNDO 0'], ['MOON_A', 'la Luna A'], ['MOON_B', 'la Luna B']]) {
@@ -48,6 +48,24 @@ export function registerSpaceTools(admin, { celestial, travel, starMap, ship, ti
   });
 
   // ---- Espacio ----
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Instalar el nodo espacial (nave ampliada)',
+    run: () => {
+      if (ship.hasSpaceNode) throw new Error('La nave ya tiene el nodo espacial');
+      installSpaceNode();
+    },
+  });
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Ir junto al nodo espacial caído',
+    run: () => {
+      const n = pickups.get('SPACE_NODE');
+      if (!n || n.taken) throw new Error('El nodo ya se ha cogido');
+      if (worlds.activeId !== n.body) throw new Error('Está en MUNDO 0');
+      controller.placeAt(n.x + 3, n.z + 3);
+    },
+  });
   admin.registerTool({ category: 'Espacio', type: 'info', label: 'Estado', read: () => {
     if (!travel.inSpace) return travel.state;
     const n = travel.nav;
@@ -59,7 +77,7 @@ export function registerSpaceTools(admin, { celestial, travel, starMap, ship, ti
     run: () => {
       if (travel.state !== 'SURFACE') throw new Error('Ya estás en el espacio');
       if (!ship.present) throw new Error('La nave no está en este cuerpo');
-      ship.hasSpaceNode = true;
+      if (!ship.hasSpaceNode) installSpaceNode();
       if (!ship.piloting) ship.enterPilot();
       if (ship.state === 'LANDED') ship.ship.y += 60; // la despega directamente
       ship.flight.state = 'FLYING';

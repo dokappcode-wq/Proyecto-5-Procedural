@@ -90,6 +90,17 @@ export const GameEvents = Object.freeze({
   SHIP_BATTERY_REQUEST: 'ship:battery',             // { slot, action: 'REMOVE'|'INSERT' }
   SHIP_BATTERIES_CHANGED: 'ship:batteries',         // { slots: [{ charge }|null], total, capacity }
   SHIP_WATCH_TOGGLE: 'ship:watchToggle',            // {}  (usar el reloj de la nave)
+  SHIP_UPGRADED: 'ship:upgraded',                   // { blueprint }  (la nave crece con el nodo espacial)
+  SHIP_DECOMPRESSION: 'ship:decompression',         // { ejected, inSpace }
+  ESCAPE_POD_REQUEST: 'ship:escapePod',             // { pod }
+  SUIT_LOCKER_REQUEST: 'ship:suitLocker',           // {}
+  OXYGEN_REFILL_REQUEST: 'ship:oxygenRefill',       // { source }
+  SPACE_NODE_INSTALL_REQUEST: 'ship:spaceNode',     // { slot }
+  GALACTIC_NODE_INSTALL_REQUEST: 'ship:galacticNode', // { slot }
+
+  // Objetos del mundo (nodo espacial, cofres…)
+  PICKUP_TAKEN: 'pickup:taken',                     // { id, body, contents }
+  MAP_OPEN_REQUEST: 'map:open',                     // {}  (usar un mapa de papel)
 
   // Admin
   ADMIN_MODE_CHANGED: 'admin:modeChanged',          // { active }

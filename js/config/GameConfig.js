@@ -424,6 +424,11 @@ export const GameConfig = deepFreeze({
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
     // Se coge en la nave (mesa del laboratorio). Usarlo muestra dónde está la nave.
     SHIP_WATCH: { NAME: 'Reloj de la nave', ICON: '⌚', USE: 'WATCH' },
+    // Tecnologías que se encuentran en el mundo y se instalan en una ranura de la nave.
+    SPACE_NODE: { NAME: 'Nodo espacial', ICON: '🔷' },
+    // Mapa de papel con la señal del nodo espacial (usarlo abre el mapa).
+    NODE_MAP: { NAME: 'Mapa de la señal', ICON: '📜', USE: 'MAP' },
+    GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀' },
   },
 
   // Alimentación (Fase 7). Equilibrio entre comida animal y vegetal.
@@ -634,6 +639,9 @@ export const GameConfig = deepFreeze({
     CAMERA_MAX_DISTANCE: 45,
     CAMERA_PITCH: -0.3,
     WATCH_ITEM: 'SHIP_WATCH',    // reloj que se coge en la nave y localiza la nave
+    SPACE_NODE_ITEM: 'SPACE_NODE',       // al instalarlo la nave crece (ShipBlueprints.EXPLORER)
+    GALACTIC_NODE_ITEM: 'GALACTIC_NODE',
+    AIRLOCK_TIME: 4,             // s en vaciar/llenar la cámara de descompresión
     // Combustible: baterías plank pequeñas en el puesto de carga.
     BATTERIES: {
       ITEM: 'PLANK_BATTERY_SMALL',
@@ -651,6 +659,10 @@ export const GameConfig = deepFreeze({
       FLIGHT_SYSTEM: { NAME: 'Sistema de vuelo', ICON: '🕹️', DESCRIPTION: 'Asiento del piloto y mandos de la nave.' },
       PLANET_MAP: { NAME: 'Mapa', ICON: '🗺️', DESCRIPTION: 'Mapa de MUNDO 0 y mapa planetario.' },
       CHARGING_STATION: { NAME: 'Puesto de carga', ICON: '🔌', DESCRIPTION: 'Baterías plank: el combustible de la nave.' },
+      SUIT_LOCKER: { NAME: 'Taquilla de trajes', ICON: '🧑‍🚀', DESCRIPTION: 'Traje espacial y jetpack de gas.' },
+      OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', DESCRIPTION: 'Recarga el oxígeno del traje.' },
+      SPACE_NODE: { NAME: 'Nodo espacial', ICON: '🔷', DESCRIPTION: 'Permite salir al espacio y viajar a las lunas.' },
+      GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀', DESCRIPTION: 'Permitiría saltar fuera del sistema de MUNDO 0.' },
     },
     INSTALLED: {
       CONTROL_CONSOLE: 'FLIGHT_SYSTEM',
@@ -661,6 +673,21 @@ export const GameConfig = deepFreeze({
       CONTROL_1: null,
       CONTROL_2: null,
     },
+    // Nave ampliada (tras instalar el nodo espacial).
+    INSTALLED_EXPLORER: {
+      CONTROL_CONSOLE: 'FLIGHT_SYSTEM',
+      LAB_1: 'PLANET_MAP',
+      LAB_2: 'CHARGING_STATION',
+      LAB_3: 'SUIT_LOCKER',
+      LAB_4: 'OXYGEN_STATION',
+      ENGINE_1: 'SPACE_NODE',
+      CONTROL_1: null,
+      CONTROL_2: null,
+      LOUNGE_1: null,
+    },
+    // Dónde cae el nodo espacial en MUNDO 0 (m desde el inicio del jugador).
+    SPACE_NODE_DROP_DISTANCE: [160, 320],
+    NODE_MAP_ITEM: 'NODE_MAP',   // se recibe al empezar: marca dónde cayó el nodo
     SPACE_NODE_REQUIRED: true,   // sin "nodo espacial" las lunas no se pueden visitar
     MAP_RESOLUTION: 160,         // píxeles por lado del mapa del planeta
   },

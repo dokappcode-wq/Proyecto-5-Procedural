@@ -1,4 +1,5 @@
-import { LEGS, DIM, LEG_RETRACTED_BOTTOM, GROUND_SAMPLES, RAMP_FOOT_SAMPLE, toWorld, rampOpenAngle } from './ShipLayout.js';
+import * as SmallLayout from './ShipLayout.js';
+import { toWorld } from './ShipLayout.js';
 
 /**
  * ShipFlight — estado de vuelo de la nave (Tecnología 1: sistema de vuelo). Sin Three.js.
@@ -40,8 +41,9 @@ export class ShipFlight {
    * @param {object} p.terrain   { heightAt(x,z), surfaceAt(x,z) (agua incluida), isWater(x,z), bounds }
    * @param {Function} p.landingBlocked (ship) → motivo | null
    */
-  constructor({ config, ship, batteries, terrain, landingBlocked = () => null }) {
+  constructor({ config, ship, batteries, terrain, landingBlocked = () => null, layout = SmallLayout }) {
     this._cfg = config;
+    this.layout = layout; // plano de la nave (cambia al instalar el nodo espacial)
     this.ship = ship;
     this.batteries = batteries;
     this._terrain = terrain;
@@ -77,7 +79,7 @@ export class ShipFlight {
         if (this.hatchTarget > 0 || s.hatch > 0.001) return { ok: false, message: 'Cierra la compuerta antes de despegar' };
         if (this.batteries.empty) return { ok: false, message: 'Sin batería: coloca baterías plank cargadas' };
         this.state = FlightState.TAKING_OFF;
-        this._takeoffGoal = this._groundUnder().hull - DIM.BOTTOM + this._cfg.TAKEOFF_HEIGHT;
+        this._takeoffGoal = this._groundUnder().hull - this.layout.DIM.BOTTOM + this._cfg.TAKEOFF_HEIGHT;
         this._takeoffGoal = Math.max(this._takeoffGoal, s.y + this._cfg.TAKEOFF_HEIGHT);
         this._emit('TAKEOFF');
         return { ok: true, message: 'Despegando…' };
@@ -305,8 +307,8 @@ export class ShipFlight {
     const feet = this._feetHeights();
     s.y = Math.max(...feet);
     s.legFeet = feet.map((h) => h - s.y);
-    const [rx, rz] = toWorld(s, RAMP_FOOT_SAMPLE[0], RAMP_FOOT_SAMPLE[1]);
-    s.rampAngle = rampOpenAngle(this._terrain.heightAt(rx, rz) - s.y);
+    const [rx, rz] = toWorld(s, this.layout.RAMP_FOOT_SAMPLE[0], this.layout.RAMP_FOOT_SAMPLE[1]);
+    s.rampAngle = this.layout.rampOpenAngle(this._terrain.heightAt(rx, rz) - s.y);
     s.pitch = 0;
     s.roll = 0;
     this.state = FlightState.LANDED;
@@ -318,7 +320,7 @@ export class ShipFlight {
   /** Motivo por el que no se puede aterrizar aquí, o null. */
   checkLanding() {
     const s = this.ship;
-    for (const l of LEGS) {
+    for (const l of this.layout.LEGS) {
       const [x, z] = toWorld(s, l.x, l.z);
       if (this._terrain.isWater(x, z)) return 'No se puede aterrizar sobre el agua';
     }
@@ -330,7 +332,7 @@ export class ShipFlight {
   /** Altura del terreno bajo cada pata. */
   _feetHeights() {
     const s = this.ship;
-    return LEGS.map((l) => {
+    return this.layout.LEGS.map((l) => {
       const [x, z] = toWorld(s, l.x, l.z);
       return this._terrain.heightAt(x, z);
     });
@@ -341,10 +343,10 @@ export class ShipFlight {
     const s = this.ship;
     let feet = -Infinity;
     let hull = -Infinity;
-    GROUND_SAMPLES.forEach(([lx, lz], i) => {
+    this.layout.GROUND_SAMPLES.forEach(([lx, lz], i) => {
       const [x, z] = toWorld(s, lx, lz);
       const h = this._terrain.surfaceAt(x, z);
-      if (i < LEGS.length) feet = Math.max(feet, h);
+      if (i < this.layout.LEGS.length) feet = Math.max(feet, h);
       hull = Math.max(hull, h);
     });
     return { feet, hull };
@@ -352,9 +354,9 @@ export class ShipFlight {
 
   /** Altura mínima de la nave (plano de apoyo) sobre el terreno según las patas. */
   _minY(g) {
-    const legsLow = LEG_RETRACTED_BOTTOM * (1 - this.ship.legs); // punto más bajo local
+    const legsLow = this.layout.LEG_RETRACTED_BOTTOM * (1 - this.ship.legs); // punto más bajo local
     const clearance = this.state === FlightState.LANDING ? 0 : this._cfg.GROUND_CLEARANCE * (1 - this.ship.legs);
-    return Math.max(g.feet - legsLow, g.hull - DIM.BOTTOM + 0.1) + clearance;
+    return Math.max(g.feet - legsLow, g.hull - this.layout.DIM.BOTTOM + 0.1) + clearance;
   }
 
   _notice(message, force = false) {

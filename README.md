@@ -19,6 +19,9 @@ Sin motores externos y sin paso de compilación.
 | 13 | Espacio: salir del planeta con la nave, ver MUNDO 0 y las lunas desde fuera, regresar |
 | 14 | Modo Admin plegable con buscador, interfaz revisada y limpieza general |
 | + | Nave pequeña: compuerta, laboratorio, sala de controles, vuelo, mapa, puesto de carga, reloj |
+| E1 | Varios cuerpos: MUNDO 0, Luna A (clara) y Luna B (rojiza), procedurales, con estado propio |
+| E2 | Espacio explorable: se pilota la nave (cámara detrás) entre MUNDO 0 y las lunas |
+| E3 | Nodo espacial caído en MUNDO 0 (con mapa); al instalarlo la nave se amplía |
 
 ## Cómo ejecutarlo
 
@@ -57,8 +60,10 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | A los mandos: `W` `S` · `A` `D` · `Espacio` `C` · `Shift` | Adelante/atrás · girar · subir/bajar · turbo |
 | A los mandos: ratón / rueda / `E` | Girar la cámara / distancia / levantarse (en el aire la nave se queda flotando) |
 | Reloj de la nave + clic derecho / `R` | Ver dónde está la nave (distancia, dirección, estado) |
-| A los mandos: `O` | Salir al espacio (en vuelo, compuerta cerrada, a más de 60 m del suelo) |
-| En el espacio: `1`–`4` · ratón · rueda · `T` | Enfocar MUNDO 0 / Luna A / Luna B / nave · girar · acercar · regresar |
+| A los mandos: `O` | Salir al espacio (con el nodo espacial; en vuelo, compuerta cerrada, a más de 60 m) |
+| En el espacio: `W`/`S` · `A`/`D` · `Espacio`/`C` · `Shift` | Acelerar/frenar · girar · cabecear · impulso |
+| En el espacio: `1` `2` `3` · `T` · `M` | Rumbo automático a MUNDO 0 / Luna A / Luna B · aterrizar al llegar · mapa estelar 3D |
+| Mapa de la señal + clic derecho / `R` | Abrir el mapa con la posición del nodo espacial |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -234,10 +239,19 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 - **Frío**: Admin → Tiempo → Medianoche y sube a las Montañas Heladas (o Admin → Temperatura).
   Con la armadura de cuero te enfrías más despacio; dentro de la nave cerrada, no.
 - **Lunas**: Admin → Cielo → "Ir a una noche con las dos lunas" y "Mirar a la Luna A/B".
-- **Espacio**: vuela por encima de 60 m y pulsa `O` (o Admin → Espacio). `1`–`4` para enfocar,
-  `T` para volver: la nave reaparece donde estaba.
+- **Nodo espacial**: al entrar recibes un 📜 *Mapa de la señal* (selecciónalo y clic derecho / `R`).
+  El nodo cae en un sitio distinto según la seed (160–320 m del inicio) y un haz de luz azul lo
+  señala. `E` para cogerlo; en la nave, `E` sobre una ranura libre lo instala. La nave crece: alas,
+  cuatro propulsores y cinco salas (mandos · estar con sofá cama · laboratorio + máquinas ·
+  cápsulas de escape · cámara de descompresión con la compuerta). Atajos: Admin → Espacio.
+- **Espacio**: con el nodo, vuela por encima de 60 m y pulsa `O`. `1`/`2`/`3` fijan el rumbo;
+  al acercarte, `T` aterriza en esa luna (o entra en MUNDO 0). Puedes levantarte y recorrer la nave.
+- **Descompresión**: fuera del aire (espacio, lunas), cierra la puerta interior, usa el panel de la
+  cámara para vaciarla y solo entonces abre la compuerta. Si la abres con la cámara presurizada
+  estando dentro, sales disparado (en el espacio, mueres).
 
-Limitaciones: las lunas no se pueden visitar (falta el nodo espacial) ni hay navegación
-orbital; el resto del planeta visto desde el espacio es decorativo; las baterías no se
+Limitaciones: todavía no hay traje ni oxígeno (la taquilla y la estación de oxígeno del
+laboratorio aún no funcionan), ni meteoritos, nodo galáctico o cápsulas de escape operativas
+(etapas siguientes); las baterías no se
 recargan todavía (Admin → Nave → Recargar); la nave no choca con árboles en vuelo; la
 temperatura no se muestra como número (es oculta; el Admin sí la muestra).

@@ -105,6 +105,20 @@ export class ShipMapPanel extends ModalPanel {
       marker(ctx, bx, bz, '#ff9ecf', 'Cama', 'dot');
     }
 
+    // Señales (nodo espacial, cofres…): anillo que late.
+    const pulse = (performance.now() / 1000) % 1.2;
+    for (const m of this._src.getMarkers?.() ?? []) {
+      const [mx, mz] = at(m.x, m.z);
+      ctx.beginPath();
+      ctx.arc(mx, mz, 6 + pulse * 12, 0, Math.PI * 2);
+      ctx.strokeStyle = m.color;
+      ctx.globalAlpha = 1 - pulse / 1.2;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      marker(ctx, mx, mz, m.color, m.label);
+    }
+
     const s = ship.ship;
     const [shx, shz] = at(s.x, s.z);
     arrow(ctx, shx, shz, s.yaw, '#ff9a4a', 9);
@@ -131,8 +145,9 @@ export class ShipMapPanel extends ModalPanel {
         <li><span class="mk" style="color:#ff9a4a">▲</span>Nave</li>
         <li><span class="mk" style="color:#ffe38a">●</span>Inicio</li>
         <li><span class="mk" style="color:#ff9ecf">●</span>Cama (reaparición)</li>
+        ${(this._src.getMarkers?.() ?? []).map((m) => `<li><span class="mk" style="color:${m.color}">◎</span>${m.label}</li>`).join('')}
       </ul>
-      <p class="muted small">La nave solo puede explorar este planeta.</p>`;
+      <p class="muted small">${this._src.hasSpaceNode?.() ? 'Con el nodo espacial la nave puede salir al espacio (a los mandos, vuela alto y pulsa O).' : 'Instala el nodo espacial en una ranura libre de la nave para poder salir al espacio.'}</p>`;
   }
 
   // ---- Mapa planetario -----------------------------------------------------------
@@ -239,8 +254,7 @@ export class ShipMapPanel extends ModalPanel {
           <dt>Órbita</dt><dd>${Math.round(b.periodHours)} h (${(b.periodHours / 24).toFixed(1)} días)</dd>
           <dt>Inclinación</dt><dd>${((b.inclination * 180) / Math.PI).toFixed(1)}°</dd>
         </dl>
-        <button type="button" disabled title="Falta el nodo espacial">🚀 Viajar</button>
-        ${locked ? '<p class="locked">🔒 No visitable: falta el <b>nodo espacial</b>.</p>' : ''}
+        ${locked ? '<p class="locked">🔒 No visitable: falta el <b>nodo espacial</b>.</p>' : '<p class="muted small">🚀 Pilota la nave hasta ella (en el espacio, tecla de rumbo).</p>'}
       </div>`);
     this._side.innerHTML = `
       <h3>Sistema de MUNDO 0</h3>
