@@ -29,6 +29,7 @@ export const FlightState = Object.freeze({
   TAKING_OFF: 'TAKING_OFF',
   FLYING: 'FLYING',
   LANDING: 'LANDING',
+  SPACE: 'SPACE', // en el espacio: la mueve SpaceNavigation (aquí solo compuerta, patas y puerta)
 });
 
 export class ShipFlight {
@@ -177,6 +178,7 @@ export class ShipFlight {
       s.roll = approach(s.roll ?? 0, 0, dt);
       return;
     }
+    if (this.state === FlightState.SPACE) return;
 
     // En el aire las patas vuelven a su longitud normal.
     for (let i = 0; i < s.legFeet.length; i++) s.legFeet[i] = approach(s.legFeet[i], 0, dt * 1.5);

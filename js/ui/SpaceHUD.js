@@ -1,23 +1,15 @@
 import { GameEvents } from '../core/GameEvents.js';
 
 /**
- * SpaceHUD — interfaz del espacio (Fase 13): fundido al salir/entrar de la
- * atmósfera, etiquetas sobre MUNDO 0, las lunas y la nave, y un panel con el
- * cuerpo enfocado y el botón de regreso. Solo vista: pide cosas por eventos
- * (SPACE_FOCUS_REQUEST, SPACE_EXIT_REQUEST) y lee etiquetas de SpaceSystem.
+ * SpaceHUD — interfaz del vuelo por el espacio: fundido al salir/entrar de una
+ * atmósfera, panel de navegación (velocidad, distancia a cada cuerpo, aviso de
+ * aterrizaje, batería) y etiquetas sobre MUNDO 0 y las lunas. Solo vista.
  */
-const BODIES = [
-  { id: 'MUNDO_0', key: '1', label: 'MUNDO 0' },
-  { id: 'MOON_A', key: '2', label: 'Luna A' },
-  { id: 'MOON_B', key: '3', label: 'Luna B' },
-  { id: 'SHIP', key: '4', label: 'Tu nave' },
-];
-
 export class SpaceHUD {
-  constructor({ container, events, space, spaceNodeRequired }) {
+  constructor({ container, events, travel }) {
     this.name = 'spaceHUD';
-    this._space = space;
-    this._locked = spaceNodeRequired;
+    this._travel = travel;
+    this._dist = {};
 
     this.fade = document.createElement('div');
     this.fade.id = 'space-fade';
@@ -25,38 +17,33 @@ export class SpaceHUD {
     document.body.appendChild(this.fade);
 
     this.labels = document.createElement('div');
-    this.labels.id = 'space-labels';
+    this.labels.id = 'nav-labels';
+    this.labels.className = 'hidden';
     container.appendChild(this.labels);
     this._labelNodes = {};
 
     this.el = document.createElement('div');
-    this.el.id = 'space-hud';
+    this.el.id = 'nav-hud';
     this.el.className = 'hidden';
     this.el.innerHTML = `
-      <div class="space-title">🌌 Órbita de MUNDO 0</div>
-      <div class="space-bodies"></div>
-      <div class="space-info"></div>
-      <button type="button" class="space-return"><kbd>T</kbd> Regresar a MUNDO 0</button>
-      <div class="space-hint">Ratón: girar · Rueda: acercar/alejar · <kbd>1</kbd>–<kbd>4</kbd> enfocar · <kbd>Esc</kbd> soltar el ratón</div>`;
-    const list = this.el.querySelector('.space-bodies');
-    this._buttons = {};
-    for (const b of BODIES) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.innerHTML = `<kbd>${b.key}</kbd> ${b.label}`;
-      btn.addEventListener('click', () => events.emit(GameEvents.SPACE_FOCUS_REQUEST, { id: b.id }));
-      list.appendChild(btn);
-      this._buttons[b.id] = btn;
-    }
-    this._info = this.el.querySelector('.space-info');
-    this.el.querySelector('.space-return').addEventListener('click', () => events.emit(GameEvents.SPACE_EXIT_REQUEST));
+      <div class="nav-title">🌌 Espacio · sistema de MUNDO 0</div>
+      <div class="nav-speed"></div>
+      <div class="nav-auto"></div>
+      <div class="nav-bodies"></div>
+      <div class="nav-land hidden"></div>
+      <div class="nav-warn hidden"></div>`;
+    this._speed = this.el.querySelector('.nav-speed');
+    this._auto = this.el.querySelector('.nav-auto');
+    this._bodies = this.el.querySelector('.nav-bodies');
+    this._land = this.el.querySelector('.nav-land');
+    this._warn = this.el.querySelector('.nav-warn');
     container.appendChild(this.el);
 
-    events.on(GameEvents.SPACE_STATE_CHANGED, ({ state, fadeTime }) => this._onState(state, fadeTime));
-    events.on(GameEvents.SPACE_FOCUS_CHANGED, () => this._renderInfo());
+    events.on(GameEvents.SPACE_STATE_CHANGED, ({ state, previous, fadeTime }) => this._onState(state, previous, fadeTime));
+    events.on(GameEvents.SPACE_NAV_UPDATE, (n) => this._render(n));
   }
 
-  _onState(state, fadeTime) {
+  _onState(state, previous, fadeTime) {
     const f = this.fade;
     f.style.transitionDuration = `${fadeTime}s`;
     const text = f.querySelector('span');
@@ -64,7 +51,7 @@ export class SpaceHUD {
       text.textContent = 'Saliendo de la atmósfera…';
       f.classList.add('active');
     } else if (state === 'DESCENDING') {
-      text.textContent = 'Entrando en la atmósfera de MUNDO 0…';
+      text.textContent = 'Aproximación y descenso…';
       f.classList.add('active');
     } else {
       f.classList.remove('active');
@@ -72,31 +59,32 @@ export class SpaceHUD {
     const inSpace = state === 'SPACE';
     this.el.classList.toggle('hidden', !inSpace);
     this.labels.classList.toggle('hidden', !inSpace);
-    document.body.classList.toggle('in-space', state !== 'SURFACE');
-    if (inSpace) this._renderInfo();
+    document.body.classList.toggle('in-space', inSpace);
+    void previous;
   }
 
-  _renderInfo() {
-    const info = this._space.getFocusInfo();
-    for (const [id, btn] of Object.entries(this._buttons)) btn.classList.toggle('active', id === info.id);
-    const fmt = (n) => n.toLocaleString('es-ES');
-    if (info.home) {
-      this._info.innerHTML = `<b>${info.name}</b> · radio ${fmt(info.radiusKm)} km<br>
-        La isla del centro es la zona que has explorado. El resto del planeta aún no se puede visitar.`;
-    } else if (info.ship) {
-      this._info.innerHTML = '<b>Tu nave</b> en órbita baja sobre MUNDO 0.<br>Pulsa <kbd>T</kbd> para volver a bajar.';
-    } else {
-      this._info.innerHTML = `<b>${info.name}</b> · radio ${fmt(info.radiusKm)} km · a ${fmt(info.distanceKm)} km<br>
-        Una vuelta cada ${Math.round(info.periodHours)} h · inclinación ${((info.inclination * 180) / Math.PI).toFixed(1)}°<br>
-        ${this._locked ? '<span class="locked">🔒 No se puede visitar: falta el <b>nodo espacial</b>.</span>' : ''}`;
-    }
+  _render(n) {
+    const kmh = Math.abs(n.speed);
+    this._speed.textContent = `Velocidad ${kmh < 10 ? kmh.toFixed(1) : Math.round(kmh)} km/s · 🔋 ${Math.round(n.charge * 100)} %${n.powered ? '' : ' · SIN BATERÍA'}`;
+    this._speed.classList.toggle('low', !n.powered || n.charge < 0.15);
+    const names = { MUNDO_0: 'MUNDO 0', MOON_A: 'Luna A', MOON_B: 'Luna B' };
+    this._auto.innerHTML = n.autopilot
+      ? `🧭 Rumbo automático: <b>${names[n.autopilot]}</b> (A/D/Espacio/C lo cancelan)`
+      : '🧭 Rumbo: <kbd>1</kbd> MUNDO 0 · <kbd>2</kbd> Luna A · <kbd>3</kbd> Luna B';
+    const fmt = (km) => (km >= 10000 ? `${(km / 1000).toFixed(1)} mil km` : `${Math.round(km).toLocaleString('es-ES')} km`);
+    this._bodies.innerHTML = n.bodies.map((b) => `<div><span>${b.name}</span><span>${fmt(Math.max(0, b.altitude))}</span></div>`).join('');
+    for (const b of n.bodies) this._dist[b.id] = b.altitude;
+    this._land.classList.toggle('hidden', !n.landable);
+    if (n.landable) this._land.innerHTML = `<kbd>T</kbd> ${n.landable.id === 'MUNDO_0' ? 'Entrar en la atmósfera de MUNDO 0' : `Aterrizar en la ${n.landable.name}`}`;
+    this._warn.classList.toggle('hidden', !n.zoneWarning);
+    this._warn.textContent = 'Te acercas al límite del sistema.';
   }
 
   update() {
-    if (!this._space.active) return;
+    if (!this._travel.inSpace) return;
     const w = window.innerWidth;
     const h = window.innerHeight;
-    for (const l of this._space.getLabels(w, h)) {
+    for (const l of this._travel.bodyScreenPositions(w, h)) {
       let node = this._labelNodes[l.id];
       if (!node) {
         node = document.createElement('div');
@@ -104,10 +92,10 @@ export class SpaceHUD {
         this.labels.appendChild(node);
         this._labelNodes[l.id] = node;
       }
-      node.textContent = l.name;
+      const d = this._dist[l.id];
+      node.textContent = d === undefined ? l.name : `${l.name} · ${Math.round(Math.max(0, d)).toLocaleString('es-ES')} km`;
       node.style.display = l.visible ? 'block' : 'none';
       node.style.transform = `translate(${l.x}px, ${l.y}px) translate(-50%, -100%)`;
-      node.classList.toggle('focused', l.focused);
     }
   }
 }

@@ -64,6 +64,7 @@ export class ShipSystem {
     this.model = new ShipModel({ scene });
 
     this.piloting = false;
+    this.hasSpaceNode = false; // nodo espacial instalado (Etapa 3: la nave crece)
     this.body = 'MUNDO_0';   // cuerpo en el que está la nave (MUNDO 0, una luna o el espacio)
     this._activeBody = () => 'MUNDO_0';
     this._held = new Set();  // mandos mantenidos desde el panel (ratón)
@@ -78,7 +79,14 @@ export class ShipSystem {
     const self = this;
     this.view = {
       yawOffset: 0,
-      pitch: config.CAMERA_PITCH,
+      basePitch: config.CAMERA_PITCH,
+      // En el espacio la cámara sigue también el cabeceo de la nave.
+      get pitch() {
+        return this.basePitch + (self.flight.state === FlightState.SPACE ? self.ship.pitch : 0);
+      },
+      set pitch(v) {
+        this.basePitch = v;
+      },
       distance: config.CAMERA_DISTANCE,
       minDistance: config.CAMERA_MIN_DISTANCE,
       maxDistance: config.CAMERA_MAX_DISTANCE,
@@ -105,18 +113,45 @@ export class ShipSystem {
   }
 
   _onSpaceState(state) {
-    if (state === 'ASCENDING' && this.piloting) this._spaceY = this.ship.y;
-    if (state === 'SURFACE' && this._spaceY !== undefined) {
-      this.ship.y = this._spaceY;
-      this._spaceY = undefined;
-      this.flight.hover();
-    }
-    this.spaceMode = state;
+    // Durante los fundidos la nave queda congelada (al subir, asciende deprisa).
+    this.spaceMode = state === 'ASCENDING' || state === 'DESCENDING' ? state : 'SURFACE';
+  }
+
+  /** Entra en el espacio: la nave pasa al origen del mundo "espacio" (se puede recorrer). */
+  enterSpace(yaw) {
+    const s = this.ship;
+    this.body = 'SPACE';
+    Object.assign(s, { x: 0, y: 0, z: 0, yaw, pitch: 0, roll: 0 });
+    s.legFeet = [0, 0, 0, 0];
+    this.flight.state = FlightState.SPACE;
+    this.flight.hover();
+    this.flight.state = FlightState.SPACE;
+  }
+
+  /** Mueve y orienta la nave según la navegación espacial. */
+  syncSpace(yaw, pitch, thrust) {
+    this.ship.yaw = yaw;
+    this.ship.pitch = this.piloting ? pitch : 0;
+    this._spaceThrust = thrust;
+  }
+
+  /** Llega a un cuerpo desde el espacio: flotando sobre su zona de aterrizaje. */
+  arriveAt(bodyId, height) {
+    const s = this.ship;
+    const site = this._world.getLandingSite() ?? { x: 0, z: 0, yaw: 0 };
+    this.body = bodyId;
+    Object.assign(s, { x: site.x, z: site.z, yaw: site.yaw, pitch: 0, roll: 0 });
+    s.y = this._world.getHeightAt(site.x, site.z) + height;
+    s.legFeet = [0, 0, 0, 0];
+    this.flight.state = FlightState.FLYING;
+    this.flight.hover();
+    this.model.update(s, 0, { airborne: true, batteries: this.batteries.snapshot().slots });
   }
 
   /** ¿Se puede salir al espacio ahora? @returns motivo o null */
   orbitBlocked() {
     if (!this.piloting) return 'Siéntate a los mandos';
+    if (!this.hasSpaceNode) return 'Para salir al espacio hace falta el nodo espacial';
     if (this.flight.state !== FlightState.FLYING) return 'Despega primero';
     if (this.flight.hatchTarget > 0 || this.ship.hatch > 0.01) return 'Cierra la compuerta antes de salir al espacio';
     if (this.ship.y - this._world.getHeightAt(this.ship.x, this.ship.z) < this._spaceCfg.ORBIT_MIN_ALTITUDE) return `Sube por encima de ${this._spaceCfg.ORBIT_MIN_ALTITUDE} m para salir al espacio`;
@@ -194,6 +229,10 @@ export class ShipSystem {
       this._events.emit(GameEvents.SPACE_ENTER_REQUEST, { source: 'SHIP' });
       return true;
     }
+    if (cmd === 'TAKEOFF_OR_LAND' && this.flight.state === FlightState.SPACE) {
+      this._events.emit(GameEvents.SPACE_EXIT_REQUEST, {});
+      return true;
+    }
     if (cmd === 'TAKEOFF_OR_LAND') cmd = this.flight.state === FlightState.LANDED ? 'TAKEOFF' : 'LAND';
     if (cmd === 'TOGGLE_LEGS') cmd = this.flight.legsTarget > 0 ? 'RETRACT_LEGS' : 'DEPLOY_LEGS';
     const r = this.flight.command(cmd);
@@ -223,6 +262,8 @@ export class ShipSystem {
     if (state === FlightState.FLYING) {
       this.flight.hover();
       this._message('Te levantas: la nave se queda flotando y sigue gastando batería.', 'biome');
+    } else if (state === FlightState.SPACE) {
+      this._message('Te levantas: la nave se detiene en el espacio.', 'biome');
     }
     this.piloting = false;
     this._held.clear();
@@ -241,7 +282,7 @@ export class ShipSystem {
     if (!this.piloting) return;
     this.piloting = false;
     this._held.clear();
-    if (this.flight.state !== FlightState.LANDED) this.flight.autoLand();
+    if (this.flight.state !== FlightState.LANDED && this.flight.state !== FlightState.SPACE) this.flight.autoLand();
     this._events.emit(GameEvents.SHIP_PILOT_CHANGED, { piloting: false, silent });
   }
 
@@ -266,9 +307,11 @@ export class ShipSystem {
     this.model.watch.visible = !this.watchTaken;
 
     const snap = this.batteries.snapshot();
+    const inSpace = this.flight.state === FlightState.SPACE;
+    if (!this.piloting) this.spaceControls = null;
     this.model.update(this.ship, dt, {
       airborne: this.flight.airborne,
-      thrust: Math.min(1, Math.abs(this.flight.forwardSpeed) / this._cfg.MAX_SPEED),
+      thrust: inSpace ? this._spaceThrust ?? 0 : Math.min(1, Math.abs(this.flight.forwardSpeed) / this._cfg.MAX_SPEED),
       batteries: snap.slots,
     });
     this._emitState(dt);
@@ -282,6 +325,13 @@ export class ShipSystem {
     if (input.wasPressed('SHIP_HATCH')) this.command('TOGGLE_HATCH');
     if (input.wasPressed('SHIP_LEGS')) this.command('TOGGLE_LEGS');
     if (input.wasPressed('SHIP_ORBIT')) this.command('ORBIT');
+    if (input.wasPressed('STAR_MAP')) this._events.emit(GameEvents.STAR_MAP_REQUEST, {});
+    if (this.flight.state === FlightState.SPACE) {
+      // Rumbo automático: 1 MUNDO 0 · 2 Luna A · 3 Luna B.
+      ['MUNDO_0', 'MOON_A', 'MOON_B'].forEach((id, i) => {
+        if (input.wasPressed(`HOTBAR_${i + 1}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { target: id });
+      });
+    }
     if (input.wasPressed('INTERACT')) {
       input.consume('INTERACT'); // que la interacción no vuelva a sentarte con la misma pulsación
       this.exitPilot();
@@ -296,12 +346,21 @@ export class ShipSystem {
     if (wheel) v.distance = Math.max(v.minDistance, Math.min(v.maxDistance, v.distance + wheel * 1.5));
 
     const axis = (pos, neg) => (pos ? 1 : 0) - (neg ? 1 : 0);
-    return {
+    const controls = {
       forward: axis(input.isDown('FORWARD') || held.has('FORWARD'), input.isDown('BACKWARD') || held.has('BACKWARD')),
       turn: axis(input.isDown('RIGHT') || held.has('RIGHT'), input.isDown('LEFT') || held.has('LEFT')),
       vertical: axis(input.isDown('JUMP') || held.has('UP'), input.isDown('DESCEND') || held.has('DOWN')),
       boost: input.isDown('RUN'),
     };
+    // En el espacio los mandos los usa SpaceTravel (navegación en km).
+    this.spaceControls = this.flight.state === FlightState.SPACE ? controls : null;
+    return this.flight.state === FlightState.SPACE ? null : controls;
+  }
+
+  /** Punto dentro de la nave donde reaparecer (en el laboratorio). */
+  getRespawnPoint() {
+    const [x, z] = Layout.toWorld(this.ship, -1.6, 3.4);
+    return { x, y: this.ship.y + Layout.DIM.FLOOR, z };
   }
 
   /** ¿Está el jugador dentro de la nave, en la rampa o en el tejado? */

@@ -48,8 +48,13 @@ import { TimeSystem } from './time/TimeSystem.js';
 import { AtmosphereSystem } from './time/AtmosphereSystem.js';
 import { TemperatureSystem } from './player/TemperatureSystem.js';
 import { CelestialSystem } from './celestial/CelestialSystem.js';
-import { SpaceSystem } from './space/SpaceSystem.js';
+import { StarMap } from './space/StarMap.js';
+import { StarMapHUD } from './ui/StarMapHUD.js';
 import { SpaceHUD } from './ui/SpaceHUD.js';
+import { SpaceWorld } from './space/SpaceWorld.js';
+import { SpaceView, SPACE_SUN_DIR } from './space/SpaceView.js';
+import { SpaceTravel } from './space/SpaceTravel.js';
+import { SeededRandom } from './core/SeededRandom.js';
 import { registerSpaceTools } from './admin/tools/SpaceTools.js';
 import { ShipSystem } from './ship/ShipSystem.js';
 import { overlapsFootprint, LEGS, RAMP_FOOT_SAMPLE, toWorld as toShipWorld } from './ship/ShipLayout.js';
@@ -356,7 +361,15 @@ function boot() {
     setNeedsPaused(true);
   });
   events.on(GameEvents.PLAYER_RESPAWNED, () => {
-    if (respawnBed && construction.exists(respawnBed)) {
+    if (worlds.activeId !== HOME) {
+      // Fuera de MUNDO 0: dentro de la nave si está aquí; si no, en la zona de aterrizaje.
+      if (ship.present) {
+        const r = ship.getRespawnPoint();
+        player.teleport(r.x, r.y, r.z);
+      } else {
+        controller.spawn();
+      }
+    } else if (respawnBed && construction.exists(respawnBed)) {
       controller.placeAt(respawnBed.x + Math.cos(respawnBed.rotation) * 1.4, respawnBed.z - Math.sin(respawnBed.rotation) * 1.4);
     } else {
       controller.spawn();
@@ -445,7 +458,13 @@ function boot() {
     animals.setActive(id === HOME);
     controller.gravityScale = planet?.GRAVITY_SCALE ?? 1;
     atmosphere.setAirless(planet?.BREATHABLE === false);
-    celestial.setObserver(id, id !== HOME ? getPlanetTextures().surface : null);
+    celestial.setObserver(id, id !== HOME && id !== 'SPACE' ? getPlanetTextures().surface : null);
+    // Espacio: sol fijo, sin horizonte, nebulosa con colores de la seed.
+    const inSpace = id === 'SPACE';
+    atmosphere.setFixedSun(inSpace ? SPACE_SUN_DIR : null);
+    const rng = new SeededRandom(worlds.home.seed.value ^ 0x9eb);
+    const hue = () => new THREE.Color().setHSL(rng.next(), 0.55, 0.35);
+    sky.setSpace(inSpace, { colorA: hue(), colorB: hue(), axis: new THREE.Vector3(rng.range(-1, 1), rng.range(-1, 1), rng.range(-1, 1)) });
   });
   const mapTexture = new THREE.CanvasTexture(planetMap.canvas);
   mapTexture.colorSpace = THREE.SRGBColorSpace;
@@ -471,6 +490,7 @@ function boot() {
       getCatalog: () => celestial.catalog,
       getBed: () => (respawnBed && construction.exists(respawnBed) ? respawnBed : null),
       spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED,
+      hasSpaceNode: () => ship.hasSpaceNode,
     },
   });
   const shipChargerPanel = new ShipChargerPanel({
@@ -488,8 +508,31 @@ function boot() {
   });
   new ShipPilotHUD({ container: hudRoot, events, shipName: cfg.SHIP.NAME });
 
-  // Espacio (Fase 13): escena aparte; se sube con la nave (o desde el Admin) y se vuelve igual.
-  const space = new SpaceSystem({
+  // El espacio: un "cuerpo" sin suelo donde la nave vuela entre MUNDO 0 y sus lunas.
+  worlds.registerExtra('SPACE', new SpaceWorld({ getSeed: () => worlds.home.seed }));
+  const noonHour = (cfg.TIME.SUNRISE_HOUR + cfg.TIME.SUNSET_HOUR) / 2;
+  const spaceView = new SpaceView({ scene: render.scene, config: cfg.SPACE, celestialConfig: cfg.CELESTIAL });
+  const spaceTravel = new SpaceTravel({
+    config: cfg.SPACE,
+    events,
+    worlds,
+    ship,
+    time,
+    camera: render.camera,
+    view: spaceView,
+    sources: {
+      getCatalog: () => celestial.catalog,
+      getTextures: () => getPlanetTextures(),
+      getSeed: () => worlds.home.seed.sub.celestial,
+      noonHour,
+    },
+  });
+  // Solo durante los fundidos se suspende el control (en el espacio se pilota o se camina por la nave).
+  events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => setControlLock('space', state === 'ASCENDING' || state === 'DESCENDING'));
+  const spaceHUD = new SpaceHUD({ container: hudRoot, events, travel: spaceTravel });
+
+  // Mapa estelar 3D (tecnología Mapa): la escena espacial "de mapa".
+  const starMap = new StarMap({
     config: cfg.SPACE,
     celestialConfig: cfg.CELESTIAL,
     render,
@@ -501,11 +544,12 @@ function boot() {
       getMapCanvas: () => (planetMap.ready ? planetMap.canvas : null),
       getSeed: () => worlds.home.seed.sub.celestial,
       planet: cfg.PLANETS.MUNDO_0,
-      noonHour: (cfg.TIME.SUNRISE_HOUR + cfg.TIME.SUNSET_HOUR) / 2,
+      noonHour,
+      getShipLocation: () => spaceTravel.getShipLocation(),
     },
   });
-  events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => setControlLock('space', state !== 'SURFACE'));
-  const spaceHUD = new SpaceHUD({ container: hudRoot, events, space, spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED });
+  events.on(GameEvents.STAR_MAP_TOGGLED, ({ open }) => setControlLock('starmap', open));
+  const starMapHUD = new StarMapHUD({ container: hudRoot, events, map: starMap, spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED });
   // Reloj de la nave: se coge en el laboratorio; al usarlo muestra dónde está la nave.
   const shipWatch = new ShipWatchHUD({ container: hudRoot, events, player, ship, time, inventory, watchItem: cfg.SHIP.WATCH_ITEM });
   ui.setInitialCameraMode(camera.mode);
@@ -524,7 +568,7 @@ function boot() {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { celestial, space, time, player, events, worlds, controller });
+  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -552,10 +596,12 @@ function boot() {
   loop.add(lighting);    // sombra centrada en el jugador
   loop.add(sky);         // cúpula centrada en la cámara
   loop.add(celestial);   // lunas en el cielo (tras la cámara: se colocan respecto a ella)
-  loop.add(space);       // transición y escena espacial (Fase 13)
+  loop.add(spaceTravel); // viaje por el espacio (tras la cámara: dibuja los cuerpos respecto a ella)
+  loop.add(starMap);     // mapa estelar 3D
   loop.add(maps);        // mapas de MUNDO 0 y de la luna actual (se dibujan poco a poco)
   loop.add(ui);
   loop.add(spaceHUD);
+  loop.add(starMapHUD);
   loop.add(craftingPanel);
   loop.add(shipMapPanel);
   loop.add(shipChargerPanel);
@@ -571,7 +617,7 @@ function boot() {
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds,
-    celestial, space, spaceHUD,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
   };
 }
 

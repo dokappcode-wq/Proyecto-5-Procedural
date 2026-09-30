@@ -147,6 +147,7 @@ export const GameConfig = deepFreeze({
       SHIP_HATCH: ['KeyG'],             // nave: abrir / cerrar la compuerta
       SHIP_LEGS: ['KeyL'],              // nave: recoger / sacar las patas de aterrizaje
       SHIP_ORBIT: ['KeyO'],             // nave: salir al espacio (en vuelo, a bastante altura)
+      STAR_MAP: ['KeyM'],               // a los mandos: mapa estelar 3D
       HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
       HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
       HOTBAR_7: ['Digit7'], HOTBAR_8: ['Digit8'], HOTBAR_9: ['Digit9'],
@@ -568,8 +569,30 @@ export const GameConfig = deepFreeze({
     MOON_RISE_MESSAGES: true,  // "Sale la Luna A."
   },
 
-  // Espacio (Fase 13): escena separada a la que se sube con la nave.
+  // Espacio explorable: se sube con la nave (con el nodo espacial). Distancias en km.
+  // La escena del mapa estelar 3D usa PLANET_RADIUS, MOON_VISUAL_SCALE, STAR_COUNT…
   SPACE: {
+    CRUISE_SPEED: 90,          // km/s
+    BOOST_MULTIPLIER: 9,       // Shift: impulso (≈ 800 km/s)
+    REVERSE_FACTOR: 0.3,
+    ACCELERATION: 60,          // km/s²
+    TURN_RATE: 0.9,            // rad/s
+    PITCH_RATE: 0.7,           // rad/s (Espacio/C cabecean)
+    MAX_PITCH: 1.2,
+    MIN_APPROACH: 1.12,        // radios: no se puede estar más cerca del centro de un cuerpo
+    APPROACH_FACTOR: 1.9,      // radios: por debajo se puede aterrizar / entrar en la atmósfera
+    LAND_ALTITUDE: 700,        // km sobre la superficie: también se puede aterrizar
+    PROXIMITY_BRAKE: 0.6,      // velocidad máx. (km/s) = altitud (km) × esto cerca de un cuerpo
+    ZONE_RADIUS: 65000,        // km desde MUNDO 0: límite del sistema
+    EXIT_ALTITUDE_KM: 900,     // al salir de MUNDO 0, km sobre la superficie
+    MOON_EXIT_ALTITUDE_KM: 250,
+    ARRIVAL_HEIGHT: 110,       // m sobre el suelo al llegar a un cuerpo
+    VIEW_DISTANCE: 600,        // m: los cuerpos se dibujan a esta distancia con su tamaño aparente
+    HOVER_DRAIN: 0.05,         // batería/s en el espacio
+    THRUST_DRAIN: 0.25,        // batería/s extra a velocidad de crucero (×2 con impulso)
+    ASTEROID_BELTS: 3,
+    ASTEROIDS_PER_BELT: 140,
+    DUST_COUNT: 260,
     FADE_TIME: 1.4,            // s de fundido al salir/entrar de la atmósfera
     PLANET_RADIUS: 60,         // unidades de la escena espacial (el resto se escala a partir de aquí)
     MOON_VISUAL_SCALE: 2.2,    // las lunas se ven más grandes que a escala real

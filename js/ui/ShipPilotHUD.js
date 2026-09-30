@@ -14,6 +14,7 @@ const FLIGHT_LABELS = {
   TAKING_OFF: 'Despegando…',
   FLYING: 'En vuelo',
   LANDING: 'Aterrizando…',
+  SPACE: 'En el espacio',
 };
 
 export class ShipPilotHUD {
@@ -72,8 +73,9 @@ export class ShipPilotHUD {
     const landed = t.flight === 'LANDED';
     this._t.flight.textContent = FLIGHT_LABELS[t.flight] ?? t.flight;
     this._t.flight.dataset.state = t.flight;
-    this._t.alt.textContent = `Altura ${t.altitude.toFixed(1)} m`;
-    this._t.speed.textContent = `${Math.round(t.speed * 3.6)} km/h`;
+    const space = t.flight === 'SPACE';
+    this._t.alt.textContent = space ? 'Navegación espacial' : `Altura ${t.altitude.toFixed(1)} m`;
+    this._t.speed.textContent = space ? '' : `${Math.round(t.speed * 3.6)} km/h`;
     this._t.battery.textContent = `🔋 ${Math.round(t.charge * 100)} %`;
     this._t.battery.classList.toggle('low', t.charge < 0.15);
     this._t.legs.textContent = t.legs === 'DEPLOYED' ? 'Patas fuera' : 'Patas recogidas';
@@ -89,6 +91,11 @@ export class ShipPilotHUD {
     b.ORBIT.disabled = !t.canOrbit;
     b.ORBIT.title = t.canOrbit ? '' : 'En vuelo, con la compuerta cerrada y a bastante altura';
     b.STAND_UP.disabled = t.flight === 'TAKING_OFF' || t.flight === 'LANDING';
-    this.el.querySelectorAll('[data-hold]').forEach((btn) => (btn.disabled = t.flight !== 'FLYING'));
+    this.el.querySelectorAll('[data-hold]').forEach((btn) => (btn.disabled = t.flight !== 'FLYING' && !space));
+    // En el espacio: Espacio/C cabecean y T aterriza en el cuerpo cercano.
+    this.el.querySelector('[data-hold="UP"]').lastChild.textContent = space ? ' Morro arriba' : ' Arriba';
+    this.el.querySelector('[data-hold="DOWN"]').lastChild.textContent = space ? ' Morro abajo' : ' Abajo';
+    b.ORBIT.classList.toggle('hidden', space);
+    b.RETRACT_LEGS.disabled = landed || t.legs !== 'DEPLOYED';
   }
 }

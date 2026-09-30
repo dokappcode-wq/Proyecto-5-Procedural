@@ -54,6 +54,12 @@ export class AtmosphereSystem {
     this.apply(); // estado inicial coherente con la hora de inicio
   }
 
+  /** En el espacio el sol no depende de la hora: dirección fija (o null para volver a la hora). */
+  setFixedSun(direction) {
+    this._fixedSun = direction ? direction.clone() : null;
+    this.apply();
+  }
+
   /** Cuerpo sin atmósfera (lunas, espacio): cielo negro y luz dura. */
   setAirless(airless) {
     this.airless = airless;
@@ -139,7 +145,7 @@ export class AtmosphereSystem {
   /** Sin atmósfera: cielo negro con estrellas, sol blanco y duro, sombras marcadas. */
   _applyAirless() {
     const P = this._P;
-    const sun = this._time.getSunDirection(this._sunDir);
+    const sun = this._fixedSun ? this._sunDir.copy(this._fixedSun) : this._time.getSunDirection(this._sunDir);
     const h = sun.y;
     this._sky.setColors({ zenith: this._airlessGround, horizon: this._airlessColor, ground: this._airlessGround });
     this._sky.setSunDirection(sun);

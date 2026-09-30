@@ -827,9 +827,11 @@ body.piloting #inventory-bar, body.piloting #use-hint, body.piloting #crosshair,
 .space-info b { color: var(--ui-fg); }
 .space-info .locked { color: #ffcf7a; }
 .space-hint { color: var(--ui-muted); font-size: 0.74rem; }
-body.in-space #crosshair, body.in-space #interaction-prompt, body.in-space #inventory-bar, body.in-space #use-hint,
-body.in-space #biome, body.in-space #ship-hud, body.in-space #ship-watch, body.in-space #frost, body.in-space #frost-haze,
-body.in-space #vignette { display: none !important; }
+/* Mapa estelar: solo el mapa. En el espacio real: sin bioma ni escarcha (la nave está climatizada). */
+body.star-map #crosshair, body.star-map #interaction-prompt, body.star-map #inventory-bar, body.star-map #use-hint,
+body.star-map #biome, body.star-map #ship-hud, body.star-map #ship-watch, body.star-map #frost, body.star-map #frost-haze,
+body.star-map #vignette, body.star-map #nav-hud, body.star-map #nav-labels { display: none !important; }
+body.in-space #biome { display: none !important; }
 
 /* Admin: categorías plegables y buscador (Fase 14). */
 .admin-search {
@@ -868,3 +870,42 @@ body.in-space #vignette { display: none !important; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* ---- Navegación espacial ------------------------------------------------------ */
+#nav-labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+#nav-hud {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: min(360px, calc(100vw - 24px));
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--ui-bg-strong);
+  border: 1px solid rgba(127, 196, 255, 0.35);
+  font-size: 0.8rem;
+  display: grid;
+  gap: 4px;
+}
+.nav-title { font-weight: 700; letter-spacing: 0.05em; text-align: center; }
+.nav-speed { text-align: center; color: #bfe3ff; font-variant-numeric: tabular-nums; }
+.nav-speed.low { color: #ff8a80; font-weight: 700; }
+.nav-bodies div { display: flex; justify-content: space-between; gap: 16px; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.nav-land { text-align: center; color: #d8f5b0; font-weight: 700; }
+.nav-warn { text-align: center; color: #ffcf7a; }
+body.in-space #clock { top: 170px; }
+
+.open-star-map {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(127, 196, 255, 0.5);
+  background: rgba(127, 196, 255, 0.15);
+  color: var(--ui-fg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nav-auto { text-align: center; color: var(--ui-muted); font-size: 0.76rem; }
+.nav-auto b { color: #ffcf9e; }

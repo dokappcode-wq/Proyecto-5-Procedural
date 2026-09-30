@@ -71,9 +71,14 @@ export const GameEvents = Object.freeze({
 
   // Espacio (Fase 13)
   SPACE_ENTER_REQUEST: 'space:enterRequest',        // { source: 'SHIP'|'ADMIN' }
-  SPACE_EXIT_REQUEST: 'space:exitRequest',
+  SPACE_EXIT_REQUEST: 'space:exitRequest',         // { target } aterrizar en el cuerpo cercano
   SPACE_STATE_CHANGED: 'space:state',               // { state: 'SURFACE'|'ASCENDING'|'SPACE'|'DESCENDING', previous }
-  SPACE_FOCUS_CHANGED: 'space:focus',               // { id, name }
+  SPACE_FOCUS_CHANGED: 'space:focus',               // { id, name }  (mapa estelar)
+  SPACE_AUTOPILOT: 'space:autopilot',               // { target } rumbo automático hacia un cuerpo
+  GALACTIC_JUMP_ATTEMPT: 'space:galacticJump',     // la nave intenta salir del sistema con el nodo galáctico
+  STAR_MAP_REQUEST: 'starMap:request',              // { open? }
+  STAR_MAP_TOGGLED: 'starMap:toggled',              // { open }
+  SPACE_NAV_UPDATE: 'space:nav',                    // { speed, bodies, landable, zoneWarning, powered }
   SPACE_FOCUS_REQUEST: 'space:focusRequest',        // { id }
 
   // Nave

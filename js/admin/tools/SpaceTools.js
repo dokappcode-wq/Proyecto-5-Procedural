@@ -1,7 +1,7 @@
 /**
  * Herramientas de depuración del cielo (Fase 12) y del espacio (Fase 13).
  */
-export function registerSpaceTools(admin, { celestial, space, time, player, worlds, controller }) {
+export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events }) {
   // ---- Cuerpos (viaje directo, sin nave: depuración) ----
   admin.registerTool({ category: 'Cuerpos', type: 'info', label: 'Cuerpo actual', read: () => worlds.profile()?.NAME ?? worlds.activeId });
   for (const [id, name] of [['MUNDO_0', 'MUNDO 0'], ['MOON_A', 'la Luna A'], ['MOON_B', 'la Luna B']]) {
@@ -48,7 +48,42 @@ export function registerSpaceTools(admin, { celestial, space, time, player, worl
   });
 
   // ---- Espacio ----
-  admin.registerTool({ category: 'Espacio', type: 'info', label: 'Estado', read: () => space.state });
-  admin.registerTool({ category: 'Espacio', label: 'Activar transición al espacio', run: () => space.enter() });
-  admin.registerTool({ category: 'Espacio', label: 'Regresar a MUNDO 0', run: () => space.exit() });
+  admin.registerTool({ category: 'Espacio', type: 'info', label: 'Estado', read: () => {
+    if (!travel.inSpace) return travel.state;
+    const n = travel.nav;
+    return `en el espacio · ${Math.round(n.speed)} km/s · a ${Math.round(n.distanceFromCenter).toLocaleString('es-ES')} km de MUNDO 0`;
+  } });
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Activar transición al espacio',
+    run: () => {
+      if (travel.state !== 'SURFACE') throw new Error('Ya estás en el espacio');
+      if (!ship.present) throw new Error('La nave no está en este cuerpo');
+      ship.hasSpaceNode = true;
+      if (!ship.piloting) ship.enterPilot();
+      if (ship.state === 'LANDED') ship.ship.y += 60; // la despega directamente
+      ship.flight.state = 'FLYING';
+      ship.flight.hatchTarget = 0;
+      ship.ship.hatch = 0;
+      travel.enter();
+    },
+  });
+  admin.registerTool({ category: 'Espacio', label: 'Aterrizar en el cuerpo cercano', run: () => travel.land() });
+  for (const [id, name] of [['MOON_A', 'Luna A'], ['MOON_B', 'Luna B'], ['MUNDO_0', 'MUNDO 0']]) {
+    admin.registerTool({
+      category: 'Espacio',
+      label: `Llevar la nave junto a ${name}`,
+      run: () => {
+        if (!travel.inSpace) throw new Error('Primero sal al espacio');
+        const b = travel.nav.survey().bodies.find((x) => x.id === id);
+        const body = travel._view.bodyPositions(time.totalHours).find((x) => x.id === id);
+        const p = body.position;
+        const l = Math.hypot(p.x, p.y, p.z) || 1;
+        const dir = id === 'MUNDO_0' ? { x: 1, y: 0, z: 0 } : { x: p.x / l, y: p.y / l, z: p.z / l };
+        travel.nav.placeNear(body, dir, body.radiusKm * 0.5);
+        void b;
+      },
+    });
+  }
+  admin.registerTool({ category: 'Espacio', label: 'Mapa estelar 3D', run: () => events.emit('starMap:request', { open: true }) });
 }

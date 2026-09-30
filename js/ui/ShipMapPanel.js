@@ -1,4 +1,5 @@
 import { ModalPanel } from './ModalPanel.js';
+import { GameEvents } from '../core/GameEvents.js';
 import { orbitPosition } from '../celestial/CelestialCatalog.js';
 
 /**
@@ -228,7 +229,7 @@ export class ShipMapPanel extends ModalPanel {
 
   _renderSystemSide() {
     const catalog = this._src.getCatalog();
-    const locked = this._src.spaceNodeRequired;
+    const locked = this._src.spaceNodeRequired && !this._src.hasSpaceNode?.();
     const cards = catalog.bodies.map((b) => `
       <div class="moon-card">
         <div class="moon-title"><span class="swatch round" style="background:${hex(b.color)}"></span>${b.name}</div>
@@ -245,7 +246,12 @@ export class ShipMapPanel extends ModalPanel {
       <h3>Sistema de MUNDO 0</h3>
       <p class="muted">Dos lunas visibles desde la superficie.</p>
       ${cards.join('')}
-      <p class="muted small">El nodo espacial es una tecnología que aún no existe. Cuando se instale en una ranura libre de la nave, las lunas se podrán visitar.</p>`;
+      <button type="button" class="open-star-map">🌌 Abrir mapa estelar 3D</button>
+      <p class="muted small">${locked ? 'Con el nodo espacial instalado la nave puede salir al espacio y viajar a las lunas.' : ''}</p>`;
+    this._side.querySelector('.open-star-map').addEventListener('click', () => {
+      this.setOpen(false);
+      this._events.emit(GameEvents.STAR_MAP_REQUEST, { open: true });
+    });
   }
 }
 

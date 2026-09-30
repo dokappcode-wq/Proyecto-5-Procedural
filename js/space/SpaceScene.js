@@ -104,7 +104,7 @@ export class SpaceScene {
     shipGeo.rotateZ(-Math.PI / 2);
     this.ship = new THREE.Mesh(shipGeo, new THREE.MeshBasicMaterial({ color: 0xffa060 }));
     this.ship.position.set(R * 1.12, R * 0.02, 0);
-    this.planet.add(this.ship);
+    this.scene.add(this.ship);
     this.scene.add(this.planet);
     this.bodies.MUNDO_0 = { object: this.planet, radius: R, name: 'MUNDO 0' };
     this.bodies.SHIP = { object: this.ship, radius: 1.5, name: 'Tu nave' };
@@ -191,8 +191,9 @@ export class SpaceScene {
   }
 
   /** Posiciones según la hora: el planeta gira (la isla mira al sol a mediodía) y las lunas orbitan. */
-  update(totalHours, dt, noonHour) {
+  update(totalHours, dt, noonHour, shipLocation = null) {
     this.planet.rotation.y = (Math.PI * 2 * (totalHours - noonHour)) / 24;
+    this.planet.updateMatrixWorld(true);
     this.cloudLayer.rotation.y += dt * 0.004;
     const p = {};
     for (const id of ['MOON_A', 'MOON_B']) {
@@ -201,6 +202,18 @@ export class SpaceScene {
       orbitPosition(b.body, totalHours, p);
       b.object.position.set(p.x, p.y, p.z).multiplyScalar(this._kmScale);
       b.object.rotation.y = -Math.PI * 2 * b.body.speed * totalHours; // cara oculta: siempre la misma hacia el planeta
+    }
+    // La nave: en el espacio, donde esté; en un cuerpo, sobre su zona de aterrizaje.
+    const R = this._cfg.PLANET_RADIUS;
+    const loc = shipLocation ?? { body: 'MUNDO_0' };
+    if (loc.body === 'SPACE' && loc.pos) {
+      this.ship.position.set(loc.pos.x, loc.pos.y, loc.pos.z).multiplyScalar(this._kmScale);
+      this.ship.rotation.set(0, loc.yaw ?? 0, 0);
+    } else if (this.bodies[loc.body] && loc.body !== 'MUNDO_0') {
+      const m = this.bodies[loc.body];
+      this.ship.position.copy(m.object.position).add(new THREE.Vector3(m.radius * 1.4, 0, 0));
+    } else {
+      this.ship.position.set(R * 1.12, R * 0.02, 0).applyMatrix4(this.planet.matrixWorld);
     }
   }
 }
