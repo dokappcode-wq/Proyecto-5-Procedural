@@ -59,6 +59,10 @@ import { registerSpaceTools } from './admin/tools/SpaceTools.js';
 import { ShipSystem } from './ship/ShipSystem.js';
 import { toWorld as toShipWorld } from './ship/ShipLayout.js';
 import { PickupSystem, findDropSite } from './world/PickupSystem.js';
+import { BubbleSystem } from './world/BubbleSystem.js';
+import { LifeSupportSystem } from './player/LifeSupportSystem.js';
+import { StationSystem } from './construction/StationSystem.js';
+import { LifeSupportHUD } from './ui/LifeSupportHUD.js';
 import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
 import { ShipMapPanel } from './ui/ShipMapPanel.js';
 import { ShipChargerPanel } from './ui/ShipChargerPanel.js';
@@ -66,6 +70,7 @@ import { ShipPilotHUD } from './ui/ShipPilotHUD.js';
 import { ShipWatchHUD } from './ui/ShipWatchHUD.js';
 import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
+import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 
 function boot() {
   const cfg = GameConfig;
@@ -245,6 +250,17 @@ function boot() {
   ship.setBreathableProvider(() => worlds.profile()?.BREATHABLE !== false);
   // Objetos sueltos del mundo (nodo espacial, cofres…): se cogen con E.
   const pickups = new PickupSystem({ scene: render.scene, worlds, events, inventory, items: cfg.ITEMS });
+  // Burbujas de oxígeno (lunas): con batería, dentro se respira.
+  const bubbles = new BubbleSystem({
+    scene: render.scene, worlds, events, inventory, player, config: cfg.LIFE_SUPPORT, batteries: cfg.SHIP.BATTERIES, blockers: [ship],
+  });
+  // ¿Se respira en (x, y, z)? Nave (según compuerta y cámara) → burbujas → aire del cuerpo.
+  const isBreathableAt = (x, y, z) => {
+    const inShip = ship.breathableAt(x, y, z);
+    if (inShip !== null) return inShip;
+    if (bubbles.contains(worlds.activeId, x, y, z)) return true;
+    return worlds.profile()?.BREATHABLE !== false;
+  };
   construction.addBlocker(ship); // no se construye encima de la nave
   // Las vallas, paredes y patas de la nave también frenan a los animales.
   animals.setObstacles({ resolveCollisions: (pos, r, y0, y1) => combinedStructures.resolveCollisions(pos, r, y0, y1) });
@@ -262,7 +278,7 @@ function boot() {
     inventory,
     events,
     construction,
-    providers: [ship, pickups], // nave (botones, puertas, asiento, tecnologías) y objetos sueltos
+    providers: [ship, pickups, bubbles], // nave (botones, puertas, asiento, tecnologías), objetos sueltos y burbujas
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -329,6 +345,18 @@ function boot() {
     if (bed && cfg.SLEEP.SETS_RESPAWN) respawnBed = bed; // el sofá cama de la nave: { ship: true }
   });
   events.on(GameEvents.WORLD_GENERATED, () => (respawnBed = null));
+  // Soporte vital (Etapa 4): aire, traje espacial (oxígeno + batería plank) y asfixia.
+  const lifeSupport = new LifeSupportSystem({
+    config: cfg.LIFE_SUPPORT, batteries: cfg.SHIP.BATTERIES, player, inventory, events, isBreathableAt,
+  });
+  const stations = new StationSystem({
+    construction, lifeSupport, inventory, events, config: cfg.LIFE_SUPPORT, batteries: cfg.SHIP.BATTERIES,
+  });
+  events.on(GameEvents.SUIT_CHANGED, ({ wearing }) => player.model.setSuit(wearing));
+  events.on(GameEvents.SUIT_LOCKER_REQUEST, () => lifeSupport.toggleSuit());
+  events.on(GameEvents.OXYGEN_REFILL_REQUEST, () => lifeSupport.refillOxygen());
+  events.on(GameEvents.BUBBLE_PLACE_REQUEST, ({ itemId }) => bubbles.placeInFront(itemId));
+  events.on(GameEvents.BATTERY_USE_REQUEST, () => lifeSupport.swapBattery());
   // Temperatura oculta (Fase 10): bioma, altura, noche, armadura y refugio (casa o nave).
   const temperature = new TemperatureSystem({
     config: cfg.TEMPERATURE,
@@ -341,7 +369,9 @@ function boot() {
       getShelterAt: (x, y, z) => {
         const a = construction.getShelterAt(x, y, z);
         const b = ship.getShelterAt(x, y, z);
-        return { factor: Math.max(a.factor, b.factor), heated: !!b.heated };
+        // El traje encendido y las burbujas con batería mantienen el calor.
+        const warm = lifeSupport.powered || bubbles.contains(worlds.activeId, x, y + 1, z);
+        return { factor: Math.max(a.factor, b.factor), heated: !!b.heated || warm };
       },
     },
     events,
@@ -349,7 +379,7 @@ function boot() {
   // Al congelarse se ve menos (la niebla se acerca poco a poco).
   events.on(GameEvents.TEMPERATURE_CHANGED, ({ visibility }) => atmosphere.setVisibility(visibility));
 
-  const needs = [hunger, thirst, energy, temperature, time];
+  const needs = [hunger, thirst, energy, temperature, time, lifeSupport];
   const setNeedsPaused = (paused) => needs.forEach((n) => (n.paused = paused));
 
   // Los ataques con origen (animales) empujan al jugador.
@@ -414,6 +444,7 @@ function boot() {
   });
   const hudRoot = document.getElementById('hud');
   const craftingPanel = new CraftingPanel({ container: hudRoot, crafting, input, events });
+  new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
 
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
   const planetMap = new PlanetMapRenderer({
@@ -460,9 +491,25 @@ function boot() {
     celestial.setSeed(worlds.home.seed.sub.celestial);
   });
 
+  // Cofre de suministros en la primera luna a la que se llega (burbuja de oxígeno y baterías).
+  let moonChestPlaced = false;
+  events.on(GameEvents.WORLD_GENERATED, () => (moonChestPlaced = false));
+  events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
+    if (moonChestPlaced || planet?.KIND !== 'MOON') return;
+    const site = worlds.get(id).getLandingSite();
+    if (!site) return;
+    moonChestPlaced = true;
+    const [x, z] = toShipWorld({ x: site.x, z: site.z, yaw: site.yaw }, 16, 4);
+    pickups.add({
+      id: 'MOON_CHEST', body: id, x, z, model: 'CHEST', label: '📦 Cofre de suministros', action: 'Abrir',
+      contents: cfg.LIFE_SUPPORT.MOON_CHEST, mapLabel: 'Cofre de suministros', mapColor: '#ffd27a',
+    });
+    message(`📦 Hay un cofre de suministros junto a la zona de aterrizaje de la ${planet.NAME} (haz amarillo). Ponte el traje antes de salir.`);
+  });
+
   // Cambio de cuerpo (MUNDO 0 ↔ lunas ↔ espacio): cada sistema se adapta a él.
   events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
-    construction.setBody(id);
+    construction.setBody(id, planet);
     animals.setActive(id === HOME);
     controller.gravityScale = planet?.GRAVITY_SCALE ?? 1;
     atmosphere.setAirless(planet?.BREATHABLE === false);
@@ -572,8 +619,6 @@ function boot() {
 
   // Equipos de la nave ampliada que aún no funcionan (etapas siguientes).
   for (const [ev, text] of [
-    [GameEvents.SUIT_LOCKER_REQUEST, 'Taquilla de trajes: los trajes aún se están preparando.'],
-    [GameEvents.OXYGEN_REFILL_REQUEST, 'Estación de oxígeno: todavía no hay trajes que recargar.'],
     [GameEvents.ESCAPE_POD_REQUEST, 'Cápsula de escape: sistemas en espera.'],
   ]) events.on(ev, () => message(text, 'info'));
 
@@ -648,6 +693,7 @@ function boot() {
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
   registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups });
+  registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -667,6 +713,9 @@ function boot() {
   loop.add(thirst);
   loop.add(energy);
   loop.add(temperature); // temperatura oculta: frío, congelación, daño (Fase 10)
+  loop.add(lifeSupport); // aire, traje y asfixia (Etapa 4)
+  loop.add(bubbles);     // burbujas de oxígeno (gastan batería)
+  loop.add(stations);    // estaciones de carga y de oxígeno construidas
   loop.add(health);      // curación, cuenta atrás de reaparición
   loop.add(nutrition);   // la dieta "olvida" poco a poco lo comido
   loop.add(sleep);
@@ -696,7 +745,7 @@ function boot() {
     config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
-    worlds, pickups,
+    worlds, pickups, bubbles, lifeSupport, stations,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
   };
 }

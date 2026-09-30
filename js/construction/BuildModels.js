@@ -141,6 +141,28 @@ export const BUILD_MODELS = {
     b.add(box, { position: [0, 0.46, 0.36], scale: [0.96, 0.06, 1.15], color: BLANKET });
     return b.build();
   },
+  CHARGING_STATION() {
+    const b = new PartsBuilder();
+    b.add(box, { position: [0, 0.08, 0], scale: [1.0, 0.16, 0.8], color: STONE_DARK });
+    b.add(box, { position: [0, 0.65, 0.1], scale: [0.9, 1.0, 0.6], color: 0x5d6670 });
+    b.add(box, { position: [0, 1.2, 0.1], scale: [0.96, 0.1, 0.66], color: 0x3b434c });
+    // Hueco de la batería y panel.
+    b.add(box, { position: [0, 0.75, -0.21], scale: [0.36, 0.5, 0.04], color: 0x20262c });
+    b.add(box, { position: [0, 0.75, -0.23], scale: [0.26, 0.4, 0.02], color: 0x5fe08a });
+    b.add(box, { position: [0.32, 1.02, -0.21], scale: [0.12, 0.08, 0.03], color: 0xffd35a });
+    return b.build();
+  },
+  OXYGEN_STATION() {
+    const b = new PartsBuilder();
+    b.add(box, { position: [0, 0.08, 0], scale: [1.0, 0.16, 1.0], color: STONE_DARK });
+    for (const [x, z] of [[-0.22, 0.12], [0.22, 0.12]]) {
+      b.add(box, { position: [x, 0.8, z], scale: [0.36, 1.3, 0.36], color: 0xdfe8ef });
+      b.add(box, { position: [x, 1.5, z], scale: [0.22, 0.14, 0.22], color: 0x4aa3df });
+    }
+    b.add(box, { position: [0, 0.9, -0.3], scale: [0.7, 0.5, 0.12], color: 0x3b434c });
+    b.add(box, { position: [0, 0.95, -0.37], scale: [0.4, 0.2, 0.02], color: 0x7fd8ff });
+    return b.build();
+  },
 };
 
 export function toGeometry({ positions, colors }) {

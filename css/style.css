@@ -909,3 +909,9 @@ body.in-space #clock { top: 170px; }
 
 .nav-auto { text-align: center; color: var(--ui-muted); font-size: 0.76rem; }
 .nav-auto b { color: #ffcf9e; }
+
+/* ---- Soporte vital (Etapa 4) ---------------------------------------- */
+.stat.hidden { display: none; }
+.stat[data-stat="AIR"] { --stat-color: #9fd8ff; }
+.stat[data-stat="SUIT_O2"] { --stat-color: #6fdcff; }
+.stat[data-stat="SUIT_BAT"] { --stat-color: #5fe08a; }

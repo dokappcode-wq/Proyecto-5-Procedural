@@ -152,7 +152,7 @@ export class InteractionSystem {
       const door = st.type === 'DOOR';
       consider(
         { kind: 'structure', id: `st-${st.id}`, ref: st },
-        st.x, st.y + (door ? 1.1 : 0.4), st.z,
+        st.x, st.y + (door ? 1.1 : st.type.endsWith('STATION') ? 0.9 : 0.4), st.z,
         door ? 0.9 : 1.0,
         door ? 0.3 : 0.9,
       );
@@ -188,7 +188,7 @@ export class InteractionSystem {
     if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
     if (t.kind === 'provided') return { ...t, label: t.ref.label, action: t.ref.action, key: t.ref.key ?? 'E' };
     if (t.kind === 'structure') {
-      const action = t.ref.type === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : 'Dormir';
+      const action = t.ref.actionText ?? (t.ref.type === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : 'Dormir');
       return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };
     }
     if (t.kind === 'animal') {

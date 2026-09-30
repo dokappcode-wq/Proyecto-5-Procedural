@@ -61,13 +61,42 @@ export class PlayerModel {
     part(eye, 0.07, 0.07, 0.02, -0.09, 0.24, -0.205, this.head);
     part(eye, 0.07, 0.07, 0.02, 0.09, 0.24, -0.205, this.head);
 
+    // Traje espacial: casco transparente, mochila con el jetpack (ocultos sin traje).
+    this._pants = pants;
+    this._pantsColor = colors.PANTS;
+    this.suitParts = new THREE.Group();
+    const helmet = new THREE.Mesh(
+      new THREE.SphereGeometry(0.34, 16, 12),
+      new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.2, depthWrite: false }),
+    );
+    helmet.position.set(0, 0.22, 0);
+    this.head.add(helmet);
+    this._helmet = helmet;
+    const tank = mat(0xd8dde3);
+    part(tank, 0.4, 0.5, 0.16, 0, 1.12, 0.24, this.suitParts);
+    part(mat(0x3a4450), 0.1, 0.12, 0.1, -0.12, 0.8, 0.26, this.suitParts);
+    part(mat(0x3a4450), 0.1, 0.12, 0.1, 0.12, 0.8, 0.26, this.suitParts);
+    this.root.add(this.suitParts);
+    this.setSuit(false);
+
     this._walkPhase = 0;
     this._swing = 0;
     this._actionTime = 0; // >0 durante la animación de golpear/recoger
   }
 
+  /** Traje espacial: blanco, con casco y mochila de oxígeno/jetpack. */
+  setSuit(on) {
+    this._suit = on;
+    this._helmet.visible = on;
+    this.suitParts.visible = on;
+    this._shirt.color.set(on ? 0xeef1f4 : this._armor ? 0x8b5a2b : this._shirtColor);
+    this._pants.color.set(on ? 0xdfe3e8 : this._pantsColor);
+  }
+
   /** Armadura de cuero: el torso y las mangas pasan a color cuero. */
   setArmor(on) {
+    this._armor = on;
+    if (this._suit) return;
     this._shirt.color.set(on ? 0x8b5a2b : this._shirtColor);
   }
 

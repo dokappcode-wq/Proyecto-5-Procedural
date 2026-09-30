@@ -17,6 +17,8 @@ const CAUSE_NAMES = {
   THIRST: 'sed',
   FALL: 'una caída',
   COLD: 'frío',
+  SUFFOCATION: 'asfixia',
+  DECOMPRESSION: 'una descompresión explosiva',
 };
 
 export class HealthSystem extends VitalStat {

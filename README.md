@@ -22,6 +22,7 @@ Sin motores externos y sin paso de compilación.
 | E1 | Varios cuerpos: MUNDO 0, Luna A (clara) y Luna B (rojiza), procedurales, con estado propio |
 | E2 | Espacio explorable: se pilota la nave (cámara detrás) entre MUNDO 0 y las lunas |
 | E3 | Nodo espacial caído en MUNDO 0 (con mapa); al instalarlo la nave se amplía |
+| E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
 
 ## Cómo ejecutarlo
 
@@ -64,6 +65,8 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | En el espacio: `W`/`S` · `A`/`D` · `Espacio`/`C` · `Shift` | Acelerar/frenar · girar · cabecear · impulso |
 | En el espacio: `1` `2` `3` · `T` · `M` | Rumbo automático a MUNDO 0 / Luna A / Luna B · aterrizar al llegar · mapa estelar 3D |
 | Mapa de la señal + clic derecho / `R` | Abrir el mapa con la posición del nodo espacial |
+| Burbuja de oxígeno + clic derecho / `R` | Desplegarla delante (`E` en el generador: poner/quitar batería, recogerla) |
+| Batería plank + clic derecho / `R` (con el traje) | Cambiar la batería del traje |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -250,8 +253,16 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   cámara para vaciarla y solo entonces abre la compuerta. Si la abres con la cámara presurizada
   estando dentro, sales disparado (en el espacio, mueres).
 
-Limitaciones: todavía no hay traje ni oxígeno (la taquilla y la estación de oxígeno del
-laboratorio aún no funcionan), ni meteoritos, nodo galáctico o cápsulas de escape operativas
-(etapas siguientes); las baterías no se
+- **Traje y oxígeno**: en el laboratorio de la nave ampliada, `E` en la taquilla pone o quita el
+  traje (con jetpack) y `E` en la estación de oxígeno llena su depósito. Sin aire aguantas la
+  respiración 15 s (fila 🫁 Aire) y luego te asfixias. El traje gasta oxígeno fuera y batería
+  siempre (sin batería no da aire ni calor).
+- **Lunas**: al llegar a la primera luna aparece un 📦 cofre (haz amarillo) con la burbuja de
+  oxígeno y 3 baterías. Construir (`B`): en las lunas la madera se paga con piedra y la lana con
+  mineral (pica las rocas con cristales); en vez de valla y cama hay estación de carga (carga una
+  batería vacía en 60 s) y estación de oxígeno. Atajos: Admin → Soporte vital.
+
+Limitaciones: todavía no hay meteoritos, jetpack utilizable, nodo galáctico ni cápsulas de
+escape operativas (etapas siguientes); salir por la compuerta en el espacio aún no tiene EVA; las baterías no se
 recargan todavía (Admin → Nave → Recargar); la nave no choca con árboles en vuelo; la
 temperatura no se muestra como número (es oculta; el Admin sí la muestra).

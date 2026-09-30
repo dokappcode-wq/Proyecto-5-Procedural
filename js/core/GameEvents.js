@@ -102,6 +102,17 @@ export const GameEvents = Object.freeze({
   PICKUP_TAKEN: 'pickup:taken',                     // { id, body, contents }
   MAP_OPEN_REQUEST: 'map:open',                     // {}  (usar un mapa de papel)
 
+  // Soporte vital (traje, oxígeno, burbujas, estaciones)
+  LIFE_SUPPORT_CHANGED: 'life:state',               // { wearing, powered, breathable, lungs, oxygen, battery }
+  SUIT_CHANGED: 'life:suit',                        // { wearing }
+  BUBBLE_PLACE_REQUEST: 'bubble:place',             // { itemId }
+  BUBBLE_CHANGED: 'bubble:changed',                 // { id, powered }
+  BATTERY_USE_REQUEST: 'battery:use',               // { itemId }  (usar una batería plank)
+
+  // IA de la nave
+  AI_SAY: 'ai:say',                                 // { text, type? }  mensaje de la IA
+  AI_PANEL_REQUEST: 'ai:panel',                     // {}
+
   // Admin
   ADMIN_MODE_CHANGED: 'admin:modeChanged',          // { active }
   ADMIN_PANEL_TOGGLED: 'admin:panelToggled',        // { open }

@@ -112,6 +112,8 @@ export class ShipSystem {
     });
     events.on(GameEvents.SHIP_BATTERY_REQUEST, (e) => this._batteryRequest(e));
     events.on(GameEvents.PLAYER_DIED, () => this._forceExit());
+    this._suitOn = false;
+    events.on(GameEvents.SUIT_CHANGED, ({ wearing }) => (this._suitOn = wearing));
     this.spaceMode = 'SURFACE';
     events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => {
       this.spaceMode = state === 'ASCENDING' || state === 'DESCENDING' ? state : 'SURFACE';
@@ -566,7 +568,7 @@ export class ShipSystem {
       const techId = this.installed[slotId] ?? null;
       const tech = techId ? this._cfg.TECHNOLOGIES[techId] : null;
       const actions = {
-        PLANET_MAP: 'Abrir mapa', CHARGING_STATION: 'Ver baterías', SUIT_LOCKER: 'Coger traje y jetpack',
+        PLANET_MAP: 'Abrir mapa', CHARGING_STATION: 'Ver baterías', SUIT_LOCKER: this._suitOn ? 'Dejar el traje' : 'Ponerse el traje y el jetpack',
         OXYGEN_STATION: 'Recargar oxígeno del traje', SPACE_NODE: 'Examinar', GALACTIC_NODE: 'Examinar',
       };
       const action = tech ? actions[techId] ?? 'Examinar' : carryingNode ? 'Instalar el nodo espacial' : 'Examinar';

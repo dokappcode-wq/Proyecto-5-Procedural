@@ -43,7 +43,8 @@ export class ConstructionSystem {
     this._items = items;
     this._events = events;
 
-    this.pieceIds = Object.keys(config.PIECES);
+    this._profile = null; // perfil del cuerpo actual (lunas: otras piezas y materiales)
+    this.pieceIds = this._piecesFor(null);
     this.active = false;
     this.selected = this.pieceIds[0];
     this.freeBuild = false; // herramienta Admin
@@ -108,7 +109,31 @@ export class ConstructionSystem {
       this._removeHighlight.visible = false;
       this._setPlacement(false, false, null, null);
     }
-    this._events.emit(GameEvents.BUILD_MODE_CHANGED, { active, pieceId: this.selected });
+    this._events.emit(GameEvents.BUILD_MODE_CHANGED, { active, pieceId: this.selected, pieces: this.pieceDefs() });
+  }
+
+  /** Piezas disponibles en un cuerpo: en las lunas, estaciones en vez de vallas y camas; en el espacio, ninguna. */
+  _piecesFor(profile) {
+    const all = Object.keys(this._cfg.PIECES);
+    if (profile?.KIND === 'SPACE') return [];
+    if (profile?.KIND === 'MOON') return all.filter((id) => !(this._cfg.HOME_ONLY ?? []).includes(id));
+    return all.filter((id) => this._cfg.PIECES[id].BODIES !== 'MOON');
+  }
+
+  /** Coste de una pieza en el cuerpo actual (en las lunas la madera se sustituye por piedra…). */
+  costOf(pieceId) {
+    const sub = this._profile?.BUILD_SUBSTITUTE ?? {};
+    const cost = {};
+    for (const [item, n] of Object.entries(this._cfg.PIECES[pieceId].COST)) {
+      const it = sub[item] ?? item;
+      cost[it] = (cost[it] ?? 0) + n;
+    }
+    return cost;
+  }
+
+  /** Piezas del cuerpo actual para la UI: [{ id, NAME, ICON, COST }]. */
+  pieceDefs() {
+    return this.pieceIds.map((id) => ({ id, ...this._cfg.PIECES[id], COST: this.costOf(id) }));
   }
 
   select(pieceId) {
@@ -120,12 +145,18 @@ export class ConstructionSystem {
 
   canAfford(pieceId) {
     if (this.freeBuild) return true;
-    return Object.entries(this._cfg.PIECES[pieceId].COST).every(([item, n]) => this._inventory.hasItem(item, n));
+    return Object.entries(this.costOf(pieceId)).every(([item, n]) => this._inventory.hasItem(item, n));
   }
 
   update() {
     const input = this._input;
-    if (input.wasPressed('BUILD_MODE')) this.setActive(!this.active);
+    if (input.wasPressed('BUILD_MODE')) {
+      if (!this.active && !this.pieceIds.length) {
+        this._events.emit(GameEvents.UI_MESSAGE, { text: 'Aquí no se puede construir.', type: 'danger' });
+      } else {
+        this.setActive(!this.active);
+      }
+    }
     if (!this.active) return;
     if (input.blocked) {
       this._ghost.visible = false;
@@ -168,9 +199,9 @@ export class ConstructionSystem {
       this._events.emit(GameEvents.UI_MESSAGE, { text: pl.reason ?? 'No se puede colocar aquí', type: 'danger' });
       return false;
     }
-    const cost = this._cfg.PIECES[pl.piece.type].COST;
+    const cost = this.costOf(pl.piece.type);
     if (!this.freeBuild) for (const [item, n] of Object.entries(cost)) this._inventory.removeItem(item, n);
-    const structure = this.addPiece(pl.piece);
+    const structure = this.addPiece({ ...pl.piece, cost });
     this._events.emit(GameEvents.STRUCTURE_PLACED, { structure });
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
     return true;
@@ -182,7 +213,7 @@ export class ConstructionSystem {
     if (!piece) return false;
     this.removePiece(piece);
     if (!this.freeBuild) {
-      for (const [item, n] of Object.entries(this._cfg.PIECES[piece.type].COST)) {
+      for (const [item, n] of Object.entries(piece.cost ?? this.costOf(piece.type))) {
         const back = Math.floor(n * this._cfg.REFUND);
         if (back > 0) this._inventory.addItem(item, back);
       }
@@ -193,8 +224,8 @@ export class ConstructionSystem {
   }
 
   /** Añade una pieza ya validada (también la usan las herramientas Admin). */
-  addPiece({ type, x, y, z, rotation, slot }) {
-    const piece = { id: this._nextId++, type, x, y, z, rotation, slot, open: false, def: this._cfg.PIECES[type] };
+  addPiece({ type, x, y, z, rotation, slot, cost = null }) {
+    const piece = { id: this._nextId++, type, x, y, z, rotation, slot, open: false, def: this._cfg.PIECES[type], cost, body: this._bodyId };
     piece.key = slotKey(slot, y);
     const root = new THREE.Group();
     root.position.set(x, y, z);
@@ -228,7 +259,10 @@ export class ConstructionSystem {
   }
 
   /** Cambia al cuerpo `id`: las construcciones del anterior se guardan (y se ocultan). */
-  setBody(id) {
+  setBody(id, profile = null) {
+    this._profile = profile;
+    this.pieceIds = this._piecesFor(profile);
+    if (!this.pieceIds.includes(this.selected) && this.pieceIds.length) this.selected = this.pieceIds[0];
     if (id === this._bodyId) return;
     this.setActive(false);
     this.group.visible = false;
@@ -250,6 +284,11 @@ export class ConstructionSystem {
 
   get bodyId() {
     return this._bodyId;
+  }
+
+  /** Todas las piezas de todos los cuerpos (las estaciones de carga cargan aunque no estés allí). */
+  allPieces() {
+    return [...this._bodyStates.values()].flatMap((st) => st.pieces);
   }
 
   /** Quita todo lo construido en todos los cuerpos (nueva seed). */
@@ -322,7 +361,7 @@ export class ConstructionSystem {
   }
 
   _costText(type) {
-    return Object.entries(this._cfg.PIECES[type].COST)
+    return Object.entries(this.costOf(type))
       .map(([item, n]) => `${n} ${this._items[item].NAME.toLowerCase()}`)
       .join(', ');
   }

@@ -72,6 +72,15 @@ export const SHAPES = {
     slot: 'FREE', half: [0.5, 1], top: 0.6, interact: 'SLEEP',
     colliders: [{ x0: -0.5, x1: 0.5, z0: -1, z1: 1, y0: 0, y1: 0.6 }], surfaces: [],
   },
+  // Lunas: estación de carga (baterías plank) y de oxígeno (traje). StationSystem las hace funcionar.
+  CHARGING_STATION: {
+    slot: 'FREE', half: [0.5, 0.4], top: 1.3, interact: 'STATION',
+    colliders: [{ x0: -0.5, x1: 0.5, z0: -0.4, z1: 0.4, y0: 0, y1: 1.3 }], surfaces: [],
+  },
+  OXYGEN_STATION: {
+    slot: 'FREE', half: [0.5, 0.5], top: 1.7, interact: 'STATION',
+    colliders: [{ x0: -0.5, x1: 0.5, z0: -0.5, z1: 0.5, y0: 0, y1: 1.7 }], surfaces: [],
+  },
 };
 
 const HALF_PI = Math.PI / 2;

@@ -196,9 +196,10 @@ export class UIManager {
       this._placement = pl;
       this._drawUseHint();
     });
-    events.on(GameEvents.BUILD_MODE_CHANGED, ({ active, pieceId }) => {
+    events.on(GameEvents.BUILD_MODE_CHANGED, ({ active, pieceId, pieces }) => {
       this._buildMode = active;
       this._buildPiece = pieceId;
+      if (pieces) this._buildPieces = pieces;
       document.body.classList.toggle('build-mode', active);
       if (active) {
         this._showTarget(null);
@@ -391,7 +392,8 @@ export class UIManager {
 
   /** Modo construcción: barra de piezas con tecla, icono y coste. */
   _drawBuildBar(bar) {
-    Object.entries(this._build.PIECES).forEach(([id, def], i) => {
+    this._pieceList().forEach((def, i) => {
+      const id = def.id;
       const slot = document.createElement('div');
       slot.className = 'inv-slot build-slot';
       if (id === this._buildPiece) slot.classList.add('selected');
@@ -403,6 +405,11 @@ export class UIManager {
       slot.querySelector('.icon').textContent = def.ICON;
       bar.appendChild(slot);
     });
+  }
+
+  /** Piezas del cuerpo actual (las manda ConstructionSystem al entrar en el modo construcción). */
+  _pieceList() {
+    return this._buildPieces ?? Object.entries(this._build.PIECES).map(([id, def]) => ({ id, ...def }));
   }
 
   _canAfford(def) {
@@ -420,7 +427,7 @@ export class UIManager {
     const pl = this._placement;
     el.classList.remove('invalid');
     if (this._buildMode) {
-      const def = this._build.PIECES[this._buildPiece];
+      const def = this._pieceList().find((p) => p.id === this._buildPiece) ?? this._build.PIECES[this._buildPiece];
       const invalid = pl?.active && !pl.valid;
       el.textContent = `${def.ICON} ${def.NAME} (${this._costText(def)}) — ` +
         (invalid ? pl.reason : '[Clic] Colocar · [Clic dcho] Quitar · [Q] Girar · [B] Salir');

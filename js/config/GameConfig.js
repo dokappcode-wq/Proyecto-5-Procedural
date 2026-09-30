@@ -21,6 +21,8 @@ function moonProfile({ name, tones, temperature, gravity, craterChance, seaFloor
     HAS_SEA: false,
     BREATHABLE: false,
     GRAVITY_SCALE: gravity,
+    // Sin árboles ni ovejas: en la luna las piezas de madera se hacen de piedra y la lana, de mineral.
+    BUILD_SUBSTITUTE: { WOOD: 'STONE', WOOL: 'MINERAL' },
     TERRAIN: {
       BASE_HEIGHT: 8,
       CONTINENT_FREQUENCY: 1 / 500,
@@ -420,7 +422,7 @@ export const GameConfig = deepFreeze({
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN' },
     LEATHER_ARMOR: { NAME: 'Armadura de cuero', ICON: '🦺', USE: 'EQUIP', SLOT: 'BODY' },
     // Combustible de la nave: se colocan en el puesto de carga (ver SHIP.BATTERIES).
-    PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋' },
+    PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋', USE: 'BATTERY' },
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
     // Se coge en la nave (mesa del laboratorio). Usarlo muestra dónde está la nave.
     SHIP_WATCH: { NAME: 'Reloj de la nave', ICON: '⌚', USE: 'WATCH' },
@@ -429,6 +431,8 @@ export const GameConfig = deepFreeze({
     // Mapa de papel con la señal del nodo espacial (usarlo abre el mapa).
     NODE_MAP: { NAME: 'Mapa de la señal', ICON: '📜', USE: 'MAP' },
     GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀' },
+    // Se encuentra en el cofre de la primera luna: al usarla se despliega una burbuja con aire.
+    OXYGEN_BUBBLE: { NAME: 'Burbuja de oxígeno', ICON: '🫧', USE: 'BUBBLE' },
   },
 
   // Alimentación (Fase 7). Equilibrio entre comida animal y vegetal.
@@ -478,7 +482,32 @@ export const GameConfig = deepFreeze({
       STAIRS: { NAME: 'Escalera', ICON: '🪜', COST: { WOOD: 4 } },
       ROOF: { NAME: 'Tejado', ICON: '🔺', COST: { WOOD: 3 } },
       BED: { NAME: 'Cama', ICON: '🛏️', COST: { WOOL: 3, WOOD: 3 } },
+      // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
+      CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', COST: { STONE: 4, MINERAL: 3 }, BODIES: 'MOON' },
+      OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', COST: { STONE: 4, MINERAL: 4 }, BODIES: 'MOON' },
     },
+    // Piezas que no se pueden hacer en las lunas (BODIES: 'HOME').
+    HOME_ONLY: ['FENCE', 'BED'],
+  },
+
+  // Soporte vital (Etapa 4): aire, traje espacial y burbujas de oxígeno.
+  //   Sin aire se aguanta la respiración LUNGS_TIME s; después, asfixia.
+  //   El traje (taquilla del laboratorio) lleva oxígeno y una batería plank
+  //   que lo mantiene funcionando (válvulas, calefacción, jetpack).
+  LIFE_SUPPORT: {
+    LUNGS_TIME: 15,              // s aguantando la respiración
+    LUNGS_RECOVER: 25,           // % por segundo al volver a respirar
+    SUFFOCATION_DAMAGE: 8,       // vida por segundo sin aire
+    SUIT_OXYGEN_TIME: 300,       // s de oxígeno con el depósito lleno
+    SUIT_BATTERY_TIME: 600,      // s que dura una batería plank en el traje
+    LOW_RATIO: 0.25,             // aviso de oxígeno/batería bajos
+    BUBBLE_RADIUS: 14,           // m de radio de la burbuja de oxígeno
+    BUBBLE_BATTERY_TIME: 1800,   // s que dura una batería plank en la burbuja
+    CHARGER_TIME: 60,            // s en cargar una batería plank en una estación de carga
+    MOON_CHEST: [                // cofre de suministros de la primera luna
+      { item: 'OXYGEN_BUBBLE', count: 1 },
+      { item: 'PLANK_BATTERY_SMALL', count: 3 },
+    ],
   },
 
   // Dormir (Fase 8). TimeSystem adelanta el reloj HOURS horas (Fase 11).

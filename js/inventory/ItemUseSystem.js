@@ -69,6 +69,14 @@ export class ItemUseSystem {
         this._events.emit(GameEvents.SHIP_WATCH_TOGGLE, {});
         ok = true;
         break;
+      case 'BUBBLE':
+        this._events.emit(GameEvents.BUBBLE_PLACE_REQUEST, { itemId });
+        ok = true;
+        break;
+      case 'BATTERY':
+        this._events.emit(GameEvents.BATTERY_USE_REQUEST, { itemId });
+        ok = true;
+        break;
       case 'MAP':
         this._events.emit(GameEvents.MAP_OPEN_REQUEST, { itemId });
         ok = true;
