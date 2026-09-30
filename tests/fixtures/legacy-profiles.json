@@ -1,0 +1,498 @@
+{
+ "PLANETS": {
+  "MUNDO_0": {
+   "NAME": "MUNDO 0",
+   "KIND": "PLANET",
+   "HAS_SEA": true,
+   "BREATHABLE": true,
+   "GRAVITY_SCALE": 1,
+   "DATA": {
+    "LIFE": "Mundo basado en carbono: la vida (árboles, hierba, ciervos, cabras y vacas) usa química del carbono y agua líquida.",
+    "ATMOSPHERE": "Atmósfera de nitrógeno y oxígeno, respirable. Presión y gravedad estándar (1 g).",
+    "SURFACE": "Una isla de 1 km rodeada de mar, con explanadas, bosques y montañas heladas.",
+    "MOONS": "Tiene 2 lunas: la Luna A, grande y clara, y la Luna B, pequeña, rojiza y lejana."
+   },
+   "TERRAIN": {
+    "BASE_HEIGHT": 7,
+    "CONTINENT_FREQUENCY": 0.0016666666666666668,
+    "CONTINENT_AMPLITUDE": 6,
+    "HILL_FREQUENCY": 0.006666666666666667,
+    "HILL_AMPLITUDE": 7,
+    "DETAIL_FREQUENCY": 0.045454545454545456,
+    "DETAIL_AMPLITUDE": 0.5,
+    "MOUNTAIN_MASK_FREQUENCY": 0.0020833333333333333,
+    "MOUNTAIN_MASK_START": 0.1,
+    "MOUNTAIN_MASK_END": 0.45,
+    "MOUNTAIN_FREQUENCY": 0.004347826086956522,
+    "MOUNTAIN_HEIGHT": 85,
+    "MOUNTAIN_OCTAVES": 4,
+    "MOUNTAIN_BASE_LIFT": 12,
+    "MOUNTAIN_COAST_FADE": 110,
+    "COAST_NOISE_FREQUENCY": 0.0058823529411764705,
+    "COAST_NOISE_AMPLITUDE": 22,
+    "COAST_SEA_WIDTH": 20,
+    "SEA_FLOOR": -9
+   },
+   "COLORS": {
+    "SAND": 14470030,
+    "SEABED": 10260330,
+    "LOWLAND_ROCK": 9339763,
+    "SAND_HEIGHT": 1.2,
+    "ROCK_SLOPE_NORMAL_Y": 0.8,
+    "PATCH_FREQUENCY": 0.05,
+    "AO_STRENGTH": 0.22,
+    "SEA": 2977688,
+    "SEA_OPACITY": 0.85
+   },
+   "BIOME_DISTRIBUTION": {
+    "MOUNTAIN_BIOME_START": 0.3,
+    "MOUNTAIN_BIOME_END": 0.6,
+    "FOREST_FREQUENCY": 0.003125,
+    "FOREST_THRESHOLD": 0,
+    "FOREST_BLEND": 0.12,
+    "SPAWN_MIN_PLAINS": 0.8
+   },
+   "BIOMES": {
+    "PLAINS": {
+     "NAME": "Explanada",
+     "TEMPERATURE": 18,
+     "HILL_SCALE": 0.35,
+     "DETAIL_SCALE": 0.6,
+     "COLORS": {
+      "GROUND": 8829018,
+      "GROUND_ALT": 11126630,
+      "ACCENT": 14275194
+     }
+    },
+    "FOREST": {
+     "NAME": "Bosque",
+     "TEMPERATURE": 14,
+     "HILL_SCALE": 1.15,
+     "DETAIL_SCALE": 1.3,
+     "COLORS": {
+      "GROUND": 4880949,
+      "GROUND_ALT": 3827503,
+      "ACCENT": 6187827
+     }
+    },
+    "FROZEN_MOUNTAINS": {
+     "NAME": "Montañas Heladas",
+     "TEMPERATURE": -4,
+     "HILL_SCALE": 1,
+     "DETAIL_SCALE": 1.5,
+     "SNOW_START_HEIGHT": 24,
+     "SNOW_MIN_NORMAL_Y": 0.42,
+     "COLORS": {
+      "GROUND": 7107455,
+      "GROUND_ALT": 5923181,
+      "SNOW": 15857146,
+      "ICE": 11853040
+     }
+    }
+   },
+   "WATER": {
+    "DISCOVERY_DISTANCE": 7,
+    "POND_COUNT": 16,
+    "RADIUS": [
+     5,
+     10
+    ],
+    "DEPTH": 1.4,
+    "SHORE_WIDTH": 0.6,
+    "MIN_SPACING": 70,
+    "MAX_SLOPE": 0.18,
+    "BIOMES": [
+     "PLAINS",
+     "FOREST"
+    ],
+    "NEAR_SPAWN_DISTANCE": [
+     25,
+     55
+    ],
+    "COLOR": 3833768,
+    "OPACITY": 0.82,
+    "MUD_COLOR": 8022860
+   },
+   "RESOURCES": {
+    "CELL_SIZE": 4,
+    "SPAWN_CLEAR_RADIUS": 8,
+    "MAX_SLOPE": 0.75,
+    "TREE_MAX_HEIGHT": 38,
+    "DENSITY": {
+     "PLAINS": {
+      "TREE": 0.01,
+      "APPLE_TREE": 0.008,
+      "BUSH": 0.05,
+      "ROCK": 0.025
+     },
+     "FOREST": {
+      "TREE": 0.26,
+      "PINE": 0.07,
+      "APPLE_TREE": 0.045,
+      "BUSH": 0.09,
+      "ROCK": 0.02
+     },
+     "FROZEN_MOUNTAINS": {
+      "PINE": 0.025,
+      "ROCK": 0.07
+     }
+    },
+    "GRASS_TUFTS_PER_CHUNK": {
+     "PLAINS": 520,
+     "FOREST": 220,
+     "FROZEN_MOUNTAINS": 0
+    }
+   },
+   "FAUNA": {
+    "HERDS": {
+     "DEER": 10,
+     "GOAT": 10,
+     "COW": 9
+    },
+    "HERD_RADIUS": 24,
+    "NEAR_SPAWN_DISTANCE": [
+     35,
+     120
+    ]
+   }
+  },
+  "MOON_A": {
+   "NAME": "Luna A",
+   "DATA": {
+    "LIFE": "Sin vida: roca de silicatos (anortosita) muy clara.",
+    "ATMOSPHERE": "Sin atmósfera. Hace falta traje espacial u oxígeno.",
+    "SURFACE": "Regolito claro, cráteres y rocas con cristales minerales. Gravedad 0,35 g, unos −30 °C."
+   },
+   "KIND": "MOON",
+   "HAS_SEA": false,
+   "BREATHABLE": false,
+   "GRAVITY_SCALE": 0.35,
+   "BUILD_SUBSTITUTE": {
+    "WOOD": "STONE",
+    "WOOL": "MINERAL"
+   },
+   "TERRAIN": {
+    "BASE_HEIGHT": 8,
+    "CONTINENT_FREQUENCY": 0.002,
+    "CONTINENT_AMPLITUDE": 4,
+    "HILL_FREQUENCY": 0.008333333333333333,
+    "HILL_AMPLITUDE": 5,
+    "DETAIL_FREQUENCY": 0.05555555555555555,
+    "DETAIL_AMPLITUDE": 0.6,
+    "MOUNTAIN_MASK_FREQUENCY": 0.002631578947368421,
+    "MOUNTAIN_MASK_START": 0.2,
+    "MOUNTAIN_MASK_END": 0.55,
+    "MOUNTAIN_FREQUENCY": 0.005,
+    "MOUNTAIN_HEIGHT": 38,
+    "MOUNTAIN_OCTAVES": 3,
+    "MOUNTAIN_BASE_LIFT": 6,
+    "MOUNTAIN_COAST_FADE": 90,
+    "COAST_NOISE_FREQUENCY": 0.006666666666666667,
+    "COAST_NOISE_AMPLITUDE": 18,
+    "COAST_SEA_WIDTH": 20,
+    "SEA_FLOOR": 2,
+    "CRATERS": {
+     "CELL": 48,
+     "CHANCE": 0.5,
+     "RADIUS": [
+      4,
+      19
+     ],
+     "DEPTH": 0.32,
+     "RIM": 0.12
+    }
+   },
+   "COLORS": {
+    "SAND": 12433841,
+    "SEABED": 9407364,
+    "LOWLAND_ROCK": 9407364,
+    "SAND_HEIGHT": -10,
+    "ROCK_SLOPE_NORMAL_Y": 0.72,
+    "PATCH_FREQUENCY": 0.03571428571428571,
+    "AO_STRENGTH": 0.4,
+    "SEA": 0,
+    "SEA_OPACITY": 0
+   },
+   "BIOME_DISTRIBUTION": {
+    "MOUNTAIN_BIOME_START": 0.3,
+    "MOUNTAIN_BIOME_END": 0.6,
+    "FOREST_FREQUENCY": 0.0038461538461538464,
+    "FOREST_THRESHOLD": 0.1,
+    "FOREST_BLEND": 0.15,
+    "SPAWN_MIN_PLAINS": 0.7
+   },
+   "BIOMES": {
+    "PLAINS": {
+     "NAME": "Llanura de regolito",
+     "TEMPERATURE": -30,
+     "HILL_SCALE": 0.4,
+     "DETAIL_SCALE": 0.8,
+     "COLORS": {
+      "GROUND": 14276303,
+      "GROUND_ALT": 12433841,
+      "ACCENT": 15921128
+     }
+    },
+    "FOREST": {
+     "NAME": "Mar oscuro",
+     "TEMPERATURE": -35,
+     "HILL_SCALE": 0.8,
+     "DETAIL_SCALE": 1.2,
+     "COLORS": {
+      "GROUND": 12433841,
+      "GROUND_ALT": 9407364,
+      "ACCENT": 14276303
+     }
+    },
+    "FROZEN_MOUNTAINS": {
+     "NAME": "Montes lunares",
+     "TEMPERATURE": -42,
+     "HILL_SCALE": 1,
+     "DETAIL_SCALE": 1.4,
+     "SNOW_START_HEIGHT": 30,
+     "SNOW_MIN_NORMAL_Y": 0.5,
+     "COLORS": {
+      "GROUND": 9407364,
+      "GROUND_ALT": 12433841,
+      "SNOW": 15921128,
+      "ICE": 14276303
+     }
+    }
+   },
+   "WATER": {
+    "DISCOVERY_DISTANCE": 7,
+    "POND_COUNT": 0,
+    "RADIUS": [
+     5,
+     10
+    ],
+    "DEPTH": 1,
+    "SHORE_WIDTH": 0.6,
+    "MIN_SPACING": 70,
+    "MAX_SLOPE": 0.18,
+    "BIOMES": [],
+    "NEAR_SPAWN_DISTANCE": [
+     25,
+     55
+    ],
+    "COLOR": 0,
+    "OPACITY": 0,
+    "MUD_COLOR": 9407364
+   },
+   "RESOURCES": {
+    "CELL_SIZE": 4,
+    "SPAWN_CLEAR_RADIUS": 8,
+    "MAX_SLOPE": 0.9,
+    "TREE_MAX_HEIGHT": -1,
+    "DENSITY": {
+     "PLAINS": {
+      "ROCK": 0.03,
+      "MINERAL_ROCK": 0.004
+     },
+     "FOREST": {
+      "ROCK": 0.05,
+      "MINERAL_ROCK": 0.006
+     },
+     "FROZEN_MOUNTAINS": {
+      "ROCK": 0.07,
+      "MINERAL_ROCK": 0.01
+     }
+    },
+    "GRASS_TUFTS_PER_CHUNK": {
+     "PLAINS": 0,
+     "FOREST": 0,
+     "FROZEN_MOUNTAINS": 0
+    }
+   },
+   "FAUNA": {
+    "HERDS": {},
+    "HERD_RADIUS": 24,
+    "NEAR_SPAWN_DISTANCE": [
+     35,
+     120
+    ]
+   },
+   "PROP_COLORS": {
+    "ROCK": 12433841
+   }
+  },
+  "MOON_B": {
+   "NAME": "Luna B",
+   "DATA": {
+    "LIFE": "Sin vida: roca rica en óxidos de hierro, de ahí su color rojizo.",
+    "ATMOSPHERE": "Sin atmósfera. Hace falta traje espacial u oxígeno.",
+    "SURFACE": "Muchos cráteres y minerales. Gravedad 0,25 g, unos −45 °C."
+   },
+   "KIND": "MOON",
+   "HAS_SEA": false,
+   "BREATHABLE": false,
+   "GRAVITY_SCALE": 0.25,
+   "BUILD_SUBSTITUTE": {
+    "WOOD": "STONE",
+    "WOOL": "MINERAL"
+   },
+   "TERRAIN": {
+    "BASE_HEIGHT": 8,
+    "CONTINENT_FREQUENCY": 0.002,
+    "CONTINENT_AMPLITUDE": 4,
+    "HILL_FREQUENCY": 0.008333333333333333,
+    "HILL_AMPLITUDE": 5,
+    "DETAIL_FREQUENCY": 0.05555555555555555,
+    "DETAIL_AMPLITUDE": 0.6,
+    "MOUNTAIN_MASK_FREQUENCY": 0.002631578947368421,
+    "MOUNTAIN_MASK_START": 0.2,
+    "MOUNTAIN_MASK_END": 0.55,
+    "MOUNTAIN_FREQUENCY": 0.005,
+    "MOUNTAIN_HEIGHT": 38,
+    "MOUNTAIN_OCTAVES": 3,
+    "MOUNTAIN_BASE_LIFT": 6,
+    "MOUNTAIN_COAST_FADE": 90,
+    "COAST_NOISE_FREQUENCY": 0.006666666666666667,
+    "COAST_NOISE_AMPLITUDE": 18,
+    "COAST_SEA_WIDTH": 20,
+    "SEA_FLOOR": 2,
+    "CRATERS": {
+     "CELL": 48,
+     "CHANCE": 0.65,
+     "RADIUS": [
+      4,
+      19
+     ],
+     "DEPTH": 0.32,
+     "RIM": 0.12
+    }
+   },
+   "COLORS": {
+    "SAND": 7226934,
+    "SEABED": 4861733,
+    "LOWLAND_ROCK": 4861733,
+    "SAND_HEIGHT": -10,
+    "ROCK_SLOPE_NORMAL_Y": 0.72,
+    "PATCH_FREQUENCY": 0.03571428571428571,
+    "AO_STRENGTH": 0.4,
+    "SEA": 0,
+    "SEA_OPACITY": 0
+   },
+   "BIOME_DISTRIBUTION": {
+    "MOUNTAIN_BIOME_START": 0.3,
+    "MOUNTAIN_BIOME_END": 0.6,
+    "FOREST_FREQUENCY": 0.0038461538461538464,
+    "FOREST_THRESHOLD": 0.1,
+    "FOREST_BLEND": 0.15,
+    "SPAWN_MIN_PLAINS": 0.7
+   },
+   "BIOMES": {
+    "PLAINS": {
+     "NAME": "Llanura de regolito",
+     "TEMPERATURE": -45,
+     "HILL_SCALE": 0.4,
+     "DETAIL_SCALE": 0.8,
+     "COLORS": {
+      "GROUND": 9067076,
+      "GROUND_ALT": 7226934,
+      "ACCENT": 11039832
+     }
+    },
+    "FOREST": {
+     "NAME": "Mar oscuro",
+     "TEMPERATURE": -50,
+     "HILL_SCALE": 0.8,
+     "DETAIL_SCALE": 1.2,
+     "COLORS": {
+      "GROUND": 7226934,
+      "GROUND_ALT": 4861733,
+      "ACCENT": 9067076
+     }
+    },
+    "FROZEN_MOUNTAINS": {
+     "NAME": "Montes lunares",
+     "TEMPERATURE": -57,
+     "HILL_SCALE": 1,
+     "DETAIL_SCALE": 1.4,
+     "SNOW_START_HEIGHT": 30,
+     "SNOW_MIN_NORMAL_Y": 0.5,
+     "COLORS": {
+      "GROUND": 4861733,
+      "GROUND_ALT": 7226934,
+      "SNOW": 11039832,
+      "ICE": 9067076
+     }
+    }
+   },
+   "WATER": {
+    "DISCOVERY_DISTANCE": 7,
+    "POND_COUNT": 0,
+    "RADIUS": [
+     5,
+     10
+    ],
+    "DEPTH": 1,
+    "SHORE_WIDTH": 0.6,
+    "MIN_SPACING": 70,
+    "MAX_SLOPE": 0.18,
+    "BIOMES": [],
+    "NEAR_SPAWN_DISTANCE": [
+     25,
+     55
+    ],
+    "COLOR": 0,
+    "OPACITY": 0,
+    "MUD_COLOR": 4861733
+   },
+   "RESOURCES": {
+    "CELL_SIZE": 4,
+    "SPAWN_CLEAR_RADIUS": 8,
+    "MAX_SLOPE": 0.9,
+    "TREE_MAX_HEIGHT": -1,
+    "DENSITY": {
+     "PLAINS": {
+      "ROCK": 0.03,
+      "MINERAL_ROCK": 0.004
+     },
+     "FOREST": {
+      "ROCK": 0.05,
+      "MINERAL_ROCK": 0.006
+     },
+     "FROZEN_MOUNTAINS": {
+      "ROCK": 0.07,
+      "MINERAL_ROCK": 0.01
+     }
+    },
+    "GRASS_TUFTS_PER_CHUNK": {
+     "PLAINS": 0,
+     "FOREST": 0,
+     "FROZEN_MOUNTAINS": 0
+    }
+   },
+   "FAUNA": {
+    "HERDS": {},
+    "HERD_RADIUS": 24,
+    "NEAR_SPAWN_DISTANCE": [
+     35,
+     120
+    ]
+   },
+   "PROP_COLORS": {
+    "ROCK": 7226934
+   }
+  }
+ },
+ "CELESTIAL": {
+  "PLANET_NAME": "MUNDO 0",
+  "PLANET_RADIUS_KM": 3200,
+  "MOON_A_SIZE": 620,
+  "MOON_B_SIZE": 240,
+  "MOON_A_DISTANCE": 42000,
+  "MOON_B_DISTANCE": 17000,
+  "MOON_A_SPEED": 0.010416666666666666,
+  "MOON_B_SPEED": 0.03333333333333333,
+  "MOON_A_COLOR": 14209732,
+  "MOON_B_COLOR": 13209450,
+  "MAX_INCLINATION_DEG": 18,
+  "MOON_A_SKY_SIZE_DEG": 7,
+  "MOON_B_SKY_SIZE_DEG": 3.6,
+  "SKY_DISTANCE": 700,
+  "DAY_OPACITY": 0.55,
+  "MOON_RISE_MESSAGES": true
+ }
+}
