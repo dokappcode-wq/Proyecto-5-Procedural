@@ -85,7 +85,7 @@ function moonProfile({ name, tones, temperature, gravity, craterChance, seaFloor
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '1.0.0',
+    VERSION: '1.1.0',
   },
 
   RENDER: {
@@ -674,6 +674,12 @@ export const GameConfig = deepFreeze({
       MINERAL_PER_HIT: 2,
       VIEW_DISTANCE: 600,        // m a los que se dibuja como impostor si está más lejos
     },
+    // Cápsulas de escape (Etapa 6): llevan al jugador a un cuerpo cercano; la IA trae la nave después.
+    ESCAPE: {
+      POD_RANGE_KM: 45000,       // alcance máximo (de superficie a superficie)
+      LAUNCH_TIME: 3,            // s del viaje (fundido)
+      PODS: 2,
+    },
     // Paseo espacial (EVA) con el traje y el jetpack de gas.
     EVA: {
       THRUST: 4,                 // m/s² del jetpack
@@ -766,6 +772,7 @@ export const GameConfig = deepFreeze({
     },
     // Dónde cae el nodo espacial en MUNDO 0 (m desde el inicio del jugador).
     SPACE_NODE_DROP_DISTANCE: [160, 320],
+    GALACTIC_NODE_DROP_DISTANCE: [70, 160], // en una de las lunas (según la seed), desde su zona de aterrizaje
     NODE_MAP_ITEM: 'NODE_MAP',   // se recibe al empezar: marca dónde cayó el nodo
     SPACE_NODE_REQUIRED: true,   // sin "nodo espacial" las lunas no se pueden visitar
     MAP_RESOLUTION: 160,         // píxeles por lado del mapa del planeta

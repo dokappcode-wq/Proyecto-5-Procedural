@@ -68,6 +68,8 @@ export class ShipSystem {
 
     this.piloting = false;
     this.hasSpaceNode = false;
+    this.crippled = false;   // salto galáctico fallido: motores y navegación fuera de servicio
+    this.podsUsed = 0;
     this.body = 'MUNDO_0';
     this._activeBody = () => 'MUNDO_0';
     this._breathableOutside = () => true; // ¿hay aire fuera? (cuerpo activo)
@@ -187,6 +189,27 @@ export class ShipSystem {
     this.model.build(this.layout, this.installed);
   }
 
+  /** Salto galáctico fallido: la nave queda inutilizada (alarma roja). */
+  setCrippled(on) {
+    this.crippled = on;
+    this._events.emit(GameEvents.SHIP_CRIPPLED, { crippled: on });
+  }
+
+  /** La IA trae la nave a un cuerpo: aterriza en su zona de aterrizaje. */
+  relocateTo(bodyId) {
+    this._forceExit(true);
+    this.body = bodyId;
+    this.spaceMode = 'SURFACE';
+    const site = this._world.getLandingSite();
+    if (site) this.placeLanded(site.x, site.z, site.yaw);
+  }
+
+  /** Quita una tecnología (el nodo galáctico se consume al fallar el salto). */
+  uninstallTech(techId) {
+    for (const [slot, t] of Object.entries(this.installed)) if (t === techId) this.installed[slot] = null;
+    this.model.build(this.layout, this.installed);
+  }
+
   // ---- Espacio -------------------------------------------------------------------------
 
   enterSpace(yaw) {
@@ -270,6 +293,10 @@ export class ShipSystem {
 
   command(cmd) {
     if (cmd === 'STAND_UP') return this.exitPilot();
+    if (this.crippled && (cmd === 'ORBIT' || cmd === 'TAKEOFF_OR_LAND' || cmd === 'TAKEOFF' || cmd === 'LAND')) {
+      this._message('Motores y navegación fuera de servicio. Evacúa en una cápsula de escape.', 'danger');
+      return false;
+    }
     if (cmd === 'ORBIT') {
       const reason = this.orbitBlocked();
       if (reason) {
@@ -429,6 +456,11 @@ export class ShipSystem {
       s.doors[d.id] = v < target ? Math.min(target, v + dt / this._cfg.DOOR_TIME) : Math.max(target, v - dt / this._cfg.DOOR_TIME);
     }
     this._updateAirlock(dt);
+    this._alarmT = (this._alarmT ?? 0) + dt;
+    for (const l of this.model.lights ?? []) {
+      if (this.crippled) l.color.setRGB(1, Math.sin(this._alarmT * 6) > 0 ? 0.12 : 0.02, 0.02);
+      else l.color.set(0xfff1d6);
+    }
     if (this.spaceMode !== 'SURFACE') {
       if (this.spaceMode === 'ASCENDING') s.y += 45 * dt;
       if (this.piloting) this._placePlayerInSeat();
@@ -558,12 +590,14 @@ export class ShipSystem {
     for (const f of L.blueprint.furniture) {
       if (!f.interact) continue;
       let action = f.interact.action;
+      if (f.interact.id.startsWith('POD_')) action = this.crippled ? '¡Evacuar a MUNDO 0!' : 'Subir y elegir destino';
       if (f.interact.id === 'AIRLOCK') {
         action = this.airlock === 'CYCLING' ? 'Cambiando de presión…' : this.airlock === 'PRESSURIZED' ? 'Descomprimir la cámara' : 'Presurizar la cámara';
       }
       add(f.interact.id, f.interact.aim, f.interact.label, action, 0.6);
     }
-    const carryingNode = this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1);
+    const carryingNode = this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1) && !this.isExplorer;
+    const carryingGalactic = this._inventory?.hasItem(this._cfg.GALACTIC_NODE_ITEM, 1) && this.isExplorer;
     for (const [slotId, slot] of Object.entries(L.SLOTS)) {
       const techId = this.installed[slotId] ?? null;
       const tech = techId ? this._cfg.TECHNOLOGIES[techId] : null;
@@ -572,7 +606,8 @@ export class ShipSystem {
         OXYGEN_STATION: 'Recargar oxígeno del traje', SPACE_NODE: 'Examinar', GALACTIC_NODE: 'Examinar',
         AI_NODE: 'Hablar con la IA',
       };
-      const action = tech ? actions[techId] ?? 'Examinar' : carryingNode ? 'Instalar el nodo espacial' : 'Examinar';
+      const action = tech ? actions[techId] ?? 'Examinar'
+        : carryingNode ? 'Instalar el nodo espacial' : carryingGalactic ? 'Instalar el nodo galáctico' : 'Examinar';
       add(`SLOT:${slotId}`, slot.aim, tech ? `${tech.ICON} ${tech.NAME}` : 'Ranura de tecnología libre', action, 0.6);
     }
     return list;
@@ -631,7 +666,7 @@ export class ShipSystem {
         this._message('Nodo espacial: permite salir al espacio. A los mandos, vuela alto y pulsa [O].');
         return true;
       case 'GALACTIC_NODE':
-        this._message('Nodo galáctico: permitiría salir del sistema de MUNDO 0…');
+        this._message('Nodo galáctico: a los mandos, sal del sistema de MUNDO 0 (más allá de 65 000 km) para intentar el salto.');
         return true;
       default:
         if (this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1) && !this.isExplorer) {

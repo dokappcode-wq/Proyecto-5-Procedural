@@ -66,6 +66,9 @@ import { LifeSupportHUD } from './ui/LifeSupportHUD.js';
 import { ShipAI } from './ship/ShipAI.js';
 import { MeteorSystem } from './space/MeteorSystem.js';
 import { EVASystem } from './player/EVASystem.js';
+import { EscapeSystem } from './space/EscapeSystem.js';
+import { PodPanel, EscapeOverlay } from './ui/EscapeUI.js';
+import { orbitPosition } from './celestial/CelestialCatalog.js';
 import { AIPanel } from './ui/AIPanel.js';
 import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
 import { ShipMapPanel } from './ui/ShipMapPanel.js';
@@ -624,11 +627,6 @@ function boot() {
     if (inventory.hasItem(cfg.SHIP.SPACE_NODE_ITEM, 1)) installSpaceNode();
   });
 
-  // Equipos de la nave ampliada que aún no funcionan (etapas siguientes).
-  for (const [ev, text] of [
-    [GameEvents.ESCAPE_POD_REQUEST, 'Cápsula de escape: sistemas en espera.'],
-  ]) events.on(ev, () => message(text, 'info'));
-
   events.on(GameEvents.MAP_OPEN_REQUEST, () => {
     shipMapPanel.showTab('PLANET');
     shipMapPanel.setOpen(true);
@@ -691,6 +689,80 @@ function boot() {
   });
   spaceHUD.setEVA(eva, ship, render.camera);
 
+  // ---- Etapa 6: nodo galáctico, salto fallido, cápsulas de escape y fin de la demo ----
+  const bodiesNow = () => {
+    const c = celestial.catalog;
+    return [
+      { id: HOME, name: c.planet.name, radiusKm: c.planet.radiusKm, position: { x: 0, y: 0, z: 0 } },
+      ...c.bodies.map((b) => ({ id: b.id, name: b.name, radiusKm: b.radiusKm, position: orbitPosition(b, time.totalHours, {}) })),
+    ];
+  };
+  // El nodo galáctico está en una de las lunas (según la seed); aparece al llegar a ella.
+  const galacticMoon = () => (new SeededRandom(worlds.home.seed.value ^ 0x6a1ac).next() < 0.5 ? 'MOON_A' : 'MOON_B');
+  let galacticPlaced = false;
+  events.on(GameEvents.WORLD_GENERATED, () => (galacticPlaced = false));
+  events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
+    if (galacticPlaced || id !== galacticMoon()) return;
+    const w = worlds.get(id);
+    const site = w.getLandingSite();
+    if (!site) return;
+    galacticPlaced = true;
+    const spot = findDropSite(w, new SeededRandom(worlds.home.seed.value ^ 0x9a1), site, cfg.SHIP.GALACTIC_NODE_DROP_DISTANCE);
+    if (!spot) return;
+    pickups.add({
+      id: 'GALACTIC_NODE', body: id, x: spot.x, z: spot.z, model: 'GALACTIC_NODE',
+      label: `${cfg.ITEMS.GALACTIC_NODE.ICON} Nodo galáctico`, action: 'Coger',
+      contents: [{ item: cfg.SHIP.GALACTIC_NODE_ITEM, count: 1 }], mapLabel: 'Señal galáctica', mapColor: '#c07bff',
+    });
+    shipAI.say(`Detecto una señal galáctica en la ${planet.NAME}, no muy lejos de la zona de aterrizaje (haz violeta). Está en el mapa.`, 'ai-warn');
+  });
+  events.on(GameEvents.PICKUP_TAKEN, ({ id }) => {
+    if (id === 'GALACTIC_NODE') shipAI.say('¡Es un nodo galáctico! Instálalo en una ranura libre de la nave ampliada. Con él quizá podamos salir del sistema…');
+  });
+  events.on(GameEvents.GALACTIC_NODE_INSTALL_REQUEST, ({ slot }) => {
+    if (!inventory.removeItem(cfg.SHIP.GALACTIC_NODE_ITEM, 1)) return;
+    ship.installTech(slot, 'GALACTIC_NODE');
+    spaceTravel.galacticNode = true;
+    shipAI.say('Nodo galáctico instalado. Para intentar el salto, sal del sistema de MUNDO 0: vuela más allá de 65 000 km del planeta (Shift = impulso).');
+  });
+  // El salto falla: la nave queda inutilizada; solo queda evacuar en una cápsula.
+  events.on(GameEvents.GALACTIC_JUMP_ATTEMPT, () => {
+    ship.setCrippled(true);
+    shipAI.say('¡FALLO DEL SALTO GALÁCTICO! El nodo galáctico se ha sobrecargado. Motores y navegación fuera de servicio.', 'ai-warn');
+    setTimeout(() => shipAI.say('Evacúa: levántate (E) y ve a la sala de cápsulas de escape. Rumbo de emergencia: MUNDO 0.', 'ai-warn'), 3500);
+  });
+  const escape = new EscapeSystem({
+    config: cfg.SPACE.ESCAPE, events, worlds, ship, travel: spaceTravel, controller, input, getBodies: bodiesNow,
+  });
+  const podPanel = new PodPanel({ container: hudRoot, input, events, escape });
+  new EscapeOverlay({ events, input });
+  // Estadísticas para la pantalla final.
+  const visited = new Set([HOME]);
+  let meteorsSeen = 0;
+  events.on(GameEvents.BODY_CHANGED, ({ id }) => id !== 'SPACE' && visited.add(id));
+  events.on(GameEvents.METEOR_SPAWNED, () => meteorsSeen++);
+  events.on(GameEvents.ESCAPE_POD_ARRIVED, ({ emergency }) => {
+    if (!emergency) return;
+    // Fin de la demo: de vuelta en MUNDO 0 con la nave (y su nodo espacial) y el planeta como estaba.
+    ship.setCrippled(false);
+    ship.uninstallTech('GALACTIC_NODE');
+    ship.podsUsed = 0;
+    spaceTravel.resetAfterDemo();
+    ship.relocateTo(HOME);
+    lifeSupport.oxygen = 1;
+    lifeSupport.gas = 1;
+    events.emit(GameEvents.DEMO_END, {
+      stats: [
+        ['Días en el sistema', `${Math.floor(time.totalHours / 24) + 1}`],
+        ['Cuerpos visitados', [...visited].map((id) => worlds.profile(id)?.NAME ?? id).join(', ')],
+        ['Meteoritos avistados', `${meteorsSeen}`],
+        ['Mineral en la mochila', `${inventory.getItemCount('MINERAL')}`],
+        ['IA de a bordo', shipAI.aiName],
+      ],
+    });
+  });
+  events.on(GameEvents.DEMO_RESTART, () => shipAI.say('Bienvenido de vuelta a MUNDO 0. La nave está en la zona de aterrizaje. Gracias por jugar esta demo.'));
+
   // Mapa estelar 3D (tecnología Mapa): la escena espacial "de mapa".
   const starMap = new StarMap({
     config: cfg.SPACE,
@@ -736,7 +808,7 @@ function boot() {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport });
+  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
@@ -772,6 +844,7 @@ function boot() {
   loop.add(celestial);   // lunas en el cielo (tras la cámara: se colocan respecto a ella)
   loop.add(spaceTravel); // viaje por el espacio (tras la cámara: dibuja los cuerpos respecto a ella)
   loop.add(meteors);     // meteoritos cerca del rumbo
+  loop.add(escape);      // viaje en cápsula de escape
   loop.add(starMap);     // mapa estelar 3D
   loop.add(maps);        // mapas de MUNDO 0 y de la luna actual (se dibujan poco a poco)
   loop.add(ui);
@@ -783,6 +856,7 @@ function boot() {
   loop.add(shipWatch);
   loop.add(shipAI);
   loop.add(aiPanel);
+  loop.add(podPanel);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
@@ -793,7 +867,7 @@ function boot() {
     config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
-    worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva,
+    worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
   };
 }

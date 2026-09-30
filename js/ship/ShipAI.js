@@ -147,6 +147,10 @@ export class ShipAI {
       if (node && !node.taken) return 'Hay una señal en MUNDO 0: es un nodo espacial. Usa el mapa de la señal y busca el haz de luz azul.';
       return 'Llevas el nodo espacial: instálalo en una ranura libre de la nave (E sobre la ranura).';
     }
+    if (ship.crippled) return 'La nave está inutilizada. Ve a la sala de cápsulas de escape y evacúa a MUNDO 0.';
+    if (this._src.travel?.galacticNode) return 'Con el nodo galáctico instalado, sal del sistema: más allá de 65 000 km de MUNDO 0 (Shift = impulso).';
+    const gnode = pickups?.get('GALACTIC_NODE');
+    if (gnode && !gnode.taken) return `La señal galáctica está en ${worlds.profile(gnode.body)?.NAME ?? 'una luna'} (haz violeta, en el mapa).`;
     if (ship.batteries.ratio < 0.3) return 'La batería de la nave está baja: cambia baterías en el puesto de carga antes de volar lejos.';
     if (worlds.activeId === 'MUNDO_0') return 'Todo listo para el espacio: a los mandos, despega, sube por encima de 60 m y pulsa O. Luego 2 o 3 fija rumbo a una luna.';
     if (worlds.activeId === 'SPACE') return 'Elige destino con 1, 2 o 3 y acelera con W. Cuando estés cerca, T para aterrizar.';
@@ -185,6 +189,7 @@ export class ShipAI {
       else if (id === 'MUNDO_0' && previous && previous !== 'MUNDO_0') this.say('De vuelta en MUNDO 0. Aire respirable, gravedad normal.');
     });
     ev.on(G.METEOR_SPAWNED, ({ distanceKm }) => {
+      if (this._src.ship.crippled) return;
       this.say(`Meteorito detectado a ${Math.round(distanceKm)} km, con cristales minerales. Pulsa 4 a los mandos para acercarnos (no se puede aterrizar: habrá que bajar con el traje).`);
     });
     ev.on(G.SHIP_DECOMPRESSION, ({ ejected }) => {

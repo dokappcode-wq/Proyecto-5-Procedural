@@ -33,12 +33,13 @@ export class SpaceTravel {
     this._timer = 0;
     this._target = null;
     this._infoTimer = 0;
-    this.galacticNode = false; // Etapa 6
+    this.galacticNode = false; // Etapa 6: con él, salir de la zona intenta el salto (y falla)
+    this.crippled = false;     // tras el salto fallido la nave no se mueve
     this.meteors = null; // MeteorSystem (se conecta en main)
     this.nav = new SpaceNavigation({ config, bodies: () => view.bodyPositions(time.totalHours), extras: () => this.meteors?.extras() ?? [] });
     this._blockNotice = 0;
     this.nav.onEvent = (type) => {
-      if (type === 'ZONE_LIMIT') this._message('Límite del sistema: el nodo espacial no alcanza más allá.', 'danger');
+      if (type === 'ZONE_LIMIT' && !this.crippled) this._message('Límite del sistema: el nodo espacial no alcanza más allá.', 'danger');
       if (type === 'EXTRA_ARRIVED') {
         this._message('Detenidos junto al meteorito. No se puede aterrizar en él: ponte el traje, descomprime la cámara y sal con el jetpack.', 'biome');
       }
@@ -88,6 +89,10 @@ export class SpaceTravel {
   /** Aterrizar en el cuerpo indicado (o en el más cercano al que se pueda). */
   land(target = null) {
     if (this.state !== TravelState.SPACE) return false;
+    if (this.crippled) {
+      this._message('La nave no responde: evacúa en una cápsula de escape.', 'danger');
+      return false;
+    }
     const landable = this.nav.survey().landable;
     if (!landable || (target && landable.id !== target)) {
       this._message('Acércate más a MUNDO 0 o a una luna para aterrizar.', 'danger');
@@ -145,14 +150,20 @@ export class SpaceTravel {
     const ship = this._ship;
     const nav = this.nav;
     const powered = !ship.batteries.empty;
-    if (ship.piloting && ship.spaceControls) nav.update(dt, ship.spaceControls, powered);
+    if (ship.piloting && ship.spaceControls && !this.crippled) nav.update(dt, ship.spaceControls, powered);
     else nav.stop(dt);
     // Batería: mantenerse + empuje (el impulso gasta el doble).
     const thrust = Math.abs(nav.speed) / c.CRUISE_SPEED; // 1 = crucero, BOOST_MULTIPLIER = impulso
     const effort = thrust <= 1 ? thrust : 1 + (thrust - 1) / (c.BOOST_MULTIPLIER - 1); // impulso = ×2
     ship.batteries.drain((c.HOVER_DRAIN + c.THRUST_DRAIN * effort) * dt);
     if (nav.outsideZone) {
-      if (this.galacticNode) this._events.emit(GameEvents.GALACTIC_JUMP_ATTEMPT, {});
+      if (this.galacticNode && !this.crippled) {
+        // El salto galáctico falla: la nave queda a la deriva en el borde del sistema.
+        this.crippled = true;
+        nav.setAutopilot(null);
+        nav.speed = 0;
+        this._events.emit(GameEvents.GALACTIC_JUMP_ATTEMPT, {});
+      }
       nav.clampToZone();
     }
     ship.syncSpace(nav.yaw, nav.pitch, Math.min(1, thrust));
@@ -174,6 +185,29 @@ export class SpaceTravel {
         autopilot: nav.autopilotTarget,
         meteor: meteor ? { id: meteor.meteor.id, distanceM: meteor.distanceM } : null,
       });
+    }
+  }
+
+  /**
+   * El jugador deja la nave (cápsula de escape): el cuerpo activo pasa a ser el
+   * destino y la nave se queda donde está (en el espacio).
+   */
+  abandonShip(target) {
+    if (this.state === TravelState.SURFACE) return;
+    this._view.setVisible(false);
+    this._worlds.setActive(target);
+    this._setState(TravelState.SURFACE);
+  }
+
+  /** Vuelve a dejar el viaje como al principio (fin de la demo). */
+  resetAfterDemo() {
+    this.galacticNode = false;
+    this.crippled = false;
+    this.nav.setAutopilot(null);
+    this.nav.speed = 0;
+    if (this.state !== TravelState.SURFACE) {
+      this._view.setVisible(false);
+      this._setState(TravelState.SURFACE);
     }
   }
 

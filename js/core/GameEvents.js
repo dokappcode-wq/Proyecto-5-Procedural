@@ -113,6 +113,13 @@ export const GameEvents = Object.freeze({
   METEOR_SPAWNED: 'meteor:spawned',                 // { id, distanceKm }
   EVA_CHANGED: 'eva:changed',                       // { active }
 
+  // Nodo galáctico, cápsulas de escape y fin de la demo (Etapa 6)
+  SHIP_CRIPPLED: 'ship:crippled',                   // { crippled }  (salto galáctico fallido)
+  ESCAPE_POD_LAUNCH: 'pod:launch',                  // { target }
+  ESCAPE_POD_ARRIVED: 'pod:arrived',                // { target, emergency }
+  DEMO_END: 'demo:end',                             // { stats }
+  DEMO_RESTART: 'demo:restart',                     // {}
+
   // IA de la nave
   AI_SAY: 'ai:say',                                 // { text, type? }  mensaje de la IA
   AI_PANEL_REQUEST: 'ai:panel',                     // {}

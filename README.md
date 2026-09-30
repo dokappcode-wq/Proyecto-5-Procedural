@@ -3,7 +3,7 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: v1.0.0 — las 14 fases completas.**
+**Estado actual: v1.1.0 — las 14 fases + la ampliación "sistema de MUNDO 0" (etapas E1–E6 y la IA), con final de demo.**
 
 | Fase | Contenido |
 |---|---|
@@ -24,6 +24,7 @@ Sin motores externos y sin paso de compilación.
 | E3 | Nodo espacial caído en MUNDO 0 (con mapa); al instalarlo la nave se amplía |
 | IA | Nodo de IA en la sala de controles: IA con el nombre que quieras, datos del sistema y avisos de la nave |
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
+| E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
 
 ## Cómo ejecutarlo
@@ -278,6 +279,15 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   mineral. Para volver, acércate al pie de la rampa (te agarras solo). Atajos: Admin → Espacio →
   "Meteorito junto a la nave" / "Salir al exterior con traje (EVA)".
 
-Limitaciones: todavía no hay nodo galáctico ni cápsulas de escape operativas (Etapa 6); las baterías no se
+- **Nodo galáctico y final**: la IA avisa de una señal galáctica al llegar a la luna que la
+  tiene (según la seed, haz violeta). Instálalo en una ranura libre y vuela más allá de 65 000 km
+  de MUNDO 0 (Shift = impulso). El salto falla: alarma roja, la nave no responde. Ve a la sala de
+  cápsulas, `E` en una cápsula → Evacuar a MUNDO 0 → pantalla de fin de la demo. Al seguir,
+  estás en MUNDO 0 junto a la nave (con el nodo espacial) y el planeta como estaba.
+  Atajos: Admin → Espacio → "Instalar el nodo galáctico" y "Llevar la nave al borde del sistema".
+- **Cápsulas (uso normal)**: desde la nave, a MUNDO 0 o a una luna a menos de 45 000 km
+  (las lunas orbitan: a veces están cerca y a veces no). La IA trae la nave detrás. Hay 2.
+
+Limitaciones: las baterías no se
 recargan todavía (Admin → Nave → Recargar); la nave no choca con árboles en vuelo; la
 temperatura no se muestra como número (es oculta; el Admin sí la muestra).

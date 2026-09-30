@@ -1,7 +1,7 @@
 /**
  * Herramientas de depuración del cielo (Fase 12) y del espacio (Fase 13).
  */
-export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups, meteors, lifeSupport }) {
+export function registerSpaceTools(admin, { celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups, meteors, lifeSupport, inventory }) {
   // ---- Cuerpos (viaje directo, sin nave: depuración) ----
   admin.registerTool({ category: 'Cuerpos', type: 'info', label: 'Cuerpo actual', read: () => worlds.profile()?.NAME ?? worlds.activeId });
   for (const [id, name] of [['MUNDO_0', 'MUNDO 0'], ['MOON_A', 'la Luna A'], ['MOON_B', 'la Luna B']]) {
@@ -125,6 +125,31 @@ export function registerSpaceTools(admin, { celestial, travel, starMap, ship, ti
       if (!lifeSupport.wearing) lifeSupport.toggleSuit();
       const s = ship.ship;
       player.teleport(s.x, s.y - 3, s.z); // bajo el casco: fuera de la nave
+    },
+  });
+  // ---- Nodo galáctico y fin de la demo (Etapa 6) ----
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Instalar el nodo galáctico',
+    run: () => {
+      if (!ship.isExplorer) throw new Error('Primero instala el nodo espacial');
+      const slot = Object.entries(ship.installed).find(([, t]) => !t)?.[0];
+      if (!slot) throw new Error('No hay ranuras libres');
+      inventory.addItem('GALACTIC_NODE', 1);
+      events.emit('ship:galacticNode', { slot });
+    },
+  });
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Llevar la nave al borde del sistema',
+    run: () => {
+      if (!travel.inSpace) throw new Error('Primero sal al espacio');
+      const n = travel.nav;
+      const d = n.distanceFromCenter || 1;
+      const k = (travel._cfg.ZONE_RADIUS * 0.97) / d;
+      n.pos = { x: n.pos.x * k, y: n.pos.y * k, z: n.pos.z * k };
+      n.yaw = Math.atan2(-n.pos.x, -n.pos.z); // mirando hacia fuera (forward = −sin, −cos)
+      n.pitch = 0;
     },
   });
   admin.registerTool({ category: 'Espacio', label: 'Mapa estelar 3D', run: () => events.emit('starMap:request', { open: true }) });
