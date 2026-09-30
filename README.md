@@ -22,6 +22,7 @@ Sin motores externos y sin paso de compilación.
 | E1 | Varios cuerpos: MUNDO 0, Luna A (clara) y Luna B (rojiza), procedurales, con estado propio |
 | E2 | Espacio explorable: se pilota la nave (cámara detrás) entre MUNDO 0 y las lunas |
 | E3 | Nodo espacial caído en MUNDO 0 (con mapa); al instalarlo la nave se amplía |
+| IA | Nodo de IA en la sala de controles: IA con el nombre que quieras, datos del sistema y avisos de la nave |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
 
 ## Cómo ejecutarlo
@@ -253,6 +254,10 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   cámara para vaciarla y solo entonces abre la compuerta. Si la abres con la cámara presurizada
   estando dentro, sales disparado (en el espacio, mueres).
 
+- **IA de la nave**: `E` sobre el nodo de IA (ojo rosa en la sala de controles). Ponle nombre
+  (se recuerda en el navegador) y pregúntale por MUNDO 0, las lunas, el sistema, la nave, el
+  soporte vital, dónde estás o qué hacer. Además avisa sola: batería al 50/25/10 %, llegada a
+  una luna, salida al espacio, descompresión, límite del sistema, falta de aire.
 - **Traje y oxígeno**: en el laboratorio de la nave ampliada, `E` en la taquilla pone o quita el
   traje (con jetpack) y `E` en la estación de oxígeno llena su depósito. Sin aire aguantas la
   respiración 15 s (fila 🫁 Aire) y luego te asfixias. El traje gasta oxígeno fuera y batería

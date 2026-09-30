@@ -13,10 +13,11 @@
 // Perfil de luna: reutiliza las tres "ranuras" de bioma de MUNDO 0 (llanura, zona
 // irregular y montes) con otros nombres, colores y relieve. Sin agua, sin aire,
 // sin vida; con cráteres y poca gravedad. `tint` aclara u oscurece toda la luna.
-function moonProfile({ name, tones, temperature, gravity, craterChance, seaFloor = 2 }) {
+function moonProfile({ name, tones, temperature, gravity, craterChance, seaFloor = 2, data }) {
   const [light, mid, dark, dust] = tones;
   return {
     NAME: name,
+    DATA: data,
     KIND: 'MOON',
     HAS_SEA: false,
     BREATHABLE: false,
@@ -221,6 +222,13 @@ export const GameConfig = deepFreeze({
       HAS_SEA: true,
       BREATHABLE: true,
       GRAVITY_SCALE: 1,
+      // Lo que sabe la IA de la nave (nodo de IA).
+      DATA: {
+        LIFE: 'Mundo basado en carbono: la vida (árboles, hierba, ciervos, cabras y vacas) usa química del carbono y agua líquida.',
+        ATMOSPHERE: 'Atmósfera de nitrógeno y oxígeno, respirable. Presión y gravedad estándar (1 g).',
+        SURFACE: 'Una isla de 1 km rodeada de mar, con explanadas, bosques y montañas heladas.',
+        MOONS: 'Tiene 2 lunas: la Luna A, grande y clara, y la Luna B, pequeña, rojiza y lejana.',
+      },
       TERRAIN: {
         BASE_HEIGHT: 7,
         CONTINENT_FREQUENCY: 1 / 600,
@@ -332,9 +340,19 @@ export const GameConfig = deepFreeze({
     // Las dos lunas (se visitan con la nave ampliada). La A es clara; la B, oscura y rojiza.
     MOON_A: moonProfile({
       name: 'Luna A', tones: [0xd9d6cf, 0xbdb9b1, 0x8f8b84, 0xf2efe8], temperature: -30, gravity: 0.35, craterChance: 0.5,
+      data: {
+        LIFE: 'Sin vida: roca de silicatos (anortosita) muy clara.',
+        ATMOSPHERE: 'Sin atmósfera. Hace falta traje espacial u oxígeno.',
+        SURFACE: 'Regolito claro, cráteres y rocas con cristales minerales. Gravedad 0,35 g, unos −30 °C.',
+      },
     }),
     MOON_B: moonProfile({
       name: 'Luna B', tones: [0x8a5a44, 0x6e4636, 0x4a2f25, 0xa87458], temperature: -45, gravity: 0.25, craterChance: 0.65,
+      data: {
+        LIFE: 'Sin vida: roca rica en óxidos de hierro, de ahí su color rojizo.',
+        ATMOSPHERE: 'Sin atmósfera. Hace falta traje espacial u oxígeno.',
+        SURFACE: 'Muchos cráteres y minerales. Gravedad 0,25 g, unos −45 °C.',
+      },
     }),
   },
 
@@ -692,6 +710,7 @@ export const GameConfig = deepFreeze({
       OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', DESCRIPTION: 'Recarga el oxígeno del traje.' },
       SPACE_NODE: { NAME: 'Nodo espacial', ICON: '🔷', DESCRIPTION: 'Permite salir al espacio y viajar a las lunas.' },
       GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀', DESCRIPTION: 'Permitiría saltar fuera del sistema de MUNDO 0.' },
+      AI_NODE: { NAME: 'Nodo de IA', ICON: '🤖', DESCRIPTION: 'IA de a bordo: datos del sistema y avisos de la nave.' },
     },
     INSTALLED: {
       CONTROL_CONSOLE: 'FLIGHT_SYSTEM',
@@ -699,7 +718,7 @@ export const GameConfig = deepFreeze({
       LAB_2: 'CHARGING_STATION',
       LAB_3: null,
       LAB_4: null,
-      CONTROL_1: null,
+      CONTROL_1: 'AI_NODE',
       CONTROL_2: null,
     },
     // Nave ampliada (tras instalar el nodo espacial).
@@ -710,7 +729,7 @@ export const GameConfig = deepFreeze({
       LAB_3: 'SUIT_LOCKER',
       LAB_4: 'OXYGEN_STATION',
       ENGINE_1: 'SPACE_NODE',
-      CONTROL_1: null,
+      CONTROL_1: 'AI_NODE',
       CONTROL_2: null,
       LOUNGE_1: null,
     },

@@ -68,6 +68,8 @@ export class ShipModel {
     this.L = layout;
     this.installed = installed;
     this.batteries = [];
+    this.nodeCore = null;
+    this.aiEye = null;
     this._buildHull();
     this._buildMoving();
     this.lights = layout.blueprint.lights.map(([x, y, z]) => {
@@ -328,6 +330,17 @@ export class ShipModel {
         this.nodeCore.position.set((k.minX + k.maxX) / 2, 3.4, cz);
         this.root.add(this.nodeCore);
         break;
+      case 'AI_NODE': { // nodo de IA: consola con un "ojo" que late
+        slabBox(b, k, DARK);
+        slab(b, dir < 0 ? -I : I - 0.1, dir < 0 ? -I + 0.1 : I, k.maxY, 4.5, k.minZ, k.maxZ, METAL);
+        this.aiEye = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff7ad9 }));
+        this.aiEye.position.set(dir < 0 ? -I + 0.2 : I - 0.2, 3.95, cz);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 6, 24), new THREE.MeshBasicMaterial({ color: 0x8a96a6 }));
+        ring.position.copy(this.aiEye.position);
+        ring.rotation.y = Math.PI / 2;
+        this.root.add(this.aiEye, ring);
+        break;
+      }
       default: { // ranura libre: pedestal y panel con "+"
         slabBox(b, k, METAL);
         slab(b, dir < 0 ? -I : I - 0.08, dir < 0 ? -I + 0.08 : I, k.maxY, 4.4, k.minZ, k.maxZ, DARK);
@@ -453,6 +466,7 @@ export class ShipModel {
     });
     this._buttonMaterial.color.set((ship.hatch ?? 0) > 0.01 ? 0x4dff7a : 0xff4a3a);
     this._engineMaterial.opacity = airborne ? 0.55 + 0.4 * thrust + Math.sin(this._t * 30) * 0.05 : 0.2;
+    if (this.aiEye) this.aiEye.scale.setScalar(0.85 + Math.sin(this._t * 2.4) * 0.15);
     if (this.nodeCore) {
       this.nodeCore.rotation.y += dt * 1.2;
       this.nodeCore.rotation.x += dt * 0.7;

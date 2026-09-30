@@ -63,6 +63,8 @@ import { BubbleSystem } from './world/BubbleSystem.js';
 import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
 import { LifeSupportHUD } from './ui/LifeSupportHUD.js';
+import { ShipAI } from './ship/ShipAI.js';
+import { AIPanel } from './ui/AIPanel.js';
 import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
 import { ShipMapPanel } from './ui/ShipMapPanel.js';
 import { ShipChargerPanel } from './ui/ShipChargerPanel.js';
@@ -673,6 +675,14 @@ function boot() {
     },
   });
   events.on(GameEvents.STAR_MAP_TOGGLED, ({ open }) => setControlLock('starmap', open));
+  // IA de la nave (nodo de IA): nombre, datos del sistema y avisos.
+  const shipAI = new ShipAI({
+    events,
+    planets: cfg.PLANETS,
+    sources: { ship, lifeSupport, worlds, getCatalog: () => celestial.catalog, pickups, travel: spaceTravel },
+  });
+  events.on(GameEvents.AI_SAY, ({ name, text, type }) => events.emit(GameEvents.UI_MESSAGE, { text: `🤖 ${name}: ${text}`, type }));
+  const aiPanel = new AIPanel({ container: hudRoot, input, events, ai: shipAI });
   const starMapHUD = new StarMapHUD({ container: hudRoot, events, map: starMap, spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED });
   // Reloj de la nave: se coge en el laboratorio; al usarlo muestra dónde está la nave.
   const shipWatch = new ShipWatchHUD({ container: hudRoot, events, player, ship, time, inventory, watchItem: cfg.SHIP.WATCH_ITEM });
@@ -735,6 +745,8 @@ function boot() {
   loop.add(shipMapPanel);
   loop.add(shipChargerPanel);
   loop.add(shipWatch);
+  loop.add(shipAI);
+  loop.add(aiPanel);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
@@ -745,7 +757,7 @@ function boot() {
     config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
-    worlds, pickups, bubbles, lifeSupport, stations,
+    worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
   };
 }

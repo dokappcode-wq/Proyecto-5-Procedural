@@ -570,6 +570,7 @@ export class ShipSystem {
       const actions = {
         PLANET_MAP: 'Abrir mapa', CHARGING_STATION: 'Ver baterías', SUIT_LOCKER: this._suitOn ? 'Dejar el traje' : 'Ponerse el traje y el jetpack',
         OXYGEN_STATION: 'Recargar oxígeno del traje', SPACE_NODE: 'Examinar', GALACTIC_NODE: 'Examinar',
+        AI_NODE: 'Hablar con la IA',
       };
       const action = tech ? actions[techId] ?? 'Examinar' : carryingNode ? 'Instalar el nodo espacial' : 'Examinar';
       add(`SLOT:${slotId}`, slot.aim, tech ? `${tech.ICON} ${tech.NAME}` : 'Ranura de tecnología libre', action, 0.6);
@@ -622,6 +623,9 @@ export class ShipSystem {
         return true;
       case 'OXYGEN_STATION':
         this._events.emit(GameEvents.OXYGEN_REFILL_REQUEST, { source: 'SHIP' });
+        return true;
+      case 'AI_NODE':
+        this._events.emit(GameEvents.AI_PANEL_REQUEST, {});
         return true;
       case 'SPACE_NODE':
         this._message('Nodo espacial: permite salir al espacio. A los mandos, vuela alto y pulsa [O].');
