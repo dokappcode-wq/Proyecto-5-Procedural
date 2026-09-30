@@ -5,8 +5,8 @@ import { createMoonGeometry } from '../celestial/CelestialSystem.js';
 import { createPlanetTextures } from './PlanetTexture.js';
 
 /**
- * SpaceScene — escena espacial separada (Fase 13): MUNDO 0 con su mapa real,
- * nubes y atmósfera, las dos lunas en sus órbitas, el sol, las estrellas y la nave.
+ * SpaceScene — escena espacial separada (Fase 13): el planeta de inicio con su
+ * mapa real, nubes y atmósfera, sus lunas en sus órbitas, el sol, las estrellas y la nave.
  *
  * Unidades: el planeta mide `PLANET_RADIUS`; las distancias de las lunas se
  * escalan con él (km × PLANET_RADIUS / PLANET_RADIUS_KM) y su tamaño se exagera
@@ -16,9 +16,10 @@ import { createPlanetTextures } from './PlanetTexture.js';
 const SUN_DIR = new THREE.Vector3(1, 0.12, 0.08).normalize();
 
 export class SpaceScene {
-  constructor({ config, celestialConfig }) {
+  constructor({ config, system }) {
     this._cfg = config;
-    this._kmScale = config.PLANET_RADIUS / celestialConfig.PLANET_RADIUS_KM;
+    this._system = system;
+    this._kmScale = config.PLANET_RADIUS / system.home.radiusKm;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x02040a);
     this.camera = new THREE.PerspectiveCamera(config.CAMERA_FOV, window.innerWidth / window.innerHeight, 0.5, 9000);
@@ -60,7 +61,7 @@ export class SpaceScene {
   _buildPlanet() {
     const R = this._cfg.PLANET_RADIUS;
     this.planet = new THREE.Group();
-    this.planet.name = 'MUNDO_0';
+    this.planet.name = 'HomePlanet';
     this._surfaceMaterial = new THREE.MeshLambertMaterial({ color: 0x2d6f98 });
     this.surface = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 64), this._surfaceMaterial);
     this._cloudMaterial = new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.85, depthWrite: false });
@@ -99,14 +100,14 @@ export class SpaceScene {
     );
     this.scene.add(atmosphere);
 
-    // La nave, en órbita baja sobre la isla de MUNDO 0 (hija del planeta: gira con él).
+    // La nave, en órbita baja sobre la isla del planeta (hija del planeta: gira con él).
     const shipGeo = new THREE.ConeGeometry(0.9, 2.6, 6);
     shipGeo.rotateZ(-Math.PI / 2);
     this.ship = new THREE.Mesh(shipGeo, new THREE.MeshBasicMaterial({ color: 0xffa060 }));
     this.ship.position.set(R * 1.12, R * 0.02, 0);
     this.scene.add(this.ship);
     this.scene.add(this.planet);
-    this.bodies.MUNDO_0 = { object: this.planet, radius: R, name: 'MUNDO 0' };
+    this.bodies[this._system.homeId] = { object: this.planet, radius: R, name: this._system.home.name };
     this.bodies.SHIP = { object: this.ship, radius: 1.5, name: 'Tu nave' };
   }
 
@@ -160,7 +161,7 @@ export class SpaceScene {
   }
 
   _buildMoons(catalog) {
-    for (const id of ['MOON_A', 'MOON_B']) {
+    for (const { id } of this._system.moons) {
       const old = this.bodies[id];
       if (old) {
         this.scene.remove(old.object, old.orbit);
@@ -196,7 +197,7 @@ export class SpaceScene {
     this.planet.updateMatrixWorld(true);
     this.cloudLayer.rotation.y += dt * 0.004;
     const p = {};
-    for (const id of ['MOON_A', 'MOON_B']) {
+    for (const { id } of this._system.moons) {
       const b = this.bodies[id];
       if (!b) continue;
       orbitPosition(b.body, totalHours, p);
@@ -205,11 +206,12 @@ export class SpaceScene {
     }
     // La nave: en el espacio, donde esté; en un cuerpo, sobre su zona de aterrizaje.
     const R = this._cfg.PLANET_RADIUS;
-    const loc = shipLocation ?? { body: 'MUNDO_0' };
+    const home = this._system.homeId;
+    const loc = shipLocation ?? { body: home };
     if (loc.body === 'SPACE' && loc.pos) {
       this.ship.position.set(loc.pos.x, loc.pos.y, loc.pos.z).multiplyScalar(this._kmScale);
       this.ship.rotation.set(0, loc.yaw ?? 0, 0);
-    } else if (this.bodies[loc.body] && loc.body !== 'MUNDO_0') {
+    } else if (this.bodies[loc.body] && loc.body !== home) {
       const m = this.bodies[loc.body];
       this.ship.position.copy(m.object.position).add(new THREE.Vector3(m.radius * 1.4, 0, 0));
     } else {

@@ -3,21 +3,19 @@ import { GameEvents } from '../core/GameEvents.js';
 import { SpaceScene } from './SpaceScene.js';
 
 /**
- * StarMap — mapa estelar 3D del sistema de MUNDO 0 (tecnología Mapa de la nave).
+ * StarMap — mapa estelar 3D del sistema (tecnología Mapa de la nave).
  *
- * Es la escena espacial "de mapa": MUNDO 0 con su mapa real, las dos lunas en su
+ * Es la escena espacial "de mapa": el planeta con su mapa real, las lunas en su
  * órbita según la hora, cinturones de asteroides y la posición actual de la nave.
  * Se abre desde el mapa de la nave (o con M a los mandos) y se cierra con M/Esc.
- * La cámara orbita el cuerpo enfocado (1 MUNDO 0 · 2 Luna A · 3 Luna B · 4 la nave).
+ * La cámara orbita el cuerpo enfocado (1 el planeta · 2… las lunas · la última tecla, la nave).
  * Es una escena aparte (RenderContext.setActive): el juego sigue debajo.
  */
-const FOCUS_KEYS = ['MUNDO_0', 'MOON_A', 'MOON_B', 'SHIP'];
-
 export class StarMap {
   /**
    * @param {object} p.sources { getCatalog(), getMapCanvas(), getSeed(), planet, noonHour, getShipLocation() }
    */
-  constructor({ config, celestialConfig, render, input, events, time, sources }) {
+  constructor({ config, system, render, input, events, time, sources }) {
     this.name = 'starMap';
     this._cfg = config;
     this._render = render;
@@ -26,9 +24,11 @@ export class StarMap {
     this._time = time;
     this._src = sources;
     this.isOpen = false;
-    this.focus = 'MUNDO_0';
+    this._system = system;
+    this.focusKeys = [...system.visitable.map((b) => b.id), 'SHIP'];
+    this.focus = system.homeId;
     this._timer = 0;
-    this._space = new SpaceScene({ config, celestialConfig });
+    this._space = new SpaceScene({ config, system });
     render.addCamera(this._space.camera);
 
     this._orbit = { yaw: 0.6, pitch: 0.25, distance: 0 };
@@ -61,7 +61,7 @@ export class StarMap {
         planet: this._src.planet,
       });
       this.isOpen = true;
-      this.focusOn(this._src.getShipLocation?.().body === 'SPACE' ? 'SHIP' : 'MUNDO_0');
+      this.focusOn(this._src.getShipLocation?.().body === 'SPACE' ? 'SHIP' : this._system.homeId);
       this._orbit.distance = this._distanceGoal * 1.6;
       this._render.setActive(this._space.scene, this._space.camera);
     } else {
@@ -76,7 +76,7 @@ export class StarMap {
     const b = this._space.bodies[id];
     if (!b) return;
     this.focus = id;
-    this._distanceGoal = Math.max(8, b.radius * (id === 'MUNDO_0' ? 3.4 : id === 'SHIP' ? 14 : 4.5));
+    this._distanceGoal = Math.max(8, b.radius * (id === this._system.homeId ? 3.4 : id === 'SHIP' ? 14 : 4.5));
     this._events.emit(GameEvents.SPACE_FOCUS_CHANGED, { id, name: b.name });
   }
 
@@ -91,7 +91,7 @@ export class StarMap {
 
   _updateSpace(dt) {
     const input = this._input;
-    FOCUS_KEYS.forEach((id, i) => input.wasPressed(`HOTBAR_${i + 1}`) && this.focusOn(id));
+    this.focusKeys.forEach((id, i) => input.wasPressed(`HOTBAR_${i + 1}`) && this.focusOn(id));
 
     const m = input.getMouseDelta();
     const o = this._orbit;
@@ -137,7 +137,7 @@ export class StarMap {
   /** Datos del cuerpo enfocado para el panel. */
   getFocusInfo() {
     const catalog = this._src.getCatalog();
-    if (this.focus === 'MUNDO_0') return { id: 'MUNDO_0', name: catalog.planet.name, radiusKm: catalog.planet.radiusKm, home: true };
+    if (this.focus === this._system.homeId) return { id: this.focus, name: catalog.planet.name, radiusKm: catalog.planet.radiusKm, home: true };
     if (this.focus === 'SHIP') return { id: 'SHIP', name: 'Tu nave', ship: true, location: this._src.getShipLocation?.() };
     return { ...catalog.bodies.find((b) => b.id === this.focus) };
   }

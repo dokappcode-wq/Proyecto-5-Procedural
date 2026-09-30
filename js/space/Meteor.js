@@ -8,7 +8,7 @@ import { SeededRandom } from '../core/SeededRandom.js';
  * dirección unitaria `dir`; el EVA la usa para caminar alrededor y el modelo 3D
  * para deformar una icosfera. Tiene cúmulos de cristales (mineral) que se pican.
  *
- * Posición en km (sistema de MUNDO 0), tamaños en metros.
+ * Posición en km (centrado en el planeta de inicio), tamaños en metros.
  */
 export function createMeteor({ id, seed, position, radiusRange = [26, 48], crystals = [5, 8], yields = 3 }) {
   const rng = new SeededRandom(seed);

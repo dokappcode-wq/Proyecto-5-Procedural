@@ -32,7 +32,7 @@ import {
  *   raycastDistance(origin, dir, max) oclusión de la cámara
  */
 export class ConstructionSystem {
-  constructor({ scene, camera, config, world, player, input, inventory, items, events }) {
+  constructor({ scene, camera, config, world, player, input, inventory, items, events, homeId }) {
     this.name = 'construction';
     this._cfg = config;
     this._camera = camera;
@@ -58,10 +58,10 @@ export class ConstructionSystem {
 
     this._scene = scene;
     this.group = new THREE.Group();
-    this.group.name = 'Buildings_MUNDO_0';
+    this.group.name = `Buildings_${homeId}`;
     scene.add(this.group);
-    // Cada cuerpo (MUNDO 0, lunas) guarda sus propias construcciones.
-    this._bodyId = 'MUNDO_0';
+    // Cada cuerpo (planeta, lunas) guarda sus propias construcciones.
+    this._bodyId = homeId;
     this._bodyStates = new Map([[this._bodyId, { pieces: this.pieces, slots: this._slots, group: this.group }]]);
 
     this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -112,11 +112,11 @@ export class ConstructionSystem {
     this._events.emit(GameEvents.BUILD_MODE_CHANGED, { active, pieceId: this.selected, pieces: this.pieceDefs() });
   }
 
-  /** Piezas disponibles en un cuerpo: en las lunas, estaciones en vez de vallas y camas; en el espacio, ninguna. */
+  /** Piezas disponibles en un cuerpo: sin aire, estaciones en vez de vallas y camas; en el espacio, ninguna. */
   _piecesFor(profile) {
     const all = Object.keys(this._cfg.PIECES);
     if (profile?.KIND === 'SPACE') return [];
-    if (profile?.KIND === 'MOON') return all.filter((id) => !(this._cfg.HOME_ONLY ?? []).includes(id));
+    if (profile?.BREATHABLE === false) return all.filter((id) => !(this._cfg.HOME_ONLY ?? []).includes(id));
     return all.filter((id) => this._cfg.PIECES[id].BODIES !== 'MOON');
   }
 

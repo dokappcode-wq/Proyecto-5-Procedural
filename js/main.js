@@ -33,7 +33,9 @@ import { ItemUseSystem } from './inventory/ItemUseSystem.js';
 import { SleepSystem } from './player/SleepSystem.js';
 import { CraftingPanel } from './ui/CraftingPanel.js';
 import { registerCraftTools } from './admin/tools/CraftTools.js';
-import { WorldManager, HOME } from './world/WorldManager.js';
+import { WorldManager } from './world/WorldManager.js';
+import { loadSystem } from './systemdata/SystemLoader.js';
+import { SolarSystem, withPrep } from './systemdata/SolarSystem.js';
 import { createPlanetTextures } from './space/PlanetTexture.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -54,7 +56,7 @@ import { SpaceHUD } from './ui/SpaceHUD.js';
 import { SpaceWorld } from './space/SpaceWorld.js';
 import { SpaceView, SPACE_SUN_DIR } from './space/SpaceView.js';
 import { SpaceTravel } from './space/SpaceTravel.js';
-import { SeededRandom } from './core/SeededRandom.js';
+import { SeededRandom, hashString } from './core/SeededRandom.js';
 import { registerSpaceTools } from './admin/tools/SpaceTools.js';
 import { ShipSystem } from './ship/ShipSystem.js';
 import { toWorld as toShipWorld } from './ship/ShipLayout.js';
@@ -79,9 +81,12 @@ import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 
-function boot() {
+function boot(system) {
   const cfg = GameConfig;
   const events = new EventBus();
+  const HOME = system.homeId;
+  const homeProfile = system.home.profile;
+  const homeName = system.home.name;
 
   // ---- Infraestructura -----------------------------------------------------
   const render = new RenderContext({
@@ -91,10 +96,10 @@ function boot() {
   });
   const input = new InputManager({ config: cfg.INPUT, domElement: render.domElement, events });
 
-  // ---- Mundos: MUNDO 0 y sus lunas (cada uno conserva su estado) -------------
+  // ---- Mundos: el planeta de inicio y sus lunas (cada uno conserva su estado) ----
   const worlds = new WorldManager({
     scene: render.scene,
-    planets: cfg.PLANETS,
+    system,
     events,
     options: {
       config: cfg.WORLD,
@@ -107,8 +112,6 @@ function boot() {
   });
   // Todos los sistemas consultan el cuerpo ACTIVO a través de este proxy.
   const world = worlds.proxy;
-  // Seed: ?seed=... en la URL o la seed por defecto de la configuración.
-  const urlSeed = new URLSearchParams(window.location.search).get('seed');
 
   // ---- Ambiente: luz y cielo comparten la dirección del sol -----------------
   const lighting = new SceneLighting({ scene: render.scene, renderConfig: cfg.RENDER, config: cfg.LIGHTING });
@@ -117,7 +120,7 @@ function boot() {
   // Día y noche (Fase 11): TimeSystem calcula la hora; AtmosphereSystem la aplica a luz, cielo y niebla.
   const time = new TimeSystem({ config: cfg.TIME, events });
   // Sol y dos lunas (Fase 12): TimeSystem da la hora; la luz de noche viene de la luna visible.
-  const celestial = new CelestialSystem({ config: cfg.CELESTIAL, time, scene: render.scene, camera: render.camera, events });
+  const celestial = new CelestialSystem({ config: cfg.CELESTIAL, system, time, scene: render.scene, camera: render.camera, events });
   const atmosphere = new AtmosphereSystem({
     time, lighting, sky, celestial, scene: render.scene, palette: cfg.TIME.PALETTE, renderConfig: cfg.RENDER,
   });
@@ -184,9 +187,9 @@ function boot() {
   // ---- Mundo vivo: animales y descubrimientos ------------------------------
   const animals = new AnimalSystem({
     config: cfg.ANIMALS,
-    fauna: cfg.PLANETS.MUNDO_0.FAUNA,
+    fauna: homeProfile.FAUNA,
     scene: render.scene,
-    world: worlds.home, // los animales viven en MUNDO 0
+    world: worlds.home, // los animales viven en el planeta de inicio
     player,
     events,
     hitKnockback: cfg.INTERACTION.HIT_KNOCKBACK,
@@ -196,7 +199,7 @@ function boot() {
     animals,
     target: player,
     events,
-    waterDistance: cfg.PLANETS.MUNDO_0.WATER.DISCOVERY_DISTANCE,
+    waterDistance: homeProfile.WATER.DISCOVERY_DISTANCE,
     animalDistance: cfg.ANIMALS.DISCOVERY_DISTANCE,
     species: cfg.ANIMALS.SPECIES,
   });
@@ -220,11 +223,13 @@ function boot() {
     inventory,
     items: cfg.ITEMS,
     events,
+    homeId: HOME,
   });
   // Nave pequeña: estructura en la que se entra y con la que se vuela (Tecnologías 1–3).
   const ship = new ShipSystem({
     config: cfg.SHIP,
     spaceConfig: cfg.SPACE,
+    system,
     scene: render.scene,
     world,
     player,
@@ -370,7 +375,7 @@ function boot() {
   // Temperatura oculta (Fase 10): bioma, altura, noche, armadura y refugio (casa o nave).
   const temperature = new TemperatureSystem({
     config: cfg.TEMPERATURE,
-    biomes: cfg.PLANETS.MUNDO_0.BIOMES,
+    biomes: homeProfile.BIOMES,
     world,
     time,
     player,
@@ -407,7 +412,7 @@ function boot() {
   });
   events.on(GameEvents.PLAYER_RESPAWNED, () => {
     if (worlds.activeId !== HOME) {
-      // Fuera de MUNDO 0: dentro de la nave si está aquí; si no, en la zona de aterrizaje.
+      // Fuera del planeta de inicio: dentro de la nave si está aquí; si no, en la zona de aterrizaje.
       if (ship.present) {
         const r = ship.getRespawnPoint();
         player.teleport(r.x, r.y, r.z);
@@ -445,6 +450,7 @@ function boot() {
   const ui = new UIManager({
     config: cfg.UI,
     gameInfo: cfg.GAME,
+    system,
     items: cfg.ITEMS,
     equipmentConfig: cfg.EQUIPMENT,
     buildConfig: cfg.BUILD,
@@ -459,17 +465,17 @@ function boot() {
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
   const planetMap = new PlanetMapRenderer({
     world: worlds.home,
-    planet: cfg.PLANETS.MUNDO_0,
+    planet: homeProfile,
     worldSize: cfg.WORLD.WORLD_SIZE,
     resolution: cfg.SHIP.MAP_RESOLUTION,
   });
   // Mapas de las lunas (se dibujan la primera vez que se visitan).
   const moonMaps = new Map();
   const mapOf = (id) => {
-    if (id === HOME || !cfg.PLANETS[id]) return planetMap;
+    if (id === HOME || !system.profiles[id]) return planetMap;
     if (!moonMaps.has(id)) {
       moonMaps.set(id, new PlanetMapRenderer({
-        world: worlds.get(id), planet: cfg.PLANETS[id], worldSize: cfg.WORLD.WORLD_SIZE, resolution: cfg.SHIP.MAP_RESOLUTION,
+        world: worlds.get(id), planet: system.profiles[id], worldSize: cfg.WORLD.WORLD_SIZE, resolution: cfg.SHIP.MAP_RESOLUTION,
       }));
     }
     return moonMaps.get(id);
@@ -478,16 +484,16 @@ function boot() {
     name: 'planetMaps',
     update() {
       planetMap.update();
-      if (worlds.activeId !== HOME && cfg.PLANETS[worlds.activeId]) mapOf(worlds.activeId).update();
+      if (worlds.activeId !== HOME && system.profiles[worlds.activeId]) mapOf(worlds.activeId).update();
     },
   };
-  // Textura de MUNDO 0 visto desde fuera (lunas, espacio): se crea una vez por seed.
+  // Textura del planeta de inicio visto desde fuera (lunas, espacio): se crea una vez por seed.
   let planetTextures = null;
   const getPlanetTextures = () => {
     const seed = worlds.home.seed.sub.celestial;
     if (!planetTextures || planetTextures.seed !== seed || (!planetTextures.withMap && planetMap.ready)) {
       const t = createPlanetTextures({
-        width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: planetMap.ready ? planetMap.canvas : null, planet: cfg.PLANETS.MUNDO_0,
+        width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: planetMap.ready ? planetMap.canvas : null, planet: homeProfile,
       });
       const toTex = (c) => Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace });
       planetTextures = { seed, withMap: planetMap.ready, surface: toTex(t.surface), clouds: toTex(t.clouds) };
@@ -514,10 +520,10 @@ function boot() {
       id: 'MOON_CHEST', body: id, x, z, model: 'CHEST', label: '📦 Cofre de suministros', action: 'Abrir',
       contents: cfg.LIFE_SUPPORT.MOON_CHEST, mapLabel: 'Cofre de suministros', mapColor: '#ffd27a',
     });
-    message(`📦 Hay un cofre de suministros junto a la zona de aterrizaje de la ${planet.NAME} (haz amarillo). Ponte el traje antes de salir.`);
+    message(`📦 Hay un cofre de suministros junto a la zona de aterrizaje ${withPrep('de', planet.NAME)} (haz amarillo). Ponte el traje antes de salir.`);
   });
 
-  // Cambio de cuerpo (MUNDO 0 ↔ lunas ↔ espacio): cada sistema se adapta a él.
+  // Cambio de cuerpo (planeta ↔ lunas ↔ espacio): cada sistema se adapta a él.
   events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
     construction.setBody(id, planet);
     animals.setActive(id === HOME);
@@ -550,8 +556,12 @@ function boot() {
       ship,
       time,
       get planetConfig() {
-        return worlds.profile() ?? cfg.PLANETS.MUNDO_0;
+        return worlds.profile() ?? homeProfile;
       },
+      homeConfig: homeProfile,
+      homeMap: planetMap,
+      systemName: system.name,
+      onHome: () => worlds.activeId === HOME,
       getCatalog: () => celestial.catalog,
       getBed: () => (respawnBed && !respawnBed.ship && construction.exists(respawnBed) ? respawnBed : null),
       getMarkers: () => pickups.markers(worlds.activeId),
@@ -568,7 +578,7 @@ function boot() {
     items: cfg.ITEMS,
     config: cfg.SHIP,
   });
-  // ---- Nodo espacial: cae en un sitio aleatorio de MUNDO 0 (según la seed) ----------
+  // ---- Nodo espacial: cae en un sitio aleatorio del planeta de inicio (según la seed) ----------
   const message = (text, type = 'biome') => events.emit(GameEvents.UI_MESSAGE, { text, type });
   let gameStarted = false;
   const dropSpaceNode = () => {
@@ -589,7 +599,7 @@ function boot() {
     const node = pickups.get('SPACE_NODE');
     if (!gameStarted || !node || node.taken || ship.hasSpaceNode || inventory.hasItem(cfg.SHIP.NODE_MAP_ITEM, 1)) return;
     inventory.addItem(cfg.SHIP.NODE_MAP_ITEM, 1);
-    message('📡 Una señal: el nodo espacial ha caído en MUNDO 0. Usa el 📜 mapa (selecciónalo y clic derecho / R) y busca el haz de luz azul.');
+    message(`📡 Una señal: el nodo espacial ha caído ${withPrep('en', homeName)}. Usa el 📜 mapa (selecciónalo y clic derecho / R) y busca el haz de luz azul.`);
   };
   events.on(GameEvents.WORLD_GENERATED, () => {
     dropSpaceNode();
@@ -637,12 +647,13 @@ function boot() {
   });
   new ShipPilotHUD({ container: hudRoot, events, shipName: cfg.SHIP.NAME });
 
-  // El espacio: un "cuerpo" sin suelo donde la nave vuela entre MUNDO 0 y sus lunas.
+  // El espacio: un "cuerpo" sin suelo donde la nave vuela entre el planeta y sus lunas.
   worlds.registerExtra('SPACE', new SpaceWorld({ getSeed: () => worlds.home.seed }));
   const noonHour = (cfg.TIME.SUNRISE_HOUR + cfg.TIME.SUNSET_HOUR) / 2;
-  const spaceView = new SpaceView({ scene: render.scene, config: cfg.SPACE, celestialConfig: cfg.CELESTIAL });
+  const spaceView = new SpaceView({ scene: render.scene, config: cfg.SPACE });
   const spaceTravel = new SpaceTravel({
     config: cfg.SPACE,
+    system,
     events,
     worlds,
     ship,
@@ -658,7 +669,7 @@ function boot() {
   });
   // Solo durante los fundidos se suspende el control (en el espacio se pilota o se camina por la nave).
   events.on(GameEvents.SPACE_STATE_CHANGED, ({ state }) => setControlLock('space', state === 'ASCENDING' || state === 'DESCENDING'));
-  const spaceHUD = new SpaceHUD({ container: hudRoot, events, travel: spaceTravel });
+  const spaceHUD = new SpaceHUD({ container: hudRoot, events, travel: spaceTravel, system });
   // Meteoritos (Etapa 5): aparecen de vez en cuando; no se aterriza, se baja con el traje.
   const meteors = new MeteorSystem({
     scene: render.scene,
@@ -698,7 +709,11 @@ function boot() {
     ];
   };
   // El nodo galáctico está en una de las lunas (según la seed); aparece al llegar a ella.
-  const galacticMoon = () => (new SeededRandom(worlds.home.seed.value ^ 0x6a1ac).next() < 0.5 ? 'MOON_A' : 'MOON_B');
+  const galacticMoon = () => {
+    const moons = system.moons;
+    if (!moons.length) return HOME; // sin lunas, en el propio planeta
+    return moons[Math.floor(new SeededRandom(worlds.home.seed.value ^ 0x6a1ac).next() * moons.length)].id;
+  };
   let galacticPlaced = false;
   events.on(GameEvents.WORLD_GENERATED, () => (galacticPlaced = false));
   events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
@@ -714,7 +729,7 @@ function boot() {
       label: `${cfg.ITEMS.GALACTIC_NODE.ICON} Nodo galáctico`, action: 'Coger',
       contents: [{ item: cfg.SHIP.GALACTIC_NODE_ITEM, count: 1 }], mapLabel: 'Señal galáctica', mapColor: '#c07bff',
     });
-    shipAI.say(`Detecto una señal galáctica en la ${planet.NAME}, no muy lejos de la zona de aterrizaje (haz violeta). Está en el mapa.`, 'ai-warn');
+    shipAI.say(`Detecto una señal galáctica ${withPrep('en', planet.NAME)}, no muy lejos de la zona de aterrizaje (haz violeta). Está en el mapa.`, 'ai-warn');
   });
   events.on(GameEvents.PICKUP_TAKEN, ({ id }) => {
     if (id === 'GALACTIC_NODE') shipAI.say('¡Es un nodo galáctico! Instálalo en una ranura libre de la nave ampliada. Con él quizá podamos salir del sistema…');
@@ -723,19 +738,19 @@ function boot() {
     if (!inventory.removeItem(cfg.SHIP.GALACTIC_NODE_ITEM, 1)) return;
     ship.installTech(slot, 'GALACTIC_NODE');
     spaceTravel.galacticNode = true;
-    shipAI.say('Nodo galáctico instalado. Para intentar el salto, sal del sistema de MUNDO 0: vuela más allá de 65 000 km del planeta (Shift = impulso).');
+    shipAI.say(`Nodo galáctico instalado. Para intentar el salto, sal del ${system.name}: vuela más allá de ${cfg.SPACE.ZONE_RADIUS.toLocaleString('es-ES')} km ${withPrep('de', homeName)} (Shift = impulso).`);
   });
   // El salto falla: la nave queda inutilizada; solo queda evacuar en una cápsula.
   events.on(GameEvents.GALACTIC_JUMP_ATTEMPT, () => {
     ship.setCrippled(true);
     shipAI.say('¡FALLO DEL SALTO GALÁCTICO! El nodo galáctico se ha sobrecargado. Motores y navegación fuera de servicio.', 'ai-warn');
-    setTimeout(() => shipAI.say('Evacúa: levántate (E) y ve a la sala de cápsulas de escape. Rumbo de emergencia: MUNDO 0.', 'ai-warn'), 3500);
+    setTimeout(() => shipAI.say(`Evacúa: levántate (E) y ve a la sala de cápsulas de escape. Rumbo de emergencia: ${homeName}.`, 'ai-warn'), 3500);
   });
   const escape = new EscapeSystem({
-    config: cfg.SPACE.ESCAPE, events, worlds, ship, travel: spaceTravel, controller, input, getBodies: bodiesNow,
+    config: cfg.SPACE.ESCAPE, system, events, worlds, ship, travel: spaceTravel, controller, input, getBodies: bodiesNow,
   });
-  const podPanel = new PodPanel({ container: hudRoot, input, events, escape });
-  new EscapeOverlay({ events, input });
+  const podPanel = new PodPanel({ container: hudRoot, input, events, escape, system });
+  new EscapeOverlay({ events, input, system, gameTitle: cfg.GAME.TITLE });
   // Estadísticas para la pantalla final.
   const visited = new Set([HOME]);
   let meteorsSeen = 0;
@@ -743,7 +758,7 @@ function boot() {
   events.on(GameEvents.METEOR_SPAWNED, () => meteorsSeen++);
   events.on(GameEvents.ESCAPE_POD_ARRIVED, ({ emergency }) => {
     if (!emergency) return;
-    // Fin de la demo: de vuelta en MUNDO 0 con la nave (y su nodo espacial) y el planeta como estaba.
+    // Fin de la demo: de vuelta en el planeta de inicio con la nave (y su nodo espacial) y el planeta como estaba.
     ship.setCrippled(false);
     ship.uninstallTech('GALACTIC_NODE');
     ship.podsUsed = 0;
@@ -761,12 +776,12 @@ function boot() {
       ],
     });
   });
-  events.on(GameEvents.DEMO_RESTART, () => shipAI.say('Bienvenido de vuelta a MUNDO 0. La nave está en la zona de aterrizaje. Gracias por jugar esta demo.'));
+  events.on(GameEvents.DEMO_RESTART, () => shipAI.say(`Bienvenido de vuelta ${withPrep('a', homeName)}. La nave está en la zona de aterrizaje. Gracias por jugar esta demo.`));
 
   // Mapa estelar 3D (tecnología Mapa): la escena espacial "de mapa".
   const starMap = new StarMap({
     config: cfg.SPACE,
-    celestialConfig: cfg.CELESTIAL,
+    system,
     render,
     input,
     events,
@@ -775,7 +790,7 @@ function boot() {
       getCatalog: () => celestial.catalog,
       getMapCanvas: () => (planetMap.ready ? planetMap.canvas : null),
       getSeed: () => worlds.home.seed.sub.celestial,
-      planet: cfg.PLANETS.MUNDO_0,
+      planet: homeProfile,
       noonHour,
       getShipLocation: () => spaceTravel.getShipLocation(),
     },
@@ -784,12 +799,12 @@ function boot() {
   // IA de la nave (nodo de IA): nombre, datos del sistema y avisos.
   const shipAI = new ShipAI({
     events,
-    planets: cfg.PLANETS,
+    system,
     sources: { ship, lifeSupport, worlds, getCatalog: () => celestial.catalog, pickups, travel: spaceTravel },
   });
   events.on(GameEvents.AI_SAY, ({ name, text, type }) => events.emit(GameEvents.UI_MESSAGE, { text: `🤖 ${name}: ${text}`, type }));
   const aiPanel = new AIPanel({ container: hudRoot, input, events, ai: shipAI });
-  const starMapHUD = new StarMapHUD({ container: hudRoot, events, map: starMap, spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED });
+  const starMapHUD = new StarMapHUD({ container: hudRoot, events, map: starMap, system, spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED });
   // Reloj de la nave: se coge en el laboratorio; al usarlo muestra dónde está la nave.
   const shipWatch = new ShipWatchHUD({ container: hudRoot, events, player, ship, time, inventory, watchItem: cfg.SHIP.WATCH_ITEM });
   ui.setInitialCameraMode(camera.mode);
@@ -797,7 +812,7 @@ function boot() {
 
   // Generación inicial: después de crear los oyentes (UI, tracker) y antes de las
   // herramientas Admin, que leen los biomas del mundo generado.
-  world.generate(urlSeed ?? cfg.WORLD.DEFAULT_SEED);
+  world.generate(String(system.seed));
 
   const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
@@ -808,7 +823,7 @@ function boot() {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
+  registerSpaceTools(admin, { system, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
@@ -846,7 +861,7 @@ function boot() {
   loop.add(meteors);     // meteoritos cerca del rumbo
   loop.add(escape);      // viaje en cápsula de escape
   loop.add(starMap);     // mapa estelar 3D
-  loop.add(maps);        // mapas de MUNDO 0 y de la luna actual (se dibujan poco a poco)
+  loop.add(maps);        // mapas del planeta y de la luna actual (se dibujan poco a poco)
   loop.add(ui);
   loop.add(spaceHUD);
   loop.add(starMapHUD);
@@ -868,15 +883,34 @@ function boot() {
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system,
   };
 }
 
-try {
-  boot();
-} catch (err) {
-  console.error(err);
-  const el = document.getElementById('fatal-error');
-  el.textContent = `No se pudo iniciar MUNDO 0: ${err.message}. ¿Tu navegador soporta WebGL?`;
-  el.classList.remove('hidden');
+/** Semilla numérica de la partida: ?seed=123 en la URL (un texto se convierte en número) o una al azar. */
+function gameSeed() {
+  const param = new URLSearchParams(window.location.search).get('seed');
+  if (param !== null && param.trim() !== '') return /^\d+$/.test(param.trim()) ? Number(param.trim()) % 2 ** 32 : hashString(param.trim());
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % 1000000000; // hasta 9 cifras: fácil de apuntar y compartir
 }
+
+/** La campaña: El Jardín del Edén, descrito en JSON como cualquier sistema importado. */
+async function loadCampaign() {
+  const res = await fetch(GameConfig.CAMPAIGN.SYSTEM_URL);
+  if (!res.ok) throw new Error(`no se pudo leer ${GameConfig.CAMPAIGN.SYSTEM_URL} (${res.status})`);
+  const result = loadSystem(await res.text(), { seed: gameSeed() });
+  if (!result.ok) throw new Error(`el sistema de la campaña no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+  for (const w of result.warnings) console.warn(`[sistema] ${w.path}: ${w.message}`);
+  return new SolarSystem(result.system);
+}
+
+loadCampaign()
+  .then((system) => boot(system))
+  .catch((err) => {
+    console.error(err);
+    const el = document.getElementById('fatal-error');
+    el.textContent = `No se pudo iniciar ${GameConfig.GAME.TITLE}: ${err.message}. ¿Tu navegador soporta WebGL?`;
+    el.classList.remove('hidden');
+  });

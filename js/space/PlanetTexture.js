@@ -3,7 +3,7 @@ import { SimplexNoise } from '../world/noise/SimplexNoise.js';
 /**
  * Texturas del planeta visto desde el espacio (Fase 13), en canvas equirectangulares.
  *
- * El área jugable de MUNDO 0 es una isla pequeña de un planeta mucho mayor: el mapa
+ * El área jugable del planeta es una isla pequeña de un planeta mucho mayor: el mapa
  * real (PlanetMapRenderer) se pega en el ecuador, en longitud 0, y alrededor el
  * resto del planeta se inventa con ruido de la seed (continentes, desiertos,
  * bosques, montañas y casquetes polares). Esas tierras no se pueden visitar.
@@ -11,7 +11,7 @@ import { SimplexNoise } from '../world/noise/SimplexNoise.js';
  * El ruido es 2D, así que cada punto de la esfera se muestrea en tres proyecciones
  * y se promedian: no hay costura en el meridiano 180°.
  */
-const ISLAND_HALF_DEG = 14; // media anchura (en grados) de la isla de MUNDO 0 en la textura
+const ISLAND_HALF_DEG = 14; // media anchura (en grados) de la isla del planeta en la textura
 
 export function createPlanetTextures({ width, seed, mapCanvas, planet }) {
   const w = width;
@@ -46,7 +46,7 @@ export function createPlanetTextures({ width, seed, mapCanvas, planet }) {
       const x = cl * Math.cos(lon);
       const z = cl * Math.sin(lon);
       let c = n3(x, y, z, 1.4) + 0.02;
-      // Mar abierto alrededor de la isla de MUNDO 0 (se pega después).
+      // Mar abierto alrededor de la isla (se pega después).
       const dLon = Math.abs(lon) * (180 / Math.PI);
       const dLat = Math.abs(lat) * (180 / Math.PI);
       const island = Math.max(dLon, dLat) / (ISLAND_HALF_DEG * 1.8);
@@ -76,7 +76,7 @@ export function createPlanetTextures({ width, seed, mapCanvas, planet }) {
   }
   ctx.putImageData(img, 0, 0);
 
-  // Isla de MUNDO 0 (el mapa real) en el ecuador, longitud 0.
+  // Isla del planeta (el mapa real) en el ecuador, longitud 0.
   if (mapCanvas) {
     const pxPerDeg = w / 360;
     const size = ISLAND_HALF_DEG * 2 * pxPerDeg;

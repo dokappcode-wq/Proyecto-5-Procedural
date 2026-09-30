@@ -4,8 +4,8 @@ import { deriveSeed } from '../core/SeededRandom.js';
 import { WorldGenerator } from './WorldGenerator.js';
 
 /**
- * WorldManager — los cuerpos que se pueden pisar: MUNDO 0, Luna A, Luna B y el
- * espacio. Cada uno es un mundo propio con su terreno, recursos y estado, que se
+ * WorldManager — los cuerpos que se pueden pisar: el planeta de inicio, sus
+ * lunas y el espacio. Cada uno es un mundo propio con su terreno, recursos y estado, que se
  * conserva al irse y volver (lo talado, lo construido…).
  *
  * El resto de sistemas no sabe que hay varios: reciben `proxy`, un objeto que
@@ -14,32 +14,32 @@ import { WorldGenerator } from './WorldGenerator.js';
  * anterior, muestra la del nuevo y emite BODY_CHANGED.
  *
  * Las lunas se generan la primera vez que se visitan (sin emitir WORLD_GENERATED,
- * así no reinician nada) con una seed derivada de la de MUNDO 0.
+ * así no reinician nada) con una seed derivada de la del planeta de inicio.
+ * Los perfiles de cada cuerpo vienen del sistema solar (SolarSystem.profiles).
  */
-export const HOME = 'MUNDO_0';
-
 export class WorldManager {
   /**
-   * @param {object} p.planets  GameConfig.PLANETS (perfiles por cuerpo)
+   * @param {object} p.system   SolarSystem (perfiles por cuerpo y cuerpo de inicio)
    * @param {object} p.options  resto de parámetros de WorldGenerator (config, resourceTypes, propColors, landing…)
    */
-  constructor({ scene, planets, events, options }) {
+  constructor({ scene, system, events, options }) {
     this.name = 'world';
     this._scene = scene;
-    this._planets = planets;
+    this._planets = system.profiles;
+    this.homeId = system.homeId;
     this._events = events;
     this._opts = options;
     this._bodies = new Map(); // id → { world, root }
     this._extra = new Map();  // cuerpos sin terreno (el espacio): id → objeto con la misma interfaz
     this._focus = null;
-    this.activeId = HOME;
+    this.activeId = this.homeId;
 
-    this._create(HOME);
+    this._create(this.homeId);
 
     const self = this;
     this.proxy = new Proxy({}, {
       get(_, key) {
-        // Regenerar (Admin: cambiar seed) siempre es MUNDO 0.
+        // Regenerar (Admin: cambiar seed) siempre es el planeta de inicio.
         if (key === 'generate') return (seed, opts) => self.regenerateHome(seed, opts);
         const w = self.active;
         const v = w[key];
@@ -47,14 +47,14 @@ export class WorldManager {
       },
     });
 
-    // Nueva seed de MUNDO 0 → las lunas cambian: se descartan y se regenerarán.
+    // Nueva seed del planeta → las lunas cambian: se descartan y se regenerarán.
     events.on(GameEvents.WORLD_GENERATED, () => {
-      for (const id of [...this._bodies.keys()]) if (id !== HOME) this._discard(id);
+      for (const id of [...this._bodies.keys()]) if (id !== this.homeId) this._discard(id);
     });
   }
 
   get home() {
-    return this._bodies.get(HOME).world;
+    return this._bodies.get(this.homeId).world;
   }
 
   get active() {
@@ -101,7 +101,7 @@ export class WorldManager {
   }
 
   regenerateHome(seed) {
-    if (this.activeId !== HOME) this.setActive(HOME);
+    if (this.activeId !== this.homeId) this.setActive(this.homeId);
     this.home.generate(seed);
   }
 
@@ -126,9 +126,9 @@ export class WorldManager {
     });
     if (this._focus) world.follow(this._focus);
     this._bodies.set(id, { world, root });
-    const homeSeed = this._bodies.get(HOME)?.world?.seed;
-    if (id !== HOME && homeSeed) {
-      // Seed de la luna derivada de la de MUNDO 0 (misma seed → mismas lunas).
+    const homeSeed = this._bodies.get(this.homeId)?.world?.seed;
+    if (id !== this.homeId && homeSeed) {
+      // Seed de la luna derivada de la del planeta (misma seed → mismas lunas).
       world.generate(`${homeSeed.text}/${id}:${deriveSeed(homeSeed.value, id)}`, { emitEvent: false });
     }
     return world;

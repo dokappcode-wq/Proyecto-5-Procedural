@@ -8,6 +8,7 @@ import { EventBus } from '../js/core/EventBus.js';
 import { GameEvents } from '../js/core/GameEvents.js';
 import { InventorySystem } from '../js/inventory/InventorySystem.js';
 import { LifeSupportSystem } from '../js/player/LifeSupportSystem.js';
+import { EDEN } from './helpers/eden.mjs';
 
 const C = GameConfig.LIFE_SUPPORT;
 const B = GameConfig.SHIP.BATTERIES;
@@ -76,8 +77,8 @@ test('no se puede quitar el traje sin aire; la estación de oxígeno llena el de
 });
 
 test('en las lunas la madera y la lana se cambian por piedra y mineral', () => {
-  for (const id of ['MOON_A', 'MOON_B']) {
-    const p = GameConfig.PLANETS[id];
+  for (const moon of EDEN.moons) {
+    const p = moon.profile;
     assert.equal(p.BREATHABLE, false);
     assert.deepEqual(p.BUILD_SUBSTITUTE, { WOOD: 'STONE', WOOL: 'MINERAL' });
   }

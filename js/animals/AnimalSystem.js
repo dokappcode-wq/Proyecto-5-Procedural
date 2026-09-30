@@ -89,7 +89,7 @@ export class AnimalSystem {
   }
 
   /**
-   * Los animales viven en MUNDO 0: en las lunas o en el espacio se pausan y se ocultan.
+   * Los animales viven en el planeta de inicio: en las lunas o en el espacio se pausan y se ocultan.
    */
   setActive(active) {
     this.enabled = active;

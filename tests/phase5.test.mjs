@@ -10,6 +10,7 @@ import { SeededRandom } from '../js/core/SeededRandom.js';
 import { InventorySystem } from '../js/inventory/InventorySystem.js';
 import { ResourceSystem } from '../js/world/ResourceSystem.js';
 import { Animal, AnimalState, Temperament, HitReaction, pickWeighted } from '../js/animals/Animal.js';
+import { HOME } from './helpers/eden.mjs';
 
 // ---- Inventario ---------------------------------------------------------------
 
@@ -37,7 +38,7 @@ test('inventario: AddItem / RemoveItem / HasItem / GetItemCount', () => {
 function flatResources() {
   // Terreno llano de bosque, sin agua: suficiente para probar la recogida.
   return new ResourceSystem({
-    config: GameConfig.PLANETS.MUNDO_0.RESOURCES,
+    config: HOME.RESOURCES,
     types: GameConfig.RESOURCE_TYPES,
     seed: 1234,
     world: {

@@ -220,3 +220,37 @@ test('el esquema se exporta a JSON Schema cerrado', () => {
   assert.ok(planet.properties.terrain.properties.generator.enum.includes('island'));
   assert.equal(planet.properties.moons.maxItems, LIMITS.MOONS);
 });
+
+// ---- Juego dirigido por el sistema (sin identificadores fijos) ----------------
+
+test('ningún módulo del juego usa los identificadores fijos de antes', async () => {
+  const { readdirSync, readFileSync, statSync } = fs;
+  const files = [];
+  const walk = (dir) => {
+    for (const f of readdirSync(dir)) {
+      const p = `${dir}/${f}`;
+      if (statSync(p).isDirectory()) walk(p);
+      else if (p.endsWith('.js')) files.push(p);
+    }
+  };
+  walk(new URL('../js', import.meta.url).pathname);
+  for (const f of files) {
+    const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    assert.doesNotMatch(code, /['"`](MUNDO_0|MOON_A|MOON_B)['"`]|MUNDO 0/, f);
+  }
+});
+
+test('nombres con preposición y teclas de rumbo según el sistema', async () => {
+  const { withPrep, SolarSystem } = await import('../js/systemdata/SolarSystem.js');
+  assert.equal(withPrep('en', 'El Jardín del Edén'), 'en el Jardín del Edén');
+  assert.equal(withPrep('de', 'El Jardín del Edén'), 'del Jardín del Edén');
+  assert.equal(withPrep('a', 'El Jardín del Edén'), 'al Jardín del Edén');
+  assert.equal(withPrep('en', 'Luna A'), 'en la Luna A');
+  assert.equal(withPrep('a', 'Nerea'), 'a Nerea');
+  assert.equal(withPrep('', 'La Roja'), 'la Roja');
+  const eden = new SolarSystem(loadSystem(EDEN_TEXT).system);
+  assert.deepEqual(eden.autopilotTargets().map((t) => `${t.key}:${t.id}`), ['1:P1', '2:P1M1', '3:P1M2', '4:METEOR']);
+  const lonely = new SolarSystem(loadSystem({ name: 'x', planets: [{ name: 'Solo' }] }).system);
+  assert.deepEqual(lonely.autopilotTargets().map((t) => t.id), ['P1', 'METEOR']);
+  assert.equal(lonely.moons.length, 0);
+});

@@ -9,9 +9,10 @@ import { WorldSeed } from '../js/world/WorldSeed.js';
 import { TerrainGenerator } from '../js/world/TerrainGenerator.js';
 import { BiomeSystem } from '../js/world/BiomeSystem.js';
 import { KeySequenceDetector } from '../js/admin/KeySequenceDetector.js';
+import { HOME } from './helpers/eden.mjs';
 
 const W = GameConfig.WORLD;
-const P = GameConfig.PLANETS.MUNDO_0;
+const P = HOME;
 
 function terrainFor(seedText) {
   const seed = new WorldSeed(seedText, W.SUB_SEEDS);

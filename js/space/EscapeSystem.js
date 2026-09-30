@@ -1,23 +1,23 @@
 import { GameEvents } from '../core/GameEvents.js';
+import { withPrep } from '../systemdata/SolarSystem.js';
 
 /**
  * EscapeSystem — cápsulas de escape de la nave ampliada.
  *
- * Desde la nave (en el espacio o posada en un cuerpo) llevan al jugador a
- * MUNDO 0 o a una luna, siempre que esté lo bastante cerca (POD_RANGE_KM, de
+ * Desde la nave (en el espacio o posada en un cuerpo) llevan al jugador al
+ * planeta o a una luna, siempre que esté lo bastante cerca (POD_RANGE_KM, de
  * superficie a superficie; las lunas orbitan, así que a veces sí y a veces no).
  * La cápsula aterriza junto a la zona de aterrizaje del destino y la IA trae la
  * nave detrás (aterriza sola), para no quedarse sin ella.
  *
  * Tras el salto galáctico fallido la única salida es la evacuación de emergencia
- * a MUNDO 0: al llegar termina la demo (DEMO_END).
+ * al planeta de inicio: al llegar termina la demo (DEMO_END).
  */
-const NAMES = { MUNDO_0: 'MUNDO 0', MOON_A: 'Luna A', MOON_B: 'Luna B' };
-
 export class EscapeSystem {
-  constructor({ config, events, worlds, ship, travel, controller, input, getBodies }) {
+  constructor({ config, system, events, worlds, ship, travel, controller, input, getBodies }) {
     this.name = 'escape';
     this._cfg = config;
+    this._system = system;
     this._events = events;
     this._worlds = worlds;
     this._ship = ship;
@@ -53,13 +53,13 @@ export class EscapeSystem {
         let reachable = d <= this._cfg.POD_RANGE_KM;
         let reason = reachable ? null : 'Demasiado lejos';
         if (emergency) {
-          reachable = b.id === 'MUNDO_0';
-          reason = reachable ? null : 'Sin energía: solo rumbo de emergencia a MUNDO 0';
+          reachable = this._system.isHome(b.id);
+          reason = reachable ? null : `Sin energía: solo rumbo de emergencia ${withPrep('a', this._system.home.name)}`;
         } else if (!this.podsLeft) {
           reachable = false;
           reason = 'No quedan cápsulas';
         }
-        return { id: b.id, name: NAMES[b.id] ?? b.name, distanceKm: Math.max(0, d), reachable, reason };
+        return { id: b.id, name: this._system.nameOf(b.id), distanceKm: Math.max(0, d), reachable, reason };
       });
   }
 
@@ -98,7 +98,7 @@ export class EscapeSystem {
     this._events.emit(GameEvents.ESCAPE_POD_ARRIVED, { target, emergency });
     if (!emergency) {
       this._ship.relocateTo(target); // la IA trae la nave detrás
-      this._msg(`Cápsula en ${NAMES[target]}. La nave ha llegado detrás y está en la zona de aterrizaje.`, 'biome');
+      this._msg(`Cápsula ${withPrep('en', this._system.nameOf(target))}. La nave ha llegado detrás y está en la zona de aterrizaje.`, 'biome');
     }
   }
 

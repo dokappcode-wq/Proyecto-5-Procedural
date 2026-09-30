@@ -7,6 +7,7 @@ import { GameConfig } from '../js/config/GameConfig.js';
 import { EventBus } from '../js/core/EventBus.js';
 import { GameEvents } from '../js/core/GameEvents.js';
 import { ShipAI } from '../js/ship/ShipAI.js';
+import { EDEN, MOON_A } from './helpers/eden.mjs';
 
 function setup() {
   const events = new EventBus();
@@ -19,9 +20,9 @@ function setup() {
     getTelemetry: () => ({ flight: 'LANDED', charge: 0.8, hatch: 'CLOSED', legs: 'DEPLOYED', altitude: 0, airlock: 'PRESSURIZED' }),
   };
   const lifeSupport = { getState: () => ({ breathable: true, wearing: false, oxygen: 1, battery: 1, lungs: 1, powered: false }) };
-  const worlds = { activeId: 'MUNDO_0', profile: (id = 'MUNDO_0') => GameConfig.PLANETS[id] };
+  const worlds = { activeId: EDEN.homeId, profile: (id = EDEN.homeId) => EDEN.profiles[id] };
   const ai = new ShipAI({
-    events, planets: GameConfig.PLANETS, sources: { ship, lifeSupport, worlds, getCatalog: () => null, pickups: { get: () => null } },
+    events, system: EDEN, sources: { ship, lifeSupport, worlds, getCatalog: () => null, pickups: { get: () => null } },
     storage: { get: (k) => store.get(k) ?? null, set: (k, v) => store.set(k, v) },
   });
   const said = [];
@@ -40,9 +41,10 @@ test('la IA viene instalada en la nave y se le puede poner nombre (y se recuerda
   assert.equal(ai.setName('   '), false);
 });
 
-test('datos del sistema: MUNDO 0 basado en carbono y con 2 lunas', () => {
+test('datos del sistema: el Jardín del Edén, basado en carbono y con 2 lunas', () => {
   const { ai } = setup();
   const planet = ai.answer('PLANET').join(' ');
+  assert.match(planet, /Jardín del Edén/);
   assert.match(planet, /carbono/);
   assert.match(planet, /2 lunas/);
   const moons = ai.answer('MOONS').join(' ');
@@ -60,6 +62,6 @@ test('avisa sola de la batería baja (una vez por umbral) y de la llegada a una 
   const texts = said.map((m) => m.text);
   assert.equal(texts.filter((t) => t.includes('50 %')).length, 1);
   assert.ok(texts.some((t) => t.includes('25 %')));
-  events.emit(GameEvents.BODY_CHANGED, { id: 'MOON_A', previous: 'SPACE', planet: GameConfig.PLANETS.MOON_A });
+  events.emit(GameEvents.BODY_CHANGED, { id: MOON_A.id, previous: 'SPACE', planet: MOON_A.profile });
   assert.match(said.at(-1).text, /Luna A/);
 });

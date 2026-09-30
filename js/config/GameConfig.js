@@ -10,82 +10,10 @@
  * Cada fase añade aquí su sección (WORLD, SURVIVAL, NUTRITION, TEMPERATURE,
  * TIME, CELESTIAL, SHIP...).
  */
-// Perfil de luna: reutiliza las tres "ranuras" de bioma de MUNDO 0 (llanura, zona
-// irregular y montes) con otros nombres, colores y relieve. Sin agua, sin aire,
-// sin vida; con cráteres y poca gravedad. `tint` aclara u oscurece toda la luna.
-function moonProfile({ name, tones, temperature, gravity, craterChance, seaFloor = 2, data }) {
-  const [light, mid, dark, dust] = tones;
-  return {
-    NAME: name,
-    DATA: data,
-    KIND: 'MOON',
-    HAS_SEA: false,
-    BREATHABLE: false,
-    GRAVITY_SCALE: gravity,
-    // Sin árboles ni ovejas: en la luna las piezas de madera se hacen de piedra y la lana, de mineral.
-    BUILD_SUBSTITUTE: { WOOD: 'STONE', WOOL: 'MINERAL' },
-    TERRAIN: {
-      BASE_HEIGHT: 8,
-      CONTINENT_FREQUENCY: 1 / 500,
-      CONTINENT_AMPLITUDE: 4,
-      HILL_FREQUENCY: 1 / 120,
-      HILL_AMPLITUDE: 5,
-      DETAIL_FREQUENCY: 1 / 18,
-      DETAIL_AMPLITUDE: 0.6,
-      MOUNTAIN_MASK_FREQUENCY: 1 / 380,
-      MOUNTAIN_MASK_START: 0.2,
-      MOUNTAIN_MASK_END: 0.55,
-      MOUNTAIN_FREQUENCY: 1 / 200,
-      MOUNTAIN_HEIGHT: 38,
-      MOUNTAIN_OCTAVES: 3,
-      MOUNTAIN_BASE_LIFT: 6,
-      MOUNTAIN_COAST_FADE: 90,
-      COAST_NOISE_FREQUENCY: 1 / 150,
-      COAST_NOISE_AMPLITUDE: 18,
-      COAST_SEA_WIDTH: 20,
-      SEA_FLOOR: seaFloor,          // el borde baja a una gran depresión (no hay mar)
-      CRATERS: { CELL: 48, CHANCE: craterChance, RADIUS: [4, 19], DEPTH: 0.32, RIM: 0.12 },
-    },
-    COLORS: {
-      SAND: mid, SEABED: dark, LOWLAND_ROCK: dark, SAND_HEIGHT: -10,
-      ROCK_SLOPE_NORMAL_Y: 0.72, PATCH_FREQUENCY: 1 / 28, AO_STRENGTH: 0.4,
-      SEA: 0x000000, SEA_OPACITY: 0,
-    },
-    BIOME_DISTRIBUTION: {
-      MOUNTAIN_BIOME_START: 0.3, MOUNTAIN_BIOME_END: 0.6,
-      FOREST_FREQUENCY: 1 / 260, FOREST_THRESHOLD: 0.1, FOREST_BLEND: 0.15,
-      SPAWN_MIN_PLAINS: 0.7,
-    },
-    BIOMES: {
-      PLAINS: { NAME: 'Llanura de regolito', TEMPERATURE: temperature, HILL_SCALE: 0.4, DETAIL_SCALE: 0.8,
-        COLORS: { GROUND: light, GROUND_ALT: mid, ACCENT: dust } },
-      FOREST: { NAME: 'Mar oscuro', TEMPERATURE: temperature - 5, HILL_SCALE: 0.8, DETAIL_SCALE: 1.2,
-        COLORS: { GROUND: mid, GROUND_ALT: dark, ACCENT: light } },
-      FROZEN_MOUNTAINS: { NAME: 'Montes lunares', TEMPERATURE: temperature - 12, HILL_SCALE: 1.0, DETAIL_SCALE: 1.4,
-        SNOW_START_HEIGHT: 30, SNOW_MIN_NORMAL_Y: 0.5, COLORS: { GROUND: dark, GROUND_ALT: mid, SNOW: dust, ICE: light } },
-    },
-    WATER: {
-      DISCOVERY_DISTANCE: 7, POND_COUNT: 0, RADIUS: [5, 10], DEPTH: 1, SHORE_WIDTH: 0.6, MIN_SPACING: 70,
-      MAX_SLOPE: 0.18, BIOMES: [], NEAR_SPAWN_DISTANCE: [25, 55], COLOR: 0x000000, OPACITY: 0, MUD_COLOR: dark,
-    },
-    RESOURCES: {
-      CELL_SIZE: 4, SPAWN_CLEAR_RADIUS: 8, MAX_SLOPE: 0.9, TREE_MAX_HEIGHT: -1,
-      DENSITY: {
-        PLAINS: { ROCK: 0.03, MINERAL_ROCK: 0.004 },
-        FOREST: { ROCK: 0.05, MINERAL_ROCK: 0.006 },
-        FROZEN_MOUNTAINS: { ROCK: 0.07, MINERAL_ROCK: 0.01 },
-      },
-      GRASS_TUFTS_PER_CHUNK: { PLAINS: 0, FOREST: 0, FROZEN_MOUNTAINS: 0 },
-    },
-    FAUNA: { HERDS: {}, HERD_RADIUS: 24, NEAR_SPAWN_DISTANCE: [35, 120] },
-    PROP_COLORS: { ROCK: mid },
-  };
-}
-
 export const GameConfig = deepFreeze({
   GAME: {
-    TITLE: 'MUNDO 0',
-    VERSION: '1.1.0',
+    TITLE: 'Mundo Cero',
+    VERSION: '1.2.0',
   },
 
   RENDER: {
@@ -198,7 +126,6 @@ export const GameConfig = deepFreeze({
 
   // Parámetros generales de generación (comunes a cualquier planeta).
   WORLD: {
-    DEFAULT_SEED: 'mundo0',   // también se puede pasar por URL: index.html?seed=loquesea
     SUB_SEEDS: ['terrain', 'biome', 'resource', 'animal', 'celestial', 'spawn'],
     WORLD_SIZE: 1024,         // lado del mundo finito (m); múltiplo de CHUNK_SIZE
     CHUNK_SIZE: 64,           // m
@@ -214,146 +141,11 @@ export const GameConfig = deepFreeze({
     SPAWN_MAX_SLOPE: 0.25,    // desnivel/distancia
   },
 
-  // Perfiles de planeta: cada planeta futuro tendrá su propio perfil.
-  PLANETS: {
-    MUNDO_0: {
-      NAME: 'MUNDO 0',
-      KIND: 'PLANET',
-      HAS_SEA: true,
-      BREATHABLE: true,
-      GRAVITY_SCALE: 1,
-      // Lo que sabe la IA de la nave (nodo de IA).
-      DATA: {
-        LIFE: 'Mundo basado en carbono: la vida (árboles, hierba, ciervos, cabras y vacas) usa química del carbono y agua líquida.',
-        ATMOSPHERE: 'Atmósfera de nitrógeno y oxígeno, respirable. Presión y gravedad estándar (1 g).',
-        SURFACE: 'Una isla de 1 km rodeada de mar, con explanadas, bosques y montañas heladas.',
-        MOONS: 'Tiene 2 lunas: la Luna A, grande y clara, y la Luna B, pequeña, rojiza y lejana.',
-      },
-      TERRAIN: {
-        BASE_HEIGHT: 7,
-        CONTINENT_FREQUENCY: 1 / 600,
-        CONTINENT_AMPLITUDE: 6,
-        HILL_FREQUENCY: 1 / 150,
-        HILL_AMPLITUDE: 7,
-        DETAIL_FREQUENCY: 1 / 22,
-        DETAIL_AMPLITUDE: 0.5,
-        MOUNTAIN_MASK_FREQUENCY: 1 / 480,
-        MOUNTAIN_MASK_START: 0.1,  // umbrales del ruido (−1..1) donde empiezan/culminan las montañas
-        MOUNTAIN_MASK_END: 0.45,
-        MOUNTAIN_FREQUENCY: 1 / 230,
-        MOUNTAIN_HEIGHT: 85,
-        MOUNTAIN_OCTAVES: 4,      // menos octavas = crestas menos dentadas
-        MOUNTAIN_BASE_LIFT: 12,
-        MOUNTAIN_COAST_FADE: 110, // m antes de la costa en los que las montañas se desvanecen
-        COAST_NOISE_FREQUENCY: 1 / 170,
-        COAST_NOISE_AMPLITUDE: 22,
-        COAST_SEA_WIDTH: 20,      // m de mar abierto antes del borde absoluto
-        SEA_FLOOR: -9,
-      },
-      // Colores comunes a todos los biomas.
-      COLORS: {
-        SAND: 0xdccb8e,
-        SEABED: 0x9c8f6a,
-        LOWLAND_ROCK: 0x8e8373,   // roca en pendientes fuertes fuera de las montañas
-        SAND_HEIGHT: 1.2,
-        ROCK_SLOPE_NORMAL_Y: 0.8, // por debajo de esta componente vertical de la normal → roca
-        PATCH_FREQUENCY: 1 / 20,  // tamaño de las manchas de color del suelo
-        AO_STRENGTH: 0.22,        // oscurecimiento de valles/hondonadas (oclusión aproximada)
-        SEA: 0x2d6f98,
-        SEA_OPACITY: 0.85,
-      },
-
-      // Reparto de biomas. Las montañas heladas siguen al relieve (factor montaña del
-      // terreno); bosque/explanada se reparten con ruido de la sub-seed "biome".
-      BIOME_DISTRIBUTION: {
-        MOUNTAIN_BIOME_START: 0.3,  // factor montaña del terreno donde empieza el bioma
-        MOUNTAIN_BIOME_END: 0.6,
-        FOREST_FREQUENCY: 1 / 320,
-        FOREST_THRESHOLD: 0.0,      // −1..1: más alto = menos bosque
-        FOREST_BLEND: 0.12,         // anchura de la transición bosque/explanada
-        SPAWN_MIN_PLAINS: 0.8,      // el jugador aparece siempre en explanada
-      },
-
-      BIOMES: {
-        PLAINS: {
-          NAME: 'Explanada',
-          TEMPERATURE: 18,          // °C base del bioma (BIOME_TEMPERATURE → TemperatureSystem)
-          HILL_SCALE: 0.35,         // relieve: explanada casi llana
-          DETAIL_SCALE: 0.6,
-          COLORS: { GROUND: 0x86b85a, GROUND_ALT: 0xa9c766, ACCENT: 0xd9d27a },
-        },
-        FOREST: {
-          NAME: 'Bosque',
-          TEMPERATURE: 14,
-          HILL_SCALE: 1.15,         // relieve: más ondulado
-          DETAIL_SCALE: 1.3,
-          COLORS: { GROUND: 0x4a7a35, GROUND_ALT: 0x3a672f, ACCENT: 0x5e6b33 },
-        },
-        FROZEN_MOUNTAINS: {
-          NAME: 'Montañas Heladas',
-          TEMPERATURE: -4,
-          HILL_SCALE: 1.0,
-          DETAIL_SCALE: 1.5,
-          SNOW_START_HEIGHT: 24,    // m: por encima empieza la nieve (con variación)
-          SNOW_MIN_NORMAL_Y: 0.42,  // pendientes más verticales que esto quedan en roca
-          COLORS: { GROUND: 0x6c737f, GROUND_ALT: 0x5a616d, SNOW: 0xf1f5fa, ICE: 0xb4dcf0 },
-        },
-      },
-
-      // Charcas de agua dulce (fuentes de agua). Sub-seed "resource".
-      WATER: {
-        DISCOVERY_DISTANCE: 7,      // m a la orilla: "Has encontrado agua."
-        POND_COUNT: 16,
-        RADIUS: [5, 10],            // m (radio de la lámina de agua)
-        DEPTH: 1.4,                 // m en el centro
-        SHORE_WIDTH: 0.6,           // fracción del radio con orilla en pendiente suave
-        MIN_SPACING: 70,            // m entre charcas
-        MAX_SLOPE: 0.18,            // solo en terreno casi llano
-        BIOMES: ['PLAINS', 'FOREST'],
-        NEAR_SPAWN_DISTANCE: [25, 55], // siempre hay una charca cerca del inicio
-        COLOR: 0x3a7fa8,
-        OPACITY: 0.82,
-        MUD_COLOR: 0x7a6b4c,        // orilla húmeda
-      },
-
-      // Recursos por bioma: probabilidad de que una celda de CELL_SIZE² contenga cada tipo.
-      RESOURCES: {
-        CELL_SIZE: 4,
-        SPAWN_CLEAR_RADIUS: 8,
-        MAX_SLOPE: 0.75,
-        TREE_MAX_HEIGHT: 38,        // sin árboles por encima (zona de nieve)
-        DENSITY: {
-          PLAINS: { TREE: 0.01, APPLE_TREE: 0.008, BUSH: 0.05, ROCK: 0.025 },
-          FOREST: { TREE: 0.26, PINE: 0.07, APPLE_TREE: 0.045, BUSH: 0.09, ROCK: 0.02 },
-          FROZEN_MOUNTAINS: { PINE: 0.025, ROCK: 0.07 },
-        },
-        GRASS_TUFTS_PER_CHUNK: { PLAINS: 520, FOREST: 220, FROZEN_MOUNTAINS: 0 },
-      },
-
-      // Rebaños por especie (sub-seed "animal"). Especies en GameConfig.ANIMALS.
-      FAUNA: {
-        HERDS: { DEER: 10, GOAT: 10, COW: 9 },
-        HERD_RADIUS: 24,            // m: zona en la que se mueve cada rebaño
-        NEAR_SPAWN_DISTANCE: [35, 120], // un rebaño de cada especie cerca del inicio
-      },
-    },
-    // Las dos lunas (se visitan con la nave ampliada). La A es clara; la B, oscura y rojiza.
-    MOON_A: moonProfile({
-      name: 'Luna A', tones: [0xd9d6cf, 0xbdb9b1, 0x8f8b84, 0xf2efe8], temperature: -30, gravity: 0.35, craterChance: 0.5,
-      data: {
-        LIFE: 'Sin vida: roca de silicatos (anortosita) muy clara.',
-        ATMOSPHERE: 'Sin atmósfera. Hace falta traje espacial u oxígeno.',
-        SURFACE: 'Regolito claro, cráteres y rocas con cristales minerales. Gravedad 0,35 g, unos −30 °C.',
-      },
-    }),
-    MOON_B: moonProfile({
-      name: 'Luna B', tones: [0x8a5a44, 0x6e4636, 0x4a2f25, 0xa87458], temperature: -45, gravity: 0.25, craterChance: 0.65,
-      data: {
-        LIFE: 'Sin vida: roca rica en óxidos de hierro, de ahí su color rojizo.',
-        ATMOSPHERE: 'Sin atmósfera. Hace falta traje espacial u oxígeno.',
-        SURFACE: 'Muchos cráteres y minerales. Gravedad 0,25 g, unos −45 °C.',
-      },
-    }),
+  // La campaña: el sistema solar en el que se empieza. Los planetas y lunas (relieve,
+  // biomas, flora, fauna, órbitas…) se describen en JSON (systems/*.system.json) y
+  // pasan por el mismo validador y compilador que un sistema importado (js/systemdata).
+  CAMPAIGN: {
+    SYSTEM_URL: 'systems/jardin-del-eden.system.json',
   },
 
   // Supervivencia (Fase 6). Valores por segundo de juego.
@@ -599,24 +391,12 @@ export const GameConfig = deepFreeze({
     FREEZING_VISIBILITY: 0.45, // la distancia de visión baja hasta este factor al congelarse
   },
 
-  // Cuerpos celestes (Fase 12): Luna A y Luna B en el cielo, en el mapa planetario y
-  // en el espacio. La posición inicial, la inclinación y el aspecto dependen de la
-  // sub-seed "celestial"; tamaño, distancia y velocidad son fijos aquí.
+  // Cuerpos celestes (Fase 12): las lunas en el cielo, en el mapa planetario y en el
+  // espacio. Tamaño, distancia, velocidad, color y tamaño en el cielo vienen del
+  // sistema solar (JSON); la posición inicial, la inclinación y el aspecto dependen
+  // de la sub-seed "celestial".
   CELESTIAL: {
-    PLANET_NAME: 'MUNDO 0',
-    PLANET_RADIUS_KM: 3200,
-    MOON_A_SIZE: 620,          // km de radio
-    MOON_B_SIZE: 240,
-    MOON_A_DISTANCE: 42000,    // km al planeta
-    MOON_B_DISTANCE: 17000,
-    MOON_A_SPEED: 1 / 96,      // vueltas por hora de juego (1 vuelta cada 4 días)
-    MOON_B_SPEED: 1 / 30,      // 1 vuelta cada 30 h
-    MOON_A_COLOR: 0xd8d2c4,
-    MOON_B_COLOR: 0xc98f6a,
     MAX_INCLINATION_DEG: 18,
-    // Cómo se ven desde la superficie (tamaño aparente exagerado para que se lean bien).
-    MOON_A_SKY_SIZE_DEG: 7,
-    MOON_B_SKY_SIZE_DEG: 3.6,
     SKY_DISTANCE: 700,         // m: se dibujan a esta distancia de la cámara (dentro de RENDER.FAR)
     DAY_OPACITY: 0.55,         // de día las lunas se ven pálidas
     MOON_RISE_MESSAGES: true,  // "Sale la Luna A."
@@ -636,8 +416,8 @@ export const GameConfig = deepFreeze({
     APPROACH_FACTOR: 1.9,      // radios: por debajo se puede aterrizar / entrar en la atmósfera
     LAND_ALTITUDE: 700,        // km sobre la superficie: también se puede aterrizar
     PROXIMITY_BRAKE: 0.6,      // velocidad máx. (km/s) = altitud (km) × esto cerca de un cuerpo
-    ZONE_RADIUS: 65000,        // km desde MUNDO 0: límite del sistema
-    EXIT_ALTITUDE_KM: 900,     // al salir de MUNDO 0, km sobre la superficie
+    ZONE_RADIUS: 65000,        // km desde el planeta de inicio: límite del sistema
+    EXIT_ALTITUDE_KM: 900,     // al salir del planeta, km sobre la superficie
     MOON_EXIT_ALTITUDE_KM: 250,
     ARRIVAL_HEIGHT: 110,       // m sobre el suelo al llegar a un cuerpo
     VIEW_DISTANCE: 600,        // m: los cuerpos se dibujan a esta distancia con su tamaño aparente
@@ -694,7 +474,7 @@ export const GameConfig = deepFreeze({
     ORBIT_SPIN_HOURS: 24,      // una vuelta del planeta por día
   },
 
-  // Nave pequeña de MUNDO 0. La forma (salas, colisiones, suelos, rampa) está en
+  // Nave pequeña. La forma (salas, colisiones, suelos, rampa) está en
   // ship/ShipLayout.js; aquí el comportamiento, las tecnologías y las baterías.
   SHIP: {
     NAME: 'Nave exploradora',
@@ -742,12 +522,12 @@ export const GameConfig = deepFreeze({
     // una tecnología o está libre para tecnologías futuras.
     TECHNOLOGIES: {
       FLIGHT_SYSTEM: { NAME: 'Sistema de vuelo', ICON: '🕹️', DESCRIPTION: 'Asiento del piloto y mandos de la nave.' },
-      PLANET_MAP: { NAME: 'Mapa', ICON: '🗺️', DESCRIPTION: 'Mapa de MUNDO 0 y mapa planetario.' },
+      PLANET_MAP: { NAME: 'Mapa', ICON: '🗺️', DESCRIPTION: 'Mapa de la región y mapa planetario.' },
       CHARGING_STATION: { NAME: 'Puesto de carga', ICON: '🔌', DESCRIPTION: 'Baterías plank: el combustible de la nave.' },
       SUIT_LOCKER: { NAME: 'Taquilla de trajes', ICON: '🧑‍🚀', DESCRIPTION: 'Traje espacial y jetpack de gas.' },
       OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', DESCRIPTION: 'Recarga el oxígeno del traje.' },
       SPACE_NODE: { NAME: 'Nodo espacial', ICON: '🔷', DESCRIPTION: 'Permite salir al espacio y viajar a las lunas.' },
-      GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀', DESCRIPTION: 'Permitiría saltar fuera del sistema de MUNDO 0.' },
+      GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀', DESCRIPTION: 'Permitiría saltar fuera del sistema solar.' },
       AI_NODE: { NAME: 'Nodo de IA', ICON: '🤖', DESCRIPTION: 'IA de a bordo: datos del sistema y avisos de la nave.' },
     },
     INSTALLED: {
@@ -771,7 +551,7 @@ export const GameConfig = deepFreeze({
       CONTROL_2: null,
       LOUNGE_1: null,
     },
-    // Dónde cae el nodo espacial en MUNDO 0 (m desde el inicio del jugador).
+    // Dónde cae el nodo espacial en el planeta de inicio (m desde el inicio del jugador).
     SPACE_NODE_DROP_DISTANCE: [160, 320],
     GALACTIC_NODE_DROP_DISTANCE: [70, 160], // en una de las lunas (según la seed), desde su zona de aterrizaje
     NODE_MAP_ITEM: 'NODE_MAP',   // se recibe al empezar: marca dónde cayó el nodo

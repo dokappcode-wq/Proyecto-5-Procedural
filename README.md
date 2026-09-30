@@ -1,9 +1,11 @@
-# MUNDO 0 — Prototipo procedural de supervivencia y exploración
+# Mundo Cero — Prototipo procedural de supervivencia y exploración
 
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: v1.1.0 — las 14 fases + la ampliación "sistema de MUNDO 0" (etapas E1–E6 y la IA), con final de demo.**
+**Estado actual: v1.2.0 — las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y el bloque 1a de los sistemas solares importables: el juego ya se construye a partir de un sistema descrito en JSON.**
+
+Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El Jardín del Edén** (antes "MUNDO 0"), con sus dos lunas.
 
 | Fase | Contenido |
 |---|---|
@@ -16,16 +18,17 @@ Sin motores externos y sin paso de compilación.
 | 10 | Temperatura oculta: frío, congelación, escarcha progresiva y daño |
 | 11 | Día y noche: sol, crepúsculos, estrellas, noches más frías, dormir adelanta el reloj |
 | 12 | Sistema celestial: sol, Luna A y Luna B en el cielo, con fases y luz de luna |
-| 13 | Espacio: salir del planeta con la nave, ver MUNDO 0 y las lunas desde fuera, regresar |
+| 13 | Espacio: salir del planeta con la nave, ver el Jardín del Edén y las lunas desde fuera, regresar |
 | 14 | Modo Admin plegable con buscador, interfaz revisada y limpieza general |
 | + | Nave pequeña: compuerta, laboratorio, sala de controles, vuelo, mapa, puesto de carga, reloj |
-| E1 | Varios cuerpos: MUNDO 0, Luna A (clara) y Luna B (rojiza), procedurales, con estado propio |
-| E2 | Espacio explorable: se pilota la nave (cámara detrás) entre MUNDO 0 y las lunas |
-| E3 | Nodo espacial caído en MUNDO 0 (con mapa); al instalarlo la nave se amplía |
+| E1 | Varios cuerpos: el Jardín del Edén, Luna A (clara) y Luna B (rojiza), procedurales, con estado propio |
+| E2 | Espacio explorable: se pilota la nave (cámara detrás) entre el Jardín del Edén y las lunas |
+| E3 | Nodo espacial caído en el Jardín del Edén (con mapa); al instalarlo la nave se amplía |
 | IA | Nodo de IA en la sala de controles: IA con el nombre que quieras, datos del sistema y avisos de la nave |
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
+| 1a | Sistemas solares como datos: catálogo del motor, esquema v1, lectura segura de JSON, validador con rutas de error, compilador. El Jardín del Edén vive en `systems/jardin-del-eden.system.json` y cada partida tiene una semilla numérica aleatoria |
 
 ## Cómo ejecutarlo
 
@@ -37,9 +40,10 @@ npm start                        # usa npx http-server en http://localhost:8080
 python3 -m http.server 8080
 ```
 
-Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
+Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 
-- Seed por URL: `http://localhost:8080/?seed=loquesea` (la misma seed produce el mismo mundo).
+- Cada partida empieza con una **semilla numérica aleatoria** (se ve arriba a la izquierda).
+- Semilla fija por URL: `http://localhost:8080/?seed=12345` (la misma semilla produce el mismo planeta y las mismas lunas).
 - Tests sin navegador (reproducibilidad, secuencia Admin): `npm test`.
 
 ## Controles
@@ -66,7 +70,7 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | Reloj de la nave + clic derecho / `R` | Ver dónde está la nave (distancia, dirección, estado) |
 | A los mandos: `O` | Salir al espacio (con el nodo espacial; en vuelo, compuerta cerrada, a más de 60 m) |
 | En el espacio: `W`/`S` · `A`/`D` · `Espacio`/`C` · `Shift` | Acelerar/frenar · girar · cabecear · impulso |
-| En el espacio: `1` `2` `3` · `T` · `M` | Rumbo automático a MUNDO 0 / Luna A / Luna B · aterrizar al llegar · mapa estelar 3D |
+| En el espacio: `1` `2` `3` · `T` · `M` | Rumbo automático al planeta / Luna A / Luna B (una tecla por cuerpo del sistema) · aterrizar al llegar · mapa estelar 3D |
 | Mapa de la señal + clic derecho / `R` | Abrir el mapa con la posición del nodo espacial |
 | Burbuja de oxígeno + clic derecho / `R` | Desplegarla delante (`E` en el generador: poner/quitar batería, recogerla) |
 | Batería plank + clic derecho / `R` (con el traje) | Cambiar la batería del traje |
@@ -86,7 +90,16 @@ css/style.css
 lib/three/              Three.js (MIT) — sin CDN, versión fija
 js/
 ├── main.js             Raíz de composición: crea sistemas, inyecta dependencias, fija el orden
-├── config/GameConfig.js  TODOS los valores ajustables (secciones por sistema)
+├── config/GameConfig.js  Valores ajustables del motor (secciones por sistema)
+├── systemdata/           Sistemas solares como DATOS (nunca código)
+│   ├── Catalog.js           Lo que el motor sabe construir: generadores, flora, fauna, tamaños, estrellas, límites
+│   ├── Schema.js            Esquema v1 derivado del catálogo (exportable a JSON Schema)
+│   ├── SafeJson.js          Lectura segura: solo JSON, 256 KB, profundidad, sin __proto__
+│   ├── Validator.js         Errores con ruta · claves desconocidas ignoradas con aviso
+│   ├── Migrations.js        Versiones del formato
+│   ├── SystemCompiler.js    JSON validado → perfiles del motor (determinista)
+│   ├── SystemLoader.js      Tubería completa + informe "Copiar error para Claude"
+│   └── SolarSystem.js       El sistema en juego: cuerpo de inicio, lunas, nombres, teclas de rumbo
 ├── core/
 │   ├── EventBus.js     Pub/sub entre sistemas (sin llamadas directas)
 │   ├── GameEvents.js   Catálogo de eventos
@@ -126,12 +139,12 @@ js/
 │   ├── TimeSystem.js        Reloj, día, dirección del sol, luz de día, frío nocturno (sin Three.js)
 │   └── AtmosphereSystem.js  Aplica la hora: sol/luna, luz ambiente, cielo, estrellas, niebla
 ├── celestial/
-│   ├── CelestialCatalog.js  Lunas A y B por seed + configuración, órbitas, fases (sin Three.js)
+│   ├── CelestialCatalog.js  Lunas del sistema + seed: órbitas, fases (sin Three.js)
 │   └── CelestialSystem.js   Lunas en el cielo (cráteres, fases por la luz del sol), luz de luna
 ├── space/
 │   ├── SpaceSystem.js       Transición superficie ↔ espacio, cámara orbital, enfoque
 │   ├── SpaceScene.js        Escena espacial: planeta, nubes, atmósfera, lunas, sol, estrellas
-│   └── PlanetTexture.js     Textura del planeta: mapa real de MUNDO 0 + resto inventado por seed
+│   └── PlanetTexture.js     Textura del planeta: mapa real de la región + resto inventado por seed
 ├── ship/
 │   ├── ShipSystem.js        Nave: compone vuelo, modelo, mandos, interacción, colisiones, refugio
 │   ├── ShipLayout.js        Forma: salas, colisiones, suelos, rampa, ranuras (sin Three.js)
@@ -165,9 +178,10 @@ js/
 ├── ui/UIManager.js          HUD provisional (reacciona a eventos): reloj, escarcha, avisos
 ├── ui/CraftingPanel.js      Panel de fabricación (pide fabricar con CRAFT_REQUEST)
 ├── ui/ModalPanel.js         Base de los paneles que liberan el ratón
-├── ui/ShipMapPanel.js       Mapa de MUNDO 0 + mapa planetario (lunas) · PlanetMapRenderer.js
+├── ui/ShipMapPanel.js       Mapa de la región + mapa planetario (lunas) · PlanetMapRenderer.js
 ├── ui/ShipChargerPanel.js   Puesto de carga · ShipPilotHUD.js mandos · ShipWatchHUD.js reloj
 ├── ui/SpaceHUD.js           Fundidos, etiquetas y panel del espacio
+systems/                     Sistemas solares en JSON (jardin-del-eden.system.json = la campaña)
 tests/                       Tests de Node (`npm test`)
 ```
 
@@ -236,6 +250,12 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Sistemas como datos (1a)**: el juego carga `systems/jardin-del-eden.system.json`, lo valida
+  y lo compila. Recarga dos veces: la semilla (arriba a la izquierda) cambia cada partida. Con
+  `?seed=12345` el planeta y las lunas son siempre los mismos. Cambia en el JSON, por ejemplo,
+  `"name"` de una luna o `"gravity"` y recarga: el juego usa los datos nuevos. Si rompes el JSON,
+  la pantalla de error dice qué línea falla. `npm test` comprueba que el JSON reproduce
+  exactamente el planeta y las lunas de antes y prueba archivos maliciosos.
 - **Nave**: aparece aterrizada a 20–45 m del inicio (el mapa la marca). Botón rojo bajo la cola
   → `E` abre la compuerta; sube por la rampa. Dentro: mapa, puesto de carga, ranuras libres,
   reloj en la mesa del laboratorio; la puerta lleva a la sala de controles.
@@ -253,13 +273,13 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   cuatro propulsores y cinco salas (mandos · estar con sofá cama · laboratorio + máquinas ·
   cápsulas de escape · cámara de descompresión con la compuerta). Atajos: Admin → Espacio.
 - **Espacio**: con el nodo, vuela por encima de 60 m y pulsa `O`. `1`/`2`/`3` fijan el rumbo;
-  al acercarte, `T` aterriza en esa luna (o entra en MUNDO 0). Puedes levantarte y recorrer la nave.
+  al acercarte, `T` aterriza en esa luna (o entra en el Jardín del Edén). Puedes levantarte y recorrer la nave.
 - **Descompresión**: fuera del aire (espacio, lunas), cierra la puerta interior, usa el panel de la
   cámara para vaciarla y solo entonces abre la compuerta. Si la abres con la cámara presurizada
   estando dentro, sales disparado (en el espacio, mueres).
 
 - **IA de la nave**: `E` sobre el nodo de IA (ojo rosa en la sala de controles). Ponle nombre
-  (se recuerda en el navegador) y pregúntale por MUNDO 0, las lunas, el sistema, la nave, el
+  (se recuerda en el navegador) y pregúntale por el Jardín del Edén, las lunas, el sistema, la nave, el
   soporte vital, dónde estás o qué hacer. Además avisa sola: batería al 50/25/10 %, llegada a
   una luna, salida al espacio, descompresión, límite del sistema, falta de aire.
 - **Traje y oxígeno**: en el laboratorio de la nave ampliada, `E` en la taquilla pone o quita el
@@ -281,11 +301,11 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 - **Nodo galáctico y final**: la IA avisa de una señal galáctica al llegar a la luna que la
   tiene (según la seed, haz violeta). Instálalo en una ranura libre y vuela más allá de 65 000 km
-  de MUNDO 0 (Shift = impulso). El salto falla: alarma roja, la nave no responde. Ve a la sala de
-  cápsulas, `E` en una cápsula → Evacuar a MUNDO 0 → pantalla de fin de la demo. Al seguir,
-  estás en MUNDO 0 junto a la nave (con el nodo espacial) y el planeta como estaba.
+  del Jardín del Edén (Shift = impulso). El salto falla: alarma roja, la nave no responde. Ve a la sala de
+  cápsulas, `E` en una cápsula → Evacuar al Jardín del Edén → pantalla de fin de la demo. Al seguir,
+  estás en el Jardín del Edén junto a la nave (con el nodo espacial) y el planeta como estaba.
   Atajos: Admin → Espacio → "Instalar el nodo galáctico" y "Llevar la nave al borde del sistema".
-- **Cápsulas (uso normal)**: desde la nave, a MUNDO 0 o a una luna a menos de 45 000 km
+- **Cápsulas (uso normal)**: desde la nave, al Jardín del Edén o a una luna a menos de 45 000 km
   (las lunas orbitan: a veces están cerca y a veces no). La IA trae la nave detrás. Hay 2.
 
 Limitaciones: las baterías no se

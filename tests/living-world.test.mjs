@@ -9,9 +9,10 @@ import { TerrainGenerator } from '../js/world/TerrainGenerator.js';
 import { BiomeSystem } from '../js/world/BiomeSystem.js';
 import { WaterSystem } from '../js/world/WaterSystem.js';
 import { ResourceSystem } from '../js/world/ResourceSystem.js';
+import { HOME } from './helpers/eden.mjs';
 
 const W = GameConfig.WORLD;
-const P = GameConfig.PLANETS.MUNDO_0;
+const P = HOME;
 const HALF = W.WORLD_SIZE / 2 - W.EDGE_MARGIN;
 const BOUNDS = { minX: -HALF, maxX: HALF, minZ: -HALF, maxZ: HALF };
 

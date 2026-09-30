@@ -5,9 +5,9 @@ import { orbitPosition } from '../celestial/CelestialCatalog.js';
 /**
  * ShipMapPanel — Tecnología 2 de la nave: el mapa.
  *
- *   "Mapa de MUNDO 0": el planeta visto desde arriba (PlanetMapRenderer) con la
+ *   "Mapa de <cuerpo>": la región del cuerpo actual vista desde arriba (PlanetMapRenderer) con la
  *   posición del jugador, la nave, el punto de inicio y la cama.
- *   "Mapa planetario": MUNDO 0 y sus dos lunas en sus órbitas (CelestialCatalog,
+ *   "Mapa planetario": el planeta y sus lunas en sus órbitas (CelestialCatalog,
  *   posiciones según la hora del TimeSystem). Las lunas no se pueden visitar:
  *   falta el "nodo espacial".
  *
@@ -26,7 +26,7 @@ export class ShipMapPanel extends ModalPanel {
     this.tab = 'PLANET';
     this.body.innerHTML = `
       <div class="map-tabs" role="tablist">
-        <button type="button" data-tab="PLANET" role="tab">Mapa de MUNDO 0</button>
+        <button type="button" data-tab="PLANET" role="tab">Mapa de la región</button>
         <button type="button" data-tab="SYSTEM" role="tab">Mapa planetario</button>
       </div>
       <div class="map-layout">
@@ -47,6 +47,7 @@ export class ShipMapPanel extends ModalPanel {
 
   render() {
     this.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === this.tab));
+    this.body.querySelector('[data-tab="PLANET"]').textContent = `Mapa: ${this._src.planetConfig.NAME}`;
     this._side.replaceChildren();
     if (this.tab === 'PLANET') this._renderPlanetSide();
     else this._renderSystemSide();
@@ -65,7 +66,7 @@ export class ShipMapPanel extends ModalPanel {
     else this._drawSystem();
   }
 
-  // ---- Mapa de MUNDO 0 ---------------------------------------------------------
+  // ---- Mapa de la región ---------------------------------------------------------
 
   _drawPlanet() {
     const ctx = this._ctx;
@@ -76,7 +77,7 @@ export class ShipMapPanel extends ModalPanel {
       ctx.fillStyle = '#a9b6c4';
       ctx.font = '15px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`Cartografiando MUNDO 0… ${Math.round(map.progress * 100)} %`, SIZE / 2, SIZE / 2);
+      ctx.fillText(`Cartografiando ${this._src.planetConfig.NAME}… ${Math.round(map.progress * 100)} %`, SIZE / 2, SIZE / 2);
       return;
     }
     ctx.imageSmoothingEnabled = true;
@@ -132,12 +133,12 @@ export class ShipMapPanel extends ModalPanel {
   _renderPlanetSide() {
     const { world, planetConfig } = this._src;
     const items = Object.values(planetConfig.BIOMES).map(
-      (b) => `<li><span class="swatch" style="background:${hex(b.COLORS.GROUND)}"></span>${b.NAME}</li>`,
+      (b) => `<li><span class="swatch" style="background:${hex(b.COLORS.GROUND)}"></span>${escapeHtml(b.NAME)}</li>`,
     );
-    items.push(`<li><span class="swatch" style="background:${hex(planetConfig.WATER.COLOR)}"></span>Agua dulce</li>`);
-    items.push(`<li><span class="swatch" style="background:${hex(planetConfig.COLORS.SEA)}"></span>Mar</li>`);
+    if (planetConfig.WATER.POND_COUNT > 0) items.push(`<li><span class="swatch" style="background:${hex(planetConfig.WATER.COLOR)}"></span>Agua dulce</li>`);
+    if (planetConfig.HAS_SEA) items.push(`<li><span class="swatch" style="background:${hex(planetConfig.COLORS.SEA)}"></span>Mar</li>`);
     this._side.innerHTML = `
-      <h3>MUNDO 0</h3>
+      <h3>${escapeHtml(planetConfig.NAME)}</h3>
       <p class="muted">Seed "${escapeHtml(world.seed?.text ?? '')}" · ${world.getInfo().worldSize} m de lado</p>
       <ul class="legend">${items.join('')}</ul>
       <ul class="legend markers">
@@ -145,7 +146,7 @@ export class ShipMapPanel extends ModalPanel {
         <li><span class="mk" style="color:#ff9a4a">▲</span>Nave</li>
         <li><span class="mk" style="color:#ffe38a">●</span>Inicio</li>
         <li><span class="mk" style="color:#ff9ecf">●</span>Cama (reaparición)</li>
-        ${(this._src.getMarkers?.() ?? []).map((m) => `<li><span class="mk" style="color:${m.color}">◎</span>${m.label}</li>`).join('')}
+        ${(this._src.getMarkers?.() ?? []).map((m) => `<li><span class="mk" style="color:${m.color}">◎</span>${escapeHtml(m.label)}</li>`).join('')}
       </ul>
       <p class="muted small">${this._src.hasSpaceNode?.() ? 'Con el nodo espacial la nave puede salir al espacio (a los mandos, vuela alto y pulsa O).' : 'Instala el nodo espacial en una ranura libre de la nave para poder salir al espacio.'}</p>`;
   }
@@ -211,15 +212,16 @@ export class ShipMapPanel extends ModalPanel {
     };
     moons.filter((m) => m.p.z < 0).forEach(drawMoon);
 
-    // Planeta: disco con el mapa real de MUNDO 0 y sombra del lado nocturno.
+    // Planeta: disco con el mapa real del planeta y sombra del lado nocturno.
     const pr = 46;
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, pr, 0, Math.PI * 2);
     ctx.clip();
-    ctx.fillStyle = hex(this._src.planetConfig.COLORS.SEA);
+    ctx.fillStyle = hex(this._src.homeConfig.COLORS.SEA);
     ctx.fillRect(cx - pr, cy - pr, pr * 2, pr * 2);
-    if (this._src.map.ready) ctx.drawImage(this._src.map.canvas, cx - pr * 0.72, cy - pr * 0.72, pr * 1.44, pr * 1.44);
+    const homeMap = this._src.homeMap;
+    if (homeMap.ready) ctx.drawImage(homeMap.canvas, cx - pr * 0.72, cy - pr * 0.72, pr * 1.44, pr * 1.44);
     const shade = ctx.createLinearGradient(cx - pr, cy, cx + pr, cy);
     shade.addColorStop(0, 'rgba(0,0,0,0)');
     shade.addColorStop(0.55, 'rgba(0,0,0,0.15)');
@@ -232,7 +234,7 @@ export class ShipMapPanel extends ModalPanel {
     ctx.beginPath();
     ctx.arc(cx, cy, pr + 1, 0, Math.PI * 2);
     ctx.stroke();
-    label(ctx, cx, cy + pr + 16, `${catalog.planet.name} (estás aquí)`, '#bfe3ff');
+    label(ctx, cx, cy + pr + 16, `${catalog.planet.name}${this._src.onHome?.() ? ' (estás aquí)' : ''}`, '#bfe3ff');
 
     moons.filter((m) => m.p.z >= 0).forEach(drawMoon);
 
@@ -247,7 +249,7 @@ export class ShipMapPanel extends ModalPanel {
     const locked = this._src.spaceNodeRequired && !this._src.hasSpaceNode?.();
     const cards = catalog.bodies.map((b) => `
       <div class="moon-card">
-        <div class="moon-title"><span class="swatch round" style="background:${hex(b.color)}"></span>${b.name}</div>
+        <div class="moon-title"><span class="swatch round" style="background:${hex(b.color)}"></span>${escapeHtml(b.name)}</div>
         <dl>
           <dt>Radio</dt><dd>${b.radiusKm.toLocaleString('es-ES')} km</dd>
           <dt>Distancia</dt><dd>${b.distanceKm.toLocaleString('es-ES')} km</dd>
@@ -256,9 +258,10 @@ export class ShipMapPanel extends ModalPanel {
         </dl>
         ${locked ? '<p class="locked">🔒 No visitable: falta el <b>nodo espacial</b>.</p>' : '<p class="muted small">🚀 Pilota la nave hasta ella (en el espacio, tecla de rumbo).</p>'}
       </div>`);
+    const n = catalog.bodies.length;
     this._side.innerHTML = `
-      <h3>Sistema de MUNDO 0</h3>
-      <p class="muted">Dos lunas visibles desde la superficie.</p>
+      <h3>${escapeHtml(this._src.systemName)}</h3>
+      <p class="muted">${n === 0 ? 'Sin lunas.' : n === 1 ? 'Una luna visible desde la superficie.' : `${n} lunas visibles desde la superficie.`}</p>
       ${cards.join('')}
       <button type="button" class="open-star-map">🌌 Abrir mapa estelar 3D</button>
       <p class="muted small">${locked ? 'Con el nodo espacial instalado la nave puede salir al espacio y viajar a las lunas.' : ''}</p>`;

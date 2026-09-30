@@ -1,45 +1,47 @@
 import { SeededRandom } from '../core/SeededRandom.js';
 
 /**
- * CelestialCatalog — cuerpos celestes de un planeta a partir de su seed. Sin Three.js.
+ * CelestialCatalog — cuerpos celestes del planeta de inicio a partir de su seed. Sin Three.js.
  *
- * Tamaño, distancia y velocidad de cada luna vienen de GameConfig.CELESTIAL
- * (MOON_A_SIZE, MOON_A_DISTANCE, MOON_A_SPEED...); la posición inicial en la
+ * Tamaño, distancia, velocidad, color y tamaño en el cielo de cada luna vienen
+ * del sistema solar (SolarSystem: system.moons); la posición inicial en la
  * órbita, la inclinación y un matiz de color dependen de la sub-seed "celestial".
  *
  * La posición de una luna es una órbita circular inclinada (sin física):
  *     ángulo = fase inicial + 2π · velocidad · horas de juego
  *
- * Lo usan el mapa planetario de la nave, CelestialSystem (las lunas en el cielo)
- * y SpaceScene (las mismas lunas vistas desde el
- * espacio. Añadir lunas/planetas = añadir entradas a `bodies`.
+ * Lo usan el mapa planetario de la nave, CelestialSystem (las lunas en el cielo),
+ * SpaceView/SpaceScene (las mismas lunas vistas desde el espacio) y la IA.
  */
-export function createCelestialCatalog(config, celestialSeed) {
+export function createCelestialCatalog(config, celestialSeed, system) {
   const rng = new SeededRandom(celestialSeed);
   const maxInc = (config.MAX_INCLINATION_DEG * Math.PI) / 180;
-  const moon = (id, name, prefix) => ({
-    id,
-    name,
+  const moon = (m, index) => ({
+    id: m.id,
+    name: m.name,
     kind: 'MOON',
-    radiusKm: config[`${prefix}_SIZE`],
-    distanceKm: config[`${prefix}_DISTANCE`],
-    speed: config[`${prefix}_SPEED`],                 // vueltas por hora de juego
-    periodHours: 1 / config[`${prefix}_SPEED`],
-    color: tint(config[`${prefix}_COLOR`], rng.range(-0.06, 0.06)),
+    index,
+    radiusKm: m.radiusKm,
+    distanceKm: m.orbit.distanceKm,
+    speed: m.orbit.speed,                              // vueltas por hora de juego
+    periodHours: m.orbit.periodHours,
+    skySizeDeg: m.skySizeDeg,
+    color: tint(m.color, rng.range(-0.06, 0.06)),
     phase: rng.range(0, Math.PI * 2),                  // posición inicial (seed)
     inclination: rng.range(-maxInc, maxInc),           // inclinación de la órbita (seed)
     node: rng.range(0, Math.PI * 2),                   // orientación de la órbita (seed)
     craterSeed: Math.floor(rng.next() * 0xffffffff),   // aspecto de la superficie (seed)
     visitable: false,                                  // falta el "nodo espacial"
   });
+  const home = system.home;
   return {
-    planet: { id: 'MUNDO_0', name: config.PLANET_NAME, radiusKm: config.PLANET_RADIUS_KM },
-    bodies: [moon('MOON_A', 'Luna A', 'MOON_A'), moon('MOON_B', 'Luna B', 'MOON_B')],
+    planet: { id: home.id, name: home.name, radiusKm: home.radiusKm },
+    bodies: system.moons.map(moon),
   };
 }
 
 /**
- * Ángulo del cuerpo en el cielo de MUNDO 0 (como `TimeSystem.sunAngle`: 0 sale,
+ * Ángulo del cuerpo en el cielo del planeta (como `TimeSystem.sunAngle`: 0 sale,
  * π/2 culmina, π se pone): la rotación del planeta menos lo que ha avanzado en su
  * órbita. Por eso cada día sale un poco más tarde.
  */

@@ -268,7 +268,7 @@ export class ShipFlight {
       s.x = cx;
       s.z = cz;
       this.forwardSpeed *= 0.5;
-      this._notice('Límite de MUNDO 0: la nave solo puede explorar este planeta');
+      this._notice('Límite de la región: más allá, sube al espacio (O) para ir a otro sitio');
     }
   }
 

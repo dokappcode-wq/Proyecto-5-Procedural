@@ -1,3 +1,4 @@
+import { withPrep } from '../systemdata/SolarSystem.js';
 import { GameEvents } from '../core/GameEvents.js';
 
 const MODE_LABELS = { FIRST_PERSON: '1ª persona', THIRD_PERSON: '3ª persona' };
@@ -48,7 +49,8 @@ const DIET_LABELS = {
   TOO_MUCH_PLANT: 'desequilibrada (demasiada fruta)',
 };
 export class UIManager {
-  constructor({ config, gameInfo, items, equipmentConfig, buildConfig, events, input, canvas, root = document }) {
+  constructor({ config, gameInfo, system, items, equipmentConfig, buildConfig, events, input, canvas, root = document }) {
+    this._system = system;
     this.name = 'ui';
     this._cfg = config;
     this._events = events;
@@ -103,6 +105,7 @@ export class UIManager {
     this.el.title.textContent = gameInfo.TITLE;
     this.el.version.textContent = `${gameInfo.TITLE} · v${gameInfo.VERSION}`;
 
+    this.el.startButton.textContent = `Entrar ${withPrep('en', system.home.name)}`;
     this.el.startButton.addEventListener('click', () => this._start());
     // Clic en el juego = recuperar el control del ratón.
     canvas.addEventListener('mousedown', () => {
@@ -224,7 +227,7 @@ export class UIManager {
       this.el.sleepOverlay.classList.remove('active');
       this.showMessage(`Has dormido ${hours} horas. Energía recuperada.`, 'biome');
     });
-    events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
+    events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de la región explorable.'));
 
     // ---- Fases 10–11: temperatura (oculta) y reloj ----
     events.on(GameEvents.TEMPERATURE_CHANGED, ({ frost }) => this._setFrost(frost));
@@ -234,9 +237,9 @@ export class UIManager {
     });
     events.on(GameEvents.TIME_CHANGED, (t) => this._updateClock(t));
     events.on(GameEvents.BODY_CHANGED, ({ planet }) => {
-      if (this._started && planet?.NAME) this.showMessage(planet.NAME === 'MUNDO 0' ? 'Has vuelto a MUNDO 0.' : `Estás en: ${planet.NAME}`, 'biome');
+      if (this._started && planet?.NAME) this.showMessage(planet.KIND === 'SPACE' ? 'En el espacio.' : `Estás ${withPrep('en', planet.NAME)}.`, 'biome');
     });
-    events.on(GameEvents.MOON_RISE, ({ name }) => this._started && this.showMessage(`Sale la ${name}.`, 'biome'));
+    events.on(GameEvents.MOON_RISE, ({ name }) => this._started && this.showMessage(`Sale ${withPrep('', name)}.`, 'biome'));
     events.on(GameEvents.TIME_PERIOD_CHANGED, ({ period, jumped }) => {
       if (!jumped && this._started && PERIOD_MESSAGES[period]) this.showMessage(PERIOD_MESSAGES[period], 'biome');
     });
@@ -489,7 +492,7 @@ export class UIManager {
     this.el.hud.classList.remove('hidden');
     this._input.requestPointerLock();
     this._events.emit(GameEvents.GAME_STARTED);
-    this.showMessage('Bienvenido a MUNDO 0');
+    this.showMessage(`Bienvenido ${withPrep('a', this._system.home.name)}`);
     this._updateLockHint();
   }
 

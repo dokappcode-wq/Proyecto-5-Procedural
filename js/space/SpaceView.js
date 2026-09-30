@@ -17,9 +17,8 @@ import { createMoonGeometry } from '../celestial/CelestialSystem.js';
 export const SPACE_SUN_DIR = new THREE.Vector3(1, 0.12, 0.08).normalize();
 
 export class SpaceView {
-  constructor({ scene, config, celestialConfig }) {
+  constructor({ scene, config }) {
     this._cfg = config;
-    this._cel = celestialConfig;
     this.group = new THREE.Group();
     this.group.name = 'SpaceView';
     this.group.visible = false;
@@ -30,7 +29,7 @@ export class SpaceView {
     this._s = new THREE.Vector3();
     this._e = new THREE.Euler();
 
-    // Planeta (textura de MUNDO 0 iluminada por el sol del espacio).
+    // Planeta (textura del planeta de inicio iluminada por el sol del espacio).
     this._planetMat = new THREE.ShaderMaterial({
       uniforms: { map: { value: null }, sunDir: { value: SPACE_SUN_DIR } },
       fog: false,
@@ -102,7 +101,7 @@ export class SpaceView {
 
   /**
    * Cinturones de asteroides procedurales: anillos (con la seed) entre las
-   * órbitas de las lunas y por fuera. Posiciones en km respecto a MUNDO 0.
+   * órbitas de las lunas y por fuera. Posiciones en km respecto al planeta.
    */
   _buildAsteroids(seed) {
     const c = this._cfg;
@@ -165,17 +164,17 @@ export class SpaceView {
 
   /** Posición (km) de cada cuerpo ahora. */
   bodyPositions(totalHours) {
-    const out = [{ id: 'MUNDO_0', name: this._catalog.planet.name, radiusKm: this._catalog.planet.radiusKm, position: { x: 0, y: 0, z: 0 } }];
+    const out = [{ id: this._catalog.planet.id, name: this._catalog.planet.name, radiusKm: this._catalog.planet.radiusKm, position: { x: 0, y: 0, z: 0 } }];
     for (const b of this._catalog.bodies) {
       out.push({ id: b.id, name: b.name, radiusKm: b.radiusKm, position: orbitPosition(b, totalHours, {}) });
     }
     return out;
   }
 
-  /** Etiquetas en pantalla (px) de MUNDO 0 y las lunas: [{ id, name, x, y, visible }]. */
+  /** Etiquetas en pantalla (px) del planeta y las lunas: [{ id, name, x, y, visible }]. */
   screenLabels(camera, width, height) {
     if (!this._catalog || !this.group.visible) return [];
-    const items = [{ id: 'MUNDO_0', name: this._catalog.planet.name, obj: this.planetRoot }];
+    const items = [{ id: this._catalog.planet.id, name: this._catalog.planet.name, obj: this.planetRoot }];
     for (const b of this._catalog.bodies) items.push({ id: b.id, name: b.name, obj: this.moons[b.id] });
     return items.map(({ id, name, obj }) => {
       this._v.copy(obj.position);

@@ -1,8 +1,8 @@
 /**
- * SpaceNavigation — vuelo de la nave por el sistema de MUNDO 0. Sin Three.js.
+ * SpaceNavigation — vuelo de la nave por el sistema solar. Sin Three.js.
  *
  * Unidades: kilómetros y segundos. La nave tiene posición (x, y, z) respecto al
- * centro de MUNDO 0, rumbo (yaw), cabeceo (pitch) y velocidad hacia delante.
+ * centro del planeta de inicio, rumbo (yaw), cabeceo (pitch) y velocidad hacia delante.
  * Mandos: forward (−1..1) empuje, turn (−1..1) girar, vertical (−1..1) cabecear,
  * boost (turbo). Sin mandos la nave frena poco a poco (no es física realista).
  *
@@ -168,7 +168,7 @@ export class SpaceNavigation {
     this._zoneNotice = Math.max(0, this._zoneNotice - dt);
   }
 
-  /** Distancia al centro del sistema (MUNDO 0). */
+  /** Distancia al centro del sistema (el planeta de inicio). */
   get distanceFromCenter() {
     return Math.hypot(this.pos.x, this.pos.y, this.pos.z);
   }

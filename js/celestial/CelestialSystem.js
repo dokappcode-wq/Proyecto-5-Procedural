@@ -5,7 +5,7 @@ import { smoothstep } from '../core/MathUtils.js';
 import { createCelestialCatalog, skyAngle, illumination } from './CelestialCatalog.js';
 
 /**
- * CelestialSystem — sol, Luna A y Luna B vistos desde la superficie (Fase 12).
+ * CelestialSystem — el sol y las lunas vistos desde la superficie (Fase 12).
  *
  * - El catálogo (tamaño, distancia, velocidad, fase inicial, inclinación, cráteres)
  *   se crea a partir de la sub-seed "celestial" al generar el mundo.
@@ -18,19 +18,22 @@ import { createCelestialCatalog, skyAngle, illumination } from './CelestialCatal
  * El sol lo dibuja SkyDome (disco + halo); aquí solo se usa su dirección.
  * Añadir cuerpos = añadir entradas al catálogo.
  *
- * Observador (`setObserver`): desde MUNDO 0 se ven las lunas; desde una luna se
- * ve MUNDO 0 enorme y quieto en el cielo (siempre la misma cara, con sus fases);
+ * Observador (`setObserver`): desde el planeta se ven las lunas; desde una luna se
+ * ve el planeta enorme y quieto en el cielo (siempre la misma cara, con sus fases);
  * en el espacio no se dibuja nada aquí (lo hace SpaceView).
  */
-// Dirección fija de MUNDO 0 en el cielo de cada luna (acoplamiento de marea).
-const PLANET_IN_SKY = {
-  MOON_A: new THREE.Vector3(0.35, 0.72, -0.6).normalize(),
-  MOON_B: new THREE.Vector3(-0.45, 0.6, -0.66).normalize(),
-};
+// Dirección fija del planeta en el cielo de cada luna (acoplamiento de marea), por orden de luna.
+const PLANET_IN_SKY = [
+  new THREE.Vector3(0.35, 0.72, -0.6).normalize(),
+  new THREE.Vector3(-0.45, 0.6, -0.66).normalize(),
+  new THREE.Vector3(0.6, 0.55, 0.58).normalize(),
+  new THREE.Vector3(-0.5, 0.65, 0.57).normalize(),
+];
 export class CelestialSystem {
-  constructor({ config, time, scene, camera, events }) {
+  constructor({ config, system, time, scene, camera, events }) {
     this.name = 'celestial';
     this._cfg = config;
+    this._system = system;
     this._time = time;
     this._camera = camera;
     this._events = events;
@@ -41,19 +44,19 @@ export class CelestialSystem {
     this._group.name = 'Moons';
     scene.add(this._group);
     this._started = false;
-    this.observer = 'MUNDO_0';
+    this.observer = system.homeId;
     this._planetMesh = null;
 
     events.on(GameEvents.GAME_STARTED, () => (this._started = true));
   }
 
   /**
-   * Desde qué cuerpo se mira el cielo. `planetTexture`: textura de MUNDO 0 (para
+   * Desde qué cuerpo se mira el cielo. `planetTexture`: textura del planeta (para
    * verlo desde las lunas).
    */
   setObserver(id, planetTexture = null) {
     this.observer = id;
-    if (PLANET_IN_SKY[id] && planetTexture) {
+    if (this._planetDirFrom(id) && planetTexture) {
       if (!this._planetMesh) this._createPlanetMesh();
       this._planetMesh.material.uniforms.map.value = planetTexture;
     }
@@ -86,7 +89,7 @@ export class CelestialSystem {
         }`,
     });
     this._planetMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), material);
-    this._planetMesh.name = 'MUNDO_0_in_sky';
+    this._planetMesh.name = 'PlanetInSky';
     this._planetMesh.frustumCulled = false;
     this._planetMesh.renderOrder = 1;
     this._group.add(this._planetMesh);
@@ -99,7 +102,8 @@ export class CelestialSystem {
       m.mesh.geometry.dispose();
       m.material.dispose();
     }
-    this.catalog = createCelestialCatalog(this._cfg, celestialSeed);
+    this.catalog = createCelestialCatalog(this._cfg, celestialSeed, this._system);
+    this._maxSkySize = Math.max(1, ...this.catalog.bodies.map((b) => b.skySizeDeg));
     this.moons = this.catalog.bodies.map((body) => this._createMoon(body));
     this.update(0);
     for (const m of this.moons) m.wasUp = m.height > 0; // sin aviso al empezar
@@ -144,7 +148,7 @@ export class CelestialSystem {
     mesh.name = body.id;
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
-    const sizeDeg = this._cfg[`${body.id}_SKY_SIZE_DEG`] ?? 3;
+    const sizeDeg = body.skySizeDeg ?? 3;
     mesh.scale.setScalar(this._cfg.SKY_DISTANCE * Math.tan(((sizeDeg * Math.PI) / 180) / 2));
     // Cada luna gira sobre sí misma distinto (se ven caras diferentes).
     mesh.rotation.set(body.inclination * 2, body.node, 0);
@@ -156,8 +160,8 @@ export class CelestialSystem {
     if (!this.catalog) return;
     const t = this._time;
     const sun = t.getSunDirection(this._sun);
-    const onPlanet = this.observer === 'MUNDO_0';
-    const fromMoon = PLANET_IN_SKY[this.observer];
+    const onPlanet = this.observer === this._system.homeId;
+    const fromMoon = this._planetDirFrom(this.observer);
     if (this._planetMesh) {
       this._planetMesh.visible = !!fromMoon;
       if (fromMoon) {
@@ -201,16 +205,16 @@ export class CelestialSystem {
    * @returns {{ direction: THREE.Vector3, strength: number } | null} strength 0..1
    */
   getNightLight() {
-    const fromMoon = PLANET_IN_SKY[this.observer];
+    const fromMoon = this._planetDirFrom(this.observer);
     if (fromMoon) {
-      // Desde una luna: la luz reflejada por MUNDO 0.
+      // Desde una luna: la luz reflejada por el planeta.
       return { direction: fromMoon, strength: illumination(fromMoon, this._sun) };
     }
-    if (this.observer !== 'MUNDO_0') return null;
+    if (this.observer !== this._system.homeId) return null;
     let best = null;
     let bestStrength = 0;
     for (const m of this.moons) {
-      const size = (this._cfg[`${m.body.id}_SKY_SIZE_DEG`] ?? 3) / this._cfg.MOON_A_SKY_SIZE_DEG;
+      const size = m.body.skySizeDeg / this._maxSkySize;
       const strength = m.lit * smoothstep(0, 0.2, m.height) * Math.min(1, size);
       if (strength > bestStrength) {
         bestStrength = strength;
@@ -218,6 +222,12 @@ export class CelestialSystem {
       }
     }
     return best ? { direction: best.dir, strength: bestStrength } : null;
+  }
+
+  /** Dirección del planeta en el cielo de una luna (null si `id` no es una luna del planeta). */
+  _planetDirFrom(id) {
+    const i = this.catalog?.bodies.findIndex((b) => b.id === id) ?? -1;
+    return i >= 0 ? PLANET_IN_SKY[i % PLANET_IN_SKY.length] : null;
   }
 
   /** Estado para Admin / UI. */
@@ -254,20 +264,22 @@ export class CelestialSystem {
 }
 
 /**
- * Esfera low-poly con cráteres (color por vértice). Luna A: gris con "mares"
- * oscuros; Luna B: rojiza con cráteres pequeños. Todo sale de craterSeed.
+ * Esfera low-poly con cráteres (color por vértice). Las lunas grandes tienen
+ * pocos cráteres grandes ("mares"); las pequeñas, muchos y pequeños. Todo sale
+ * de craterSeed.
  */
 export function createMoonGeometry(body, detail = 3) {
   const geometry = new THREE.IcosahedronGeometry(1, detail);
   const pos = geometry.getAttribute('position');
   const rng = new SeededRandom(body.craterSeed);
   const craters = [];
-  const count = body.id === 'MOON_A' ? 26 : 40;
+  const large = body.radiusKm >= 400;
+  const count = large ? 26 : 40;
   for (let i = 0; i < count; i++) {
     const u = rng.range(-1, 1);
     const a = rng.range(0, Math.PI * 2);
     const r = Math.sqrt(1 - u * u);
-    craters.push({ c: new THREE.Vector3(r * Math.cos(a), u, r * Math.sin(a)), size: rng.range(0.08, body.id === 'MOON_A' ? 0.45 : 0.25) });
+    craters.push({ c: new THREE.Vector3(r * Math.cos(a), u, r * Math.sin(a)), size: rng.range(0.08, large ? 0.45 : 0.25) });
   }
   const base = new THREE.Color(body.color);
   const colors = new Float32Array(pos.count * 3);

@@ -48,7 +48,7 @@ export class AIPanel extends ModalPanel {
     if (!lines.length) {
       const p = document.createElement('p');
       p.className = 'muted';
-      p.textContent = 'Pregúntame lo que quieras saber del sistema de MUNDO 0 o de la nave.';
+      p.textContent = `Pregúntame lo que quieras saber ${this._ai.systemName ? `del ${this._ai.systemName}` : 'del sistema'} o de la nave.`;
       this._log.appendChild(p);
     }
     for (const l of lines) {

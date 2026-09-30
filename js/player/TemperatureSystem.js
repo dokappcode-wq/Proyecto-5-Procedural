@@ -73,7 +73,7 @@ export class TemperatureSystem {
     const c = this._cfg;
     const info = this._world.getBiomeAt(x, z);
     const weights = info.weights;
-    // La temperatura mezclada por pesos la da el mundo activo (MUNDO 0 o una luna).
+    // La temperatura mezclada por pesos la da el mundo activo (el planeta o una luna).
     let biome = info.temperature;
     if (biome === undefined) {
       biome = 0;

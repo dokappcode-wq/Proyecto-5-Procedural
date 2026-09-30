@@ -8,8 +8,9 @@ import { EventBus } from '../js/core/EventBus.js';
 import { TimeSystem } from '../js/time/TimeSystem.js';
 import { WorldSeed } from '../js/world/WorldSeed.js';
 import { createCelestialCatalog, skyAngle, illumination } from '../js/celestial/CelestialCatalog.js';
+import { EDEN } from './helpers/eden.mjs';
 
-const catalog = createCelestialCatalog(GameConfig.CELESTIAL, new WorldSeed('mundo0', GameConfig.WORLD.SUB_SEEDS).sub.celestial);
+const catalog = createCelestialCatalog(GameConfig.CELESTIAL, new WorldSeed('mundo0', GameConfig.WORLD.SUB_SEEDS).sub.celestial, EDEN);
 
 test('el sol y las lunas usan el mismo cielo: skyDirection(sunAngle) = dirección del sol', () => {
   const time = new TimeSystem({ config: GameConfig.TIME, events: new EventBus() });
@@ -48,9 +49,8 @@ test('fase de la luna: llena frente al sol, nueva junto a él', () => {
 });
 
 test('las dos lunas se ven distintas desde la superficie', () => {
-  const C = GameConfig.CELESTIAL;
-  assert.notEqual(C.MOON_A_SKY_SIZE_DEG, C.MOON_B_SKY_SIZE_DEG);
   const [a, b] = catalog.bodies;
+  assert.notEqual(a.skySizeDeg, b.skySizeDeg);
   assert.notEqual(a.color, b.color);
   assert.notEqual(a.speed, b.speed);
   assert.notEqual(a.inclination, b.inclination);

@@ -10,10 +10,11 @@ import { TimeSystem } from '../js/time/TimeSystem.js';
 import { TemperatureSystem } from '../js/player/TemperatureSystem.js';
 import { createCelestialCatalog, orbitPosition } from '../js/celestial/CelestialCatalog.js';
 import { WorldSeed } from '../js/world/WorldSeed.js';
+import { EDEN, HOME } from './helpers/eden.mjs';
 
 const T = GameConfig.TIME;
 const C = GameConfig.TEMPERATURE;
-const BIOMES = GameConfig.PLANETS.MUNDO_0.BIOMES;
+const BIOMES = HOME.BIOMES;
 const secondsPerHour = (T.DAY_LENGTH_MINUTES * 60) / 24;
 
 // ---- Tiempo --------------------------------------------------------------------
@@ -159,19 +160,19 @@ test('la armadura reduce la pérdida (ARMOR_COLD_RESISTANCE) y el refugio climat
 
 // ---- Lunas -------------------------------------------------------------------------
 
-test('las dos lunas dependen de la seed (fase e inclinación) y de la configuración (tamaño, distancia, velocidad)', () => {
+test('las dos lunas dependen de la seed (fase e inclinación) y del sistema solar (tamaño, distancia, velocidad)', () => {
   const cfg = GameConfig.CELESTIAL;
   const sub = (text) => new WorldSeed(text, GameConfig.WORLD.SUB_SEEDS).sub.celestial;
-  const a = createCelestialCatalog(cfg, sub('mundo0'));
-  const b = createCelestialCatalog(cfg, sub('mundo0'));
-  const c = createCelestialCatalog(cfg, sub('otra'));
+  const a = createCelestialCatalog(cfg, sub('mundo0'), EDEN);
+  const b = createCelestialCatalog(cfg, sub('mundo0'), EDEN);
+  const c = createCelestialCatalog(cfg, sub('otra'), EDEN);
   assert.deepEqual(a, b, 'misma seed → mismas lunas');
   assert.notEqual(a.bodies[0].phase, c.bodies[0].phase);
   const [A, B] = a.bodies;
   assert.equal(A.name, 'Luna A');
   assert.equal(B.name, 'Luna B');
-  assert.equal(A.radiusKm, cfg.MOON_A_SIZE);
-  assert.equal(B.distanceKm, cfg.MOON_B_DISTANCE);
+  assert.equal(A.radiusKm, 620);
+  assert.equal(B.distanceKm, 17000);
   assert.ok(A.radiusKm !== B.radiusKm && A.distanceKm !== B.distanceKm && A.speed !== B.speed, 'visualmente distintas');
   assert.ok(!A.visitable && !B.visitable, 'no visitables: falta el nodo espacial');
   // Órbita circular: la distancia al planeta se conserva y vuelve al inicio tras un periodo.

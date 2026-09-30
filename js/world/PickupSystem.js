@@ -3,8 +3,8 @@ import { GameEvents } from '../core/GameEvents.js';
 
 /**
  * PickupSystem — objetos sueltos en el mundo que se recogen con E: el nodo
- * espacial caído en MUNDO 0, cofres, el nodo galáctico… Cada uno pertenece a un
- * cuerpo (MUNDO_0, MOON_A…) y solo se ve y se usa cuando ese cuerpo está activo.
+ * espacial caído en el planeta, cofres, el nodo galáctico… Cada uno pertenece a un
+ * cuerpo (P1, P1M1…) y solo se ve y se usa cuando ese cuerpo está activo.
  *
  *   add({ id, body, x, z, model: 'NODE'|'GALACTIC_NODE'|'CHEST', label, action,
  *         contents: [{ item, count }], beacon, mapLabel, mapColor })

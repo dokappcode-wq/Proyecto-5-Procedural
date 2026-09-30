@@ -1,5 +1,5 @@
 /**
- * PlanetMapRenderer — dibuja el mapa de MUNDO 0 visto desde arriba en un canvas.
+ * PlanetMapRenderer — dibuja el mapa de la región de un cuerpo visto desde arriba en un canvas.
  *
  * Muestrea el generador de terreno (altura + pesos de bioma) en una rejilla de
  * `resolution`² puntos que cubre todo el mundo (incluido el mar del borde) y

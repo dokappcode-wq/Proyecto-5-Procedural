@@ -3,7 +3,7 @@ import { Animal } from './Animal.js';
 import { PartsBuilder } from '../render/PartsBuilder.js';
 
 /**
- * Ciervo — el "animal de pradera" de MUNDO 0. Da carne.
+ * Ciervo — el "animal de pradera" (plantilla "deer"). Da carne.
  * Esbelto y asustadizo: se alerta y huye desde lejos (valores en config).
  */
 export class Deer extends Animal {

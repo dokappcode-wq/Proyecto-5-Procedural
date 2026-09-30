@@ -1,13 +1,15 @@
 import { ModalPanel } from './ModalPanel.js';
 import { GameEvents } from '../core/GameEvents.js';
+import { withPrep } from '../systemdata/SolarSystem.js';
 
 /**
  * PodPanel — elegir el destino de la cápsula de escape (E sobre una cápsula).
  */
 export class PodPanel extends ModalPanel {
-  constructor({ container, input, events, escape }) {
+  constructor({ container, input, events, escape, system }) {
     super({ id: 'pod-panel', title: '🛟 Cápsula de escape', container, input, events });
     this._escape = escape;
+    this._system = system;
     events.on(GameEvents.ESCAPE_POD_REQUEST, () => this.setOpen(true));
   }
 
@@ -16,9 +18,12 @@ export class PodPanel extends ModalPanel {
     const list = esc.destinations();
     const emergency = list.some((d) => d.reason?.startsWith('Sin energía'));
     const fmt = (km) => `${Math.round(km).toLocaleString('es-ES')} km`;
-    this.body.innerHTML = `
-      ${emergency ? '<p class="pod-alert">⚠️ Salto galáctico fallido. Evacuación de emergencia a MUNDO 0.</p>' : `<p class="muted">Cápsulas disponibles: ${esc.podsLeft}. Alcance: ${fmt(esc._cfg.POD_RANGE_KM)}. La IA traerá la nave detrás.</p>`}
-      <div class="pod-list"></div>`;
+    this.body.innerHTML = '<p></p><div class="pod-list"></div>';
+    const intro = this.body.querySelector('p');
+    intro.className = emergency ? 'pod-alert' : 'muted';
+    intro.textContent = emergency
+      ? `⚠️ Salto galáctico fallido. Evacuación de emergencia ${withPrep('a', this._system.home.name)}.`
+      : `Cápsulas disponibles: ${esc.podsLeft}. Alcance: ${fmt(esc._cfg.POD_RANGE_KM)}. La IA traerá la nave detrás.`;
     const box = this.body.querySelector('.pod-list');
     for (const d of list) {
       const row = document.createElement('div');
@@ -42,8 +47,9 @@ export class PodPanel extends ModalPanel {
  * y pantalla de fin de la demo.
  */
 export class EscapeOverlay {
-  constructor({ events, input }) {
+  constructor({ events, input, system, gameTitle }) {
     this._events = events;
+    this._system = system;
     this._input = input;
     this.fade = document.createElement('div');
     this.fade.id = 'pod-fade';
@@ -60,18 +66,20 @@ export class EscapeOverlay {
     this.end.setAttribute('role', 'dialog');
     this.end.innerHTML = `
       <div class="demo-card">
-        <h1>MUNDO 0</h1>
+        <h1></h1>
         <h2>Fin de la demo</h2>
         <p class="demo-text"></p>
         <ul class="demo-stats"></ul>
-        <button type="button">Seguir explorando MUNDO 0</button>
+        <button type="button"></button>
       </div>`;
+    this.end.querySelector('h1').textContent = gameTitle;
+    this.end.querySelector('button').textContent = `Seguir explorando ${withPrep('', system.home.name)}`;
     document.body.appendChild(this.end);
     this.end.querySelector('button').addEventListener('click', () => this._close());
 
     events.on(GameEvents.ESCAPE_POD_LAUNCH, ({ name, emergency, time }) => {
       this.fade.style.transitionDuration = `${Math.min(1, time / 3)}s`;
-      this.fade.querySelector('span').textContent = emergency ? `Evacuación de emergencia… rumbo a ${name}` : `Cápsula de escape en camino a ${name}…`;
+      this.fade.querySelector('span').textContent = emergency ? `Evacuación de emergencia… rumbo ${withPrep('a', name)}` : `Cápsula de escape en camino ${withPrep('a', name)}…`;
       this.fade.classList.add('active');
     });
     events.on(GameEvents.ESCAPE_POD_ARRIVED, () => this.fade.classList.remove('active'));
@@ -85,7 +93,7 @@ export class EscapeOverlay {
     this._input.exitPointerLock();
     this.end.querySelector('.demo-text').textContent =
       'El nodo galáctico no aguantó el salto y la nave quedó a la deriva en el borde del sistema. ' +
-      'Has vuelto a MUNDO 0 en una cápsula de escape. La nave, con su nodo espacial, te espera en la zona de aterrizaje.';
+      `Has vuelto ${withPrep('a', this._system.home.name)} en una cápsula de escape. La nave, con su nodo espacial, te espera en la zona de aterrizaje.`;
     const ul = this.end.querySelector('.demo-stats');
     ul.replaceChildren();
     for (const [k, v] of stats) {

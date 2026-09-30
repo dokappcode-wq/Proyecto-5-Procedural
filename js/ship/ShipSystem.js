@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
+import { withPrep } from '../systemdata/SolarSystem.js';
 import { createShipLayout, toWorld, toLocal } from './ShipLayout.js';
 import { BLUEPRINTS } from './ShipBlueprints.js';
 import { BatteryBank } from './BatteryBank.js';
@@ -30,9 +31,10 @@ import { ShipModel } from './ShipModel.js';
  * SpaceTravel (vuelo espacial), BatteryBank (combustible), ShipModel (dibujo).
  */
 export class ShipSystem {
-  constructor({ config, spaceConfig, scene, world, player, input, events, landingBlocked = () => null }) {
+  constructor({ config, spaceConfig, system, scene, world, player, input, events, landingBlocked = () => null }) {
     this.name = 'ship';
     this._cfg = config;
+    this._system = system;
     this._spaceCfg = spaceConfig;
     this._world = world;
     this._player = player;
@@ -70,8 +72,8 @@ export class ShipSystem {
     this.hasSpaceNode = false;
     this.crippled = false;   // salto galáctico fallido: motores y navegación fuera de servicio
     this.podsUsed = 0;
-    this.body = 'MUNDO_0';
-    this._activeBody = () => 'MUNDO_0';
+    this.body = system.homeId;
+    this._activeBody = () => system.homeId;
     this._breathableOutside = () => true; // ¿hay aire fuera? (cuerpo activo)
     this._held = new Set();
     this._raycaster = new THREE.Raycaster();
@@ -257,7 +259,7 @@ export class ShipSystem {
     this._forceExit(true);
     const site = this._world.getLandingSite();
     if (!site) return;
-    this.body = 'MUNDO_0';
+    this.body = this._system.homeId;
     // Mundo nuevo: vuelve a ser la nave pequeña, sin nodo espacial.
     if (this.isExplorer) this._setBlueprint('SMALL', this._cfg.INSTALLED);
     this.hasSpaceNode = false;
@@ -497,9 +499,9 @@ export class ShipSystem {
     if (input.wasPressed('SHIP_ORBIT')) this.command('ORBIT');
     if (input.wasPressed('STAR_MAP')) this._events.emit(GameEvents.STAR_MAP_REQUEST, {});
     if (this.flight.state === FlightState.SPACE) {
-      ['MUNDO_0', 'MOON_A', 'MOON_B', 'METEOR'].forEach((id, i) => {
-        if (input.wasPressed(`HOTBAR_${i + 1}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { target: id });
-      });
+      for (const t of this._system.autopilotTargets()) {
+        if (input.wasPressed(`HOTBAR_${t.key}`)) this._events.emit(GameEvents.SPACE_AUTOPILOT, { target: t.id });
+      }
     }
     if (input.wasPressed('INTERACT')) {
       input.consume('INTERACT'); // que la interacción no vuelva a sentarte con la misma pulsación
@@ -590,7 +592,7 @@ export class ShipSystem {
     for (const f of L.blueprint.furniture) {
       if (!f.interact) continue;
       let action = f.interact.action;
-      if (f.interact.id.startsWith('POD_')) action = this.crippled ? '¡Evacuar a MUNDO 0!' : 'Subir y elegir destino';
+      if (f.interact.id.startsWith('POD_')) action = this.crippled ? `¡Evacuar ${withPrep('a', this._system.home.name)}!` : 'Subir y elegir destino';
       if (f.interact.id === 'AIRLOCK') {
         action = this.airlock === 'CYCLING' ? 'Cambiando de presión…' : this.airlock === 'PRESSURIZED' ? 'Descomprimir la cámara' : 'Presurizar la cámara';
       }
@@ -666,7 +668,7 @@ export class ShipSystem {
         this._message('Nodo espacial: permite salir al espacio. A los mandos, vuela alto y pulsa [O].');
         return true;
       case 'GALACTIC_NODE':
-        this._message('Nodo galáctico: a los mandos, sal del sistema de MUNDO 0 (más allá de 65 000 km) para intentar el salto.');
+        this._message(`Nodo galáctico: a los mandos, sal del ${this._system.name} (más allá de ${this._spaceCfg.ZONE_RADIUS.toLocaleString('es-ES')} km) para intentar el salto.`);
         return true;
       default:
         if (this._inventory?.hasItem(this._cfg.SPACE_NODE_ITEM, 1) && !this.isExplorer) {
