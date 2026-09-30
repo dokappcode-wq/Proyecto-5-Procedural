@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.4.0-fase4',
+    VERSION: '0.5.0-fase5',
   },
 
   RENDER: {
@@ -67,7 +67,8 @@ export const GameConfig = deepFreeze({
       DESCEND: ['KeyC', 'ControlLeft'], // solo en vuelo (debug)
       TOGGLE_CAMERA: ['KeyV'],
       TOGGLE_HELP: ['KeyH'],
-      INTERACT: ['KeyE'],               // reservado para fases posteriores
+      INTERACT: ['KeyE'],               // recoger / interactuar
+      ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
     },
   },
 
@@ -241,14 +242,48 @@ export const GameConfig = deepFreeze({
     },
   },
 
-  // Tipos de recurso: lo que da cada uno al recogerlo (Fase 5+), colisión y tamaño.
-  // Los IDs de objeto (WOOD, STONE, APPLE...) serán los del inventario.
+  // Tipos de recurso: qué dan al recogerlos, colisión y tamaño.
+  // HARVEST: cada acción de recoger da 1 ITEM hasta agotar AMOUNT. Si REMOVE_WHEN_EMPTY,
+  // el recurso desaparece; si no, vuelve a dar fruto tras REGROW_SECONDS.
+  // AIM_HEIGHT / AIM_RADIUS: dónde y con qué tolerancia apunta la mira al recurso.
   RESOURCE_TYPES: {
-    TREE: { NAME: 'Árbol', DROPS: { WOOD: 3 }, COLLISION_RADIUS: 0.35, SCALE: [0.85, 1.3] },
-    PINE: { NAME: 'Pino', DROPS: { WOOD: 3 }, COLLISION_RADIUS: 0.3, SCALE: [0.8, 1.35] },
-    APPLE_TREE: { NAME: 'Manzano', DROPS: { WOOD: 2, APPLE: 3 }, COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1] },
-    ROCK: { NAME: 'Roca', DROPS: { STONE: 2 }, COLLISION_RADIUS: 0.75, SCALE: [0.5, 1.4] },
-    BUSH: { NAME: 'Arbusto', DROPS: {}, COLLISION_RADIUS: 0, SCALE: [0.7, 1.3] },
+    TREE: {
+      NAME: 'Árbol', COLLISION_RADIUS: 0.35, SCALE: [0.85, 1.3], AIM_HEIGHT: 1.3, AIM_RADIUS: 0.8,
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar' },
+    },
+    PINE: {
+      NAME: 'Pino', COLLISION_RADIUS: 0.3, SCALE: [0.8, 1.35], AIM_HEIGHT: 1.3, AIM_RADIUS: 0.8,
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar' },
+    },
+    APPLE_TREE: {
+      NAME: 'Manzano', COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1], AIM_HEIGHT: 1.8, AIM_RADIUS: 1.3,
+      HARVEST: { ITEM: 'APPLE', AMOUNT: 3, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 180, VERB: 'Coger manzana' },
+    },
+    ROCK: {
+      NAME: 'Roca', COLLISION_RADIUS: 0.75, SCALE: [0.5, 1.4], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.9,
+      HARVEST: { ITEM: 'STONE', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Picar' },
+    },
+    BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
+  },
+
+  // Objetos del inventario. FOOD: tipo de comida para la nutrición (Fase 7).
+  ITEMS: {
+    WOOD: { NAME: 'Madera', ICON: '🪵' },
+    STONE: { NAME: 'Piedra', ICON: '🪨' },
+    WOOL: { NAME: 'Lana', ICON: '🧶' },
+    LEATHER: { NAME: 'Cuero', ICON: '🟫' },
+    MEAT: { NAME: 'Carne', ICON: '🍖', FOOD: 'ANIMAL' },
+    APPLE: { NAME: 'Manzana', ICON: '🍎', FOOD: 'PLANT' },
+    WATER: { NAME: 'Agua', ICON: '💧' },
+  },
+
+  // Interacción del jugador con el mundo (recoger, golpear).
+  INTERACTION: {
+    RANGE: 2.8,                 // m desde el jugador hasta el borde del objetivo
+    ACTION_COOLDOWN: 0.45,      // s entre acciones (recoger o golpear)
+    PLAYER_HIT_DAMAGE: 1,       // daño de un puñetazo
+    HIT_KNOCKBACK: 3,           // m/s de empuje al animal golpeado
+    DAMAGE_KNOCKBACK: 6,        // m/s de empuje al jugador cuando un animal le ataca
   },
 
   // Colores de los elementos del mundo (estilo low-poly con color por vértice).
@@ -267,7 +302,19 @@ export const GameConfig = deepFreeze({
   },
 
   // Especies animales. Comportamiento sencillo: pastar, pasear, mirar, huir.
+  // Cada animal recibe al nacer (al azar, derivado de la seed):
+  //   TEMPERAMENT ante el jugador: FLEE (huye), CURIOUS (se acerca), NEUTRAL (lo ignora)
+  //   HIT_REACTION al ser golpeado: FLEE (huye) o FIGHT (se defiende y ataca)
+  // Las probabilidades de cada especie están en TEMPERAMENT_WEIGHTS / HIT_REACTION_WEIGHTS.
   ANIMALS: {
+    CURIOUS_STOP_DISTANCE: 2.4,   // m: los curiosos se paran a esta distancia
+    CURIOUS_INTEREST_TIME: [8, 18], // s que dura la curiosidad antes de perder interés
+    CURIOUS_COOLDOWN: [15, 30],   // s sin interés después
+    HIT_FLEE_TIME: [6, 10],       // s huyendo tras un golpe
+    AGGRO_TIME: 14,               // s persiguiendo al jugador tras un golpe
+    AGGRO_MAX_DISTANCE: 30,       // m: deja de perseguir si el jugador se aleja más
+    ATTACK_RANGE: 1.7,            // m
+    DEATH_TIME: 1.6,              // s de animación antes de desaparecer
     DISCOVERY_DISTANCE: 28,       // m: aviso "Has encontrado cabras." la primera vez
     ACTIVE_RADIUS: 170,           // m: solo se simulan y dibujan animales cercanos
     MAX_PER_SPECIES: 80,
@@ -278,10 +325,15 @@ export const GameConfig = deepFreeze({
         NAME: 'Ciervo',            // "animal de pradera"
         NAME_PLURAL: 'Ciervos',
         DROPS: { MEAT: 2 },
+        HEALTH: 3,
+        ATTACK_DAMAGE: 5,
+        ATTACK_COOLDOWN: 1.2,
+        TEMPERAMENT_WEIGHTS: { FLEE: 0.6, CURIOUS: 0.2, NEUTRAL: 0.2 },
+        HIT_REACTION_WEIGHTS: { FLEE: 0.75, FIGHT: 0.25 },
         WALK_SPEED: 1.3,
         FLEE_SPEED: 7,
-        ALERT_DISTANCE: 22,         // m: se queda mirando al jugador
-        FLEE_DISTANCE: 13,          // m: huye (×1.6 si el jugador corre)
+        ALERT_DISTANCE: 22,         // m: temperamento FLEE: se queda mirando / CURIOUS: se acerca
+        FLEE_DISTANCE: 13,          // m: temperamento FLEE: huye (×1.6 si el jugador corre)
         HERD_SIZE: [3, 5],
         BIOMES: { PLAINS: 1, FOREST: 0.8 },
         SCALE: [0.9, 1.1],
@@ -291,6 +343,11 @@ export const GameConfig = deepFreeze({
         NAME: 'Cabra',
         NAME_PLURAL: 'Cabras',
         DROPS: { MEAT: 1, WOOL: 2 },
+        HEALTH: 3,
+        ATTACK_DAMAGE: 6,
+        ATTACK_COOLDOWN: 1.1,
+        TEMPERAMENT_WEIGHTS: { FLEE: 0.35, CURIOUS: 0.35, NEUTRAL: 0.3 },
+        HIT_REACTION_WEIGHTS: { FLEE: 0.4, FIGHT: 0.6 },
         WALK_SPEED: 1.1,
         FLEE_SPEED: 5.5,
         ALERT_DISTANCE: 16,
@@ -304,6 +361,11 @@ export const GameConfig = deepFreeze({
         NAME: 'Vaca',
         NAME_PLURAL: 'Vacas',
         DROPS: { MEAT: 3, LEATHER: 2 },
+        HEALTH: 5,
+        ATTACK_DAMAGE: 10,
+        ATTACK_COOLDOWN: 1.6,
+        TEMPERAMENT_WEIGHTS: { FLEE: 0.2, CURIOUS: 0.3, NEUTRAL: 0.5 },
+        HIT_REACTION_WEIGHTS: { FLEE: 0.5, FIGHT: 0.5 },
         WALK_SPEED: 0.8,
         FLEE_SPEED: 3.5,
         ALERT_DISTANCE: 10,

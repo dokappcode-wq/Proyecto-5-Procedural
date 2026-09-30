@@ -31,6 +31,27 @@ export function registerLifeTools(admin, { world, animals, player, controller, s
   });
   admin.registerTool({
     category: 'Mundo vivo',
+    type: 'info',
+    label: 'Temperamentos (huir/curioso/neutral)',
+    read: () => {
+      const t = animals.getTemperamentStats().temperament;
+      return `${t.FLEE ?? 0} / ${t.CURIOUS ?? 0} / ${t.NEUTRAL ?? 0}`;
+    },
+  });
+  admin.registerTool({
+    category: 'Mundo vivo',
+    type: 'info',
+    label: 'Animal más cercano',
+    read: () => {
+      const a = animals
+        .getAnimalsNear(pos().x, pos().z, 40)
+        .sort((u, v) => Math.hypot(u.x - pos().x, u.z - pos().z) - Math.hypot(v.x - pos().x, v.z - pos().z))[0];
+      if (!a) return '—';
+      return `${a.def.NAME} · ${a.temperament}/${a.hitReaction} · ${a.state} · vida ${a.health}`;
+    },
+  });
+  admin.registerTool({
+    category: 'Mundo vivo',
     label: 'Ir al agua más cercana',
     run: () => {
       const n = world.water.nearestPond(pos().x, pos().z);

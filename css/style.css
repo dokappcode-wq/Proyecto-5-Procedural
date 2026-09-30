@@ -191,7 +191,7 @@ kbd {
 #messages {
   position: absolute;
   left: 50%;
-  bottom: 48px;
+  bottom: 96px;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -213,6 +213,89 @@ kbd {
 .message-admin { color: var(--ui-admin); font-weight: 700; letter-spacing: 0.06em; }
 .message-error { color: var(--ui-error); }
 .message-biome { font-weight: 600; letter-spacing: 0.03em; }
+.message-pickup { color: #d8f5b0; font-weight: 600; }
+.message-danger { color: #ffb0a8; font-weight: 600; }
+
+/* ---- Interacción ----------------------------------------------------- */
+#crosshair.has-target::before, #crosshair.has-target::after { background: #ffe38a; }
+#crosshair.pulse { animation: crosshair-pulse 0.25s ease-out; }
+@keyframes crosshair-pulse { 50% { transform: translate(-50%, -50%) scale(1.5); } }
+
+#interaction-prompt {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 22px);
+  transform: translateX(-50%);
+  background: var(--ui-bg);
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+#interaction-prompt .target-name { font-weight: 700; }
+#interaction-prompt .target-action { color: #ffe38a; margin-left: 6px; }
+#interaction-prompt .target-count { color: var(--ui-muted); margin-left: 4px; }
+
+/* ---- Inventario ------------------------------------------------------ */
+#inventory-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#inventory-bar:empty::before {
+  content: 'Inventario vacío';
+  font-size: 0.78rem;
+  color: var(--ui-muted);
+  background: var(--ui-bg);
+  padding: 5px 12px;
+  border-radius: var(--radius);
+}
+.inv-slot {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  background: var(--ui-bg-strong);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  font-size: 1.5rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.inv-slot .count {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px #000;
+}
+.inv-slot .label {
+  position: absolute;
+  top: -16px;
+  font-size: 0.62rem;
+  color: var(--ui-muted);
+  white-space: nowrap;
+}
+.inv-slot.bump { transform: scale(1.15); border-color: #d8f5b0; }
+
+/* Destello de daño: aparece de golpe y se desvanece gradualmente. */
+#damage-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(200, 20, 10, 0.55) 100%);
+  transition: opacity 0.6s ease-out;
+}
+#damage-flash.active { opacity: 1; transition: none; }
 
 /* ---- Admin ----------------------------------------------------------- */
 #admin-panel {

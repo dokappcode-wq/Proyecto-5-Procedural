@@ -9,10 +9,12 @@ import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
  * Rejilla con jitter (CELL_SIZE); en cada celda, la probabilidad de cada tipo
  * es la mezcla de las densidades de los biomas según sus pesos en ese punto.
  *
- * Preparado para la Fase 5:
- *   - Cada nodo sabe qué da al recogerlo (RESOURCE_TYPES[type].DROPS).
- *   - removeNode(id) lo retira y recuerda la retirada aunque el chunk se
- *     descargue; emite onChunkChanged para reconstruir la malla del chunk.
+ * Recogida (Fase 5):
+ *   - harvest(id) da 1 unidad del objeto del recurso (RESOURCE_TYPES[type].HARVEST)
+ *     hasta agotarlo. Agotado: se retira (árboles, rocas) o queda sin fruto y
+ *     rebrota tras REGROW_SECONDS (manzanos).
+ *   - El estado se recuerda aunque el chunk se descargue; onChunkChanged avisa
+ *     para reconstruir la malla del chunk.
  *
  * Colisiones: resolveCollisions(pos, radius) empuja un círculo fuera de
  * troncos y rocas (jugador y animales).
@@ -32,7 +34,46 @@ export class ResourceSystem {
     this._world = world;
     this._chunks = new Map();   // key → { nodes, grass }
     this._removed = new Set();  // ids retirados
+    this._regrowing = [];       // nodos agotados que volverán a dar fruto
     this.onChunkChanged = null; // (cx, cz) => void
+  }
+
+  /**
+   * Recoge 1 unidad de un recurso.
+   * @returns {{ node, item, amount, depleted, removed } | null}
+   */
+  harvest(id) {
+    const node = this._findNode(id);
+    const h = node && this._types[node.type].HARVEST;
+    if (!h || node.removed || node.remaining <= 0) return null;
+    node.remaining--;
+    let removed = false;
+    if (node.remaining === 0) {
+      if (h.REMOVE_WHEN_EMPTY) {
+        removed = true;
+        node.removed = true;
+        this._removed.add(id);
+      } else {
+        node.depleted = true;
+        node.regrowIn = h.REGROW_SECONDS;
+        this._regrowing.push(node);
+      }
+      this._notify(id);
+    }
+    return { node, item: h.ITEM, amount: 1, depleted: node.remaining === 0, removed };
+  }
+
+  /** Avanza el rebrote de los recursos agotados (manzanos). */
+  update(dt) {
+    if (!this._regrowing.length) return;
+    this._regrowing = this._regrowing.filter((node) => {
+      node.regrowIn -= dt;
+      if (node.regrowIn > 0) return true;
+      node.depleted = false;
+      node.remaining = this._types[node.type].HARVEST.AMOUNT;
+      this._notify(node.id);
+      return false;
+    });
   }
 
   static key(cx, cz) {
@@ -65,16 +106,24 @@ export class ResourceSystem {
     return out;
   }
 
-  /** Retira un nodo (recogida). @returns {object|null} el nodo retirado */
+  /** Retira un nodo por completo. @returns {object|null} el nodo retirado */
   removeNode(id) {
-    const [cx, cz] = id.split(':').map(Number);
-    const chunk = this.getChunk(cx, cz);
-    const node = chunk.nodes.find((n) => n.id === id && !n.removed);
-    if (!node) return null;
+    const node = this._findNode(id);
+    if (!node || node.removed) return null;
     node.removed = true;
     this._removed.add(id);
-    this.onChunkChanged?.(cx, cz);
+    this._notify(id);
     return node;
+  }
+
+  _findNode(id) {
+    const [cx, cz] = id.split(':').map(Number);
+    return this.getChunk(cx, cz).nodes.find((n) => n.id === id) ?? null;
+  }
+
+  _notify(id) {
+    const [cx, cz] = id.split(':').map(Number);
+    this.onChunkChanged?.(cx, cz);
   }
 
   /**
@@ -146,6 +195,8 @@ export class ResourceSystem {
           variant: Math.floor(rVar * 3),
           tint: rTint,
           radius: def.COLLISION_RADIUS * (type === 'ROCK' ? scale : 1),
+          remaining: def.HARVEST ? def.HARVEST.AMOUNT : 0,
+          depleted: false,
           removed: this._removed.has(id),
         });
       }

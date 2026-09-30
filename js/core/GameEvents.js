@@ -22,6 +22,15 @@ export const GameEvents = Object.freeze({
   PLAYER_LANDED: 'player:landed',                   // { fallSpeed }
   PLAYER_FLY_CHANGED: 'player:flyChanged',          // { flying }
   PLAYER_BIOME_CHANGED: 'player:biomeChanged',      // { biome: { id, name, weights, temperature }, first }
+  PLAYER_DAMAGED: 'player:damaged',                 // { amount, source, sourceName, fromX, fromZ }
+  PLAYER_ACTION: 'player:action',                   // { kind: 'hit' | 'harvest' | 'miss' }
+
+  // Interacción, animales e inventario
+  INTERACTION_TARGET_CHANGED: 'interaction:targetChanged', // { target: { kind, label, action } | null }
+  ANIMAL_HIT: 'animal:hit',                         // { animal, killed }
+  ANIMAL_KILLED: 'animal:killed',                   // { animal, drops }
+  RESOURCE_HARVESTED: 'resource:harvested',         // { node, item, amount, depleted }
+  INVENTORY_CHANGED: 'inventory:changed',           // { itemId, count, delta, items }
 
   // Admin
   ADMIN_MODE_CHANGED: 'admin:modeChanged',          // { active }

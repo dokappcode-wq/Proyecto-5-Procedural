@@ -16,6 +16,8 @@ import { SkyDome } from './world/SkyDome.js';
 import { BiomeTracker } from './world/BiomeTracker.js';
 import { DiscoveryTracker } from './world/DiscoveryTracker.js';
 import { AnimalSystem } from './animals/AnimalSystem.js';
+import { InventorySystem } from './inventory/InventorySystem.js';
+import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { WorldGenerator } from './world/WorldGenerator.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -25,6 +27,7 @@ import { AdminSystem } from './admin/AdminSystem.js';
 import { registerCoreDebugTools } from './admin/tools/CoreDebugTools.js';
 import { registerWorldTools } from './admin/tools/WorldTools.js';
 import { registerLifeTools } from './admin/tools/LifeTools.js';
+import { registerInventoryTools } from './admin/tools/InventoryTools.js';
 
 function boot() {
   const cfg = GameConfig;
@@ -88,6 +91,7 @@ function boot() {
     world,
     player,
     events,
+    hitKnockback: cfg.INTERACTION.HIT_KNOCKBACK,
   });
   const discovery = new DiscoveryTracker({
     world,
@@ -102,6 +106,26 @@ function boot() {
   // Cada vez que se (re)genera el mundo, el jugador aparece en el spawn de esa seed.
   events.on(GameEvents.WORLD_GENERATED, () => controller.spawn());
 
+  // ---- Inventario e interacción (recoger, golpear) --------------------------
+  const inventory = new InventorySystem({ items: cfg.ITEMS, events });
+  const interaction = new InteractionSystem({
+    config: cfg.INTERACTION,
+    resourceTypes: cfg.RESOURCE_TYPES,
+    input,
+    camera: render.camera,
+    player,
+    world,
+    animals,
+    inventory,
+    events,
+  });
+  events.on(GameEvents.PLAYER_ACTION, () => player.playAction());
+  // Daño recibido: por ahora solo empujón + efectos de UI; la Fase 6 (HealthSystem)
+  // escuchará este mismo evento para restar vida.
+  events.on(GameEvents.PLAYER_DAMAGED, ({ fromX, fromZ }) =>
+    controller.applyKnockback(fromX, fromZ, cfg.INTERACTION.DAMAGE_KNOCKBACK),
+  );
+
   // Sin entrada de juego hasta pulsar "Entrar".
   input.setBlocked('start-screen', true);
   events.on(GameEvents.GAME_STARTED, () => input.setBlocked('start-screen', false));
@@ -110,7 +134,14 @@ function boot() {
   events.on(GameEvents.CAMERA_BODY_VISIBILITY, ({ visible }) => player.setBodyVisible(visible));
 
   // ---- Interfaz y herramientas --------------------------------------------
-  const ui = new UIManager({ config: cfg.UI, gameInfo: cfg.GAME, events, input, canvas: render.domElement });
+  const ui = new UIManager({
+    config: cfg.UI,
+    gameInfo: cfg.GAME,
+    items: cfg.ITEMS,
+    events,
+    input,
+    canvas: render.domElement,
+  });
   ui.setInitialCameraMode(camera.mode);
 
   // Generación inicial: después de crear los oyentes (UI, tracker) y antes de las
@@ -120,6 +151,7 @@ function boot() {
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
   registerLifeTools(admin, { world, animals, player, controller, species: cfg.ANIMALS.SPECIES });
+  registerInventoryTools(admin, { inventory, items: cfg.ITEMS });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
@@ -128,6 +160,7 @@ function boot() {
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(biomeTracker); // bioma actual del jugador
   loop.add(discovery);   // agua y animales descubiertos
@@ -140,7 +173,7 @@ function boot() {
   loop.start();
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
-  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, player, controller, camera, ui, admin, loop };
+  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction, player, controller, camera, ui, admin, loop };
 }
 
 try {

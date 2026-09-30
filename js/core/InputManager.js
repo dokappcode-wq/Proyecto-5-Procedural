@@ -4,6 +4,8 @@ import { GameEvents } from './GameEvents.js';
  * InputManager — traduce eventos del navegador a un estado consultable.
  *
  * - Acciones con nombre (FORWARD, JUMP, TOGGLE_CAMERA...) según KEYBINDINGS.
+ *   Los botones del ratón se nombran 'Mouse0' (izq.), 'Mouse1', 'Mouse2' y solo
+ *   cuentan con el ratón capturado (el primer clic sirve para capturarlo).
  * - Movimiento del ratón acumulado por frame (solo con pointer lock).
  * - Rueda del ratón acumulada por frame.
  * - Los consumidores NO escuchan el DOM directamente: preguntan aquí.
@@ -39,6 +41,8 @@ export class InputManager {
     this._onKeyUp = this._onKeyUp.bind(this);
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onWheel = this._onWheel.bind(this);
+    this._onMouseDown = this._onMouseDown.bind(this);
+    this._onMouseUp = this._onMouseUp.bind(this);
     this._onBlur = () => this._down.clear();
     this._skipNextMouseMove = false;
     this._onPointerLockChange = () => {
@@ -51,6 +55,8 @@ export class InputManager {
     window.addEventListener('keyup', this._onKeyUp);
     window.addEventListener('blur', this._onBlur);
     document.addEventListener('mousemove', this._onMouseMove);
+    document.addEventListener('mousedown', this._onMouseDown);
+    document.addEventListener('mouseup', this._onMouseUp);
     document.addEventListener('pointerlockchange', this._onPointerLockChange);
     this._dom.addEventListener('wheel', this._onWheel, { passive: false });
   }
@@ -150,6 +156,17 @@ export class InputManager {
 
   _onKeyUp(e) {
     this._down.delete(e.code);
+  }
+
+  _onMouseDown(e) {
+    if (!this.isPointerLocked()) return;
+    const code = `Mouse${e.button}`;
+    this._codeToActions.get(code)?.forEach((a) => this._pressedThisFrame.add(a));
+    this._down.add(code);
+  }
+
+  _onMouseUp(e) {
+    this._down.delete(`Mouse${e.button}`);
   }
 
   _onMouseMove(e) {

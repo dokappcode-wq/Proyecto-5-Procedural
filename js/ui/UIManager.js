@@ -13,13 +13,14 @@ const MODE_LABELS = { FIRST_PERSON: '1ª persona', THIRD_PERSON: '3ª persona' }
  * añadirán aquí en las fases 6 y 10, alimentados por eventos.
  */
 export class UIManager {
-  constructor({ config, gameInfo, events, input, canvas, root = document }) {
+  constructor({ config, gameInfo, items, events, input, canvas, root = document }) {
     this.name = 'ui';
     this._cfg = config;
     this._events = events;
     this._input = input;
     this._started = false;
     this._adminPanelOpen = false;
+    this._items = items;
 
     const $ = (id) => root.getElementById(id);
     this.el = {
@@ -35,6 +36,9 @@ export class UIManager {
       version: $('version'),
       seed: $('seed'),
       biome: $('biome'),
+      prompt: $('interaction-prompt'),
+      inventory: $('inventory-bar'),
+      damageFlash: $('damage-flash'),
     };
 
     this.el.title.textContent = gameInfo.TITLE;
@@ -74,6 +78,14 @@ export class UIManager {
     events.on(GameEvents.ANIMAL_DISCOVERED, ({ namePlural }) =>
       this.showMessage(`Has encontrado ${namePlural.toLowerCase()}.`, 'biome'),
     );
+    events.on(GameEvents.INTERACTION_TARGET_CHANGED, ({ target }) => this._showTarget(target));
+    events.on(GameEvents.PLAYER_ACTION, () => this._pulseCrosshair());
+    events.on(GameEvents.INVENTORY_CHANGED, (e) => this._renderInventory(e));
+    events.on(GameEvents.PLAYER_DAMAGED, ({ amount, sourceName }) => {
+      this._flashDamage();
+      this.showMessage(`${sourceName ?? 'Algo'} te ha atacado (−${amount})`, 'danger');
+    });
+    events.on(GameEvents.ANIMAL_KILLED, ({ animal }) => this.showMessage(`Has abatido: ${animal.def.NAME}`));
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
   }
 
@@ -99,6 +111,69 @@ export class UIManager {
       node.classList.remove('visible');
       setTimeout(() => node.remove(), 600);
     }, this._cfg.MESSAGE_DURATION_MS);
+  }
+
+  _showTarget(target) {
+    const el = this.el.prompt;
+    this.el.crosshair.classList.toggle('has-target', !!target?.action);
+    if (!target) {
+      el.classList.add('hidden');
+      return;
+    }
+    el.classList.remove('hidden');
+    el.replaceChildren();
+    const name = document.createElement('span');
+    name.className = 'target-name';
+    name.textContent = target.label;
+    el.appendChild(name);
+    if (target.action) {
+      const action = document.createElement('span');
+      action.className = 'target-action';
+      action.textContent = `[${target.key}] ${target.action}`;
+      el.appendChild(action);
+    }
+    if (target.remaining) {
+      const count = document.createElement('span');
+      count.className = 'target-count';
+      count.textContent = `(${target.remaining})`;
+      el.appendChild(count);
+    }
+  }
+
+  _renderInventory({ itemId, delta, items }) {
+    const bar = this.el.inventory;
+    bar.replaceChildren();
+    for (const it of items) {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot';
+      slot.title = it.NAME;
+      slot.innerHTML = `<span class="label"></span><span class="icon"></span><span class="count"></span>`;
+      slot.querySelector('.label').textContent = it.NAME;
+      slot.querySelector('.icon').textContent = it.ICON;
+      slot.querySelector('.count').textContent = it.count;
+      if (it.id === itemId && delta > 0) {
+        slot.classList.add('bump');
+        setTimeout(() => slot.classList.remove('bump'), 200);
+      }
+      bar.appendChild(slot);
+    }
+    if (delta > 0) {
+      const def = this._items[itemId];
+      this.showMessage(`+${delta} ${def.ICON} ${def.NAME}`, 'pickup');
+    }
+  }
+
+  _pulseCrosshair() {
+    const c = this.el.crosshair;
+    c.classList.remove('pulse');
+    void c.offsetWidth; // reinicia la animación CSS
+    c.classList.add('pulse');
+  }
+
+  _flashDamage() {
+    const f = this.el.damageFlash;
+    f.classList.add('active');
+    requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('active')));
   }
 
   _start() {

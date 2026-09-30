@@ -58,6 +58,11 @@ export class Player {
     this.state.onGround = false;
   }
 
+  /** Animación de acción (golpear, recoger). Solo visual. */
+  playAction() {
+    this.model.playAction();
+  }
+
   setBodyVisible(visible) {
     this.model.setVisible(visible);
   }

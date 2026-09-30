@@ -22,7 +22,7 @@ export class PropMesher {
     const nodes = chunk.nodes.filter((n) => !n.removed);
     const props = this._merge(
       nodes.map((n) => ({
-        template: this._pick(n.type, n.variant),
+        template: this._pick(n.type === 'APPLE_TREE' && n.depleted ? 'APPLE_TREE_EMPTY' : n.type, n.variant),
         x: n.x,
         y: n.y - (n.type === 'ROCK' ? 0.25 * n.scale : 0.12),
         z: n.z,
@@ -125,11 +125,12 @@ export class PropMesher {
       return b.build();
     };
 
-    const appleTree = (variant) => {
+    const appleTree = (variant, withApples = true) => {
       const b = new PartsBuilder();
       b.add(trunk, { position: [0, 0.9, 0], scale: [0.2, 1.8, 0.2], color: C.TRUNK });
       b.add(ico, { position: [0, 2.7, 0], scale: [1.5, 1.2, 1.5], color: C.APPLE_LEAVES, jitter: lumpy(40 + variant, 0.25) });
       b.add(ico, { position: [0.6, 2.3, -0.5], scale: 0.9, color: shade(C.APPLE_LEAVES, 0.92), jitter: lumpy(50 + variant, 0.25) });
+      if (!withApples) return b.build();
       // Manzanas sobre la copa (fijas por variante).
       const rng = new SeededRandom(60 + variant);
       for (let i = 0; i < 8; i++) {
@@ -177,6 +178,7 @@ export class PropMesher {
       TREE: [tree(0), tree(1), tree(2)],
       PINE: [pine(0), pine(1)],
       APPLE_TREE: [appleTree(0), appleTree(1)],
+      APPLE_TREE_EMPTY: [appleTree(0, false), appleTree(1, false)],
       ROCK: [rock(0), rock(1), rock(2)],
       BUSH: [bush(0), bush(1)],
       GRASS: [grassTuft()],

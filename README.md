@@ -3,9 +3,10 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: FASE 4** — mundo vivo: árboles, manzanos, pinos, rocas, arbustos, hierba,
-charcas de agua dulce y rebaños de ciervos, cabras y vacas, sobre un mundo finito con biomas
-(Explanada, Bosque, Montañas Heladas) generado a partir de una seed, en estilo low-poly.
+**Estado actual: FASE 5** — inventario y recogida: talar árboles, picar rocas, coger manzanas y
+golpear animales (carne, lana, cuero). Cada animal tiene un temperamento (huir / curiosidad /
+neutral) y una reacción al golpe (huir / defenderse). Sobre las Fases 1–4: mundo finito por seed
+con biomas, recursos, charcas y rebaños, en estilo low-poly.
 
 ## Cómo ejecutarlo
 
@@ -32,6 +33,8 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | `C` | Bajar (solo en vuelo) |
 | Ratón | Mirar (clic en el juego para capturarlo, `Esc` para liberarlo) |
 | `V` | Alternar 1ª / 3ª persona |
+| `E` | Recoger (talar, picar, coger manzanas) |
+| Clic izquierdo / `F` | Golpear animal (o recoger) |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -73,10 +76,12 @@ js/
 │   └── SceneLighting.js     Luz ambiente + sol con sombras que siguen al jugador
 ├── animals/
 │   ├── AnimalSystem.js      Rebaños por seed, simulación y dibujo solo cerca del jugador
-│   ├── Animal.js            Máquina de estados: pastar, pasear, mirar, huir
+│   ├── Animal.js            Estados + temperamento (huir/curioso/neutral) + reacción al golpe
 │   ├── Deer.js / Goat.js / Cow.js  Especies (modelo + ajustes de comportamiento)
 │   └── AnimalRenderer.js    InstancedMesh cuerpo + patas animadas (2 draw calls/especie)
 ├── render/PartsBuilder.js   Geometría low-poly por piezas con color por vértice
+├── inventory/InventorySystem.js   AddItem/RemoveItem/HasItem/GetItemCount (sin Three.js)
+├── interaction/InteractionSystem.js  Objetivo de la mira + recoger / golpear
 ├── player/
 │   ├── Player.js            Estado del jugador (posición, mirada, flags)
 │   ├── PlayerController.js  Entrada → física (gravedad, salto, escalones, colisión)
@@ -86,7 +91,7 @@ js/
 │   ├── AdminSystem.js       Activación por secuencia + registro de herramientas
 │   ├── AdminPanel.js        Vista DOM del panel
 │   ├── KeySequenceDetector.js
-│   └── tools/               CoreDebugTools, WorldTools (seed, biomas), LifeTools (agua, animales)
+│   └── tools/               CoreDebugTools, WorldTools, LifeTools, InventoryTools
 └── ui/UIManager.js          HUD provisional (reacciona a eventos)
 tests/                       Tests de Node (`npm test`)
 ```
@@ -110,6 +115,11 @@ Principios:
   chunk no depende del orden de visita) y fusionados en una malla por chunk. Cada recurso sabe
   qué dará al recogerlo (Fase 5). Charcas excavadas en el terreno, siempre una cerca del inicio.
   Animales por rebaños con la sub-seed `animal`; solo se simulan/dibujan los cercanos.
+- **Animales con carácter.** Cada animal recibe al azar (derivado de la seed y según las
+  probabilidades de su especie) un temperamento ante el jugador y una reacción al golpe. Los
+  ataques emiten `PLAYER_DAMAGED`, que en la Fase 6 consumirá HealthSystem.
+- **Interacción desacoplada.** InteractionSystem solo decide el objetivo y delega en
+  ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
 - **Mundo finito.** 1024 × 1024 m en chunks de 64 m. Los datos de altura se generan bajo demanda
   y se guardan; solo existen mallas en un radio de 4 chunks. El borde desciende a un mar y el
   jugador no puede salir del área jugable.

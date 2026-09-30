@@ -58,6 +58,23 @@ export class PlayerController {
     this._events.emit(GameEvents.PLAYER_FLY_CHANGED, { flying });
   }
 
+  /**
+   * Empujón (p. ej. al recibir un ataque): aleja al jugador de (fromX, fromZ).
+   * La aceleración normal lo frena en unas décimas de segundo.
+   */
+  applyKnockback(fromX, fromZ, strength) {
+    const p = this._player;
+    const dx = p.position.x - fromX;
+    const dz = p.position.z - fromZ;
+    const d = Math.hypot(dx, dz) || 1;
+    p.velocity.x += (dx / d) * strength;
+    p.velocity.z += (dz / d) * strength;
+    if (p.state.onGround && !p.state.isFlying) {
+      p.velocity.y = Math.max(p.velocity.y, strength * 0.4);
+      p.state.onGround = false;
+    }
+  }
+
   /** Coloca al jugador sobre el suelo en (x, z). */
   placeAt(x, z) {
     const y = this._groundHeight(x, z);

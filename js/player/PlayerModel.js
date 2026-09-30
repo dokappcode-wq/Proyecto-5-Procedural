@@ -61,6 +61,13 @@ export class PlayerModel {
 
     this._walkPhase = 0;
     this._swing = 0;
+    this._actionTime = 0; // >0 durante la animación de golpear/recoger
+  }
+
+  /** Animación corta del brazo derecho (golpear, recoger). */
+  playAction(duration = 0.32) {
+    this._actionTime = duration;
+    this._actionDuration = duration;
   }
 
   _pivot(x, y, z) {
@@ -96,6 +103,14 @@ export class PlayerModel {
       this.leftArm.rotation.x = this.rightArm.rotation.x = -0.4;
       this.leftArm.rotation.z = -0.35;
       this.rightArm.rotation.z = 0.35;
+    }
+
+    // Golpe/recogida: el brazo derecho se lanza hacia delante.
+    if (this._actionTime > 0) {
+      this._actionTime = Math.max(0, this._actionTime - dt);
+      const t = 1 - this._actionTime / this._actionDuration;
+      this.rightArm.rotation.x = Math.sin(t * Math.PI) * 1.7; // frente = -Z
+      this.rightArm.rotation.z = 0;
     }
 
     // Leve rebote del torso al caminar.

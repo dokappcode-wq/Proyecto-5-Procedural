@@ -157,7 +157,8 @@ export class WorldGenerator {
     this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
   }
 
-  update() {
+  update(dt = 0) {
+    this.resources?.update(dt);
     if (!this._focus || !this.terrain) return;
     const cs = this._cfg.CHUNK_SIZE;
     this._chunks.update((this._focus.x + this._half) / cs, (this._focus.z + this._half) / cs);

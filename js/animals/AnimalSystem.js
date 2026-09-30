@@ -5,6 +5,7 @@ import { AnimalRenderer } from './AnimalRenderer.js';
 import { Deer } from './Deer.js';
 import { Goat } from './Goat.js';
 import { Cow } from './Cow.js';
+import { pickWeighted } from './Animal.js';
 
 /** Registro de especies: añadir una especie = crear su clase y añadirla aquí + config. */
 const SPECIES_CLASSES = { DEER: Deer, GOAT: Goat, COW: Cow };
@@ -17,12 +18,19 @@ const SPECIES_CLASSES = { DEER: Deer, GOAT: Goat, COW: Cow };
  *   hay un rebaño de cada especie cerca del punto de inicio.
  * - Solo se SIMULAN y DIBUJAN los animales a menos de ACTIVE_RADIUS del
  *   jugador (el resto queda congelado donde estaba).
- * - Consultas preparadas para fases posteriores: getAnimalsNear(), removeAnimal().
+ * - Temperamento (huir / curiosidad / neutral) y reacción al golpe (huir /
+ *   defenderse) asignados al azar por animal, según las probabilidades de su
+ *   especie y derivados de la seed.
+ * - hitAnimal(): golpe del jugador. Si el animal muere emite ANIMAL_KILLED
+ *   con lo que suelta (carne, lana, cuero). Los ataques de los animales
+ *   emiten PLAYER_DAMAGED (lo consumirá HealthSystem en la Fase 6).
  */
 export class AnimalSystem {
-  constructor({ config, fauna, scene, world, player, events }) {
+  constructor({ config, fauna, scene, world, player, events, hitKnockback }) {
     this.name = 'animals';
     this._cfg = config;
+    this._events = events;
+    this._hitKnockback = hitKnockback;
     this._fauna = fauna;
     this._world = world;
     this._player = player;
@@ -46,7 +54,16 @@ export class AnimalSystem {
     // Entorno que consultan los animales (sin acoplarlos a WorldGenerator).
     const bounds = () => world.getBounds();
     this._env = {
+      cfg: config,
       player: { x: 0, z: 0 },
+      onAttack: (animal) =>
+        events.emit(GameEvents.PLAYER_DAMAGED, {
+          amount: animal.def.ATTACK_DAMAGE,
+          source: animal.species,
+          sourceName: animal.def.NAME,
+          fromX: animal.x,
+          fromZ: animal.z,
+        }),
       playerRunning: false,
       turnSpeed: config.TURN_SPEED,
       groundAt: (x, z) => world.getHeightAt(x, z),
@@ -126,6 +143,7 @@ export class AnimalSystem {
         }
       }
       const id = `${species}-${herd.id}-${i}`;
+      const animalRng = new SeededRandom(deriveSeed(seed, id));
       const animal = new Cls({
         id,
         species,
@@ -133,8 +151,10 @@ export class AnimalSystem {
         x: ax,
         z: az,
         home: herd,
-        rng: new SeededRandom(deriveSeed(seed, id)),
+        rng: animalRng,
         scale: rng.range(def.SCALE[0], def.SCALE[1]),
+        temperament: pickWeighted(def.TEMPERAMENT_WEIGHTS, animalRng.next()),
+        hitReaction: pickWeighted(def.HIT_REACTION_WEIGHTS, animalRng.next()),
       });
       animal.y = this._world.getHeightAt(ax, az);
       herd.members.push(animal);
@@ -166,17 +186,42 @@ export class AnimalSystem {
 
   // ---- Consultas (fases posteriores) ----------------------------------------
 
+  /** Animales VIVOS en un radio. */
   getAnimalsNear(x, z, radius, species = null) {
     return this.animals.filter(
-      (a) => !a.removed && (!species || a.species === species) && Math.hypot(a.x - x, a.z - z) <= radius,
+      (a) => a.alive && (!species || a.species === species) && Math.hypot(a.x - x, a.z - z) <= radius,
     );
   }
 
-  /** Retira un animal (Fase 7/8: obtener carne, lana, cuero). */
+  /**
+   * Golpe del jugador a un animal.
+   * @returns {{ killed: boolean, drops: object|null }}
+   */
+  hitAnimal(animal, damage, fromX, fromZ) {
+    if (!animal?.alive) return { killed: false, drops: null };
+    const { killed } = animal.takeHit(damage, fromX, fromZ, this._cfg, this._hitKnockback);
+    this._events.emit(GameEvents.ANIMAL_HIT, { animal, killed });
+    if (!killed) return { killed: false, drops: null };
+    this._events.emit(GameEvents.ANIMAL_KILLED, { animal, drops: animal.drops });
+    return { killed: true, drops: animal.drops };
+  }
+
+  /** Retira un animal inmediatamente (depuración / fases posteriores). */
   removeAnimal(id) {
     const a = this.animals.find((an) => an.id === id && !an.removed);
     if (a) a.removed = true;
     return a ?? null;
+  }
+
+  /** Recuento de temperamentos y reacciones (depuración). */
+  getTemperamentStats() {
+    const stats = { temperament: {}, hitReaction: {} };
+    for (const a of this.animals) {
+      if (a.removed) continue;
+      stats.temperament[a.temperament] = (stats.temperament[a.temperament] ?? 0) + 1;
+      stats.hitReaction[a.hitReaction] = (stats.hitReaction[a.hitReaction] ?? 0) + 1;
+    }
+    return stats;
   }
 
   /** Rebaño más cercano de una especie (depuración). */
