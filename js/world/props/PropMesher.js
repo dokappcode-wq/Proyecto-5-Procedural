@@ -24,7 +24,7 @@ export class PropMesher {
       nodes.map((n) => ({
         template: this._pick(n.type === 'APPLE_TREE' && n.depleted ? 'APPLE_TREE_EMPTY' : n.type, n.variant),
         x: n.x,
-        y: n.y - (n.type === 'ROCK' ? 0.25 * n.scale : 0.12),
+        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : 0.12),
         z: n.z,
         scale: n.scale,
         rotation: n.rotation,
@@ -151,6 +151,22 @@ export class PropMesher {
       return b.build();
     };
 
+    // Veta de mineral: roca con cristales que brillan (se mina en lunas y meteoritos).
+    const mineralRock = (variant) => {
+      const b = new PartsBuilder();
+      b.add(ico, { position: [0, 0.35, 0], scale: [0.85, 0.6, 0.8], color: shade(C.ROCK, 0.8), jitter: lumpy(120 + variant, 0.4) });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + variant;
+        b.add(octa, {
+          position: [Math.cos(a) * 0.4, 0.55 + (i % 2) * 0.15, Math.sin(a) * 0.35],
+          rotation: [Math.cos(a) * 0.5, a, Math.sin(a) * 0.5],
+          scale: [0.13, 0.4 + (i % 3) * 0.12, 0.13],
+          color: i % 2 ? C.MINERAL : shade(C.MINERAL, 1.25),
+        });
+      }
+      return b.build();
+    };
+
     const bush = (variant) => {
       const b = new PartsBuilder();
       b.add(ico, { position: [0, 0.4, 0], scale: [0.7, 0.55, 0.7], color: C.BUSH, jitter: lumpy(90 + variant, 0.3) });
@@ -180,6 +196,7 @@ export class PropMesher {
       APPLE_TREE: [appleTree(0), appleTree(1)],
       APPLE_TREE_EMPTY: [appleTree(0, false), appleTree(1, false)],
       ROCK: [rock(0), rock(1), rock(2)],
+      MINERAL_ROCK: [mineralRock(0), mineralRock(1)],
       BUSH: [bush(0), bush(1)],
       GRASS: [grassTuft()],
     };

@@ -46,9 +46,18 @@ export class AtmosphereSystem {
     this._hemiSky = new THREE.Color();
     this._hemiGround = new THREE.Color();
 
+    this.airless = false;        // lunas y espacio: cielo negro, estrellas siempre, sin crepúsculo
+    this._airlessColor = new THREE.Color(0x05060b);
+    this._airlessGround = new THREE.Color(0x020203);
     this.visibility = 1;         // factor aplicado a la niebla (1 = normal)
     this._targetVisibility = 1;
     this.apply(); // estado inicial coherente con la hora de inicio
+  }
+
+  /** Cuerpo sin atmósfera (lunas, espacio): cielo negro y luz dura. */
+  setAirless(airless) {
+    this.airless = airless;
+    this.apply();
   }
 
   /** Factor de distancia de visión deseado (0..1); se alcanza de forma gradual. */
@@ -64,6 +73,10 @@ export class AtmosphereSystem {
   }
 
   apply() {
+    if (this.airless) {
+      this._applyAirless();
+      return;
+    }
     const P = this._P;
     const p = this._p;
     const sun = this._time.getSunDirection(this._sunDir);
@@ -121,5 +134,33 @@ export class AtmosphereSystem {
       fog.far = this._fogFar * this.visibility;
     }
     if (this._scene.background?.isColor) this._scene.background.copy(this._horizon);
+  }
+
+  /** Sin atmósfera: cielo negro con estrellas, sol blanco y duro, sombras marcadas. */
+  _applyAirless() {
+    const P = this._P;
+    const sun = this._time.getSunDirection(this._sunDir);
+    const h = sun.y;
+    this._sky.setColors({ zenith: this._airlessGround, horizon: this._airlessColor, ground: this._airlessGround });
+    this._sky.setSunDirection(sun);
+    this._sky.setSunColor(0xffffff);
+    this._sky.setStars(1.2);
+    if (h >= 0) {
+      this._lighting.setSun({ direction: sun, color: 0xffffff, intensity: P.DAY.SUN_INTENSITY * 1.2 * smoothstep(-0.02, 0.12, h) });
+    } else {
+      // De noche, la luz reflejada por el planeta (o la luna) que hay en el cielo.
+      const shine = this._celestial?.getNightLight();
+      if (shine && shine.strength > 0.02) this._lightDir.copy(shine.direction);
+      else this._lightDir.copy(sun).negate();
+      this._lighting.setSun({ direction: this._lightDir, color: 0x9fc0ff, intensity: 0.5 * (shine ? 0.3 + 0.7 * shine.strength : 0.3) });
+    }
+    this._lighting.setAmbient({ skyColor: 0x6a7080, groundColor: 0x1a1a1e, intensity: 0.32 });
+    const fog = this._scene.fog;
+    if (fog) {
+      fog.color.copy(this._airlessColor);
+      fog.near = this._fogNear * 1.4 * this.visibility;
+      fog.far = this._fogFar * 1.2 * this.visibility;
+    }
+    if (this._scene.background?.isColor) this._scene.background.copy(this._airlessColor);
   }
 }

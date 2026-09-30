@@ -1,7 +1,20 @@
 /**
  * Herramientas de depuración del cielo (Fase 12) y del espacio (Fase 13).
  */
-export function registerSpaceTools(admin, { celestial, space, time, player }) {
+export function registerSpaceTools(admin, { celestial, space, time, player, worlds, controller }) {
+  // ---- Cuerpos (viaje directo, sin nave: depuración) ----
+  admin.registerTool({ category: 'Cuerpos', type: 'info', label: 'Cuerpo actual', read: () => worlds.profile()?.NAME ?? worlds.activeId });
+  for (const [id, name] of [['MUNDO_0', 'MUNDO 0'], ['MOON_A', 'la Luna A'], ['MOON_B', 'la Luna B']]) {
+    admin.registerTool({
+      category: 'Cuerpos',
+      label: `Ir a ${name} (sin nave)`,
+      run: () => {
+        worlds.setActive(id);
+        controller.spawn();
+      },
+    });
+  }
+
   // ---- Cielo ----
   admin.registerTool({
     category: 'Cielo',

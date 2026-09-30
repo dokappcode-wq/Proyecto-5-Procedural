@@ -50,8 +50,8 @@ export class WaterSystem {
       return true;
     };
 
-    // 1. Charca cercana al inicio.
-    for (let i = 0; i < 200; i++) {
+    // 1. Charca cercana al inicio (si el planeta tiene charcas).
+    for (let i = 0; i < (c.POND_COUNT > 0 ? 200 : 0); i++) {
       const a = rng.range(0, Math.PI * 2);
       const d = rng.range(c.NEAR_SPAWN_DISTANCE[0], c.NEAR_SPAWN_DISTANCE[1] + i * 0.5);
       if (tryPlace(spawn.x + Math.cos(a) * d, spawn.z + Math.sin(a) * d)) break;

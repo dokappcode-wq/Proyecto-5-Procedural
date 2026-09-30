@@ -64,6 +64,8 @@ export class ShipSystem {
     this.model = new ShipModel({ scene });
 
     this.piloting = false;
+    this.body = 'MUNDO_0';   // cuerpo en el que está la nave (MUNDO 0, una luna o el espacio)
+    this._activeBody = () => 'MUNDO_0';
     this._held = new Set();  // mandos mantenidos desde el panel (ratón)
     this._raycaster = new THREE.Raycaster();
     this._stateKey = '';
@@ -122,6 +124,16 @@ export class ShipSystem {
     return null;
   }
 
+  /** Función que dice qué cuerpo está activo (WorldManager). */
+  setBodyProvider(fn) {
+    this._activeBody = fn;
+  }
+
+  /** ¿Está la nave en el cuerpo que se está mostrando? */
+  get present() {
+    return this.body === this._activeBody();
+  }
+
   /** Inventario (baterías y reloj); se inyecta desde main. */
   setInventory(inventory) {
     this._inventory = inventory;
@@ -143,6 +155,7 @@ export class ShipSystem {
     this._forceExit(true);
     const site = this._world.getLandingSite();
     if (!site) return;
+    this.body = 'MUNDO_0';
     this.placeLanded(site.x, site.z, site.yaw);
     this.batteries.fillAll(this._cfg.BATTERIES.START_CHARGE);
     this._emitBatteries(true);
@@ -235,6 +248,8 @@ export class ShipSystem {
   // ---- Bucle ----------------------------------------------------------------------
 
   update(dt) {
+    this.model.root.visible = this.present;
+    if (!this.present) return; // la nave está en otro cuerpo
     if (this.spaceMode !== 'SURFACE') {
       // Saliendo de la atmósfera: sube deprisa (tras el fundido). En órbita: congelada.
       if (this.spaceMode === 'ASCENDING' && this._spaceY !== undefined) this.ship.y += 45 * dt;
@@ -338,7 +353,7 @@ export class ShipSystem {
    * [{ id, x, y, z, aimRadius, reach, label, action, key }]
    */
   getInteractablesNear(x, y, z, range) {
-    if (this.piloting) return [];
+    if (this.piloting || !this.present) return [];
     const s = this.ship;
     if (Math.hypot(x - s.x, z - s.z) > range + 12) return [];
     const list = [];
@@ -458,24 +473,24 @@ export class ShipSystem {
   // ---- Consultas de colisión y entorno ----------------------------------------------
 
   surfaceAt(x, z, maxY) {
-    return Layout.surfaceAt(this.ship, x, z, maxY);
+    return this.present ? Layout.surfaceAt(this.ship, x, z, maxY) : null;
   }
 
   blocksAt(x, z, r, y0, y1) {
-    return Layout.blocksAt(this.ship, x, z, r, y0, y1);
+    return this.present && Layout.blocksAt(this.ship, x, z, r, y0, y1);
   }
 
   ceilingAt(x, z, y) {
-    return Layout.ceilingAt(this.ship, x, z, y);
+    return this.present ? Layout.ceilingAt(this.ship, x, z, y) : Infinity;
   }
 
   resolveCollisions(pos, r, y0, y1) {
-    return Layout.resolveCollisions(this.ship, pos, r, y0, y1);
+    return this.present && Layout.resolveCollisions(this.ship, pos, r, y0, y1);
   }
 
   /** Oclusión de la cámara (no cuando la cámara orbita la propia nave). */
   raycastDistance(origin, dir, maxDist) {
-    if (this.piloting) return null;
+    if (this.piloting || !this.present) return null;
     this._raycaster.set(origin, dir);
     this._raycaster.far = maxDist;
     const hit = this._raycaster.intersectObject(this.model.root, true)[0];
@@ -484,13 +499,13 @@ export class ShipSystem {
 
   /** Refugio para la temperatura: dentro y con la compuerta cerrada = climatizada. */
   getShelterAt(x, y, z) {
-    if (!Layout.isInside(this.ship, x, y, z)) return { factor: 0, heated: false };
+    if (!this.present || !Layout.isInside(this.ship, x, y, z)) return { factor: 0, heated: false };
     const closed = this.ship.hatch < 0.01;
     return { factor: closed ? 1 : 0.6, heated: closed };
   }
 
   /** ¿Choca una caja del mundo (AABB en planta) con la nave? (construcción) */
   overlapsBox(box, margin = 0.2) {
-    return Layout.overlapsFootprint(this.ship, box, margin);
+    return this.present && Layout.overlapsFootprint(this.ship, box, margin);
   }
 }

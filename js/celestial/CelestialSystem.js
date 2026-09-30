@@ -17,7 +17,16 @@ import { createCelestialCatalog, skyAngle, illumination } from './CelestialCatal
  *
  * El sol lo dibuja SkyDome (disco + halo); aquí solo se usa su dirección.
  * Añadir cuerpos = añadir entradas al catálogo.
+ *
+ * Observador (`setObserver`): desde MUNDO 0 se ven las lunas; desde una luna se
+ * ve MUNDO 0 enorme y quieto en el cielo (siempre la misma cara, con sus fases);
+ * en el espacio no se dibuja nada aquí (lo hace SpaceView).
  */
+// Dirección fija de MUNDO 0 en el cielo de cada luna (acoplamiento de marea).
+const PLANET_IN_SKY = {
+  MOON_A: new THREE.Vector3(0.35, 0.72, -0.6).normalize(),
+  MOON_B: new THREE.Vector3(-0.45, 0.6, -0.66).normalize(),
+};
 export class CelestialSystem {
   constructor({ config, time, scene, camera, events }) {
     this.name = 'celestial';
@@ -32,8 +41,55 @@ export class CelestialSystem {
     this._group.name = 'Moons';
     scene.add(this._group);
     this._started = false;
+    this.observer = 'MUNDO_0';
+    this._planetMesh = null;
 
     events.on(GameEvents.GAME_STARTED, () => (this._started = true));
+  }
+
+  /**
+   * Desde qué cuerpo se mira el cielo. `planetTexture`: textura de MUNDO 0 (para
+   * verlo desde las lunas).
+   */
+  setObserver(id, planetTexture = null) {
+    this.observer = id;
+    if (PLANET_IN_SKY[id] && planetTexture) {
+      if (!this._planetMesh) this._createPlanetMesh();
+      this._planetMesh.material.uniforms.map.value = planetTexture;
+    }
+    this.update(0);
+  }
+
+  _createPlanetMesh() {
+    const material = new THREE.ShaderMaterial({
+      uniforms: { map: { value: null }, sunDir: { value: new THREE.Vector3(0, 1, 0) } },
+      fog: false,
+      vertexShader: /* glsl */ `
+        varying vec3 vNormalW;
+        varying vec2 vUv;
+        void main() {
+          vNormalW = normalize(mat3(modelMatrix) * normal);
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D map;
+        uniform vec3 sunDir;
+        varying vec3 vNormalW;
+        varying vec2 vUv;
+        void main() {
+          float lit = smoothstep(-0.08, 0.25, dot(normalize(vNormalW), normalize(sunDir)));
+          vec3 col = texture2D(map, vUv).rgb * (0.03 + 1.1 * lit);
+          gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+    this._planetMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), material);
+    this._planetMesh.name = 'MUNDO_0_in_sky';
+    this._planetMesh.frustumCulled = false;
+    this._planetMesh.renderOrder = 1;
+    this._group.add(this._planetMesh);
   }
 
   /** Crea las lunas de una seed (lo llama main al generar el mundo). */
@@ -100,6 +156,23 @@ export class CelestialSystem {
     if (!this.catalog) return;
     const t = this._time;
     const sun = t.getSunDirection(this._sun);
+    const onPlanet = this.observer === 'MUNDO_0';
+    const fromMoon = PLANET_IN_SKY[this.observer];
+    if (this._planetMesh) {
+      this._planetMesh.visible = !!fromMoon;
+      if (fromMoon) {
+        const body = this.catalog.bodies.find((b) => b.id === this.observer);
+        const angular = Math.atan(this.catalog.planet.radiusKm / body.distanceKm);
+        this._planetMesh.position.copy(this._camera.position).addScaledVector(fromMoon, this._cfg.SKY_DISTANCE);
+        this._planetMesh.scale.setScalar(this._cfg.SKY_DISTANCE * Math.tan(angular));
+        this._planetMesh.rotation.y = t.rotationAngle * 0.2;
+        this._planetMesh.material.uniforms.sunDir.value.copy(sun);
+      }
+    }
+    if (!onPlanet) {
+      for (const m of this.moons) m.mesh.visible = false;
+      return;
+    }
     const night = 1 - t.daylight;
     const rot = t.rotationAngle;
     // Tras un salto de reloj (dormir, Admin) no se anuncia nada: solo el paso normal del tiempo.
@@ -128,6 +201,12 @@ export class CelestialSystem {
    * @returns {{ direction: THREE.Vector3, strength: number } | null} strength 0..1
    */
   getNightLight() {
+    const fromMoon = PLANET_IN_SKY[this.observer];
+    if (fromMoon) {
+      // Desde una luna: la luz reflejada por MUNDO 0.
+      return { direction: fromMoon, strength: illumination(fromMoon, this._sun) };
+    }
+    if (this.observer !== 'MUNDO_0') return null;
     let best = null;
     let bestStrength = 0;
     for (const m of this.moons) {

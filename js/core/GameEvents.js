@@ -59,6 +59,9 @@ export const GameEvents = Object.freeze({
   PLAYER_SLEEP_STARTED: 'sleep:started',            // { bed }
   PLAYER_SLEPT: 'sleep:finished',                   // { hours, bed }
 
+  // Cuerpos (MUNDO 0, lunas, espacio)
+  BODY_CHANGED: 'world:bodyChanged',                // { id, previous, planet }
+
   // Tiempo y temperatura (Fases 10–11)
   TIME_CHANGED: 'time:changed',                     // { day, hour, minute, totalHours, daylight, isNight }
   TIME_PERIOD_CHANGED: 'time:period',               // { period: 'DAWN'|'DAY'|'DUSK'|'NIGHT', previous }

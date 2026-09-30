@@ -55,9 +55,13 @@ export class ConstructionSystem {
     this._target = null; // pieza apuntada (para quitar)
     this._blockers = [];  // otras estructuras sobre las que no se construye (la nave): { overlapsBox(box) }
 
+    this._scene = scene;
     this.group = new THREE.Group();
-    this.group.name = 'Buildings';
+    this.group.name = 'Buildings_MUNDO_0';
     scene.add(this.group);
+    // Cada cuerpo (MUNDO 0, lunas) guarda sus propias construcciones.
+    this._bodyId = 'MUNDO_0';
+    this._bodyStates = new Map([[this._bodyId, { pieces: this.pieces, slots: this._slots, group: this.group }]]);
 
     this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this._geometries = {};
@@ -217,15 +221,44 @@ export class ConstructionSystem {
 
   removePiece(piece) {
     this.group.remove(piece.object);
-    this.pieces = this.pieces.filter((p) => p !== piece);
+    const i = this.pieces.indexOf(piece);
+    if (i >= 0) this.pieces.splice(i, 1); // mismo array: lo comparte el estado del cuerpo
     if (piece.key) this._slots.delete(piece.key);
     if (this._target === piece) this._target = null;
   }
 
+  /** Cambia al cuerpo `id`: las construcciones del anterior se guardan (y se ocultan). */
+  setBody(id) {
+    if (id === this._bodyId) return;
+    this.setActive(false);
+    this.group.visible = false;
+    let st = this._bodyStates.get(id);
+    if (!st) {
+      const group = new THREE.Group();
+      group.name = `Buildings_${id}`;
+      this._scene.add(group);
+      st = { pieces: [], slots: new Map(), group };
+      this._bodyStates.set(id, st);
+    }
+    this.pieces = st.pieces;
+    this._slots = st.slots;
+    this.group = st.group;
+    this.group.visible = true;
+    this._bodyId = id;
+    this._target = null;
+  }
+
+  get bodyId() {
+    return this._bodyId;
+  }
+
+  /** Quita todo lo construido en todos los cuerpos (nueva seed). */
   clear() {
-    for (const p of this.pieces) this.group.remove(p.object);
-    this.pieces = [];
-    this._slots.clear();
+    for (const st of this._bodyStates.values()) {
+      for (const p of st.pieces) st.group.remove(p.object);
+      st.pieces.length = 0;
+      st.slots.clear();
+    }
     this._target = null;
   }
 

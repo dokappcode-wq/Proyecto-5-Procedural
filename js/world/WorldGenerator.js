@@ -111,8 +111,11 @@ export class WorldGenerator {
     this._focus = position;
   }
 
-  /** (Re)genera el mundo con una seed. Emite WORLD_GENERATED. */
-  generate(seedInput) {
+  /**
+   * (Re)genera el mundo con una seed. Emite WORLD_GENERATED salvo con
+   * `{ emitEvent: false }` (las lunas se generan en silencio: no reinician nada).
+   */
+  generate(seedInput, { emitEvent = true } = {}) {
     const t0 = performance.now();
     this.seed = new WorldSeed(seedInput, this._cfg.SUB_SEEDS);
     this.biomes = new BiomeSystem({
@@ -164,7 +167,7 @@ export class WorldGenerator {
     this.resources.onChunkChanged = (cx, cz) => this._chunks.rebuild(cx, cz);
     this._stats.generationMs = performance.now() - t0;
 
-    this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
+    if (emitEvent) this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
   }
 
   update(dt = 0) {
@@ -220,6 +223,17 @@ export class WorldGenerator {
 
   getSpawnPoint() {
     return { ...this._spawn };
+  }
+
+  /** Perfil del planeta (GameConfig.PLANETS.*): nombre, gravedad, si hay aire… */
+  get planet() {
+    return this._planet;
+  }
+
+  /** Libera la memoria de GPU de este mundo (al descartar una luna). */
+  dispose() {
+    this._scene.traverse((o) => o.geometry?.dispose?.()); // el índice compartido es de este mundo
+    this._scene.parent?.remove(this._scene);
   }
 
   /** Lugar donde aparece aterrizada la nave: { x, z, yaw } (o null). */
@@ -465,6 +479,7 @@ export class WorldGenerator {
     sea.rotation.x = -Math.PI / 2;
     sea.position.y = this._cfg.SEA_LEVEL;
     sea.name = 'sea';
+    sea.visible = this._planet.HAS_SEA !== false; // las lunas no tienen mar
     this._scene.add(sea);
   }
 }

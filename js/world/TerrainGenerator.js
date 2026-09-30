@@ -1,5 +1,5 @@
 import { SimplexNoise } from './noise/SimplexNoise.js';
-import { deriveSeed } from '../core/SeededRandom.js';
+import { deriveSeed, hash2D } from '../core/SeededRandom.js';
 import { smoothstep } from '../core/MathUtils.js';
 
 /**
@@ -21,6 +21,8 @@ import { smoothstep } from '../core/MathUtils.js';
  *      mundo finito (línea de costa irregular). Las montañas se atenúan
  *      antes de llegar a la costa para que el borde sea siempre tierra baja.
  *   6. Charcas: si hay WaterSystem, excava las fuentes de agua.
+ *   7. Cráteres (opcional, TERRAIN.CRATERS, p. ej. en las lunas): cuencos con
+ *      borde elevado, uno como mucho por celda de una rejilla, según la seed.
  */
 export class TerrainGenerator {
   constructor({ profile, biomes, seed, worldSize, edgeMargin }) {
@@ -42,6 +44,7 @@ export class TerrainGenerator {
     this._mountains = new SimplexNoise(deriveSeed(seed, 'mountains'));
     this._detail = new SimplexNoise(deriveSeed(seed, 'detail'));
     this._coast = new SimplexNoise(deriveSeed(seed, 'coast'));
+    this._craterSeed = deriveSeed(seed, 'craters');
 
     this._sample = { height: 0, mountain: 0, coast: 0, biomes: {} };
     this._water = null;
@@ -103,6 +106,8 @@ export class TerrainGenerator {
       detail * p.DETAIL_AMPLITUDE * detailScale +
       mountainHeight;
 
+    if (p.CRATERS) height += this._craters(x, z) * (1 - coast);
+
     // Costa: el terreno desciende hacia el fondo marino.
     height += (p.SEA_FLOOR - height) * coast;
     if (this._water) height = this._water.carve(x, z, height);
@@ -112,5 +117,27 @@ export class TerrainGenerator {
     s.mountain = mountain;
     s.coast = coast;
     return s;
+  }
+
+  /** Suma de los cráteres de las 3×3 celdas vecinas (cuenco + borde). */
+  _craters(x, z) {
+    const c = this._p.CRATERS;
+    const cx = Math.floor(x / c.CELL);
+    const cz = Math.floor(z / c.CELL);
+    let dh = 0;
+    for (let i = cx - 1; i <= cx + 1; i++) {
+      for (let j = cz - 1; j <= cz + 1; j++) {
+        const seed = this._craterSeed;
+        if (hash2D(seed, i, j) > c.CHANCE) continue;
+        const px = (i + hash2D(seed + 1, i, j)) * c.CELL;
+        const pz = (j + hash2D(seed + 2, i, j)) * c.CELL;
+        const r = c.RADIUS[0] + (c.RADIUS[1] - c.RADIUS[0]) * hash2D(seed + 3, i, j) ** 2;
+        const d = Math.hypot(x - px, z - pz) / r;
+        // Perfil continuo: cuenco que sube hasta el borde (d = 1) y baja fuera (d = 1.4).
+        if (d < 1) dh += r * (-c.DEPTH * (1 - d * d) + c.RIM * d ** 4);
+        else if (d < 1.4) dh += r * c.RIM * (1 - (d - 1) / 0.4) ** 2;
+      }
+    }
+    return dh;
   }
 }

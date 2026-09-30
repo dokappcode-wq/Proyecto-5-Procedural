@@ -10,6 +10,75 @@
  * Cada fase añade aquí su sección (WORLD, SURVIVAL, NUTRITION, TEMPERATURE,
  * TIME, CELESTIAL, SHIP...).
  */
+// Perfil de luna: reutiliza las tres "ranuras" de bioma de MUNDO 0 (llanura, zona
+// irregular y montes) con otros nombres, colores y relieve. Sin agua, sin aire,
+// sin vida; con cráteres y poca gravedad. `tint` aclara u oscurece toda la luna.
+function moonProfile({ name, tones, temperature, gravity, craterChance, seaFloor = 2 }) {
+  const [light, mid, dark, dust] = tones;
+  return {
+    NAME: name,
+    KIND: 'MOON',
+    HAS_SEA: false,
+    BREATHABLE: false,
+    GRAVITY_SCALE: gravity,
+    TERRAIN: {
+      BASE_HEIGHT: 8,
+      CONTINENT_FREQUENCY: 1 / 500,
+      CONTINENT_AMPLITUDE: 4,
+      HILL_FREQUENCY: 1 / 120,
+      HILL_AMPLITUDE: 5,
+      DETAIL_FREQUENCY: 1 / 18,
+      DETAIL_AMPLITUDE: 0.6,
+      MOUNTAIN_MASK_FREQUENCY: 1 / 380,
+      MOUNTAIN_MASK_START: 0.2,
+      MOUNTAIN_MASK_END: 0.55,
+      MOUNTAIN_FREQUENCY: 1 / 200,
+      MOUNTAIN_HEIGHT: 38,
+      MOUNTAIN_OCTAVES: 3,
+      MOUNTAIN_BASE_LIFT: 6,
+      MOUNTAIN_COAST_FADE: 90,
+      COAST_NOISE_FREQUENCY: 1 / 150,
+      COAST_NOISE_AMPLITUDE: 18,
+      COAST_SEA_WIDTH: 20,
+      SEA_FLOOR: seaFloor,          // el borde baja a una gran depresión (no hay mar)
+      CRATERS: { CELL: 48, CHANCE: craterChance, RADIUS: [4, 19], DEPTH: 0.32, RIM: 0.12 },
+    },
+    COLORS: {
+      SAND: mid, SEABED: dark, LOWLAND_ROCK: dark, SAND_HEIGHT: -10,
+      ROCK_SLOPE_NORMAL_Y: 0.72, PATCH_FREQUENCY: 1 / 28, AO_STRENGTH: 0.4,
+      SEA: 0x000000, SEA_OPACITY: 0,
+    },
+    BIOME_DISTRIBUTION: {
+      MOUNTAIN_BIOME_START: 0.3, MOUNTAIN_BIOME_END: 0.6,
+      FOREST_FREQUENCY: 1 / 260, FOREST_THRESHOLD: 0.1, FOREST_BLEND: 0.15,
+      SPAWN_MIN_PLAINS: 0.7,
+    },
+    BIOMES: {
+      PLAINS: { NAME: 'Llanura de regolito', TEMPERATURE: temperature, HILL_SCALE: 0.4, DETAIL_SCALE: 0.8,
+        COLORS: { GROUND: light, GROUND_ALT: mid, ACCENT: dust } },
+      FOREST: { NAME: 'Mar oscuro', TEMPERATURE: temperature - 5, HILL_SCALE: 0.8, DETAIL_SCALE: 1.2,
+        COLORS: { GROUND: mid, GROUND_ALT: dark, ACCENT: light } },
+      FROZEN_MOUNTAINS: { NAME: 'Montes lunares', TEMPERATURE: temperature - 12, HILL_SCALE: 1.0, DETAIL_SCALE: 1.4,
+        SNOW_START_HEIGHT: 30, SNOW_MIN_NORMAL_Y: 0.5, COLORS: { GROUND: dark, GROUND_ALT: mid, SNOW: dust, ICE: light } },
+    },
+    WATER: {
+      DISCOVERY_DISTANCE: 7, POND_COUNT: 0, RADIUS: [5, 10], DEPTH: 1, SHORE_WIDTH: 0.6, MIN_SPACING: 70,
+      MAX_SLOPE: 0.18, BIOMES: [], NEAR_SPAWN_DISTANCE: [25, 55], COLOR: 0x000000, OPACITY: 0, MUD_COLOR: dark,
+    },
+    RESOURCES: {
+      CELL_SIZE: 4, SPAWN_CLEAR_RADIUS: 8, MAX_SLOPE: 0.9, TREE_MAX_HEIGHT: -1,
+      DENSITY: {
+        PLAINS: { ROCK: 0.03, MINERAL_ROCK: 0.004 },
+        FOREST: { ROCK: 0.05, MINERAL_ROCK: 0.006 },
+        FROZEN_MOUNTAINS: { ROCK: 0.07, MINERAL_ROCK: 0.01 },
+      },
+      GRASS_TUFTS_PER_CHUNK: { PLAINS: 0, FOREST: 0, FROZEN_MOUNTAINS: 0 },
+    },
+    FAUNA: { HERDS: {}, HERD_RADIUS: 24, NEAR_SPAWN_DISTANCE: [35, 120] },
+    PROP_COLORS: { ROCK: mid },
+  };
+}
+
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
@@ -145,6 +214,10 @@ export const GameConfig = deepFreeze({
   PLANETS: {
     MUNDO_0: {
       NAME: 'MUNDO 0',
+      KIND: 'PLANET',
+      HAS_SEA: true,
+      BREATHABLE: true,
+      GRAVITY_SCALE: 1,
       TERRAIN: {
         BASE_HEIGHT: 7,
         CONTINENT_FREQUENCY: 1 / 600,
@@ -253,6 +326,13 @@ export const GameConfig = deepFreeze({
         NEAR_SPAWN_DISTANCE: [35, 120], // un rebaño de cada especie cerca del inicio
       },
     },
+    // Las dos lunas (se visitan con la nave ampliada). La A es clara; la B, oscura y rojiza.
+    MOON_A: moonProfile({
+      name: 'Luna A', tones: [0xd9d6cf, 0xbdb9b1, 0x8f8b84, 0xf2efe8], temperature: -30, gravity: 0.35, craterChance: 0.5,
+    }),
+    MOON_B: moonProfile({
+      name: 'Luna B', tones: [0x8a5a44, 0x6e4636, 0x4a2f25, 0xa87458], temperature: -45, gravity: 0.25, craterChance: 0.65,
+    }),
   },
 
   // Supervivencia (Fase 6). Valores por segundo de juego.
@@ -316,6 +396,10 @@ export const GameConfig = deepFreeze({
       HARVEST: { ITEM: 'STONE', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Picar' },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
+    MINERAL_ROCK: {
+      NAME: 'Veta de mineral', COLLISION_RADIUS: 0.7, SCALE: [0.7, 1.2], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.9,
+      HARVEST: { ITEM: 'MINERAL', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Minar' },
+    },
   },
 
   // Objetos del inventario. FOOD: tipo de comida para la nutrición (Fase 7).
@@ -327,6 +411,7 @@ export const GameConfig = deepFreeze({
     WOOD: { NAME: 'Madera', ICON: '🪵' },
     STONE: { NAME: 'Piedra', ICON: '🪨' },
     WOOL: { NAME: 'Lana', ICON: '🧶' },
+    MINERAL: { NAME: 'Mineral', ICON: '💎' },
     LEATHER: { NAME: 'Cuero', ICON: '🟫' },
     MEAT: { NAME: 'Carne', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION' },
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
@@ -576,6 +661,7 @@ export const GameConfig = deepFreeze({
     APPLE: 0xc8302a,
     ROCK: 0x8d8b88,
     BUSH: 0x4d8a3c,
+    MINERAL: 0x5fd8ff,
     GRASS: 0x7fb050,
     GRASS_TIP: 0xb9cf6a,
     COLOR_JITTER: 0.12,

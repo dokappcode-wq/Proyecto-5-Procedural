@@ -22,6 +22,10 @@ export class BiomeTracker {
     /** Último bioma confirmado: { id, name, weights, temperature } */
     this.current = null;
 
+    events.on(GameEvents.BODY_CHANGED, () => {
+      this.current = null;
+      this._timer = 0;
+    });
     events.on(GameEvents.WORLD_GENERATED, () => {
       this.current = null;
       this._timer = 0;

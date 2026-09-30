@@ -88,6 +88,17 @@ export class AnimalSystem {
     events.on(GameEvents.WORLD_GENERATED, () => this.generate());
   }
 
+  /**
+   * Los animales viven en MUNDO 0: en las lunas o en el espacio se pausan y se ocultan.
+   */
+  setActive(active) {
+    this.enabled = active;
+    for (const id in this._renderers) {
+      this._renderers[id].body.visible = active;
+      this._renderers[id].legs.visible = active;
+    }
+  }
+
   /** Obstáculos adicionales ({ resolveCollisions(pos, r, y0, y1) }), p. ej. construcciones. */
   setObstacles(obstacles) {
     this._obstacles = obstacles;

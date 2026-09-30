@@ -33,7 +33,8 @@ import { ItemUseSystem } from './inventory/ItemUseSystem.js';
 import { SleepSystem } from './player/SleepSystem.js';
 import { CraftingPanel } from './ui/CraftingPanel.js';
 import { registerCraftTools } from './admin/tools/CraftTools.js';
-import { WorldGenerator } from './world/WorldGenerator.js';
+import { WorldManager, HOME } from './world/WorldManager.js';
+import { createPlanetTextures } from './space/PlanetTexture.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
 import { CameraSystem } from './camera/CameraSystem.js';
@@ -72,18 +73,22 @@ function boot() {
   });
   const input = new InputManager({ config: cfg.INPUT, domElement: render.domElement, events });
 
-  // ---- Mundo procedural (MUNDO 0) -------------------------------------------
-  const world = new WorldGenerator({
+  // ---- Mundos: MUNDO 0 y sus lunas (cada uno conserva su estado) -------------
+  const worlds = new WorldManager({
     scene: render.scene,
-    config: cfg.WORLD,
-    planet: cfg.PLANETS.MUNDO_0,
+    planets: cfg.PLANETS,
     events,
-    resourceTypes: cfg.RESOURCE_TYPES,
-    propColors: cfg.PROPS,
-    flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
-    // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
-    landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
+    options: {
+      config: cfg.WORLD,
+      resourceTypes: cfg.RESOURCE_TYPES,
+      propColors: cfg.PROPS,
+      flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
+      // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
+      landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
+    },
   });
+  // Todos los sistemas consultan el cuerpo ACTIVO a través de este proxy.
+  const world = worlds.proxy;
   // Seed: ?seed=... en la URL o la seed por defecto de la configuración.
   const urlSeed = new URLSearchParams(window.location.search).get('seed');
 
@@ -154,7 +159,7 @@ function boot() {
     occluders: { raycastDistance: (o, d, max) => combinedStructures.raycastDistance(o, d, max) },
   });
   lighting.follow(player.position);
-  world.follow(player.position);
+  worlds.follow(player.position);
 
   const biomeTracker = new BiomeTracker({ world, target: player, events });
 
@@ -163,7 +168,7 @@ function boot() {
     config: cfg.ANIMALS,
     fauna: cfg.PLANETS.MUNDO_0.FAUNA,
     scene: render.scene,
-    world,
+    world: worlds.home, // los animales viven en MUNDO 0
     player,
     events,
     hitKnockback: cfg.INTERACTION.HIT_KNOCKBACK,
@@ -229,6 +234,7 @@ function boot() {
     },
   });
   ship.setInventory(inventory);
+  ship.setBodyProvider(() => worlds.activeId);
   construction.addBlocker(ship); // no se construye encima de la nave
   // Las vallas, paredes y patas de la nave también frenan a los animales.
   animals.setObstacles({ resolveCollisions: (pos, r, y0, y1) => combinedStructures.resolveCollisions(pos, r, y0, y1) });
@@ -390,15 +396,56 @@ function boot() {
 
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
   const planetMap = new PlanetMapRenderer({
-    world,
+    world: worlds.home,
     planet: cfg.PLANETS.MUNDO_0,
     worldSize: cfg.WORLD.WORLD_SIZE,
     resolution: cfg.SHIP.MAP_RESOLUTION,
   });
+  // Mapas de las lunas (se dibujan la primera vez que se visitan).
+  const moonMaps = new Map();
+  const mapOf = (id) => {
+    if (id === HOME || !cfg.PLANETS[id]) return planetMap;
+    if (!moonMaps.has(id)) {
+      moonMaps.set(id, new PlanetMapRenderer({
+        world: worlds.get(id), planet: cfg.PLANETS[id], worldSize: cfg.WORLD.WORLD_SIZE, resolution: cfg.SHIP.MAP_RESOLUTION,
+      }));
+    }
+    return moonMaps.get(id);
+  };
+  const maps = {
+    name: 'planetMaps',
+    update() {
+      planetMap.update();
+      if (worlds.activeId !== HOME && cfg.PLANETS[worlds.activeId]) mapOf(worlds.activeId).update();
+    },
+  };
+  // Textura de MUNDO 0 visto desde fuera (lunas, espacio): se crea una vez por seed.
+  let planetTextures = null;
+  const getPlanetTextures = () => {
+    const seed = worlds.home.seed.sub.celestial;
+    if (!planetTextures || planetTextures.seed !== seed || (!planetTextures.withMap && planetMap.ready)) {
+      const t = createPlanetTextures({
+        width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: planetMap.ready ? planetMap.canvas : null, planet: cfg.PLANETS.MUNDO_0,
+      });
+      const toTex = (c) => Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace });
+      planetTextures = { seed, withMap: planetMap.ready, surface: toTex(t.surface), clouds: toTex(t.clouds) };
+    }
+    return planetTextures;
+  };
   events.on(GameEvents.WORLD_GENERATED, () => {
     planetMap.reset();
+    moonMaps.clear();
     time.reset();
-    celestial.setSeed(world.seed.sub.celestial);
+    celestial.setSeed(worlds.home.seed.sub.celestial);
+  });
+
+  // Cambio de cuerpo (MUNDO 0 ↔ lunas ↔ espacio): cada sistema se adapta a él.
+  events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
+    construction.setBody(id);
+    animals.setActive(id === HOME);
+    controller.gravityScale = planet?.GRAVITY_SCALE ?? 1;
+    atmosphere.setAirless(planet?.BREATHABLE === false);
+    celestial.setObserver(id, id !== HOME ? getPlanetTextures().surface : null);
   });
   const mapTexture = new THREE.CanvasTexture(planetMap.canvas);
   mapTexture.colorSpace = THREE.SRGBColorSpace;
@@ -411,12 +458,16 @@ function boot() {
     input,
     events,
     sources: {
-      map: planetMap,
+      get map() {
+        return mapOf(worlds.activeId);
+      },
       world,
       player,
       ship,
       time,
-      planetConfig: cfg.PLANETS.MUNDO_0,
+      get planetConfig() {
+        return worlds.profile() ?? cfg.PLANETS.MUNDO_0;
+      },
       getCatalog: () => celestial.catalog,
       getBed: () => (respawnBed && construction.exists(respawnBed) ? respawnBed : null),
       spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED,
@@ -448,7 +499,7 @@ function boot() {
     sources: {
       getCatalog: () => celestial.catalog,
       getMapCanvas: () => (planetMap.ready ? planetMap.canvas : null),
-      getSeed: () => world.seed.sub.celestial,
+      getSeed: () => worlds.home.seed.sub.celestial,
       planet: cfg.PLANETS.MUNDO_0,
       noonHour: (cfg.TIME.SUNRISE_HOUR + cfg.TIME.SUNSET_HOUR) / 2,
     },
@@ -473,11 +524,11 @@ function boot() {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { celestial, space, time, player, events });
+  registerSpaceTools(admin, { celestial, space, time, player, events, worlds, controller });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
-  loop.add(world);       // carga/descarga progresiva de chunks
+  loop.add(worlds);      // carga/descarga progresiva de chunks del cuerpo activo
   loop.add(time);        // reloj del mundo (Fase 11)
   loop.add(ship);        // nave: mandos, vuelo, compuerta, patas (coloca al piloto en su asiento)
   loop.add(controller);  // entrada → física del jugador
@@ -502,7 +553,7 @@ function boot() {
   loop.add(sky);         // cúpula centrada en la cámara
   loop.add(celestial);   // lunas en el cielo (tras la cámara: se colocan respecto a ella)
   loop.add(space);       // transición y escena espacial (Fase 13)
-  loop.add(planetMap);   // mapa del planeta (se dibuja poco a poco)
+  loop.add(maps);        // mapas de MUNDO 0 y de la luna actual (se dibujan poco a poco)
   loop.add(ui);
   loop.add(spaceHUD);
   loop.add(craftingPanel);
@@ -519,6 +570,7 @@ function boot() {
     config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
+    worlds,
     celestial, space, spaceHUD,
   };
 }

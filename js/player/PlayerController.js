@@ -44,6 +44,7 @@ export class PlayerController {
     this._edgeNoticeCooldown = 0;
     this._wasAtEdge = false;
     this._mods = { canRun: true, speedMultiplier: 1 };
+    this.gravityScale = 1; // lunas: menos gravedad (se salta más y se cae más despacio)
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
@@ -167,7 +168,7 @@ export class PlayerController {
       this._events.emit(GameEvents.PLAYER_JUMPED);
     }
 
-    v.y = Math.max(v.y - cfg.GRAVITY * dt, -cfg.TERMINAL_VELOCITY);
+    v.y = Math.max(v.y - cfg.GRAVITY * this.gravityScale * dt, -cfg.TERMINAL_VELOCITY);
 
     // Movimiento horizontal por ejes, con bloqueo por paredes y pendientes.
     const nx = p.position.x + v.x * dt;

@@ -71,17 +71,22 @@ export class TemperatureSystem {
   /** Temperatura ambiente y su desglose en (x, y, z). */
   sampleAmbient(x, y, z) {
     const c = this._cfg;
-    const weights = this._world.getBiomeAt(x, z).weights;
-    let biome = 0;
-    let total = 0;
-    for (const [id, w] of Object.entries(weights)) {
-      const def = this._biomes[id];
-      if (!def || !(w > 0)) continue;
-      biome += def.TEMPERATURE * w;
-      total += w;
+    const info = this._world.getBiomeAt(x, z);
+    const weights = info.weights;
+    // La temperatura mezclada por pesos la da el mundo activo (MUNDO 0 o una luna).
+    let biome = info.temperature;
+    if (biome === undefined) {
+      biome = 0;
+      let total = 0;
+      for (const [id, w] of Object.entries(weights)) {
+        const def = this._biomes[id];
+        if (!def || !(w > 0)) continue;
+        biome += def.TEMPERATURE * w;
+        total += w;
+      }
+      biome = total > 0 ? biome / total : 15;
     }
-    biome = total > 0 ? biome / total : 15;
-    const altitude = Math.max(0, y - this._world.seaLevel - c.ALTITUDE_REFERENCE) * c.ALTITUDE_LAPSE;
+    const altitude = Math.max(0, Math.min(200, y - this._world.seaLevel - c.ALTITUDE_REFERENCE)) * c.ALTITUDE_LAPSE;
     const mountain = weights.FROZEN_MOUNTAINS ?? 0;
     const night = this._time.nightTemperatureDrop + this._time.nightFactor * c.MOUNTAIN_NIGHT_EXTRA_DROP * mountain;
     const shelter = this._shelter?.getShelterAt(x, y, z) ?? { factor: 0, heated: false };
