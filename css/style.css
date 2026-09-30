@@ -981,3 +981,4 @@ body.ship-alarm #alarm-overlay { animation: alarm-pulse 1s ease-in-out infinite;
   background: #ffb347; color: #1b1206; font-weight: 700; cursor: pointer;
 }
 #demo-end .demo-stats li span { text-align: left; }
+.space-label.meteor { color: #ffd27a; font-weight: 700; border: 1px solid rgba(255, 210, 122, 0.55); }

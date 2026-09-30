@@ -175,7 +175,8 @@ export class MeteorSystem {
     for (const m of this.list) {
       const v = this.localCenter(m, this._v);
       const d = v.length();
-      const k = d > c.VIEW_DISTANCE ? c.VIEW_DISTANCE / d : 1;
+      let k = d > c.VIEW_DISTANCE ? c.VIEW_DISTANCE / d : 1;
+      if (d > c.VIEW_DISTANCE) k = Math.max(k, (c.MIN_APPARENT_M ?? 0) / m.radius); // lejos: al menos un punto visible
       m.mesh.position.copy(v).multiplyScalar(k);
       m.mesh.scale.setScalar(k);
       m.mesh.rotation.y += dt * 0.0; // quietos: se camina sobre ellos
@@ -250,14 +251,30 @@ export class MeteorSystem {
       const v = this._v.copy(m.mesh.position);
       const d = this.localCenter(m, new THREE.Vector3()).length() - m.radius;
       v.project(camera);
-      const visible = v.z < 1 && Math.abs(v.x) < 1.2 && Math.abs(v.y) < 1.2;
+      // Fuera de la pantalla (o detrás): indicador en el borde con una flecha hacia él.
+      let x = v.x;
+      let y = v.y;
+      const behind = v.z > 1;
+      if (behind) {
+        x = -x;
+        y = -y;
+      }
+      const onScreen = !behind && Math.abs(x) < 0.95 && Math.abs(y) < 0.9;
+      let arrow = '';
+      if (!onScreen) {
+        const s = 0.9 / Math.max(Math.abs(x), Math.abs(y), 1e-6);
+        x *= s;
+        y *= s;
+        const a = Math.atan2(y, x);
+        arrow = ['➡️', '↗️', '⬆️', '↖️', '⬅️', '↙️', '⬇️', '↘️'][((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8] + ' ';
+      }
       out.push({
         id: m.id,
         name: 'Meteorito',
-        text: `☄️ Meteorito · ${d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.max(0, Math.round(d))} m`}`,
-        x: (v.x * 0.5 + 0.5) * width,
-        y: (-v.y * 0.5 + 0.5) * height - 12,
-        visible,
+        text: `${arrow}☄️ Meteorito · ${d >= 1000 ? `${(d / 1000).toFixed(d >= 100000 ? 0 : 1)} km` : `${Math.max(0, Math.round(d))} m`}`,
+        x: (x * 0.5 + 0.5) * width,
+        y: (-y * 0.5 + 0.5) * height - (onScreen ? 12 : 0),
+        visible: true,
       });
     }
     return out;

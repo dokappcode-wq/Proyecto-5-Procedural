@@ -271,7 +271,7 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   mineral (pica las rocas con cristales); en vez de valla y cama hay estación de carga (carga una
   batería vacía en 60 s) y estación de oxígeno. Atajos: Admin → Soporte vital.
 
-- **Meteoritos**: en el espacio aparecen de vez en cuando cerca del rumbo (la IA avisa). A los
+- **Meteoritos**: se detectan pronto, a 250–700 km por delante del rumbo (el primero a los 2 s de salir al espacio); la IA avisa, el panel muestra la distancia y una flecha ámbar en el borde de la pantalla indica dónde están si no se ven. A los
   mandos pulsa `4`: la nave apunta, frena y se detiene a ~120 m (no se puede aterrizar en ellos).
   Levántate, ponte el traje, cierra la puerta interior, vacía la cámara con su panel y abre la
   compuerta. Baja de la rampa: estás en ingravidez. El jetpack empuja hacia donde miras; cerca

@@ -657,12 +657,13 @@ export const GameConfig = deepFreeze({
     // Meteoritos (Etapa 5): aparecen de vez en cuando cerca del rumbo. La nave no puede
     // aterrizar en ellos: se detiene cerca y se baja con el traje y el jetpack de gas.
     METEORS: {
-      FIRST_DELAY: 6,            // s en el espacio hasta que aparece el primero
-      INTERVAL: [25, 50],        // s entre apariciones
-      MAX: 2,                    // a la vez
-      SPAWN_DISTANCE_KM: [18, 40],
+      FIRST_DELAY: 2,            // s en el espacio hasta que se detecta el primero
+      INTERVAL: [20, 40],        // s entre apariciones
+      MAX: 3,                    // a la vez
+      SPAWN_DISTANCE_KM: [250, 700], // se detectan lejos: da tiempo a fijar rumbo (tecla 4)
       SPAWN_CONE: 0.6,           // rad alrededor del rumbo de la nave
-      DESPAWN_KM: 250,
+      DESPAWN_KM: 2500,          // se siguen detectando aunque se hayan dejado atrás
+      MIN_APPARENT_M: 3,         // tamaño mínimo del punto lejano (a VIEW_DISTANCE) para que se vea
       STOP_DISTANCE_M: 120,      // el rumbo automático (tecla 4) se detiene a esta distancia de la superficie
       MIN_DISTANCE_M: 70,        // la nave nunca se acerca más (no se aterriza)
       APPROACH_RANGE_KM: 5,      // más cerca, la velocidad máxima baja

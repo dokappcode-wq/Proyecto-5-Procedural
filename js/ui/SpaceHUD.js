@@ -68,9 +68,10 @@ export class SpaceHUD {
     this._speed.textContent = `Velocidad ${kmh < 10 ? kmh.toFixed(1) : Math.round(kmh)} km/s · 🔋 ${Math.round(n.charge * 100)} %${n.powered ? '' : ' · SIN BATERÍA'}`;
     this._speed.classList.toggle('low', !n.powered || n.charge < 0.15);
     const names = { MUNDO_0: 'MUNDO 0', MOON_A: 'Luna A', MOON_B: 'Luna B' };
+    const fmtM = (m) => (m >= 1000 ? `${Math.round(m / 1000).toLocaleString('es-ES')} km` : `${Math.max(0, Math.round(m))} m`);
     this._auto.innerHTML = n.autopilot
       ? `🧭 Rumbo automático: <b>${names[n.autopilot] ?? 'meteorito'}</b> (A/D/Espacio/C lo cancelan)`
-      : `🧭 Rumbo: <kbd>1</kbd> MUNDO 0 · <kbd>2</kbd> Luna A · <kbd>3</kbd> Luna B${n.meteor ? ' · <kbd>4</kbd> meteorito' : ''}`;
+      : `🧭 Rumbo: <kbd>1</kbd> MUNDO 0 · <kbd>2</kbd> Luna A · <kbd>3</kbd> Luna B${n.meteor ? ` · <kbd>4</kbd> meteorito (${fmtM(n.meteor.distanceM)})` : ''}`;
     const fmt = (km) => (km >= 10000 ? `${(km / 1000).toFixed(1)} mil km` : `${Math.round(km).toLocaleString('es-ES')} km`);
     this._bodies.innerHTML = n.bodies.map((b) => `<div><span>${b.name}</span><span>${fmt(Math.max(0, b.altitude))}</span></div>`).join('');
     for (const b of n.bodies) this._dist[b.id] = b.altitude;
@@ -110,6 +111,7 @@ export class SpaceHUD {
       }
       const d = this._dist[l.id];
       node.textContent = l.text ?? (d === undefined ? l.name : `${l.name} · ${Math.round(Math.max(0, d)).toLocaleString('es-ES')} km`);
+      node.classList.toggle('meteor', l.id.startsWith('METEOR'));
       node.style.display = l.visible ? 'block' : 'none';
       node.style.transform = `translate(${l.x}px, ${l.y}px) translate(-50%, -100%)`;
     }
