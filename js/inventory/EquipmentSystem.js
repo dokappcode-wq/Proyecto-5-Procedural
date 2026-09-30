@@ -6,7 +6,7 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  * - El objeto equipado sigue contando en el inventario (no se "mueve").
  * - Si el objeto desaparece del inventario, se desequipa solo.
- * - getColdLossMultiplier(): lo usará TemperatureSystem (Fase 10). La armadura
+ * - getColdLossMultiplier(): lo usa TemperatureSystem (Fase 10). La armadura
  *   NO da inmunidad: solo reduce la velocidad a la que se pierde temperatura.
  */
 export class EquipmentSystem {

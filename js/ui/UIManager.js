@@ -10,8 +10,9 @@ const MODE_LABELS = { FIRST_PERSON: '1ª persona', THIRD_PERSON: '3ª persona' }
  * pointer lock al pulsar "Entrar", que es interacción de interfaz).
  *
  * Barras de Vida/Hambre/Sed/Energía (PLAYER_STAT_CHANGED), avisos al cruzar
- * umbrales (PLAYER_STAT_LEVEL) y pantalla de muerte. Los efectos de
- * temperatura (Fase 10) se añadirán aquí, también alimentados por eventos.
+ * umbrales (PLAYER_STAT_LEVEL) y pantalla de muerte. Temperatura (Fase 10):
+ * escarcha y bruma gradual (TEMPERATURE_CHANGED) y avisos por estado; la
+ * temperatura en sí no se muestra (es oculta). Reloj (Fase 11): TIME_CHANGED.
  */
 const STAT_UI = [
   { id: 'HEALTH', icon: '❤️', name: 'Vida' },
@@ -28,6 +29,17 @@ const STAT_WARNINGS = {
 };
 
 const LEVEL_ORDER = { ok: 0, low: 1, critical: 2 };
+
+const TEMPERATURE_ORDER = { NORMAL: 0, COLD: 1, FREEZING: 2, CRITICAL: 3 };
+const TEMPERATURE_WARNINGS = {
+  COLD: 'Tu temperatura está bajando.',
+  FREEZING: 'Estás empezando a congelarte.',
+  CRITICAL: 'Estás sufriendo daño por frío.',
+};
+const PERIOD_MESSAGES = {
+  DAWN: 'Amanece.',
+  DUSK: 'Anochece: la noche será más fría.',
+};
 
 const DIET_LABELS = {
   UNKNOWN: 'sin datos aún',
@@ -77,7 +89,12 @@ export class UIManager {
       respawnButton: $('respawn-button'),
       useHint: $('use-hint'),
       sleepOverlay: $('sleep-overlay'),
+      clock: $('clock'),
+      frost: $('frost'),
+      frostHaze: $('frost-haze'),
     };
+    this._openPanels = new Set();
+    this.el.frost.style.backgroundImage = `url(${createFrostTexture()})`;
     this._statRows = this._buildStatBars();
     this.el.diet = this._buildDietRow();
     this._respawnTimer = 0;
@@ -89,7 +106,7 @@ export class UIManager {
     this.el.startButton.addEventListener('click', () => this._start());
     // Clic en el juego = recuperar el control del ratón.
     canvas.addEventListener('mousedown', () => {
-      if (this._started && !this._adminPanelOpen && !this._craftingOpen) input.requestPointerLock();
+      if (this._started && !this._adminPanelOpen && !this._craftingOpen && !this._openPanels.size) input.requestPointerLock();
     });
 
     events.on(GameEvents.CAMERA_MODE_CHANGED, ({ mode }) => {
@@ -207,6 +224,28 @@ export class UIManager {
       this.showMessage(`Has dormido ${hours} horas. Energía recuperada.`, 'biome');
     });
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de MUNDO 0.'));
+
+    // ---- Fases 10–11: temperatura (oculta) y reloj ----
+    events.on(GameEvents.TEMPERATURE_CHANGED, ({ frost }) => this._setFrost(frost));
+    events.on(GameEvents.TEMPERATURE_STATE_CHANGED, ({ state, previous }) => {
+      if (TEMPERATURE_ORDER[state] > TEMPERATURE_ORDER[previous]) this.showMessage(TEMPERATURE_WARNINGS[state], 'danger');
+      else if (state === 'NORMAL') this.showMessage('Vuelves a entrar en calor.', 'biome');
+    });
+    events.on(GameEvents.TIME_CHANGED, (t) => this._updateClock(t));
+    events.on(GameEvents.TIME_PERIOD_CHANGED, ({ period, jumped }) => {
+      if (!jumped && this._started && PERIOD_MESSAGES[period]) this.showMessage(PERIOD_MESSAGES[period], 'biome');
+    });
+
+    // ---- Nave ----
+    events.on(GameEvents.UI_PANEL_TOGGLED, ({ id, open }) => {
+      if (open) this._openPanels.add(id);
+      else this._openPanels.delete(id);
+      this._updateLockHint();
+    });
+    events.on(GameEvents.SHIP_PILOT_CHANGED, ({ piloting }) => {
+      document.body.classList.toggle('piloting', piloting);
+      if (piloting) this._showTarget(null);
+    });
   }
 
   setInitialCameraMode(mode) {
@@ -402,7 +441,8 @@ export class UIManager {
         break;
       }
       case 'EQUIP': text = `${key} ${this._equippedId === id ? 'Quitar' : 'Equipar'}`; break;
-      default: text = 'Material · [Tab] Fabricar · [B] Construir';
+      case 'WATCH': text = `${key} Ver dónde está la nave`; break;
+      default: text = id.startsWith('PLANK_BATTERY') ? 'Combustible: colócala en el puesto de carga de la nave' : 'Material · [Tab] Fabricar · [B] Construir';
     }
     el.textContent = `${def.ICON} ${def.NAME} — ${text}`;
     el.classList.remove('hidden');
@@ -446,8 +486,64 @@ export class UIManager {
     this.el.cameraMode.textContent = `Cámara: ${MODE_LABELS[mode] ?? mode} (V)`;
   }
 
+  _updateClock({ day, clock, isNight }) {
+    this.el.clock.textContent = `${isNight ? '🌙' : '☀️'} Día ${day} · ${clock}`;
+    this.el.clock.dataset.night = isNight ? '1' : '0';
+  }
+
+  /** Escarcha en los bordes (0..1) y bruma blanca al congelarse. Las transiciones CSS la suavizan. */
+  _setFrost(frost) {
+    this.el.frost.style.opacity = frost.toFixed(3);
+    this.el.frostHaze.style.opacity = (Math.max(0, frost - 0.5) * 2 * 0.45).toFixed(3);
+  }
+
   _updateLockHint() {
-    const show = this._started && !this._adminPanelOpen && !this._craftingOpen && !this._input.isPointerLocked();
+    const show = this._started && !this._adminPanelOpen && !this._craftingOpen && !this._openPanels.size && !this._input.isPointerLocked();
     this.el.lockHint.classList.toggle('hidden', !show);
   }
+}
+
+/**
+ * Textura de escarcha (se genera una vez): cristales de hielo ramificados que
+ * nacen en los bordes de la pantalla. Aleatoriedad fija: siempre la misma.
+ */
+function createFrostTexture() {
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  // Velo blanco-azulado más denso en los bordes.
+  const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.72);
+  g.addColorStop(0, 'rgba(225,240,255,0)');
+  g.addColorStop(0.6, 'rgba(225,240,255,0.25)');
+  g.addColorStop(1, 'rgba(235,246,255,0.85)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  // Cristales: ramas que crecen desde el borde hacia el centro.
+  const branch = (x, y, angle, len, width, depth) => {
+    if (depth <= 0 || len < 3) return;
+    const x2 = x + Math.cos(angle) * len;
+    const y2 = y + Math.sin(angle) * len;
+    ctx.strokeStyle = `rgba(240,248,255,${0.18 + depth * 0.08})`;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const t = 0.3 + rnd() * 0.6;
+      branch(x + (x2 - x) * t, y + (y2 - y) * t, angle + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.6), len * (0.35 + rnd() * 0.25), width * 0.7, depth - 1);
+    }
+    branch(x2, y2, angle + (rnd() - 0.5) * 0.4, len * 0.6, width * 0.8, depth - 1);
+  };
+  for (let i = 0; i < 130; i++) {
+    const side = Math.floor(rnd() * 4);
+    const p = rnd() * size;
+    const [x, y, a] = [[p, 0, Math.PI / 2], [size, p, Math.PI], [p, size, -Math.PI / 2], [0, p, 0]][side];
+    branch(x, y, a + (rnd() - 0.5) * 1.1, 22 + rnd() * 50, 0.8 + rnd() * 0.6, 4);
+  }
+  return c.toDataURL();
 }

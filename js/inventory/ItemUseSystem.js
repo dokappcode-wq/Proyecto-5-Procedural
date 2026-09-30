@@ -64,6 +64,11 @@ export class ItemUseSystem {
         this._equipment.toggle(itemId);
         ok = true;
         break;
+      case 'WATCH':
+        // Reloj de la nave: la UI muestra/oculta dónde está la nave.
+        this._events.emit(GameEvents.SHIP_WATCH_TOGGLE, {});
+        ok = true;
+        break;
       default:
         this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
     }

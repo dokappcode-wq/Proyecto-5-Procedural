@@ -53,6 +53,7 @@ export class ConstructionSystem {
     this._rotSteps = 0;
     this._placement = { active: false, valid: false, reason: null, piece: null };
     this._target = null; // pieza apuntada (para quitar)
+    this._blockers = [];  // otras estructuras sobre las que no se construye (la nave): { overlapsBox(box) }
 
     this.group = new THREE.Group();
     this.group.name = 'Buildings';
@@ -86,6 +87,11 @@ export class ConstructionSystem {
 
   get placement() {
     return this._placement;
+  }
+
+  /** Estructura que ocupa espacio y no admite piezas encima o dentro (p. ej. la nave). */
+  addBlocker(blocker) {
+    this._blockers.push(blocker);
   }
 
   // ---- Modo construcción ---------------------------------------------------------
@@ -252,6 +258,7 @@ export class ConstructionSystem {
     const b = w.getBounds();
     if (Math.hypot(candidate.x - p.x, candidate.z - p.z) > this._cfg.RANGE) return { ok: false, reason: 'Demasiado lejos' };
     if (fp.minX < b.minX || fp.maxX > b.maxX || fp.minZ < b.minZ || fp.maxZ > b.maxZ) return { ok: false, reason: 'Fuera del mundo' };
+    if (this._blockers.some((bl) => bl.overlapsBox(fp))) return { ok: false, reason: 'La nave está en medio' };
     if (!this.canAfford(candidate.type)) return { ok: false, reason: `Te faltan materiales (${this._costText(candidate.type)})` };
     const key = slotKey(candidate.slot, candidate.y);
     if (key && this._slots.has(key)) return { ok: false, reason: 'Ya hay una pieza ahí' };

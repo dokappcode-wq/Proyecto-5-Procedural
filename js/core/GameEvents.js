@@ -59,10 +59,27 @@ export const GameEvents = Object.freeze({
   PLAYER_SLEEP_STARTED: 'sleep:started',            // { bed }
   PLAYER_SLEPT: 'sleep:finished',                   // { hours, bed }
 
+  // Tiempo y temperatura (Fases 10–11)
+  TIME_CHANGED: 'time:changed',                     // { day, hour, minute, totalHours, daylight, isNight }
+  TIME_PERIOD_CHANGED: 'time:period',               // { period: 'DAWN'|'DAY'|'DUSK'|'NIGHT', previous }
+  TEMPERATURE_CHANGED: 'temperature:changed',       // { value, ambient, target, state, frost, visibility }
+  TEMPERATURE_STATE_CHANGED: 'temperature:state',   // { state: 'NORMAL'|'COLD'|'FREEZING'|'CRITICAL', previous }
+
+  // Nave
+  SHIP_STATE_CHANGED: 'ship:state',                 // { flight, hatch, legs, door, piloting, charge }
+  SHIP_PILOT_CHANGED: 'ship:pilot',                 // { piloting }
+  SHIP_COMMAND: 'ship:command',                     // { command: 'TAKEOFF'|'LAND'|'TOGGLE_HATCH'|'RETRACT_LEGS'|'DEPLOY_LEGS'|'STAND_UP' }
+  SHIP_CONTROL_HOLD: 'ship:controlHold',            // { control: 'FORWARD'|'BACKWARD'|'UP'|'DOWN'|'LEFT'|'RIGHT', active }
+  SHIP_PANEL_REQUEST: 'ship:panel',                 // { panel: 'MAP'|'CHARGER' }
+  SHIP_BATTERY_REQUEST: 'ship:battery',             // { slot, action: 'REMOVE'|'INSERT' }
+  SHIP_BATTERIES_CHANGED: 'ship:batteries',         // { slots: [{ charge }|null], total, capacity }
+  SHIP_WATCH_TOGGLE: 'ship:watchToggle',            // {}  (usar el reloj de la nave)
+
   // Admin
   ADMIN_MODE_CHANGED: 'admin:modeChanged',          // { active }
   ADMIN_PANEL_TOGGLED: 'admin:panelToggled',        // { open }
 
   // UI
   UI_MESSAGE: 'ui:message',                         // { text, type? }
+  UI_PANEL_TOGGLED: 'ui:panelToggled',              // { id, open }  (paneles que liberan el ratón)
 });

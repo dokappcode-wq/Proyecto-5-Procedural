@@ -52,6 +52,23 @@ kbd {
   background: radial-gradient(ellipse at center, transparent 55%, rgba(8, 14, 24, 0.38) 100%);
 }
 
+/* Frío (Fase 10): escarcha en los bordes y bruma blanca al congelarse.
+   Las transiciones largas hacen que aparezca y desaparezca poco a poco. */
+#frost, #frost-haze {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 1.5s linear;
+}
+#frost {
+  background-size: 100% 100%;
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 30%, #000 78%);
+  mask-image: radial-gradient(ellipse at center, transparent 30%, #000 78%);
+}
+#frost-haze { background: radial-gradient(ellipse at center, rgba(230, 242, 255, 0.55), rgba(236, 246, 255, 0.95)); }
+
 /* ---- Pantalla de inicio ---------------------------------------------- */
 .overlay {
   position: fixed;
@@ -161,6 +178,21 @@ kbd {
 #biome[data-biome="PLAINS"] { --biome-color: #a9c766; }
 #biome[data-biome="FOREST"] { --biome-color: #4d8a3a; }
 #biome[data-biome="FROZEN_MOUNTAINS"] { --biome-color: #bfe1f2; }
+
+#clock {
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ui-bg);
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: #ffe9b0;
+}
+#clock:empty { display: none; }
+#clock[data-night="1"] { color: #c3d4ff; }
 
 #help {
   position: absolute;
@@ -563,3 +595,173 @@ body.build-mode #crosshair::before, body.build-mode #crosshair::after { backgrou
   z-index: 50;
 }
 .admin-info .value { overflow-wrap: anywhere; }
+
+/* ---- Paneles de la nave (mapa, puesto de carga) ------------------------- */
+.modal-panel {
+  pointer-events: auto;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 28;
+  width: min(900px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-bg-strong);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+}
+.modal-panel header, .modal-panel footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+}
+.modal-panel header { font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.85rem; }
+.modal-panel footer { display: block; text-align: center; color: var(--ui-muted); font-size: 0.75rem; }
+.modal-panel .close { background: none; border: 0; color: var(--ui-fg); font-size: 1rem; cursor: pointer; }
+.modal-panel .panel-body { padding: 0 14px; overflow-y: auto; }
+.modal-panel button { font: inherit; }
+.modal-panel .muted { color: var(--ui-muted); }
+.modal-panel .small { font-size: 0.78rem; }
+.modal-panel h3 { margin: 4px 0 2px; font-size: 1rem; }
+
+.map-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.map-tabs button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--ui-fg);
+  cursor: pointer;
+  font-weight: 600;
+}
+.map-tabs button.active { background: var(--ui-accent); color: #06121f; border-color: transparent; }
+.map-layout { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.map-layout canvas {
+  width: min(520px, 100%);
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #0b1522;
+}
+.map-side { flex: 1 1 220px; min-width: 200px; font-size: 0.86rem; }
+.legend { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.4); }
+.swatch.round { border-radius: 50%; }
+.legend .mk { width: 14px; text-align: center; }
+.moon-card {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.moon-title { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.moon-card dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0; font-size: 0.8rem; }
+.moon-card dt { color: var(--ui-muted); }
+.moon-card dd { margin: 0; }
+.moon-card button { padding: 4px 12px; border-radius: 6px; border: 0; opacity: 0.45; cursor: not-allowed; }
+.moon-card .locked { margin: 6px 0 0; color: #ffcf7a; font-size: 0.8rem; }
+
+.battery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+.battery-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.battery-slot.empty { border-style: dashed; }
+.battery-name { font-size: 0.78rem; color: var(--ui-muted); }
+.battery-icon { font-size: 1.8rem; }
+.battery-bar { width: 100%; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.battery-bar span { display: block; height: 100%; background: linear-gradient(90deg, #6aff9a, #f0c24a); }
+.battery-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+.battery-slot button, .battery-slot button:disabled {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--ui-accent);
+  color: #06121f;
+  font-weight: 600;
+  cursor: pointer;
+}
+.battery-slot button:disabled { opacity: 0.4; cursor: default; }
+.battery-summary { display: grid; gap: 4px; margin-bottom: 10px; font-size: 0.86rem; }
+
+/* ---- Mandos de la nave --------------------------------------------------- */
+#ship-hud {
+  pointer-events: auto;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: min(380px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--ui-bg-strong);
+  border: 1px solid rgba(255, 160, 90, 0.35);
+  font-size: 0.82rem;
+}
+.ship-hud-title { font-weight: 700; letter-spacing: 0.04em; margin-bottom: 6px; }
+.ship-telemetry { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.ship-telemetry [data-t="flight"] { color: #ffcf9e; font-weight: 700; }
+.ship-telemetry .low { color: #ff8a80; font-weight: 700; }
+.ship-controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+.ship-controls button {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ui-fg);
+  font: inherit;
+  cursor: pointer;
+  touch-action: none;
+}
+.ship-controls button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.ship-controls button:disabled { opacity: 0.35; cursor: default; }
+.ship-controls button.wide { grid-column: span 2; }
+.ship-hint { margin-top: 6px; color: var(--ui-muted); font-size: 0.74rem; }
+body.piloting #inventory-bar, body.piloting #use-hint, body.piloting #crosshair, body.piloting #interaction-prompt { display: none; }
+@media (max-width: 560px) {
+  #ship-hud { right: 50%; transform: translateX(50%); }
+}
+
+/* ---- Reloj de la nave ------------------------------------------------------ */
+#ship-watch {
+  position: absolute;
+  right: 12px;
+  top: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 8px 12px 8px 8px;
+  border-radius: 999px;
+  background: var(--ui-bg-strong);
+  border: 1px solid rgba(127, 224, 255, 0.4);
+  font-size: 0.78rem;
+}
+.watch-face {
+  flex: none;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  grid-template-rows: auto 1fr auto;
+  padding: 6px 0;
+  background: radial-gradient(circle, #10283a, #071420);
+  border: 2px solid #7fe0ff;
+  color: #bff0ff;
+  font-variant-numeric: tabular-nums;
+}
+.watch-time { font-size: 0.72rem; }
+.watch-arrow { display: block; transition: transform 0.1s linear; }
+.watch-dist { font-size: 0.7rem; font-weight: 700; }
+.watch-info { color: var(--ui-fg); }

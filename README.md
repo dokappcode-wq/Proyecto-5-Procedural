@@ -3,11 +3,14 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: FASE 9** — alimentación con equilibrio animal/vegetal (7), odre, armadura de
-cuero y cama para dormir (8), fabricación con recetas y **construcción modular libre** (9):
-cimientos, suelos, paredes, puertas, ventanas, vallas, pilares, escaleras, tejados y cama.
-Sobre las Fases 1–6: mundo finito por seed con biomas, recursos, charcas, rebaños con
-temperamento, inventario, recogida y supervivencia (vida, hambre, sed, energía), en estilo low-poly.
+**Estado actual: FASE 11 + nave** — temperatura oculta con escarcha progresiva, congelación y
+daño por frío (10), ciclo de día y noche con sol, estrellas y noches más frías (11), y una
+**nave pequeña** en la que se entra: botón exterior → compuerta inferior con rampa, sala de
+estar/laboratorio (mapa, puesto de carga, ranuras libres), puerta y sala de controles con el
+asiento del piloto. Se puede volar por MUNDO 0, levantarse en el aire (la nave flota), abrir
+la compuerta y saltar (la nave aterriza sola), y llevar el reloj de la nave para localizarla.
+Sobre las Fases 1–9: mundo finito por seed con biomas, recursos, charcas, rebaños con
+temperamento, inventario, supervivencia, alimentación, fabricación y construcción modular.
 
 ## Cómo ejecutarlo
 
@@ -41,6 +44,11 @@ Abre `http://localhost:8080` y pulsa **Entrar en MUNDO 0**.
 | `Tab` | Panel de fabricación (odre, armadura) |
 | `B` | Modo construcción: `1`–`0` pieza · clic colocar · clic derecho quitar · `Q` girar |
 | `E` sobre una puerta / cama | Abrir o cerrar / dormir |
+| `E` en la nave | Botón de la compuerta, puerta, asiento del piloto, mapa, puesto de carga, reloj |
+| A los mandos: `T` / `G` / `L` | Despegar o aterrizar / compuerta / recoger o sacar patas |
+| A los mandos: `W` `S` · `A` `D` · `Espacio` `C` · `Shift` | Adelante/atrás · girar · subir/bajar · turbo |
+| A los mandos: ratón / rueda / `E` | Girar la cámara / distancia / levantarse (en el aire la nave se queda flotando) |
+| Reloj de la nave + clic derecho / `R` | Ver dónde está la nave (distancia, dirección, estado) |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
@@ -91,6 +99,16 @@ js/
 │   ├── HotbarSystem.js      Objeto seleccionado (teclas 1–9)
 │   ├── ItemUseSystem.js     "Usar": delega en nutrición, odre, equipamiento o construcción
 │   └── EquipmentSystem.js   Armadura (ranura BODY) → multiplicador de pérdida de frío
+├── time/
+│   ├── TimeSystem.js        Reloj, día, dirección del sol, luz de día, frío nocturno (sin Three.js)
+│   └── AtmosphereSystem.js  Aplica la hora: sol/luna, luz ambiente, cielo, estrellas, niebla
+├── celestial/CelestialCatalog.js  Lunas A y B por seed + configuración (sin Three.js)
+├── ship/
+│   ├── ShipSystem.js        Nave: compone vuelo, modelo, mandos, interacción, colisiones, refugio
+│   ├── ShipLayout.js        Forma: salas, colisiones, suelos, rampa, ranuras (sin Three.js)
+│   ├── ShipFlight.js        Vuelo: despegar, volar, flotar, aterrizar (también sola) (sin Three.js)
+│   ├── BatteryBank.js       Puesto de carga: baterías plank pequeñas (sin Three.js)
+│   └── ShipModel.js         Modelo low-poly con compuerta, puerta, patas y luces móviles
 ├── nutrition/NutritionSystem.js  Equilibrio comida animal/vegetal (sin Three.js)
 ├── crafting/CraftingSystem.js    Recetas de GameConfig.RECIPES (sin Three.js)
 ├── construction/
@@ -105,7 +123,8 @@ js/
 │   ├── HungerSystem.js      Hambre: desgaste; a 0 hace daño vía evento
 │   ├── ThirstSystem.js      Sed: desgaste, beber (evento PLAYER_DRANK)
 │   ├── EnergySystem.js      Energía: tiempo + actividad; limita correr y velocidad
-│   ├── SleepSystem.js       Dormir: energía, coste de hambre/sed, evento de horas (Fase 11)
+│   ├── SleepSystem.js       Dormir: energía, coste de hambre/sed; TimeSystem adelanta el reloj
+│   ├── TemperatureSystem.js Temperatura oculta: frío, congelación, daño (sin Three.js)
 │   ├── PlayerController.js  Entrada → física (gravedad, salto, escalones, colisión)
 │   └── PlayerModel.js       Personaje de bloques animado
 ├── camera/CameraSystem.js   1ª/3ª persona con transición suave
@@ -114,8 +133,11 @@ js/
 │   ├── AdminPanel.js        Vista DOM del panel
 │   ├── KeySequenceDetector.js
 │   └── tools/               Core, World, Life, Inventory, Survival y Craft tools
-├── ui/UIManager.js          HUD provisional (reacciona a eventos)
-└── ui/CraftingPanel.js      Panel de fabricación (pide fabricar con CRAFT_REQUEST)
+├── ui/UIManager.js          HUD provisional (reacciona a eventos): reloj, escarcha, avisos
+├── ui/CraftingPanel.js      Panel de fabricación (pide fabricar con CRAFT_REQUEST)
+├── ui/ModalPanel.js         Base de los paneles que liberan el ratón
+├── ui/ShipMapPanel.js       Mapa de MUNDO 0 + mapa planetario (lunas) · PlanetMapRenderer.js
+├── ui/ShipChargerPanel.js   Puesto de carga · ShipPilotHUD.js mandos · ShipWatchHUD.js reloj
 tests/                       Tests de Node (`npm test`)
 ```
 
@@ -160,7 +182,36 @@ Principios:
   jugador no puede salir del área jugable.
 - **La lógica del jugador no depende de la cámara.** El jugador expone ojos + yaw/pitch;
   la cámara decide dónde colocarse. Ocultar el cuerpo en 1ª persona se hace por evento.
+- **Temperatura oculta (Fase 10).** Ambiente = bioma − altura − noche + refugio; la temperatura
+  del jugador se acerca a ella poco a poco (la armadura multiplica la pérdida por 0,7). Estados
+  Normal → Frío → Congelación → Crítico; solo emite eventos: la escarcha y la bruma las dibuja la
+  UI y la distancia de visión la reduce AtmosphereSystem, siempre de forma gradual.
+- **Día y noche (Fase 11).** TimeSystem solo calcula (hora, sol, luz, frío nocturno) y
+  AtmosphereSystem lo aplica. Dormir adelanta el reloj. La posición de las lunas ya se calcula
+  (CelestialCatalog) y la mostrará el cielo en la Fase 12.
+- **Nave.** Forma, vuelo y baterías son lógica pura probada en Node; las colisiones se resuelven
+  en coordenadas locales de la nave (sirven con cualquier orientación y a cualquier altura).
+  Construcciones y nave comparten la misma interfaz (`surfaceAt`, `blocksAt`, `ceilingAt`,
+  `resolveCollisions`, `getShelterAt`), así el jugador, la cámara, los animales y la temperatura
+  las tratan igual. Nueva tecnología = entrada en `SHIP.TECHNOLOGIES` + ranura en `SHIP.INSTALLED`.
 - **Admin extensible.** Cada fase registra sus herramientas con `admin.registerTool()`.
 - **Configuración centralizada.** Cada sistema recibe solo su sección de `GameConfig`.
 
 Depuración desde la consola del navegador: `window.__MUNDO0__` expone los sistemas.
+
+## Cómo probar las Fases 10–11 y la nave
+
+- **Nave**: aparece aterrizada a 20–45 m del inicio (el mapa la marca). Botón rojo bajo la cola
+  → `E` abre la compuerta; sube por la rampa. Dentro: mapa, puesto de carga, ranuras libres,
+  reloj en la mesa del laboratorio; la puerta lleva a la sala de controles.
+- **Vuelo**: `E` en el asiento → `G` cierra la compuerta → `T` despega → `L` recoge patas →
+  `W/A/S/D`, `Espacio`/`C`. `L` saca patas y `T` aterriza (necesita un claro sin árboles).
+- **Flotar y saltar**: en el aire pulsa `E` para levantarte; la nave queda quieta gastando
+  batería. Abre la compuerta con el botón interior y baja por la rampa: al dejar la nave, busca
+  un sitio despejado y aterriza sola. ¡La caída hace daño!
+- **Frío**: Admin → Tiempo → Medianoche y sube a las Montañas Heladas (o Admin → Temperatura →
+  Enfriar). Con la armadura de cuero te enfrías más despacio; dentro de la nave cerrada, no.
+
+Limitaciones: las lunas aún no se dibujan en el cielo (Fase 12) ni se pueden visitar (falta el
+nodo espacial); las baterías no se recargan todavía (Admin → Nave → Recargar); la nave no choca
+con árboles en vuelo; la temperatura no se muestra como número (es oculta; el Admin sí la muestra).

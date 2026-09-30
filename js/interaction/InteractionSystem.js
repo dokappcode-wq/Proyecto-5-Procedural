@@ -15,9 +15,14 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  * No contiene reglas de los recursos ni de los animales: delega en
  * ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
+ *
+ * `providers`: otros sistemas con puntos interactivos propios (la nave:
+ * botones, puerta, asiento, tecnologías). Cada uno expone
+ *   getInteractablesNear(x, y, z, range) → [{ id, x, y, z, aimRadius, reach, label, action, key }]
+ *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [] }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -29,6 +34,7 @@ export class InteractionSystem {
     this._inventory = inventory;
     this._events = events;
     this._construction = construction;
+    this._providers = providers;
 
     this._cooldown = 0;
     this._queued = null; // acción pulsada durante el enfriamiento (se ejecuta al terminar)
@@ -69,6 +75,8 @@ export class InteractionSystem {
     this._cooldown = this._cfg.ACTION_COOLDOWN;
     if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
+    } else if (target?.kind === 'provided' && button === 'INTERACT') {
+      target.provider.interact(target.ref.id);
     } else if (target?.kind === 'structure' && target.action && button === 'INTERACT') {
       this._events.emit(GameEvents.STRUCTURE_INTERACT, { structure: target.ref });
     } else if (target?.kind === 'water' && button === 'INTERACT') {
@@ -150,6 +158,13 @@ export class InteractionSystem {
       );
     }
 
+    // Otros sistemas (nave): botones, puertas, asiento, tecnologías.
+    for (const provider of this._providers) {
+      for (const it of provider.getInteractablesNear(p.x, p.y, p.z, range)) {
+        consider({ kind: 'provided', id: `${provider.name}:${it.id}`, ref: it, provider }, it.x, it.y, it.z, it.aimRadius, it.reach);
+      }
+    }
+
     // Agua: punto donde la mira corta la lámina de la charca más cercana.
     const water = this._world.water?.nearestPond(p.x, p.z);
     if (water && water.distance <= range + 1 && this._dir.y < -0.05) {
@@ -171,6 +186,7 @@ export class InteractionSystem {
   /** Añade el texto que mostrará la UI: { label, action }. */
   _describe(t) {
     if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
+    if (t.kind === 'provided') return { ...t, label: t.ref.label, action: t.ref.action, key: t.ref.key ?? 'E' };
     if (t.kind === 'structure') {
       const action = t.ref.type === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : 'Dormir';
       return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };

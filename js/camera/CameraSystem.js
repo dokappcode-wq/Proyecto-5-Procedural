@@ -21,6 +21,10 @@ const OCCLUSION_STEPS = 16;
  *
  * En 3ª persona la cámara mira en la misma dirección que el jugador (vista
  * "sobre el hombro"), de forma que la mira central sirve en ambos modos.
+ *
+ * Vista de vehículo (`setVehicleView`): mientras se pilota la nave, la cámara
+ * orbita el vehículo en 3ª persona (el vehículo expone la misma interfaz que el
+ * jugador + `distance`). Al soltarla vuelve suavemente al modo anterior.
  */
 export class CameraSystem {
   constructor({ config, camera, input, target, terrain, events, occluders = null }) {
@@ -48,6 +52,12 @@ export class CameraSystem {
     this._tmp = new THREE.Vector3();
     this._back = new THREE.Vector3();
     this._occluders = occluders; // { raycastDistance(origin, dir, max) } — p. ej. paredes construidas
+    this._vehicle = null;        // { getEyePosition(out), yaw, pitch, distance } mientras se pilota
+  }
+
+  /** Cámara en 3ª persona alrededor de un vehículo (o null para volver al jugador). */
+  setVehicleView(view) {
+    this._vehicle = view;
   }
 
   setTerrain(terrain) {
@@ -69,9 +79,9 @@ export class CameraSystem {
     const cfg = this._cfg;
     const input = this._input;
 
-    if (input.wasPressed('TOGGLE_CAMERA')) this.toggleMode();
+    if (input.wasPressed('TOGGLE_CAMERA') && !this._vehicle) this.toggleMode();
 
-    const wheel = input.getWheel();
+    const wheel = this._vehicle ? 0 : input.getWheel();
     if (wheel && this.mode === CameraMode.THIRD_PERSON) {
       this._distance = THREE.MathUtils.clamp(
         this._distance + wheel * cfg.THIRD_PERSON_ZOOM_STEP,
@@ -81,7 +91,7 @@ export class CameraSystem {
     }
 
     // Transición suave (exponencial, independiente del framerate).
-    const goal = MODE_BLEND[this.mode];
+    const goal = this._vehicle ? 1 : MODE_BLEND[this.mode];
     if (cfg.TRANSITION_SPEED > 0) {
       this._blend += (goal - this._blend) * (1 - Math.exp(-cfg.TRANSITION_SPEED * dt));
       if (Math.abs(goal - this._blend) < 0.001) this._blend = goal;
@@ -95,9 +105,12 @@ export class CameraSystem {
 
   _place() {
     const cfg = this._cfg;
-    const t = this._target;
+    const v = this._vehicle;
+    const t = v ?? this._target;
     const yaw = t.yaw;
     const pitch = t.pitch;
+    const shoulder = v ? 0 : cfg.THIRD_PERSON_SHOULDER_OFFSET;
+    const heightOffset = v ? 0 : cfg.THIRD_PERSON_HEIGHT_OFFSET;
 
     t.getEyePosition(this._eye);
     const cp = Math.cos(pitch);
@@ -105,9 +118,9 @@ export class CameraSystem {
     this._right.set(Math.cos(yaw), 0, -Math.sin(yaw));
 
     // Posición ideal en 3ª persona: detrás, un poco por encima y al hombro.
-    this._pivot.copy(this._eye).addScaledVector(this._right, cfg.THIRD_PERSON_SHOULDER_OFFSET * this._blend);
-    this._pivot.y += cfg.THIRD_PERSON_HEIGHT_OFFSET;
-    let dist = this._occlusionDistance(this._pivot, this._distance);
+    this._pivot.copy(this._eye).addScaledVector(this._right, shoulder * this._blend);
+    this._pivot.y += heightOffset;
+    let dist = this._occlusionDistance(this._pivot, v ? v.distance : this._distance);
     // Paredes y techos construidos: la cámara se acerca para no quedar detrás.
     if (this._occluders && this._blend > 0.01) {
       this._back.copy(this._fwd).negate();
@@ -144,7 +157,7 @@ export class CameraSystem {
   }
 
   _updateBodyVisibility() {
-    const visible = this._blend > this._cfg.HIDE_BODY_BELOW_BLEND;
+    const visible = !this._vehicle && this._blend > this._cfg.HIDE_BODY_BELOW_BLEND;
     if (visible !== this._bodyVisible) {
       this._bodyVisible = visible;
       this._events.emit(GameEvents.CAMERA_BODY_VISIBILITY, { visible });

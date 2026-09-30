@@ -25,7 +25,7 @@ export class ResourceSystem {
    * @param {object} p.config      PLANETS.<planeta>.RESOURCES
    * @param {object} p.types       RESOURCE_TYPES
    * @param {number} p.seed        sub-seed de recursos
-   * @param {object} p.world       { chunkSize, half, chunkCount, heightAt(x,z), sample(x,z), isWater(x,z,m), spawn, seaLevel }
+   * @param {object} p.world       { chunkSize, half, chunkCount, heightAt(x,z), sample(x,z), isWater(x,z,m), spawn, clearZones?, seaLevel }
    */
   constructor({ config, types, seed, world }) {
     this._cfg = config;
@@ -226,6 +226,7 @@ export class ResourceSystem {
     if (y < w.seaLevel + 0.6) return false;
     if (w.isWater(x, z, 1.5)) return false;
     if (Math.hypot(x - w.spawn.x, z - w.spawn.z) < c.SPAWN_CLEAR_RADIUS) return false;
+    for (const zone of w.clearZones ?? []) if (Math.hypot(x - zone.x, z - zone.z) < zone.r) return false;
     const isTree = type === 'TREE' || type === 'PINE' || type === 'APPLE_TREE';
     if (isTree && y > c.TREE_MAX_HEIGHT) return false;
     const d = 1;

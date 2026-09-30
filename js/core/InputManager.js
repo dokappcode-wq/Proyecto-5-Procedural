@@ -89,6 +89,11 @@ export class InputManager {
     return !this.blocked && this._pressedThisFrame.has(action);
   }
 
+  /** Marca una pulsación como ya usada: los sistemas que se actualizan después no la verán. */
+  consume(action) {
+    this._pressedThisFrame.delete(action);
+  }
+
   /** Delta del ratón del frame en píxeles. */
   getMouseDelta() {
     if (this.blocked) return { x: 0, y: 0 };

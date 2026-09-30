@@ -7,13 +7,13 @@
  *  - Cada sistema recibe SOLO su sección, nunca el objeto completo,
  *    para que las dependencias sean explícitas.
  *
- * Las fases futuras añadirán aquí sus secciones (WORLD, BIOMES, SURVIVAL,
- * NUTRITION, TEMPERATURE, TIME, CELESTIAL, ...).
+ * Cada fase añade aquí su sección (WORLD, SURVIVAL, NUTRITION, TEMPERATURE,
+ * TIME, CELESTIAL, SHIP...).
  */
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'MUNDO 0',
-    VERSION: '0.9.1-construccion',
+    VERSION: '0.11.0-nave',
   },
 
   RENDER: {
@@ -42,7 +42,8 @@ export const GameConfig = deepFreeze({
     SUN_GLOW: 0.35,
   },
 
-  // Iluminación base (en la Fase 11 TimeSystem la hará variar con la hora).
+  // Iluminación base (a pleno día). TimeSystem + AtmosphereSystem la hacen variar
+  // con la hora (Fase 11): ver TIME.PALETTE.
   LIGHTING: {
     SUN_DIRECTION: { x: 0.55, y: 0.55, z: 0.3 }, // hacia el sol; sol bajo = más relieve
     SUN_COLOR: 0xffe8c8,
@@ -73,6 +74,9 @@ export const GameConfig = deepFreeze({
       ROTATE: ['KeyQ'],                 // girar la pieza antes de colocarla
       CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
       BUILD_MODE: ['KeyB'],             // entrar/salir del modo construcción
+      SHIP_TAKEOFF: ['KeyT'],           // nave (a los mandos): despegar / aterrizar
+      SHIP_HATCH: ['KeyG'],             // nave: abrir / cerrar la compuerta
+      SHIP_LEGS: ['KeyL'],              // nave: recoger / sacar las patas de aterrizaje
       HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
       HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
       HOTBAR_7: ['Digit7'], HOTBAR_8: ['Digit8'], HOTBAR_9: ['Digit9'],
@@ -188,7 +192,7 @@ export const GameConfig = deepFreeze({
       BIOMES: {
         PLAINS: {
           NAME: 'Explanada',
-          TEMPERATURE: 18,          // °C base (lo usará TemperatureSystem en la Fase 10)
+          TEMPERATURE: 18,          // °C base del bioma (BIOME_TEMPERATURE → TemperatureSystem)
           HILL_SCALE: 0.35,         // relieve: explanada casi llana
           DETAIL_SCALE: 0.6,
           COLORS: { GROUND: 0x86b85a, GROUND_ALT: 0xa9c766, ACCENT: 0xd9d27a },
@@ -328,6 +332,11 @@ export const GameConfig = deepFreeze({
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN' },
     LEATHER_ARMOR: { NAME: 'Armadura de cuero', ICON: '🦺', USE: 'EQUIP', SLOT: 'BODY' },
+    // Combustible de la nave: se colocan en el puesto de carga (ver SHIP.BATTERIES).
+    PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋' },
+    PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
+    // Se coge en la nave (mesa del laboratorio). Usarlo muestra dónde está la nave.
+    SHIP_WATCH: { NAME: 'Reloj de la nave', ICON: '⌚', USE: 'WATCH' },
   },
 
   // Alimentación (Fase 7). Equilibrio entre comida animal y vegetal.
@@ -380,15 +389,152 @@ export const GameConfig = deepFreeze({
     },
   },
 
-  // Dormir (Fase 8). El avance real del reloj llegará con TimeSystem (Fase 11).
+  // Dormir (Fase 8). TimeSystem adelanta el reloj HOURS horas (Fase 11).
   SLEEP: {
     FADE_TIME: 1.2,        // s de fundido a negro
     DURATION: 2.5,         // s de pantalla negra
-    HOURS: 8,              // horas que pasarán (TimeSystem, Fase 11)
+    HOURS: 8,              // horas que pasan al dormir
     ENERGY_RESTORED: 100,
     HUNGER_COST: 15,
     THIRST_COST: 20,
     SETS_RESPAWN: true,    // dormir en una cama la convierte en punto de reaparición
+  },
+
+  // Día y noche (Fase 11). El día dura DAY_LENGTH_MINUTES minutos reales.
+  // El sol sale a SUNRISE_HOUR y se pone a SUNSET_HOUR (día más largo que la noche).
+  TIME: {
+    DAY_LENGTH_MINUTES: 24,   // 1 hora de juego = 1 minuto real
+    START_HOUR: 8,
+    SUNRISE_HOUR: 6,
+    SUNSET_HOUR: 20,
+    SUN_MAX_ELEVATION_DEG: 60, // altura máxima del sol a mediodía
+    SUN_AZIMUTH_DEG: 25,       // giro del plano por el que se mueve el sol
+    NIGHT_TEMPERATURE_DROP: 6, // °C menos en plena noche
+    PERIOD_MESSAGES: true,     // "Amanece…", "Anochece…"
+    // Colores por momento del día; AtmosphereSystem los mezcla según la altura del sol.
+    PALETTE: {
+      DAY: {
+        ZENITH: 0x4f8fd6, HORIZON: 0xbfd9ec, GROUND: 0x9db8c9,
+        SUN: 0xffe8c8, SUN_INTENSITY: 2.6,
+        HEMI_SKY: 0xb9d7f0, HEMI_GROUND: 0x4c5842, HEMI_INTENSITY: 0.9,
+      },
+      TWILIGHT: {
+        ZENITH: 0x46557f, HORIZON: 0xf2a56e, GROUND: 0x7b6a6a,
+        SUN: 0xffa968,
+      },
+      NIGHT: {
+        ZENITH: 0x060a18, HORIZON: 0x1b2540, GROUND: 0x0d1119,
+        MOON_LIGHT: 0x9fb4e6, MOON_INTENSITY: 0.45,
+        HEMI_SKY: 0x34487a, HEMI_GROUND: 0x10131a, HEMI_INTENSITY: 0.32,
+        STARS: 1,
+      },
+    },
+  },
+
+  // Temperatura (Fase 10). Estadística OCULTA: el jugador solo ve sus efectos.
+  //   Temperatura ambiente = temperatura del bioma (PLANETS.*.BIOMES.*.TEMPERATURE,
+  //   mezclada por pesos) − penalización por altura − penalización nocturna
+  //   + refugio (construcciones, nave).
+  //   La temperatura del jugador se acerca poco a poco a la ambiente; con armadura
+  //   la pérdida se multiplica por EQUIPMENT.ARMOR_COLD_RESISTANCE (0.7).
+  //   Estados por la temperatura del jugador: Normal ≥ COLD_THRESHOLD > Frío ≥
+  //   FREEZING_THRESHOLD > Congelación ≥ DAMAGE_THRESHOLD > Crítico (daño).
+  TEMPERATURE: {
+    COMFORT: 8,               // °C: por encima no se pierde calor
+    ALTITUDE_REFERENCE: 12,   // m sobre el mar sin penalización
+    ALTITUDE_LAPSE: 0.15,     // °C menos por metro por encima de la referencia
+    MOUNTAIN_NIGHT_EXTRA_DROP: 8, // °C extra de noche en las Montañas Heladas (× peso del bioma)
+    SHELTER_BONUS: 8,         // °C a cubierto (× factor de refugio 0..1)
+    HEATED_TEMPERATURE: 20,   // °C mínimos en un interior climatizado (nave cerrada)
+    COLD_THRESHOLD: 4,        // °C del jugador: por debajo → Frío (escarcha)
+    FREEZING_THRESHOLD: -4,   // → Congelación (más escarcha, peor visibilidad)
+    DAMAGE_THRESHOLD: -10,    // → Crítico (daño)
+    MIN_TEMPERATURE: -30,
+    LOSS_RATE: 0.35,          // °C/s máximos que baja la temperatura del jugador
+    RECOVERY_RATE: 0.8,       // °C/s que sube al volver a una zona templada
+    COLD_DAMAGE: 0.8,         // vida/s en estado crítico
+    COLD_DAMAGE_PER_DEGREE: 0.08, // vida/s extra por cada °C por debajo de DAMAGE_THRESHOLD
+    DAMAGE_TICK: 2,           // s entre golpes de daño por frío
+    SAMPLE_INTERVAL: 0.25,    // s entre cálculos
+    FREEZING_VISIBILITY: 0.45, // la distancia de visión baja hasta este factor al congelarse
+  },
+
+  // Cuerpos celestes (se verán en el cielo en la Fase 12; ya aparecen en el mapa
+  // planetario de la nave). La posición inicial y la inclinación dependen de la
+  // sub-seed "celestial"; tamaño, distancia y velocidad son fijos aquí.
+  CELESTIAL: {
+    PLANET_NAME: 'MUNDO 0',
+    PLANET_RADIUS_KM: 3200,
+    MOON_A_SIZE: 620,          // km de radio
+    MOON_B_SIZE: 240,
+    MOON_A_DISTANCE: 42000,    // km al planeta
+    MOON_B_DISTANCE: 17000,
+    MOON_A_SPEED: 1 / 96,      // vueltas por hora de juego (1 vuelta cada 4 días)
+    MOON_B_SPEED: 1 / 30,      // 1 vuelta cada 30 h
+    MOON_A_COLOR: 0xd8d2c4,
+    MOON_B_COLOR: 0xc98f6a,
+    MAX_INCLINATION_DEG: 18,
+  },
+
+  // Nave pequeña de MUNDO 0. La forma (salas, colisiones, suelos, rampa) está en
+  // ship/ShipLayout.js; aquí el comportamiento, las tecnologías y las baterías.
+  SHIP: {
+    NAME: 'Nave exploradora',
+    LANDING_DISTANCE: [22, 45],  // m del inicio del jugador donde aparece aterrizada
+    CLEAR_RADIUS: 11,            // m sin árboles ni rocas alrededor del lugar de aterrizaje
+    // Vuelo
+    TAKEOFF_HEIGHT: 7,           // m sobre el suelo al terminar de despegar
+    TAKEOFF_SPEED: 3,            // m/s de subida al despegar
+    LANDING_SPEED: 3.5,          // m/s de bajada al aterrizar (frena cerca del suelo)
+    MAX_SPEED: 26,               // m/s hacia delante
+    BOOST_MULTIPLIER: 1.6,       // con Shift
+    REVERSE_FACTOR: 0.4,         // velocidad marcha atrás = MAX_SPEED × esto
+    ACCELERATION: 10,            // m/s²
+    VERTICAL_SPEED: 9,           // m/s arriba/abajo
+    TURN_RATE: 1.3,              // rad/s
+    MAX_ALTITUDE: 220,           // m sobre el nivel del mar
+    GROUND_CLEARANCE: 0.4,       // m mínimos entre la nave y el terreno en vuelo
+    LANDING_MAX_UNEVENNESS: 1.2, // m de desnivel máximo bajo las patas
+    AUTOLAND_SEARCH_RADIUS: 70,  // m en los que busca un sitio despejado para aterrizar sola
+    AUTOLAND_SPEED: 7,           // m/s de desplazamiento hacia ese sitio
+    HATCH_TIME: 1.6,             // s en abrir/cerrar la compuerta
+    LEGS_TIME: 1.4,              // s en recoger/sacar las patas
+    DOOR_TIME: 0.5,              // s de la puerta interior
+    // Cámara a los mandos (3ª persona sobre la nave)
+    CAMERA_DISTANCE: 24,
+    CAMERA_MIN_DISTANCE: 11,
+    CAMERA_MAX_DISTANCE: 45,
+    CAMERA_PITCH: -0.3,
+    WATCH_ITEM: 'SHIP_WATCH',    // reloj que se coge en la nave y localiza la nave
+    // Combustible: baterías plank pequeñas en el puesto de carga.
+    BATTERIES: {
+      ITEM: 'PLANK_BATTERY_SMALL',
+      EMPTY_ITEM: 'PLANK_BATTERY_SMALL_EMPTY',
+      SLOTS: 4,
+      CAPACITY: 100,             // carga de una batería llena
+      START_CHARGE: 1,           // 1 = empiezan llenas
+      HOVER_DRAIN: 0.07,         // carga/s solo por estar en el aire
+      THRUST_DRAIN: 0.22,        // carga/s extra a velocidad máxima
+      CLIMB_DRAIN: 0.08,         // carga/s extra subiendo
+    },
+    // Tecnologías instalables. Cada ranura de la nave (ShipLayout.SLOTS) tiene
+    // una tecnología o está libre para tecnologías futuras.
+    TECHNOLOGIES: {
+      FLIGHT_SYSTEM: { NAME: 'Sistema de vuelo', ICON: '🕹️', DESCRIPTION: 'Asiento del piloto y mandos de la nave.' },
+      PLANET_MAP: { NAME: 'Mapa', ICON: '🗺️', DESCRIPTION: 'Mapa de MUNDO 0 y mapa planetario.' },
+      CHARGING_STATION: { NAME: 'Puesto de carga', ICON: '🔌', DESCRIPTION: 'Baterías plank: el combustible de la nave.' },
+    },
+    INSTALLED: {
+      CONTROL_CONSOLE: 'FLIGHT_SYSTEM',
+      LAB_1: 'PLANET_MAP',
+      LAB_2: 'CHARGING_STATION',
+      LAB_3: null,
+      LAB_4: null,
+      CONTROL_1: null,
+      CONTROL_2: null,
+    },
+    SPACE_NODE_REQUIRED: true,   // sin "nodo espacial" las lunas no se pueden visitar
+    MAP_RESOLUTION: 160,         // píxeles por lado del mapa del planeta
   },
 
   // Interacción del jugador con el mundo (recoger, golpear).

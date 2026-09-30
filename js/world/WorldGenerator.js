@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
-import { SeededRandom } from '../core/SeededRandom.js';
+import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
 import { WorldSeed } from './WorldSeed.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { TerrainMesher } from './TerrainMesher.js';
@@ -34,8 +34,14 @@ import { PropMesher } from './props/PropMesher.js';
  * (controlador, cámara) no necesita actualizarse.
  */
 export class WorldGenerator {
-  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false }) {
+  /**
+   * @param {object} [p.landing] lugar de aterrizaje de la nave inicial:
+   *   { DISTANCE: [min, max] m del spawn, CLEAR_RADIUS, HALF_WIDTH, HALF_LENGTH }
+   */
+  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false, landing = null }) {
     this.name = 'world';
+    this._landingCfg = landing;
+    this._landing = null;
     this._cfg = config;
     this._planet = planet;
     this._events = events;
@@ -135,6 +141,9 @@ export class WorldGenerator {
     this.water.generate({ seed: this.seed.sub.resource, terrain: this.terrain, spawn: this._spawn, bounds: this.getBounds() });
     this.terrain.setWater(this.water);
     this._buildPonds();
+    this._landing = this._landingCfg ? this._findLandingSite(this._landingCfg) : null;
+    // Zonas sin árboles ni rocas: alrededor del inicio (SPAWN_CLEAR_RADIUS) y de la nave.
+    const clearZones = this._landing ? [{ x: this._landing.x, z: this._landing.z, r: this._landingCfg.CLEAR_RADIUS }] : [];
 
     this.resources = new ResourceSystem({
       config: this._planet.RESOURCES,
@@ -146,6 +155,7 @@ export class WorldGenerator {
         chunkCount: this._chunkCount,
         seaLevel: this._cfg.SEA_LEVEL,
         spawn: this._spawn,
+        clearZones,
         heightAt: (x, z) => this.getHeightAt(x, z),
         sample: (x, z) => this.terrain.sample(x, z),
         isWater: (x, z, m) => this.water.isWater(x, z, m),
@@ -212,6 +222,11 @@ export class WorldGenerator {
     return { ...this._spawn };
   }
 
+  /** Lugar donde aparece aterrizada la nave: { x, z, yaw } (o null). */
+  getLandingSite() {
+    return this._landing ? { ...this._landing } : null;
+  }
+
   /** Bioma en (x, z): { id, name, weights, temperature }. */
   getBiomeAt(x, z) {
     return this.biomes.describe(this.terrain.sample(x, z).biomes);
@@ -269,6 +284,7 @@ export class WorldGenerator {
       chunkMeshesPending: this._chunks.pendingCount,
       generationMs: this._stats.generationMs,
       spawn: this._spawn,
+      landing: this._landing,
     };
   }
 
@@ -378,6 +394,51 @@ export class WorldGenerator {
       if (best) return best;
       if (radiusLimit >= maxRadius) return { x: 0, z: 0 };
     }
+  }
+
+  /**
+   * Lugar de aterrizaje determinista (sub-seed "spawn" → "landing"): seco, llano,
+   * sin charcas, fuera de las montañas, a DISTANCE m del inicio y con la cola
+   * (la rampa) mirando hacia el jugador.
+   */
+  _findLandingSite({ DISTANCE, HALF_WIDTH, HALF_LENGTH }) {
+    const rng = new SeededRandom(deriveSeed(this.seed.sub.spawn, 'landing'));
+    const sp = this._spawn;
+    const b = this.getBounds();
+    let best = null;
+    for (let i = 0; i < 240; i++) {
+      const angle = rng.range(0, Math.PI * 2);
+      const radius = rng.range(DISTANCE[0], DISTANCE[1]);
+      const x = sp.x + Math.cos(angle) * radius;
+      const z = sp.z + Math.sin(angle) * radius;
+      if (x < b.minX + 30 || x > b.maxX - 30 || z < b.minZ + 30 || z > b.maxZ - 30) continue;
+      // La cola (+Z local) apunta al inicio: (sin yaw, cos yaw) ∥ (spawn − lugar).
+      const yaw = Math.atan2(sp.x - x, sp.z - z) + rng.range(-0.3, 0.3);
+      const c = Math.cos(yaw);
+      const s = Math.sin(yaw);
+      let min = Infinity;
+      let max = -Infinity;
+      let ok = true;
+      for (let u = -1; u <= 1 && ok; u += 0.5) {
+        for (let v = -1; v <= 1 && ok; v += 0.25) {
+          const lx = u * HALF_WIDTH;
+          const lz = v * HALF_LENGTH;
+          const px = x + lx * c + lz * s;
+          const pz = z - lx * s + lz * c;
+          const sample = this.terrain.sample(px, pz);
+          const h = this.terrain.heightAt(px, pz);
+          if (h < this._cfg.SEA_LEVEL + 1.2 || this.water.isWater(px, pz, 4) || (sample.biomes.FROZEN_MOUNTAINS ?? 0) > 0.2) ok = false;
+          min = Math.min(min, h);
+          max = Math.max(max, h);
+        }
+      }
+      if (!ok) continue;
+      const uneven = max - min;
+      if (!best || uneven < best.uneven) best = { x, z, yaw, uneven };
+      if (best.uneven < 0.25 && i > 30) break;
+    }
+    if (best) return { x: best.x, z: best.z, yaw: best.yaw };
+    return { x: sp.x + 25, z: sp.z, yaw: Math.PI / 2 };
   }
 
   _slopeAt(x, z) {

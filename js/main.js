@@ -5,6 +5,7 @@
  * actualización. No contiene lógica de juego: si algo "hace" cosas, vive en
  * su propio sistema. Añadir un sistema nuevo = crearlo aquí y registrarlo.
  */
+import * as THREE from 'three';
 import { GameConfig } from './config/GameConfig.js';
 import { EventBus } from './core/EventBus.js';
 import { GameEvents } from './core/GameEvents.js';
@@ -42,6 +43,19 @@ import { registerCoreDebugTools } from './admin/tools/CoreDebugTools.js';
 import { registerWorldTools } from './admin/tools/WorldTools.js';
 import { registerLifeTools } from './admin/tools/LifeTools.js';
 import { registerInventoryTools } from './admin/tools/InventoryTools.js';
+import { TimeSystem } from './time/TimeSystem.js';
+import { AtmosphereSystem } from './time/AtmosphereSystem.js';
+import { TemperatureSystem } from './player/TemperatureSystem.js';
+import { createCelestialCatalog } from './celestial/CelestialCatalog.js';
+import { ShipSystem } from './ship/ShipSystem.js';
+import { overlapsFootprint, LEGS, RAMP_FOOT_SAMPLE, toWorld as toShipWorld } from './ship/ShipLayout.js';
+import { PlanetMapRenderer } from './ui/PlanetMapRenderer.js';
+import { ShipMapPanel } from './ui/ShipMapPanel.js';
+import { ShipChargerPanel } from './ui/ShipChargerPanel.js';
+import { ShipPilotHUD } from './ui/ShipPilotHUD.js';
+import { ShipWatchHUD } from './ui/ShipWatchHUD.js';
+import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
+import { registerShipTools } from './admin/tools/ShipTools.js';
 
 function boot() {
   const cfg = GameConfig;
@@ -64,6 +78,8 @@ function boot() {
     resourceTypes: cfg.RESOURCE_TYPES,
     propColors: cfg.PROPS,
     flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
+    // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
+    landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
   });
   // Seed: ?seed=... en la URL o la seed por defecto de la configuración.
   const urlSeed = new URLSearchParams(window.location.search).get('seed');
@@ -72,6 +88,34 @@ function boot() {
   const lighting = new SceneLighting({ scene: render.scene, renderConfig: cfg.RENDER, config: cfg.LIGHTING });
   const sky = new SkyDome({ scene: render.scene, camera: render.camera, config: cfg.SKY, radius: cfg.RENDER.FAR * 0.9 });
   sky.setSunDirection(lighting.sunDirection);
+  // Día y noche (Fase 11): TimeSystem calcula la hora; AtmosphereSystem la aplica a luz, cielo y niebla.
+  const time = new TimeSystem({ config: cfg.TIME, events });
+  const atmosphere = new AtmosphereSystem({ time, lighting, sky, scene: render.scene, palette: cfg.TIME.PALETTE, renderConfig: cfg.RENDER });
+
+  // Estructuras en las que se camina y que bloquean: construcciones + nave.
+  // (Se crean más abajo; estas funciones solo se llaman durante el bucle.)
+  const structureSources = () => [construction, ship];
+  const combinedStructures = {
+    surfaceAt: (x, z, maxY) => {
+      let best = null;
+      for (const s of structureSources()) {
+        const v = s.surfaceAt(x, z, maxY);
+        if (v !== null && (best === null || v > best)) best = v;
+      }
+      return best;
+    },
+    blocksAt: (x, z, r, y0, y1) => structureSources().some((s) => s.blocksAt(x, z, r, y0, y1)),
+    ceilingAt: (x, z, y) => Math.min(...structureSources().map((s) => s.ceilingAt(x, z, y))),
+    resolveCollisions: (pos, r, y0, y1) => {
+      let hit = false;
+      for (const s of structureSources()) if (s.resolveCollisions(pos, r, y0, y1)) hit = true;
+      return hit;
+    },
+    raycastDistance: (o, d, max) => {
+      const hits = structureSources().map((s) => s.raycastDistance(o, d, max)).filter((v) => v !== null);
+      return hits.length ? Math.min(...hits) : null;
+    },
+  };
 
   // ---- Jugador y cámara ----------------------------------------------------
   const player = new Player({ config: cfg.PLAYER, scene: render.scene });
@@ -81,20 +125,16 @@ function boot() {
     input,
     player,
     terrain: world,
-    // Obstáculos: recursos (troncos, rocas) + construcciones (paredes, vallas, pilares...).
+    // Obstáculos: recursos (troncos, rocas) + construcciones y nave (paredes, patas...).
     obstacles: {
       resolveCollisions: (pos, r, y0, y1) => {
         const a = world.resources?.resolveCollisions(pos, r) ?? false;
-        const b = construction.resolveCollisions(pos, r, y0, y1);
+        const b = combinedStructures.resolveCollisions(pos, r, y0, y1);
         return a || b;
       },
     },
-    // Superficies construidas: suelos, cimientos, escaleras, tejados.
-    structures: {
-      surfaceAt: (x, z, maxY) => construction.surfaceAt(x, z, maxY),
-      blocksAt: (x, z, r, y0, y1) => construction.blocksAt(x, z, r, y0, y1),
-      ceilingAt: (x, z, y) => construction.ceilingAt(x, z, y),
-    },
+    // Superficies: suelos, cimientos, escaleras y tejados construidos; suelo y rampa de la nave.
+    structures: combinedStructures,
     events,
   });
   const camera = new CameraSystem({
@@ -104,7 +144,7 @@ function boot() {
     target: player,
     terrain: world,
     events,
-    occluders: { raycastDistance: (o, d, max) => construction.raycastDistance(o, d, max) },
+    occluders: { raycastDistance: (o, d, max) => combinedStructures.raycastDistance(o, d, max) },
   });
   lighting.follow(player.position);
   world.follow(player.position);
@@ -151,7 +191,39 @@ function boot() {
     items: cfg.ITEMS,
     events,
   });
-  animals.setObstacles(construction); // las vallas y paredes también frenan a los animales
+  // Nave pequeña: estructura en la que se entra y con la que se vuela (Tecnologías 1–3).
+  const ship = new ShipSystem({
+    config: cfg.SHIP,
+    scene: render.scene,
+    world,
+    player,
+    input,
+    events,
+    // No aterrizar encima de árboles ni construcciones; una roca solo estorba bajo una pata o la rampa
+    // (el casco está a 2,2 m del suelo y las rocas son más bajas).
+    landingBlocked: (s) => {
+      const supports = [...LEGS.map((l) => [l.x, l.z]), RAMP_FOOT_SAMPLE].map(([lx, lz]) => toShipWorld(s, lx, lz));
+      for (const n of world.resources.getNodesNear(s.x, s.z, 12)) {
+        const r = n.radius;
+        if (!(r > 0)) continue;
+        if (n.type === 'ROCK') {
+          if (supports.some(([x, z]) => Math.hypot(n.x - x, n.z - z) < r + 0.6)) return 'Hay una roca bajo las patas: busca un sitio despejado';
+        } else if (overlapsFootprint(s, { minX: n.x - r, maxX: n.x + r, minZ: n.z - r, maxZ: n.z + r })) {
+          return 'Hay árboles debajo: busca un claro para aterrizar';
+        }
+      }
+      for (const p of construction.pieces) {
+        if (Math.hypot(p.x - s.x, p.z - s.z) < 12 && overlapsFootprint(s, { minX: p.x - 1, maxX: p.x + 1, minZ: p.z - 1, maxZ: p.z + 1 })) {
+          return 'Hay construcciones debajo';
+        }
+      }
+      return null;
+    },
+  });
+  ship.setInventory(inventory);
+  construction.addBlocker(ship); // no se construye encima de la nave
+  // Las vallas, paredes y patas de la nave también frenan a los animales.
+  animals.setObstacles({ resolveCollisions: (pos, r, y0, y1) => combinedStructures.resolveCollisions(pos, r, y0, y1) });
   events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId }) => {
     if (slot === 'BODY') player.model.setArmor(itemId === 'LEATHER_ARMOR');
   });
@@ -166,6 +238,7 @@ function boot() {
     inventory,
     events,
     construction,
+    providers: [ship], // botones, puerta, asiento y tecnologías de la nave
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -209,6 +282,14 @@ function boot() {
     interaction.enabled = !active;
     if (!active) interaction.resetTarget();
   });
+  // A los mandos de la nave: el jugador no camina ni usa objetos; la cámara sigue a la nave.
+  events.on(GameEvents.SHIP_PILOT_CHANGED, ({ piloting }) => {
+    if (piloting) construction.setActive(false);
+    for (const s of [controller, hotbar, itemUse, interaction, construction, craftingPanel]) s.enabled = !piloting;
+    camera.setVehicleView(piloting ? ship.view : null);
+    player.setBodyVisible(!piloting && camera.mode === 'THIRD_PERSON');
+    if (!piloting) interaction.resetTarget();
+  });
   const sleep = new SleepSystem({ config: cfg.SLEEP, energy, hunger, thirst, input, events });
   // Dormir en una cama la convierte en punto de reaparición.
   let respawnBed = null;
@@ -216,7 +297,27 @@ function boot() {
     if (bed && cfg.SLEEP.SETS_RESPAWN) respawnBed = bed;
   });
   events.on(GameEvents.WORLD_GENERATED, () => (respawnBed = null));
-  const needs = [hunger, thirst, energy];
+  // Temperatura oculta (Fase 10): bioma, altura, noche, armadura y refugio (casa o nave).
+  const temperature = new TemperatureSystem({
+    config: cfg.TEMPERATURE,
+    biomes: cfg.PLANETS.MUNDO_0.BIOMES,
+    world,
+    time,
+    player,
+    equipment,
+    shelter: {
+      getShelterAt: (x, y, z) => {
+        const a = construction.getShelterAt(x, y, z);
+        const b = ship.getShelterAt(x, y, z);
+        return { factor: Math.max(a.factor, b.factor), heated: !!b.heated };
+      },
+    },
+    events,
+  });
+  // Al congelarse se ve menos (la niebla se acerca poco a poco).
+  events.on(GameEvents.TEMPERATURE_CHANGED, ({ visibility }) => atmosphere.setVisibility(visibility));
+
+  const needs = [hunger, thirst, energy, temperature, time];
   const setNeedsPaused = (paused) => needs.forEach((n) => (n.paused = paused));
 
   // Los ataques con origen (animales) empujan al jugador.
@@ -255,7 +356,7 @@ function boot() {
   });
 
   // Presentación: el cuerpo se oculta cuando la cámara está "dentro" de la cabeza.
-  events.on(GameEvents.CAMERA_BODY_VISIBILITY, ({ visible }) => player.setBodyVisible(visible));
+  events.on(GameEvents.CAMERA_BODY_VISIBILITY, ({ visible }) => player.setBodyVisible(visible && !ship.piloting));
 
   // ---- Interfaz y herramientas --------------------------------------------
   const ui = new UIManager({
@@ -268,7 +369,60 @@ function boot() {
     input,
     canvas: render.domElement,
   });
-  const craftingPanel = new CraftingPanel({ container: document.getElementById('hud'), crafting, input, events });
+  const hudRoot = document.getElementById('hud');
+  const craftingPanel = new CraftingPanel({ container: hudRoot, crafting, input, events });
+
+  // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
+  const planetMap = new PlanetMapRenderer({
+    world,
+    planet: cfg.PLANETS.MUNDO_0,
+    worldSize: cfg.WORLD.WORLD_SIZE,
+    resolution: cfg.SHIP.MAP_RESOLUTION,
+  });
+  let celestial = null;
+  events.on(GameEvents.WORLD_GENERATED, () => {
+    planetMap.reset();
+    celestial = createCelestialCatalog(cfg.CELESTIAL, world.seed.sub.celestial);
+    time.reset();
+  });
+  const mapTexture = new THREE.CanvasTexture(planetMap.canvas);
+  mapTexture.colorSpace = THREE.SRGBColorSpace;
+  planetMap.onReady = () => {
+    mapTexture.needsUpdate = true;
+    ship.model.setMapTexture(mapTexture);
+  };
+  const shipMapPanel = new ShipMapPanel({
+    container: hudRoot,
+    input,
+    events,
+    sources: {
+      map: planetMap,
+      world,
+      player,
+      ship,
+      time,
+      planetConfig: cfg.PLANETS.MUNDO_0,
+      getCatalog: () => celestial,
+      getBed: () => (respawnBed && construction.exists(respawnBed) ? respawnBed : null),
+      spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED,
+    },
+  });
+  const shipChargerPanel = new ShipChargerPanel({
+    container: hudRoot,
+    input,
+    events,
+    ship,
+    inventory,
+    items: cfg.ITEMS,
+    config: cfg.SHIP,
+  });
+  events.on(GameEvents.SHIP_PANEL_REQUEST, ({ panel }) => {
+    if (panel === 'MAP') shipMapPanel.setOpen(true);
+    else if (panel === 'CHARGER') shipChargerPanel.setOpen(true);
+  });
+  new ShipPilotHUD({ container: hudRoot, events, shipName: cfg.SHIP.NAME });
+  // Reloj de la nave: se coge en el laboratorio; al usarlo muestra dónde está la nave.
+  const shipWatch = new ShipWatchHUD({ container: hudRoot, events, player, ship, time, inventory, watchItem: cfg.SHIP.WATCH_ITEM });
   ui.setInitialCameraMode(camera.mode);
   [health, hunger, thirst, energy].forEach((s) => s.emitState()); // pinta las barras iniciales
 
@@ -282,11 +436,15 @@ function boot() {
   registerInventoryTools(admin, { inventory, items: cfg.ITEMS });
   registerSurvivalTools(admin, { health, hunger, thirst, energy, events });
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
+  registerEnvironmentTools(admin, { time, temperature });
+  registerShipTools(admin, { ship, player, controller, inventory, world, events });
   registerCoreDebugTools(admin, { player, controller, camera });
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
   const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
   loop.add(world);       // carga/descarga progresiva de chunks
+  loop.add(time);        // reloj del mundo (Fase 11)
+  loop.add(ship);        // nave: mandos, vuelo, compuerta, patas (coloca al piloto en su asiento)
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
@@ -298,22 +456,35 @@ function boot() {
   loop.add(hunger);      // supervivencia: desgaste por tiempo y actividad
   loop.add(thirst);
   loop.add(energy);
+  loop.add(temperature); // temperatura oculta: frío, congelación, daño (Fase 10)
   loop.add(health);      // curación, cuenta atrás de reaparición
   loop.add(nutrition);   // la dieta "olvida" poco a poco lo comido
   loop.add(sleep);
   loop.add(biomeTracker); // bioma actual del jugador
   loop.add(discovery);   // agua y animales descubiertos
+  loop.add(atmosphere);  // luz, cielo, estrellas y niebla según la hora
   loop.add(lighting);    // sombra centrada en el jugador
   loop.add(sky);         // cúpula centrada en la cámara
+  loop.add(planetMap);   // mapa del planeta (se dibuja poco a poco)
   loop.add(ui);
   loop.add(craftingPanel);
+  loop.add(shipMapPanel);
+  loop.add(shipChargerPanel);
+  loop.add(shipWatch);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
   loop.start();
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
-  window.__MUNDO0__ = { config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction, health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player, controller, camera, ui, admin, loop };
+  window.__MUNDO0__ = {
+    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
+    health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
+    controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
+    get celestial() {
+      return celestial;
+    },
+  };
 }
 
 try {
