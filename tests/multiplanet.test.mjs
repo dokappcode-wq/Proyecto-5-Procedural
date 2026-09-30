@@ -13,7 +13,7 @@ import { LruCache } from '../js/core/LruCache.js';
 import { regionSize } from '../js/systemdata/Catalog.js';
 import { EDEN } from './helpers/eden.mjs';
 
-const KAPPA = new SolarSystem(loadSystem(fs.readFileSync(new URL('../systems/pruebas/tres-mundos.system.json', import.meta.url), 'utf8'), { seed: 42 }).system);
+const KAPPA = new SolarSystem(loadSystem(fs.readFileSync(new URL('../systems/kappa.system.json', import.meta.url), 'utf8'), { seed: 42 }).system);
 const layoutOf = (sys) => createSystemLayout({ ...cfg.CELESTIAL, ZONE_MARGIN_KM: cfg.SPACE.ZONE_MARGIN_KM }, 12345, sys, cfg.SPACE.SUN_DIRECTION);
 
 test('cada categoría de tamaño tiene su lado de región', () => {

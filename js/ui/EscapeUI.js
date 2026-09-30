@@ -44,7 +44,7 @@ export class PodPanel extends ModalPanel {
 
 /**
  * EscapeOverlay — fundido del viaje en cápsula, alarma roja tras el salto fallido
- * y pantalla de fin de la demo.
+ * y pantalla de fin del tutorial (el Edén).
  */
 export class EscapeOverlay {
   constructor({ events, input, system, gameTitle }) {
@@ -67,7 +67,7 @@ export class EscapeOverlay {
     this.end.innerHTML = `
       <div class="demo-card">
         <h1></h1>
-        <h2>Fin de la demo</h2>
+        <h2>Fin del tutorial</h2>
         <p class="demo-text"></p>
         <ul class="demo-stats"></ul>
         <button type="button"></button>
@@ -93,7 +93,9 @@ export class EscapeOverlay {
     this._input.exitPointerLock();
     this.end.querySelector('.demo-text').textContent =
       'El nodo galáctico no aguantó el salto y la nave quedó a la deriva en el borde del sistema. ' +
-      `Has vuelto ${withPrep('a', this._system.home.name)} en una cápsula de escape. La nave, con su nodo espacial, te espera en la zona de aterrizaje.`;
+      `Has vuelto ${withPrep('a', this._system.home.name)} en una cápsula de escape. La nave te espera en la zona de aterrizaje ` +
+      'y la IA ha convertido los restos del nodo galáctico en un nodo de velocidad-luz: sal al espacio, aléjate de la estrella ' +
+      'hasta el borde del sistema y elige a qué sistema saltar.';
     const ul = this.end.querySelector('.demo-stats');
     ul.replaceChildren();
     for (const [k, v] of stats) {

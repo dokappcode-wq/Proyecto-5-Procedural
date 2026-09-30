@@ -168,6 +168,9 @@ export class ShipAI {
       if (node && !node.taken) return `Hay una señal ${withPrep('en', homeName)}: es un nodo espacial. Usa el mapa de la señal y busca el haz de luz azul.`;
       return 'Llevas el nodo espacial: instálalo en una ranura libre de la nave (E sobre la ranura).';
     }
+    if (Object.values(ship.installed ?? {}).includes('LIGHTSPEED_NODE')) {
+      return `Con el nodo de velocidad-luz podemos saltar a otro sistema: a los mandos, sal al espacio y aléjate de la estrella ${sys.star.name} hasta el borde del sistema. Cada salto gasta una batería de la nave.`;
+    }
     if (ship.crippled) return `La nave está inutilizada. Ve a la sala de cápsulas de escape y evacúa ${withPrep('a', homeName)}.`;
     if (this._src.travel?.galacticNode) return `Con el nodo galáctico instalado, sal del sistema: aléjate de la estrella ${sys.star.name} hasta más de ${this._zoneKm()} (Shift = impulso).`;
     const gnode = pickups?.get('GALACTIC_NODE');

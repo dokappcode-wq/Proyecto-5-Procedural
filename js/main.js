@@ -36,6 +36,9 @@ import { registerCraftTools } from './admin/tools/CraftTools.js';
 import { WorldManager } from './world/WorldManager.js';
 import { loadSystem } from './systemdata/SystemLoader.js';
 import { SolarSystem, withPrep } from './systemdata/SolarSystem.js';
+import { parseSystemCatalog } from './systemdata/SystemCatalog.js';
+import { captureState, saveHandoff, takeHandoff, applyState } from './core/TravelHandoff.js';
+import { HyperspacePanel, WarpOverlay } from './ui/HyperspaceUI.js';
 import { createPlanetTextures } from './space/PlanetTexture.js';
 import { Player } from './player/Player.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -81,7 +84,7 @@ import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 
-function boot(system) {
+function boot(system, { file, catalog = [], handoff = null } = {}) {
   const cfg = GameConfig;
   const events = new EventBus();
   const HOME = system.homeId;
@@ -729,7 +732,8 @@ function boot(system) {
   let galacticPlaced = false;
   events.on(GameEvents.WORLD_GENERATED, () => (galacticPlaced = false));
   events.on(GameEvents.BODY_CHANGED, ({ id, planet }) => {
-    if (galacticPlaced || id !== galacticMoon()) return;
+    // Con el nodo de velocidad-luz (tutorial terminado) ya no hay señal galáctica.
+    if (galacticPlaced || id !== galacticMoon() || spaceTravel.hyperdrive()) return;
     const w = worlds.get(id);
     const site = w.getLandingSite();
     if (!site) return;
@@ -772,7 +776,15 @@ function boot(system) {
     if (!emergency) return;
     // Fin de la demo: de vuelta en el planeta de inicio con la nave (y su nodo espacial) y el planeta como estaba.
     ship.setCrippled(false);
-    ship.uninstallTech('GALACTIC_NODE');
+    // Fin del tutorial: la IA convierte los restos del nodo galáctico en un nodo de velocidad-luz.
+    const slot = Object.entries(ship.installed).find(([, t]) => t === 'GALACTIC_NODE')?.[0];
+    if (slot) ship.installTech(slot, 'LIGHTSPEED_NODE');
+    else ship.uninstallTech('GALACTIC_NODE');
+    try {
+      localStorage.setItem('mundo0.tutorialDone', '1');
+    } catch {
+      /* sin almacenamiento */
+    }
     ship.podsUsed = 0;
     spaceTravel.resetAfterDemo();
     ship.relocateTo(HOME);
@@ -788,7 +800,55 @@ function boot(system) {
       ],
     });
   });
-  events.on(GameEvents.DEMO_RESTART, () => shipAI.say(`Bienvenido de vuelta ${withPrep('a', homeName)}. La nave está en la zona de aterrizaje. Gracias por jugar esta demo.`));
+  events.on(GameEvents.DEMO_RESTART, () => {
+    shipAI.say(`Bienvenido de vuelta ${withPrep('a', homeName)}. La nave está en la zona de aterrizaje.`);
+    setTimeout(() => shipAI.say(`He convertido los restos del nodo galáctico en un nodo de velocidad-luz. Sal al espacio y aléjate de la estrella ${system.star.name} hasta el borde del sistema: allí elegiremos a qué sistema saltar. Cada salto gasta ${cfg.SPACE.HYPERSPACE.BATTERY_COST} batería de la nave.`), 4000);
+  });
+
+  // ---- Hiperespacio: del borde del sistema a otro sistema del catálogo ----------------
+  const hasLightspeed = () => Object.values(ship.installed).includes('LIGHTSPEED_NODE');
+  spaceTravel.hyperdrive = hasLightspeed;
+  const campaignSeed = file === cfg.CAMPAIGN.SYSTEM_FILE ? system.seed : handoff?.campaignSeed ?? null;
+  const HS = cfg.SPACE.HYPERSPACE;
+  const hyperPanel = new HyperspacePanel({
+    container: hudRoot,
+    input,
+    events,
+    sources: {
+      catalog: () => catalog,
+      currentFile: file,
+      systemName: system.name,
+      aiName: () => shipAI.aiName,
+      batteries: ship.batteries,
+      cost: HS.BATTERY_COST,
+    },
+  });
+  const warp = new WarpOverlay();
+  events.on(GameEvents.HYPERSPACE_EDGE, () => {
+    shipAI.say(`Borde del ${system.name}. Nodo de velocidad-luz preparado: ¿a qué sistema vamos?`);
+    events.emit(GameEvents.HYPERSPACE_PANEL_REQUEST, {});
+  });
+  let jumping = false;
+  events.on(GameEvents.HYPERSPACE_JUMP, ({ entry }) => {
+    if (jumping || entry.file === file) return;
+    if (!ship.batteries.spendWhole(HS.BATTERY_COST)) {
+      shipAI.say(`No hay carga suficiente: el salto necesita ${HS.BATTERY_COST} batería entera. Recarga o cambia baterías en el puesto de carga.`, 'ai-warn');
+      return;
+    }
+    jumping = true;
+    input.setBlocked('hyperspace', true);
+    setNeedsPaused(true);
+    shipAI.say(`Salto confirmado. Rumbo al ${entry.name}. Entrando en el hiperespacio…`);
+    events.emit(GameEvents.SHIP_BATTERIES_CHANGED, { total: ship.batteries.total, capacity: ship.batteries.capacity });
+    warp.enter(`Hiperespacio · rumbo al ${entry.name}`, HS.JUMP_TIME, () => {
+      saveHandoff(captureState({
+        systemName: system.name, target: entry.file, campaignSeed,
+        inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time,
+      }));
+      const seed = entry.file === cfg.CAMPAIGN.SYSTEM_FILE && campaignSeed !== null ? `&seed=${campaignSeed}` : '';
+      window.location.assign(`${window.location.pathname}?system=${encodeURIComponent(entry.file)}${seed}`);
+    });
+  });
 
   // Mapa estelar 3D (tecnología Mapa): la escena espacial "de mapa".
   const starMap = new StarMap({
@@ -830,6 +890,26 @@ function boot(system) {
   // herramientas Admin, que leen los biomas del mundo generado.
   world.generate(String(system.seed));
 
+  // Llegada desde el hiperespacio: se recupera la partida y la nave aparece en el espacio.
+  if (handoff) {
+    applyState(handoff, {
+      items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time,
+    });
+    if (ship.isExplorer) {
+      pickups.remove('SPACE_NODE'); // la nave ya tiene el nodo espacial
+      if (inventory.hasItem(cfg.SHIP.NODE_MAP_ITEM, 1)) inventory.removeItem(cfg.SHIP.NODE_MAP_ITEM, inventory.getItemCount(cfg.SHIP.NODE_MAP_ITEM));
+    }
+    document.getElementById('start-button').textContent = `Salir del hiperespacio · ${system.name}`;
+    events.on(GameEvents.GAME_STARTED, () => {
+      warp.exit(`Llegada al ${system.name}`);
+      events.emit(GameEvents.HYPERSPACE_ARRIVED, { from: handoff.from });
+      setTimeout(() => {
+        const planets = system.planets.map((p) => p.name).join(', ');
+        shipAI.say(`Salto completado desde el ${handoff.from}. Bienvenido al ${system.name}: ${system.planets.length === 1 ? 'un planeta' : `${system.planets.length} planetas`} (${planets}) alrededor de la estrella ${system.star.name}. Elige rumbo con las teclas numéricas.`);
+      }, 2500);
+    });
+  }
+
   const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
@@ -839,9 +919,14 @@ function boot(system) {
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
-  registerSpaceTools(admin, { system, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
+  registerSpaceTools(admin, { system, hasLightspeed, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
+  // La nave llega al espacio del nuevo sistema (después de las herramientas Admin, que leen el terreno).
+  if (handoff) {
+    ship.enterPilot();
+    spaceTravel.arriveFromHyperspace();
+  }
 
   // ---- Bucle: el orden de registro es el orden de actualización ----------
   loop.add(worlds);      // carga/descarga progresiva de chunks del cuerpo activo
@@ -888,6 +973,7 @@ function boot(system) {
   loop.add(shipAI);
   loop.add(aiPanel);
   loop.add(podPanel);
+  loop.add(hyperPanel);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
@@ -899,7 +985,7 @@ function boot(system) {
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp,
   };
 }
 
@@ -913,23 +999,34 @@ function gameSeed() {
 }
 
 /**
- * La campaña: El Jardín del Edén, descrito en JSON como cualquier sistema importado.
- * Para probar otro sistema de la carpeta systems/: ?system=pruebas/tres-mundos
- * (solo nombres de archivo de esa carpeta; el archivo pasa por el mismo validador).
+ * La campaña (El Jardín del Edén) o el sistema de systems/ indicado con ?system=kappa.
+ * Todos pasan por el mismo validador y compilador que un sistema importado.
+ * La campaña usa una semilla aleatoria por partida; los demás sistemas, la suya
+ * (del archivo o derivada de su nombre), salvo que la URL traiga ?seed=.
+ * Si se llega por el hiperespacio, se recupera el traspaso de la partida.
  */
 async function loadCampaign() {
-  const param = new URLSearchParams(window.location.search).get('system');
-  const url = param && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*$/.test(param) ? `systems/${param}.system.json` : GameConfig.CAMPAIGN.SYSTEM_URL;
-  const res = await fetch(url);
+  const params = new URLSearchParams(window.location.search);
+  const param = params.get('system');
+  const file = param && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*$/.test(param) ? param : GameConfig.CAMPAIGN.SYSTEM_FILE;
+  const url = `systems/${file}.system.json`;
+  const [res, catalogText] = await Promise.all([
+    fetch(url),
+    fetch(GameConfig.CAMPAIGN.CATALOG_URL).then((r) => (r.ok ? r.text() : '')).catch(() => ''),
+  ]);
   if (!res.ok) throw new Error(`no se pudo leer ${url} (${res.status})`);
-  const result = loadSystem(await res.text(), { seed: gameSeed() });
-  if (!result.ok) throw new Error(`el sistema de la campaña no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+  const campaign = file === GameConfig.CAMPAIGN.SYSTEM_FILE;
+  const seed = campaign || params.has('seed') ? gameSeed() : undefined;
+  const result = loadSystem(await res.text(), { seed });
+  if (!result.ok) throw new Error(`el sistema ${file} no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
   for (const w of result.warnings) console.warn(`[sistema] ${w.path}: ${w.message}`);
-  return new SolarSystem(result.system);
+  const catalog = catalogText ? parseSystemCatalog(catalogText) : { entries: [], errors: [] };
+  for (const e of catalog.errors) console.warn(`[catálogo] ${e.path}: ${e.message}`);
+  return { system: new SolarSystem(result.system), file, catalog: catalog.entries, handoff: takeHandoff(file) };
 }
 
 loadCampaign()
-  .then((system) => boot(system))
+  .then(({ system, file, catalog, handoff }) => boot(system, { file, catalog, handoff }))
   .catch((err) => {
     console.error(err);
     const el = document.getElementById('fatal-error');

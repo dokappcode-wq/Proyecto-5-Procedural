@@ -122,6 +122,10 @@ export const GameEvents = Object.freeze({
 
   // IA de la nave
   AI_SAY: 'ai:say',                                 // { text, type? }  mensaje de la IA
+  HYPERSPACE_EDGE: 'hyperspace:edge',           // la nave con nodo de velocidad-luz llega al borde del sistema
+  HYPERSPACE_PANEL_REQUEST: 'hyperspace:panel', // abrir la navegación hiperespacial
+  HYPERSPACE_JUMP: 'hyperspace:jump',           // { entry } saltar al sistema elegido
+  HYPERSPACE_ARRIVED: 'hyperspace:arrived',     // { from } llegada tras un salto
   AI_PANEL_REQUEST: 'ai:panel',                     // {}
 
   // Admin

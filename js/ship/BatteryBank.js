@@ -50,6 +50,37 @@ export class BatteryBank {
     return amount - left;
   }
 
+  /** ¿Hay carga para gastar `count` baterías enteras? */
+  canSpend(count = 1) {
+    return this.total >= this._cfg.CAPACITY * count - 1e-6;
+  }
+
+  /**
+   * Gasta `count` baterías enteras (el hiperespacio): empieza por la más llena y,
+   * si no estaba completa, lo que falta sale de las demás.
+   * @returns {boolean} false (sin cambios) si no hay carga suficiente
+   */
+  spendWhole(count = 1) {
+    if (!this.canSpend(count)) return false;
+    for (let i = 0; i < count; i++) {
+      const fullest = this.slots.filter(Boolean).sort((a, b) => b.charge - a.charge)[0];
+      let left = this._cfg.CAPACITY - fullest.charge;
+      fullest.charge = 0;
+      for (const b of this.slots) {
+        if (!b || left <= 0 || b === fullest) continue;
+        const used = Math.min(b.charge, left);
+        b.charge -= used;
+        left -= used;
+      }
+    }
+    return true;
+  }
+
+  /** Baterías colocadas con carga completa. */
+  get fullCount() {
+    return this.slots.filter((b) => b && b.charge >= this._cfg.CAPACITY - 0.5).length;
+  }
+
   /**
    * Retira la batería de una ranura.
    * @returns {{ ok: boolean, item?: string, reason?: string }}

@@ -3,7 +3,7 @@ import { withPrep } from '../../systemdata/SolarSystem.js';
 /**
  * Herramientas de depuración del cielo (Fase 12) y del espacio (Fase 13).
  */
-export function registerSpaceTools(admin, { system, celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups, meteors, lifeSupport, inventory }) {
+export function registerSpaceTools(admin, { system, hasLightspeed, celestial, travel, starMap, ship, time, player, worlds, controller, events, installSpaceNode, pickups, meteors, lifeSupport, inventory }) {
   // ---- Cuerpos (viaje directo, sin nave: depuración) ----
   admin.registerTool({ category: 'Cuerpos', type: 'info', label: 'Cuerpo actual', read: () => worlds.profile()?.NAME ?? worlds.activeId });
   for (const { id, name } of system.visitable) {
@@ -156,5 +156,18 @@ export function registerSpaceTools(admin, { system, celestial, travel, starMap, 
       n.pitch = 0;
     },
   });
+  // ---- Hiperespacio ----
+  admin.registerTool({
+    category: 'Espacio',
+    label: 'Completar el tutorial (nodo de velocidad-luz)',
+    run: () => {
+      if (!ship.isExplorer) installSpaceNode();
+      if (hasLightspeed()) throw new Error('La nave ya tiene el nodo de velocidad-luz');
+      const slot = Object.entries(ship.installed).find(([, t]) => !t || t === 'GALACTIC_NODE')?.[0];
+      if (!slot) throw new Error('No hay ranuras libres');
+      ship.installTech(slot, 'LIGHTSPEED_NODE');
+    },
+  });
+  admin.registerTool({ category: 'Espacio', label: 'Abrir la navegación hiperespacial', run: () => events.emit('hyperspace:panel', {}) });
   admin.registerTool({ category: 'Espacio', label: 'Mapa estelar 3D', run: () => events.emit('starMap:request', { open: true }) });
 }

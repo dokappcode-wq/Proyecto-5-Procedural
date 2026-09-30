@@ -3,7 +3,7 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: v1.3.0 — las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y los bloques 1a y 1b de los sistemas solares importables: el juego se construye a partir de un sistema descrito en JSON, con regiones de 0,5 a 20 km, varios planetas y crucero interplanetario.**
+**Estado actual: v1.4.0 — el Edén es el tutorial: al terminarlo, la nave recibe el nodo de velocidad-luz y salta por el hiperespacio a los sistemas del catálogo (el primero, Kappa). Además: las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y los bloques 1a y 1b de los sistemas solares importables: el juego se construye a partir de un sistema descrito en JSON, con regiones de 0,5 a 20 km, varios planetas y crucero interplanetario.**
 
 Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El Jardín del Edén** (antes "MUNDO 0"), con sus dos lunas.
 
@@ -28,6 +28,7 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
+| HS | Hiperespacio: al terminar el tutorial (el Edén) la IA convierte el nodo galáctico en un nodo de velocidad-luz. En el borde de cualquier sistema, la IA pregunta a qué sistema ir (panel de navegación con el catálogo `systems/catalogo.json`); cada salto gasta 1 batería de la nave y la partida (mochila, traje, nave, baterías) viaja contigo |
 | 1b | Regiones de tamaño real (enano 0,5 km · pequeño 1 · mediano 5 · grande 10 · enorme 20) con caché de terreno que descarta lo más antiguo; varios planetas por sistema alrededor de una estrella, todas las lunas visitables, animales en cada cuerpo con fauna, crucero interplanetario y rumbo automático que rodea los planetas |
 | 1a | Sistemas solares como datos: catálogo del motor, esquema v1, lectura segura de JSON, validador con rutas de error, compilador. El Jardín del Edén vive en `systems/jardin-del-eden.system.json` y cada partida tiene una semilla numérica aleatoria |
 
@@ -45,7 +46,8 @@ Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 
 - Cada partida empieza con una **semilla numérica aleatoria** (se ve arriba a la izquierda).
 - Semilla fija por URL: `http://localhost:8080/?seed=12345` (la misma semilla produce el mismo planeta y las mismas lunas).
-- Otro sistema de la carpeta `systems/`: `http://localhost:8080/?system=pruebas/tres-mundos` (sistema de prueba con tres planetas: enano, mediano y enorme).
+- Catálogo de sistemas a los que se salta: `systems/catalogo.json` (id, archivo, nombre, descripción). Para añadir un sistema: su `systems/<archivo>.system.json` y una entrada en el catálogo.
+- Otro sistema de la carpeta `systems/`: `http://localhost:8080/?system=kappa` (sistema de prueba con tres planetas: enano, mediano y enorme).
 - Tests sin navegador (reproducibilidad, secuencia Admin): `npm test`.
 
 ## Controles
@@ -252,7 +254,13 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
-- **Varios planetas (1b)**: abre `?system=pruebas/tres-mundos`. Instala el nodo espacial (Admin → Espacio),
+- **Hiperespacio**: termina el tutorial (nodo galáctico → salto fallido → cápsula) o usa Admin →
+  Espacio → *Completar el tutorial (nodo de velocidad-luz)*. Sal al espacio y aléjate de la
+  estrella (o Admin → *Llevar la nave al borde del sistema* y avanza con `W`): la IA pregunta
+  a qué sistema ir. Elige *Sistema Kappa*: se gasta 1 batería, se ve el túnel del hiperespacio
+  y apareces en el espacio de Kappa con tu nave y tu mochila. Desde Kappa puedes volver al
+  mismo Edén (se conserva su semilla).
+- **Varios planetas (1b)**: abre `?system=kappa`. Instala el nodo espacial (Admin → Espacio),
   sal al espacio y pulsa `2` (Thalassa): mantén `W` + `Shift` y, lejos de los planetas, el HUD
   marca 🚀 *Crucero interplanetario* (hasta 90 000 km/s); frena solo al llegar. Thalassa mide 5 km,
   tiene mar, cabras y ciervos y dos lunas en su cielo. `3` lleva a Ferrum: 20 km, rojo, sin aire,

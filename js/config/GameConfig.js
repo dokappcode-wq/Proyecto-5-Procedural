@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.3.0',
+    VERSION: '1.4.0',
   },
 
   RENDER: {
@@ -146,7 +146,8 @@ export const GameConfig = deepFreeze({
   // biomas, flora, fauna, órbitas…) se describen en JSON (systems/*.system.json) y
   // pasan por el mismo validador y compilador que un sistema importado (js/systemdata).
   CAMPAIGN: {
-    SYSTEM_URL: 'systems/jardin-del-eden.system.json',
+    SYSTEM_FILE: 'jardin-del-eden',          // systems/<archivo>.system.json: el tutorial
+    CATALOG_URL: 'systems/catalogo.json',    // sistemas a los que se salta con el nodo de velocidad-luz
   },
 
   // Supervivencia (Fase 6). Valores por segundo de juego.
@@ -467,6 +468,13 @@ export const GameConfig = deepFreeze({
       MINERAL_PER_HIT: 2,
       VIEW_DISTANCE: 600,        // m a los que se dibuja como impostor si está más lejos
     },
+    // Hiperespacio: con el nodo de velocidad-luz, al llegar al borde del sistema la IA
+    // pregunta a qué sistema ir. Cada salto gasta baterías enteras de la nave.
+    HYPERSPACE: {
+      BATTERY_COST: 1,           // baterías plank que consume un salto
+      JUMP_TIME: 3.5,            // s de viaje por el hiperespacio (animación)
+      REPROMPT_MARGIN_KM: 8000,  // hay que volver a entrar esto en el sistema para que vuelva a preguntar
+    },
     // Cápsulas de escape (Etapa 6): llevan al jugador a un cuerpo cercano; la IA trae la nave después.
     ESCAPE: {
       POD_RANGE_KM: 45000,       // alcance máximo (de superficie a superficie)
@@ -541,6 +549,7 @@ export const GameConfig = deepFreeze({
       SPACE_NODE: { NAME: 'Nodo espacial', ICON: '🔷', DESCRIPTION: 'Permite salir al espacio y viajar a las lunas.' },
       GALACTIC_NODE: { NAME: 'Nodo galáctico', ICON: '🌀', DESCRIPTION: 'Permitiría saltar fuera del sistema solar.' },
       AI_NODE: { NAME: 'Nodo de IA', ICON: '🤖', DESCRIPTION: 'IA de a bordo: datos del sistema y avisos de la nave.' },
+      LIGHTSPEED_NODE: { NAME: 'Nodo de velocidad-luz', ICON: '⚡', DESCRIPTION: 'Salto por el hiperespacio a otros sistemas solares (desde el borde del sistema).' },
     },
     INSTALLED: {
       CONTROL_CONSOLE: 'FLIGHT_SYSTEM',

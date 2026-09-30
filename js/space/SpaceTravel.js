@@ -36,12 +36,14 @@ export class SpaceTravel {
     this._target = null;
     this._infoTimer = 0;
     this.galacticNode = false; // Etapa 6: con él, salir de la zona intenta el salto (y falla)
+    this.hyperdrive = () => false; // ¿hay nodo de velocidad-luz? (lo conecta main)
+    this._edgePrompted = false;
     this.crippled = false;     // tras el salto fallido la nave no se mueve
     this.meteors = null; // MeteorSystem (se conecta en main)
     this.nav = new SpaceNavigation({ config, bodies: () => view.bodyPositions(time.totalHours), extras: () => this.meteors?.extras() ?? [] });
     this._blockNotice = 0;
     this.nav.onEvent = (type) => {
-      if (type === 'ZONE_LIMIT' && !this.crippled) this._message('Límite del sistema: el nodo espacial no alcanza más allá.', 'danger');
+      if (type === 'ZONE_LIMIT' && !this.crippled && !this.hyperdrive()) this._message('Límite del sistema: el nodo espacial no alcanza más allá.', 'danger');
       if (type === 'EXTRA_ARRIVED') {
         this._message('Detenidos junto al meteorito. No se puede aterrizar en él: ponte el traje, descomprime la cámara y sal con el jetpack.', 'biome');
       }
@@ -169,6 +171,30 @@ export class SpaceTravel {
     this._message(`En el espacio, rumbo: ${keys} · [W] avanzar · [Shift] impulso${cruise} · [T] aterrizar al llegar`, 'biome');
   }
 
+  /**
+   * Llegada desde el hiperespacio a un sistema nuevo: la nave aparece en el espacio,
+   * en el borde interior del sistema, mirando hacia el planeta de inicio.
+   */
+  arriveFromHyperspace() {
+    const layout = this._src.getLayout();
+    this._from = this._system.homeId;
+    this._view.build({ layout, seed: this._src.getSeed(), textures: (id) => this._src.getTextures(id) });
+    this.nav.zone = { center: { ...layout.star.position }, radius: layout.zoneRadiusKm };
+    // En la dirección opuesta a la estrella desde el planeta de inicio, a 60 000 km de él.
+    const s = layout.sun;
+    const d = 60000;
+    this.nav.pos = { x: -s.x * d, y: -s.y * d + 4000, z: -s.z * d };
+    this.nav.yaw = Math.atan2(this.nav.pos.x, this.nav.pos.z); // forward = (−sin, −cos) → hacia el origen
+    this.nav.pitch = 0;
+    this.nav.speed = 0;
+    this.nav.setAutopilot(null);
+    this._edgePrompted = true; // no preguntar nada más llegar
+    this._worlds.setActive('SPACE');
+    this._ship.enterSpace(this.nav.yaw);
+    this._view.setVisible(true);
+    this._setState(TravelState.SPACE);
+  }
+
   _arriveAtBody() {
     const id = this._target;
     this.nav.setAutopilot(null); // al volver al espacio se elige rumbo de nuevo
@@ -191,7 +217,15 @@ export class SpaceTravel {
     const effort = Math.min(nav.cruising ? 2.5 : 2, thrust <= 1 ? thrust : 1 + (thrust - 1) / (c.BOOST_MULTIPLIER - 1));
     ship.batteries.drain((c.HOVER_DRAIN + c.THRUST_DRAIN * effort) * dt);
     if (nav.outsideZone) {
-      if (this.galacticNode && !this.crippled) {
+      if (this.hyperdrive() && !this.crippled) {
+        // Nodo de velocidad-luz: en el borde, la IA pregunta a qué sistema ir (una vez por visita al borde).
+        nav.setAutopilot(null);
+        nav.speed = 0;
+        if (!this._edgePrompted) {
+          this._edgePrompted = true;
+          this._events.emit(GameEvents.HYPERSPACE_EDGE, {});
+        }
+      } else if (this.galacticNode && !this.crippled) {
         // El salto galáctico falla: la nave queda a la deriva en el borde del sistema.
         this.crippled = true;
         nav.setAutopilot(null);
@@ -200,6 +234,7 @@ export class SpaceTravel {
       }
       nav.clampToZone();
     }
+    if (this._edgePrompted && nav.distanceFromCenter < nav.zone.radius - (c.HYPERSPACE?.REPROMPT_MARGIN_KM ?? 8000)) this._edgePrompted = false;
     ship.syncSpace(nav.yaw, nav.pitch, Math.min(1, thrust));
     this._view.update(dt, nav, this._camera.position, this._time.totalHours, this._src.noonHour);
     // El sol del cielo (y la luz) viene de la estrella, vista desde la nave.

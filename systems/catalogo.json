@@ -1,0 +1,16 @@
+{
+  "systems": [
+    {
+      "id": "eden",
+      "file": "jardin-del-eden",
+      "name": "Sistema del Edén",
+      "description": "Donde empezó todo: el Jardín del Edén y sus dos lunas."
+    },
+    {
+      "id": "kappa",
+      "file": "kappa",
+      "name": "Sistema Kappa",
+      "description": "Tres planetas muy distintos alrededor de una enana naranja."
+    }
+  ]
+}

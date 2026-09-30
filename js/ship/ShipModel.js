@@ -70,6 +70,8 @@ export class ShipModel {
     this.batteries = [];
     this.nodeCore = null;
     this.aiEye = null;
+    this.lightspeedCore = null;
+    this.lightspeedRing = null;
     this._buildHull();
     this._buildMoving();
     this.lights = layout.blueprint.lights.map(([x, y, z]) => {
@@ -330,6 +332,17 @@ export class ShipModel {
         this.nodeCore.position.set((k.minX + k.maxX) / 2, 3.4, cz);
         this.root.add(this.nodeCore);
         break;
+      case 'LIGHTSPEED_NODE': { // nodo de velocidad-luz: anillo violeta con un núcleo dorado
+        slabBox(b, { ...k, maxY: 2.9 }, DARK);
+        const c = new THREE.Vector3((k.minX + k.maxX) / 2, 3.5, cz);
+        this.lightspeedCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), new THREE.MeshBasicMaterial({ color: 0xffd36a }));
+        this.lightspeedCore.position.copy(c);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 8, 32), new THREE.MeshBasicMaterial({ color: 0xc07bff }));
+        ring.position.copy(c);
+        this.lightspeedRing = ring;
+        this.root.add(this.lightspeedCore, ring);
+        break;
+      }
       case 'AI_NODE': { // nodo de IA: consola con un "ojo" que late
         slabBox(b, k, DARK);
         slab(b, dir < 0 ? -I : I - 0.1, dir < 0 ? -I + 0.1 : I, k.maxY, 4.5, k.minZ, k.maxZ, METAL);
@@ -470,6 +483,11 @@ export class ShipModel {
     if (this.nodeCore) {
       this.nodeCore.rotation.y += dt * 1.2;
       this.nodeCore.rotation.x += dt * 0.7;
+    }
+    if (this.lightspeedCore) {
+      this.lightspeedCore.rotation.y += dt * 2.5;
+      this.lightspeedRing.rotation.x += dt * 1.6;
+      this.lightspeedRing.rotation.y += dt * 0.9;
     }
     if (airlock) this._airlockMaterial.color.set(airlock === 'PRESSURIZED' ? 0x4dff7a : airlock === 'CYCLING' ? 0xffc23a : 0xff4a3a);
     if (batteries) {

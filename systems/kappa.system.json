@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
   "name": "Sistema Kappa",
-  "description": "Sistema de prueba: tres planetas muy distintos (enano, mediano y enorme).",
-  "author": "Pruebas de Mundo Cero",
+  "description": "Tres planetas muy distintos alrededor de una enana naranja: uno enano y verde, uno mediano cubierto de agua y uno enorme, rojo y sin aire.",
+  "author": "Mundo Cero",
   "star": { "name": "Kappa", "type": "orange_dwarf" },
   "planets": [
     {

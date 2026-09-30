@@ -607,7 +607,7 @@ export class ShipSystem {
       const actions = {
         PLANET_MAP: 'Abrir mapa', CHARGING_STATION: 'Ver baterías', SUIT_LOCKER: this._suitOn ? 'Dejar el traje' : 'Ponerse el traje y el jetpack',
         OXYGEN_STATION: 'Recargar oxígeno del traje', SPACE_NODE: 'Examinar', GALACTIC_NODE: 'Examinar',
-        AI_NODE: 'Hablar con la IA',
+        AI_NODE: 'Hablar con la IA', LIGHTSPEED_NODE: 'Examinar',
       };
       const action = tech ? actions[techId] ?? 'Examinar'
         : carryingNode ? 'Instalar el nodo espacial' : carryingGalactic ? 'Instalar el nodo galáctico' : 'Examinar';
@@ -667,6 +667,9 @@ export class ShipSystem {
         return true;
       case 'SPACE_NODE':
         this._message('Nodo espacial: permite salir al espacio. A los mandos, vuela alto y pulsa [O].');
+        return true;
+      case 'LIGHTSPEED_NODE':
+        this._message(`Nodo de velocidad-luz: a los mandos, aléjate de la estrella ${this._system.star.name} hasta el borde del sistema y la IA te preguntará a qué sistema saltar (gasta ${this._spaceCfg.HYPERSPACE.BATTERY_COST} batería).`);
         return true;
       case 'GALACTIC_NODE':
         this._message(`Nodo galáctico: a los mandos, sal del ${this._system.name} (aléjate de la estrella ${this._system.star.name}) para intentar el salto.`);
