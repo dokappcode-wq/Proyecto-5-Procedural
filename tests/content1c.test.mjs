@@ -35,13 +35,16 @@ function landShare(body) {
 const planet = (generator, extra = {}) => loadSystem({ name: 'T', planets: [{ name: 'X', size: 'medium', terrain: { generator }, ...extra }] }).system.bodies[0];
 
 test('los generadores del catálogo: cuánta tierra hay y siempre tierra en el centro', () => {
-  assert.deepEqual(Object.keys(TERRAIN_GENERATORS).sort(), ['archipelago', 'cratered', 'dunes', 'highlands', 'island', 'ocean_world']);
+  assert.deepEqual(Object.keys(TERRAIN_GENERATORS).sort(), ['archipelago', 'cratered', 'dunes', 'highlands', 'island', 'ocean_world', 'open_ocean']);
   const arch = landShare(planet('archipelago'));
   const ocean = landShare(planet('ocean_world'));
   assert.ok(arch.share > 0.25 && arch.share < 0.6, `archipiélago ${arch.share}`);
   assert.ok(ocean.share < 0.25, `océano ${ocean.share}`);
   assert.ok(arch.center > 1 && ocean.center > 1, 'el centro (inicio y nave) es tierra');
   for (const g of ['island', 'highlands', 'dunes']) assert.ok(landShare(planet(g)).share > 0.95, g);
+  const open = landShare(planet('open_ocean'));
+  assert.equal(open.share, 0, 'solo mar: ni una isla');
+  assert.ok(open.center < -20, 'ni siquiera en el centro');
   const fewer = landShare(planet('archipelago', { terrain: { generator: 'archipelago', params: { land_fraction: 0.1 } } }));
   assert.ok(fewer.share < arch.share, 'land_fraction controla la tierra');
 });

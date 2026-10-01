@@ -82,7 +82,8 @@ function compileBody(b, kind, ctx) {
   const generatorId = b.terrain?.generator ?? D.generator;
   const gen = TERRAIN_GENERATORS[generatorId];
   const look = gen.look;
-  const livingDefaults = kind === 'PLANET' && breathable;
+  // Sin tierra (solo mar) no hay plantas ni animales por defecto.
+  const livingDefaults = kind === 'PLANET' && breathable && !gen.look.NO_LAND;
 
   // Relieve.
   const params = {};
@@ -224,6 +225,20 @@ function compileBody(b, kind, ctx) {
   if (palette) profile.PROP_COLORS = { ROCK: palette.mid };
   if (Object.keys(floraColors).length) profile.PROP_COLORS = { ...(profile.PROP_COLORS ?? {}), ...floraColors };
   if (Object.keys(floraSize).length) profile.RESOURCES.SIZE = floraSize;
+  // Ola gigante (capacidad del motor): cruza la región cada `period_hours` horas.
+  const gw = b.water?.giant_wave;
+  if (gw && hasSea) {
+    profile.WAVE = {
+      PERIOD_HOURS: gw.period_hours ?? 24,
+      HOUR: gw.hour ?? 12,
+      HEIGHT: gw.height_m ?? 18,
+      SPEED: gw.speed_mps ?? 25,
+      WARNING_HOURS: (gw.warning_minutes ?? 60) / 60,
+      ANGLE: new SeededRandom(deriveSeed(ctx.systemSeed, `wave:${ctx.id}`)).range(0, Math.PI * 2),
+    };
+  } else if (gw) {
+    notes.push({ path: `${path}.water.giant_wave`, message: 'La ola gigante necesita mar (water.sea = true): se ignora.' });
+  }
   // Nadar y bucear (capacidad del motor): solo si el archivo lo ajusta; si no, valores por defecto.
   if (b.water && (b.water.swim !== undefined || b.water.dive !== undefined || b.water.visibility_m !== undefined)) {
     profile.FLUID = { SWIM: b.water.swim ?? true, DIVE: b.water.dive ?? true, VISIBILITY: b.water.visibility_m ?? 25 };

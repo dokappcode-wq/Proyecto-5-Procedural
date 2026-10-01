@@ -117,9 +117,11 @@ export class TerrainGenerator {
     if (p.ISLANDS) {
       const I = p.ISLANDS;
       const n = this._islands.fbm(x, z, { frequency: I.FREQUENCY, octaves: 3 });
-      const center = 1 - smoothstep(I.CENTER_RADIUS * 0.6, I.CENTER_RADIUS, Math.hypot(x, z));
-      const land = smoothstep(I.THRESHOLD - 0.1, I.THRESHOLD + 0.1, n + center * 0.8);
-      height = I.FLOOR + (height - I.FLOOR) * land;
+      // Sin tierra (NO_LAND): solo mar, con el fondo ondulado.
+      const center = I.NO_LAND ? 0 : 1 - smoothstep(I.CENTER_RADIUS * 0.6, I.CENTER_RADIUS, Math.hypot(x, z));
+      const land = I.NO_LAND ? 0 : smoothstep(I.THRESHOLD - 0.1, I.THRESHOLD + 0.1, n + center * 0.8);
+      const seabed = I.FLOOR + n * (I.SEABED_RELIEF ?? 0);
+      height = seabed + (height - seabed) * land;
     }
 
     // Costa: el terreno desciende hacia el fondo marino.

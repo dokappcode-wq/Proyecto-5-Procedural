@@ -1,51 +1,193 @@
 {
   "schema_version": "1.0",
   "name": "Sistema Kappa",
-  "description": "Tres planetas muy distintos alrededor de una enana naranja: uno enano y verde, uno mediano cubierto de agua y uno enorme, rojo y sin aire.",
+  "description": "Cuatro planetas muy distintos alrededor de una enana naranja: uno enano y verde, un mundo oceánico de islas, un mar sin una sola isla con una ola gigante diaria y un desierto rojo enorme sin aire.",
   "author": "Mundo Cero",
-  "star": { "name": "Kappa", "type": "orange_dwarf" },
+  "star": {
+    "name": "Kappa",
+    "type": "orange_dwarf"
+  },
   "planets": [
     {
       "name": "Aurora",
       "description": "Un mundo enano, verde y templado.",
       "size": "dwarf",
       "radius_km": 1800,
-      "moons": [ { "name": "Guijarro" } ]
+      "moons": [
+        {
+          "name": "Guijarro"
+        }
+      ]
     },
     {
       "name": "Thalassa",
-      "description": "Mediano, casi todo agua tranquila, con islas bajas.",
+      "description": "Mundo oceánico: agua cálida por todas partes y unas pocas islas bajas y dispersas.",
       "size": "medium",
       "radius_km": 4200,
-      "orbit": { "distance": 2.2 },
-      "physics": { "gravity": 0.9, "breathable": true },
-      "climate": { "temperature_c": 24 },
-      "terrain": { "generator": "island", "params": { "relief": 0.6, "mountains": 0.4, "mountain_coverage": 0.3 } },
-      "water": { "sea": true, "sea_color": "#1f8fb0" },
-      "biomes": {
-        "low": { "name": "Playas de coral", "colors": { "ground": "#c9d77a", "ground_alt": "#b4c86a", "accent": "#f0e0a0" } },
-        "mid": { "name": "Selva baja", "colors": { "ground": "#2f7a4a", "ground_alt": "#276a3e", "accent": "#5a9a3a" } }
+      "orbit": {
+        "distance": 2.2
       },
-      "fauna": [ { "template": "goat", "herds": 8 }, { "template": "deer", "herds": 4 } ],
+      "physics": {
+        "gravity": 0.9,
+        "breathable": true
+      },
+      "climate": {
+        "temperature_c": 24
+      },
+      "terrain": {
+        "generator": "ocean_world",
+        "params": {
+          "land_fraction": 0.14,
+          "sea_depth": 30,
+          "relief": 0.5,
+          "mountains": 0.3,
+          "mountain_coverage": 0.25
+        }
+      },
+      "water": {
+        "sea": true,
+        "sea_color": "#1f8fb0"
+      },
+      "biomes": {
+        "low": {
+          "name": "Playas de coral",
+          "colors": {
+            "ground": "#c9d77a",
+            "ground_alt": "#b4c86a",
+            "accent": "#f0e0a0"
+          }
+        },
+        "mid": {
+          "name": "Selva baja",
+          "colors": {
+            "ground": "#2f7a4a",
+            "ground_alt": "#276a3e",
+            "accent": "#5a9a3a"
+          }
+        }
+      },
+      "fauna": [
+        {
+          "template": "goat",
+          "herds": 8
+        },
+        {
+          "template": "deer",
+          "herds": 4
+        }
+      ],
       "moons": [
-        { "name": "Nerea", "size": "dwarf", "color": "#b8c4d8", "orbit": { "distance": 25, "period_hours": 48 } },
-        { "name": "Coral", "color": "#d8a0a0", "orbit": { "distance": 50 } }
+        {
+          "name": "Nerea",
+          "size": "dwarf",
+          "color": "#b8c4d8",
+          "orbit": {
+            "distance": 25,
+            "period_hours": 48
+          }
+        },
+        {
+          "name": "Coral",
+          "color": "#d8a0a0",
+          "orbit": {
+            "distance": 50
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pontos",
+      "description": "Solo mar: ni una isla en todo el planeta. Cada 24 horas lo cruza una ola gigante.",
+      "size": "medium",
+      "radius_km": 4600,
+      "orbit": {
+        "distance": 3.1
+      },
+      "physics": {
+        "gravity": 1.0,
+        "breathable": true
+      },
+      "climate": {
+        "temperature_c": 21
+      },
+      "terrain": {
+        "generator": "open_ocean",
+        "params": {
+          "sea_depth": 45,
+          "seabed_relief": 10
+        }
+      },
+      "water": {
+        "sea": true,
+        "sea_color": "#1b6f9e",
+        "visibility_m": 30,
+        "giant_wave": {
+          "period_hours": 24,
+          "hour": 15,
+          "height_m": 20,
+          "speed_mps": 25,
+          "warning_minutes": 60
+        }
+      },
+      "moons": [
+        {
+          "name": "Ancla",
+          "size": "dwarf",
+          "color": "#a8b0b8"
+        }
       ]
     },
     {
       "name": "Ferrum",
-      "description": "Enorme, rojo, caliente y sin aire.",
+      "description": "Enorme desierto rojo de dunas, caliente y sin aire.",
       "size": "huge",
       "radius_km": 7000,
-      "orbit": { "distance": 4 },
-      "physics": { "gravity": 1.6, "breathable": false },
-      "climate": { "temperature_c": 60 },
-      "water": { "sea": false },
-      "terrain": { "generator": "cratered", "params": { "relief": 1.4, "mountains": 1.8, "craters": 0.3 } },
-      "palette": { "light": "#c46a3c", "mid": "#a0502c", "dark": "#6a3020", "highlight": "#e0a070" },
-      "musica_ambiental": "tambores"
+      "orbit": {
+        "distance": 4.5
+      },
+      "physics": {
+        "gravity": 1.6,
+        "breathable": false
+      },
+      "climate": {
+        "temperature_c": 60
+      },
+      "water": {
+        "sea": false
+      },
+      "terrain": {
+        "generator": "dunes",
+        "params": {
+          "relief": 0.6,
+          "mountains": 0.5,
+          "dune_height": 12,
+          "dune_spacing": 70
+        }
+      },
+      "palette": {
+        "light": "#c46a3c",
+        "mid": "#a0502c",
+        "dark": "#6a3020",
+        "highlight": "#e0a070"
+      },
+      "musica_ambiental": "tambores",
+      "biomes": {
+        "low": {
+          "name": "Mar de dunas rojas"
+        },
+        "mid": {
+          "name": "Hondonadas de óxido"
+        },
+        "high": {
+          "name": "Riscos de hierro"
+        }
+      }
     }
   ],
-  "meteors": { "frequency": 0.7 },
-  "unsupported_requests": ["Que la gravedad de Ferrum cambie con la música"]
+  "meteors": {
+    "frequency": 0.7
+  },
+  "unsupported_requests": [
+    "Que la gravedad de Ferrum cambie con la música"
+  ]
 }

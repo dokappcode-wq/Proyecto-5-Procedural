@@ -88,6 +88,13 @@ export class PlayerController {
     }
   }
 
+  /** Arrastre externo (la ola gigante, una corriente): desplaza al jugador respetando obstáculos. */
+  drift(dx, dz) {
+    const p = this._player;
+    if (!this._isBlocked(p.position.x + dx, p.position.z)) p.position.x += dx;
+    if (!this._isBlocked(p.position.x, p.position.z + dz)) p.position.z += dz;
+  }
+
   /**
    * Modificadores de movimiento que imponen otros sistemas (p. ej. la energía).
    * @param {{ canRun?: boolean, speedMultiplier?: number }} mods
@@ -131,8 +138,10 @@ export class PlayerController {
     p.state.isMoving = moving;
     p.state.isRunning = moving && input.isDown('RUN') && !p.state.isFlying && this._mods.canRun;
 
-    if (p.state.isFlying) this._updateFlying(dt);
-    else this._updateWalking(dt);
+    if (p.state.isFlying) {
+      this._setSwimming(false, false, null); // volando (Admin) no se nada
+      this._updateFlying(dt);
+    } else this._updateWalking(dt);
 
     // ---- Orientación del cuerpo hacia la dirección de avance ---------------
     if (moving) {
@@ -253,9 +262,17 @@ export class PlayerController {
     const floatFeet = surface - S.FLOAT_DEPTH;
     const up = this._input.isDown('JUMP');
     const down = this._input.isDown('DESCEND') && fluid.dive;
-    // Salir del agua: en la orilla (suelo justo bajo los pies) Espacio salta.
+    // Salir del agua: en la orilla (suelo justo bajo los pies) Espacio salta; delante de
+    // un borde poco más alto que la superficie (la rampa de la nave, una roca) se trepa.
+    const ledge = this._input.wasPressed('JUMP') ? this._ledgeAhead(p.position.y) : null;
     if (this._input.wasPressed('JUMP') && p.position.y - ground < 0.4) {
       v.y = cfg.JUMP_VELOCITY;
+      this._events.emit(GameEvents.PLAYER_JUMPED);
+    } else if (ledge !== null) {
+      v.y = Math.sqrt(2 * cfg.GRAVITY * this.gravityScale * (ledge - p.position.y + 0.35));
+      const f = 2.5;
+      v.x = -Math.sin(p.yaw) * f;
+      v.z = -Math.cos(p.yaw) * f;
       this._events.emit(GameEvents.PLAYER_JUMPED);
     } else if (up) {
       v.y = p.position.y < floatFeet ? S.VERTICAL_SPEED : Math.min(v.y, 0.5);
@@ -283,6 +300,18 @@ export class PlayerController {
     }
     p.state.onGround = p.position.y - ground < 0.02;
     this._setSwimming(true, p.position.y + cfg.HEIGHT * 0.9 < surface, surface);
+  }
+
+  /** Altura de un borde trepable justo delante (entre 0,3 y 2 m sobre los pies), o null. */
+  _ledgeAhead(feet) {
+    const p = this._player;
+    const fx = -Math.sin(p.yaw);
+    const fz = -Math.cos(p.yaw);
+    for (const d of [0.6, 1.0]) {
+      const h = this._groundAt(p.position.x + fx * d, p.position.z + fz * d, feet + 2.1);
+      if (h - feet > 0.3 && h - feet < 2.0) return h;
+    }
+    return null;
   }
 
   _setSwimming(swimming, underwater, surface) {

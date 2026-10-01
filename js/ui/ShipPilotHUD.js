@@ -71,7 +71,7 @@ export class ShipPilotHUD {
   _render(t) {
     if (!t.piloting) return;
     const landed = t.flight === 'LANDED';
-    this._t.flight.textContent = FLIGHT_LABELS[t.flight] ?? t.flight;
+    this._t.flight.textContent = landed && t.afloat ? 'En el agua' : FLIGHT_LABELS[t.flight] ?? t.flight;
     this._t.flight.dataset.state = t.flight;
     const space = t.flight === 'SPACE';
     this._t.alt.textContent = space ? 'Navegación espacial' : `Altura ${t.altitude.toFixed(1)} m`;

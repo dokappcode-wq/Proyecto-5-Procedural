@@ -131,7 +131,7 @@ export class LifeSupportSystem {
     } else {
       if (!this._warned.noAir) {
         this._warned.noAir = true;
-        const underwater = this._player.state?.headUnderwater;
+        const underwater = this._player.state?.headUnderwater || this._player.state?.isSwimming;
         this._msg(underwater
           ? '¡Bajo el agua no se respira! Aguanta la respiración y sube a la superficie (Espacio).'
           : this.wearing ? '¡No te llega aire! Aguanta la respiración y busca oxígeno.' : '¡Aquí no hay aire! Aguanta la respiración: necesitas el traje espacial.', 'danger');
@@ -177,6 +177,7 @@ export class LifeSupportSystem {
       oxygen: this.oxygen,
       battery: this.battery ?? 0,
       gas: this.gas,
+      underwater: !!(this._player.state?.headUnderwater || this._player.state?.isSwimming),
     };
   }
 

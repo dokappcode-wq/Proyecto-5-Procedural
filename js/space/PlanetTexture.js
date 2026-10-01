@@ -37,6 +37,9 @@ export function createPlanetTextures({ width, seed, mapCanvas, planet }) {
   const snow = rgb(B.FROZEN_MOUNTAINS.COLORS.SNOW);
   const sand = rgb(planet.COLORS.SAND);
   const desert = [0.78, 0.66, 0.42];
+  // Mundos de islas: más mar que tierra; solo mar (NO_LAND): ni una isla en todo el globo.
+  const islands = planet.TERRAIN?.ISLANDS;
+  const landBias = islands?.NO_LAND ? -10 : islands ? -0.12 : 0;
 
   for (let j = 0; j < h; j++) {
     const lat = (0.5 - (j + 0.5) / h) * Math.PI; // +π/2 arriba
@@ -52,6 +55,7 @@ export function createPlanetTextures({ width, seed, mapCanvas, planet }) {
       const dLat = Math.abs(lat) * (180 / Math.PI);
       const island = Math.max(dLon, dLat) / (ISLAND_HALF_DEG * 1.8);
       if (island < 1) c -= (1 - island) * 0.5;
+      c = landBias < -1 ? Math.min(0.015, c * 0.4 - 0.05) : c + landBias;
       const detail = n3(x, y, z, 6);
       const polar = Math.abs(lat) / (Math.PI / 2);
       let col;

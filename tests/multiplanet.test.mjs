@@ -18,7 +18,7 @@ const layoutOf = (sys) => createSystemLayout({ ...cfg.CELESTIAL, ZONE_MARGIN_KM:
 
 test('cada categoría de tamaño tiene su lado de región', () => {
   assert.deepEqual([0.5, 1, 5, 10, 20].map((k) => regionSize(k)), [512, 1024, 5120, 10240, 20480]);
-  assert.deepEqual(KAPPA.planets.map((p) => p.regionKm), [0.5, 5, 20]);
+  assert.deepEqual(KAPPA.planets.map((p) => p.regionKm), [0.5, 5, 5, 20]);
 });
 
 test('la caché LRU descarta lo menos usado pero nunca lo protegido', () => {
@@ -36,9 +36,9 @@ test('la caché LRU descarta lo menos usado pero nunca lo protegido', () => {
 });
 
 test('todos los planetas y lunas son visitables; teclas de rumbo por grupo', () => {
-  assert.deepEqual(KAPPA.visitable.map((b) => b.name), ['Aurora', 'Guijarro', 'Thalassa', 'Nerea', 'Coral', 'Ferrum']);
+  assert.deepEqual(KAPPA.visitable.map((b) => b.name), ['Aurora', 'Guijarro', 'Thalassa', 'Nerea', 'Coral', 'Pontos', 'Ancla', 'Ferrum']);
   assert.equal(KAPPA.planetOf('P2M1'), 'P2');
-  assert.deepEqual(KAPPA.autopilotTargets('P2M2').map((t) => t.name), ['Aurora', 'Thalassa', 'Ferrum', 'Nerea', 'Coral', 'meteorito']);
+  assert.deepEqual(KAPPA.autopilotTargets('P2M2').map((t) => t.name), ['Aurora', 'Thalassa', 'Pontos', 'Ferrum', 'Nerea', 'Coral', 'meteorito']);
   assert.deepEqual(EDEN.autopilotTargets().map((t) => t.key + t.id), ['1P1', '2P1M1', '3P1M2', '4METEOR'], 'el Edén no cambia');
 });
 

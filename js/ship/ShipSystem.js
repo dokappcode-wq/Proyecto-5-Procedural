@@ -46,19 +46,24 @@ export class ShipSystem {
     this.ship = { x: 0, y: 0, z: 0, yaw: 0, hatch: 0, legs: 1, doors: {}, legFeet: this.layout.LEGS.map(() => 0), rampAngle: this.layout.rampOpenAngle(0), pitch: 0, roll: 0 };
     this._doorTargets = {};
     this.batteries = new BatteryBank(config.BATTERIES);
+    const floats = () => !!world.planet?.TERRAIN?.ISLANDS?.NO_LAND;
+    this._floats = floats;
+    this._seaLevel = () => world.seaLevel;
+    this._waveAt = null; // (x, z) → cuánto levanta el agua la ola gigante
     this.flight = new ShipFlight({
       config,
       ship: this.ship,
       batteries: this.batteries,
       layout: this.layout,
       terrain: {
-        heightAt: (x, z) => world.getHeightAt(x, z),
+        // En un mundo sin tierra (solo mar) la nave amerriza: el agua hace de suelo.
+        heightAt: (x, z) => (floats() ? Math.max(world.getHeightAt(x, z), world.seaLevel) : world.getHeightAt(x, z)),
         surfaceAt: (x, z) => {
           const h = world.getHeightAt(x, z);
           const pond = world.water.getPondAt?.(x, z);
           return Math.max(h, world.seaLevel, pond ? pond.level : -Infinity);
         },
-        isWater: (x, z) => world.water.isWater(x, z) || world.getHeightAt(x, z) < world.seaLevel + 0.3,
+        isWater: (x, z) => !floats() && (world.water.isWater(x, z) || world.getHeightAt(x, z) < world.seaLevel + 0.3),
         get bounds() {
           return world.getBounds();
         },
@@ -133,6 +138,11 @@ export class ShipSystem {
   /** Función que dice si fuera de la nave hay aire respirable (cuerpo activo). */
   setBreathableProvider(fn) {
     this._breathableOutside = fn;
+  }
+
+  /** Ola gigante: amerizada, la nave sube y baja con el agua (y quien vaya dentro con ella). */
+  setWaveProvider(fn) {
+    this._waveAt = fn;
   }
 
   setInventory(inventory) {
@@ -234,7 +244,7 @@ export class ShipSystem {
     const site = this._world.getLandingSite() ?? { x: 0, z: 0, yaw: 0 };
     this.body = bodyId;
     Object.assign(s, { x: site.x, z: site.z, yaw: site.yaw, pitch: 0, roll: 0 });
-    s.y = this._world.getHeightAt(site.x, site.z) + height;
+    s.y = this.flight._terrain.heightAt(site.x, site.z) + height;
     s.legFeet = this.layout.LEGS.map(() => 0);
     this.flight.state = FlightState.FLYING;
     this.flight.hover();
@@ -246,7 +256,7 @@ export class ShipSystem {
     if (!this.hasSpaceNode) return 'Para salir al espacio hace falta el nodo espacial';
     if (this.flight.state !== FlightState.FLYING) return 'Despega primero';
     if (this.flight.hatchTarget > 0 || this.ship.hatch > 0.01) return 'Cierra la compuerta antes de salir al espacio';
-    if (this.ship.y - this._world.getHeightAt(this.ship.x, this.ship.z) < this._spaceCfg.ORBIT_MIN_ALTITUDE) {
+    if (this.ship.y - this.flight._terrain.heightAt(this.ship.x, this.ship.z) < this._spaceCfg.ORBIT_MIN_ALTITUDE) {
       return `Sube por encima de ${this._spaceCfg.ORBIT_MIN_ALTITUDE} m para salir al espacio`;
     }
     if (this.batteries.total < this._spaceCfg.ORBIT_COST) return 'No queda batería suficiente para salir de la atmósfera';
@@ -282,12 +292,12 @@ export class ShipSystem {
     this.flight.state = FlightState.LANDED;
     const feet = L.LEGS.map((l) => {
       const [wx, wz] = toWorld(s, l.x, l.z);
-      return this._world.getHeightAt(wx, wz);
+      return this.flight._terrain.heightAt(wx, wz);
     });
     s.y = Math.max(...feet);
     s.legFeet = feet.map((h) => h - s.y);
     const [rx, rz] = toWorld(s, L.RAMP_FOOT_SAMPLE[0], L.RAMP_FOOT_SAMPLE[1]);
-    s.rampAngle = L.rampOpenAngle(this._world.getHeightAt(rx, rz) - s.y);
+    s.rampAngle = L.rampOpenAngle(this.flight._terrain.heightAt(rx, rz) - s.y);
     this.model.update(s, 0, { batteries: this.batteries.snapshot().slots });
   }
 
@@ -473,6 +483,7 @@ export class ShipSystem {
     if (this.piloting) controls = this._readPilotInput();
     this.flight.autopilot = !this.piloting;
     this.flight.update(dt, controls);
+    if (this.flight.state === FlightState.LANDED && this._floats()) s.y = this._seaLevel() + (this._waveAt?.(s.x, s.z) ?? 0);
     if (this.piloting) this._placePlayerInSeat();
     else this._checkAbandoned(dt);
     this.model.watch.visible = !this.watchTaken;
@@ -724,9 +735,10 @@ export class ShipSystem {
 
   getTelemetry() {
     const s = this.ship;
-    const ground = this._world.getHeightAt(s.x, s.z);
+    const ground = this.flight._terrain.heightAt(s.x, s.z);
     return {
       flight: this.flight.state,
+      afloat: this._floats(), // amerizada (mundo de solo mar)
       piloting: this.piloting,
       body: this.body,
       present: this.present,

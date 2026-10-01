@@ -244,7 +244,8 @@ export class ShipAI {
       }
       if (!this._flags.noAir && s.lungs < 0.8) {
         this._flags.noAir = true;
-        this.say(s.wearing ? 'Tu traje no da oxígeno: vuelve a la nave o a una burbuja.' : 'No hay aire aquí y no llevas traje. Vuelve adentro.', 'ai-warn');
+        this.say(s.underwater ? 'Estás bajo el agua: sube a la superficie para respirar.'
+          : s.wearing ? 'Tu traje no da oxígeno: vuelve a la nave o a una burbuja.' : 'No hay aire aquí y no llevas traje. Vuelve adentro.', 'ai-warn');
       }
     });
   }

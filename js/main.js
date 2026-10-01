@@ -64,6 +64,7 @@ import { registerSpaceTools } from './admin/tools/SpaceTools.js';
 import { ShipSystem } from './ship/ShipSystem.js';
 import { toWorld as toShipWorld } from './ship/ShipLayout.js';
 import { PickupSystem, findDropSite } from './world/PickupSystem.js';
+import { GiantWaveSystem } from './world/GiantWave.js';
 import { BubbleSystem } from './world/BubbleSystem.js';
 import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
@@ -270,19 +271,30 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   const bubbles = new BubbleSystem({
     scene: render.scene, worlds, events, inventory, player, config: cfg.LIFE_SUPPORT, batteries: cfg.SHIP.BATTERIES, blockers: [ship],
   });
+  // Ola gigante periódica (cuerpos con water.giant_wave): la IA avisa; si está apagada, aviso normal.
+  const giantWave = new GiantWaveSystem({
+    scene: render.scene, events, time, worlds, player, controller, ship, timeConfig: cfg.TIME,
+    say: (text) => (shipAI.online ? shipAI.say(text, 'ai-warn') : message(`🌊 ${text}`, 'warning')),
+  });
+  ship.setWaveProvider((x, z) => giantWave.heightAt(x, z));
+  // Superficie del agua en (x, z), con lo que la levante la ola gigante al pasar.
+  const waterSurfaceAt = (x, z) => {
+    const s = world.waterSurfaceAt?.(x, z) ?? null;
+    return s === null ? null : s + giantWave.heightAt(x, z);
+  };
   // ¿Se respira en (x, y, z)? Nave (según compuerta y cámara) → burbujas → aire del cuerpo.
   const isBreathableAt = (x, y, z) => {
     const inShip = ship.breathableAt(x, y, z);
     if (inShip !== null) return inShip;
     // Bajo el agua no se respira (el traje con oxígeno sí deja bucear).
-    const surface = world.waterSurfaceAt?.(x, z) ?? null;
+    const surface = waterSurfaceAt(x, z);
     if (surface !== null && y < surface) return false;
     if (bubbles.contains(worlds.activeId, x, y, z)) return true;
     return worlds.profile()?.BREATHABLE !== false;
   };
   construction.addBlocker(ship); // no se construye encima de la nave
   // Nadar y bucear: capacidad del motor; cada cuerpo la activa o ajusta (water.swim/dive/visibility_m).
-  controller.setWater({ surfaceAt: (x, z) => world.waterSurfaceAt?.(x, z) ?? null, fluid: () => world.fluid });
+  controller.setWater({ surfaceAt: waterSurfaceAt, fluid: () => world.fluid });
   let swimHint = false;
   events.on(GameEvents.PLAYER_SWIM_CHANGED, ({ swimming, underwater }) => {
     document.body.classList.toggle('underwater', underwater);
@@ -931,6 +943,22 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
+  admin.registerTool({ category: 'Mundo', type: 'info', label: 'Ola gigante', read: () => giantWave.describe() ?? 'Este cuerpo no tiene' });
+  admin.registerTool({
+    category: 'Mundo',
+    label: 'Provocar la ola gigante ahora',
+    run: () => {
+      if (!giantWave.triggerNow()) throw new Error('Este cuerpo no tiene ola gigante');
+    },
+  });
+  // Al llegar a un cuerpo con ola gigante, la IA dice cuándo llega la próxima.
+  events.on(GameEvents.BODY_CHANGED, ({ id }) => {
+    if (id === 'SPACE' || !system.profiles[id]?.WAVE) return;
+    setTimeout(() => {
+      const text = worlds.activeId === id && giantWave.describe();
+      if (text) giantWave._say(text);
+    }, 2500);
+  });
   registerLifeTools(admin, { world, animals, player, controller, species: cfg.ANIMALS.SPECIES });
   registerInventoryTools(admin, { inventory, items: cfg.ITEMS });
   registerSurvivalTools(admin, { health, hunger, thirst, energy, events });
@@ -949,6 +977,7 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   // ---- Bucle: el orden de registro es el orden de actualización ----------
   loop.add(worlds);      // carga/descarga progresiva de chunks del cuerpo activo
   loop.add(time);        // reloj del mundo (Fase 11)
+  loop.add(giantWave);   // ola gigante periódica (si el cuerpo la tiene)
   loop.add(ship);        // nave: mandos, vuelo, compuerta, patas (coloca al piloto en su asiento)
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
@@ -1003,7 +1032,7 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave,
   };
 }
 

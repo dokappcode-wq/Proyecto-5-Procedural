@@ -216,6 +216,19 @@ export const TERRAIN_GENERATORS = Object.freeze({
     build: (p) => ({ ...shapeTerrain(ISLAND_TERRAIN, p), ISLANDS: islandLayer(p, 1 / 420) }),
     look: { ...ISLAND_LOOK, BIOME_NAMES: { low: 'Arenales', mid: 'Selva costera', high: 'Peñas' } },
   },
+  open_ocean: {
+    label: 'Solo mar',
+    description: 'Un océano sin ninguna tierra: no hay suelo donde pisar, solo agua y el fondo marino. La nave amerriza y flota; se nada y se bucea.',
+    params: {
+      sea_depth: { min: 6, max: 120, default: 40, description: 'Profundidad media del mar (m).' },
+      seabed_relief: { min: 0, max: 30, default: 8, description: 'Relieve del fondo marino (m).' },
+    },
+    build: (p) => ({
+      ...shapeTerrain(ISLAND_TERRAIN, { relief: 0.3, mountains: 0, mountain_coverage: 0, roughness: 0.5, craters: 0 }),
+      ISLANDS: { FREQUENCY: 1 / 300, THRESHOLD: 2, CENTER_RADIUS: 0, DEPTH: p.sea_depth, FLOOR: -p.sea_depth, SEABED_RELIEF: p.seabed_relief, NO_LAND: true },
+    }),
+    look: { ...ISLAND_LOOK, BIOME_NAMES: { low: 'Mar abierto', mid: 'Aguas profundas', high: 'Dorsales' }, NO_LAND: true },
+  },
   highlands: {
     label: 'Altiplano',
     description: 'Mesetas altas en escalones con cortados, valles y cumbres. Fresco y con mucho relieve.',

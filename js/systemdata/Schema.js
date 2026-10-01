@@ -122,6 +122,13 @@ function bodyProperties(kind) {
       swim: bool('¿Se puede nadar en el agua? (por defecto sí)'),
       dive: bool('¿Se puede bucear bajo el agua? (por defecto sí; bajo el agua no se respira sin traje)'),
       visibility_m: num(3, 120, 'Visibilidad bajo el agua en metros (agua turbia 5, cristalina 60).'),
+      giant_wave: obj({
+        period_hours: num(1, 240, 'Cada cuántas horas de juego llega la ola (24 = una vez al día).'),
+        hour: num(0, 24, 'Hora del día a la que empieza (12 = mediodía).'),
+        height_m: num(2, 60, 'Altura de la ola (m).'),
+        speed_mps: num(5, 80, 'Velocidad a la que cruza la región (m/s).'),
+        warning_minutes: num(0, 240, 'Minutos de juego antes de que la IA avise.'),
+      }, 'Ola gigante periódica que cruza toda la región (necesita mar). Arrastra a quien esté fuera de la nave.'),
     }, 'Agua (mar y charcas). Nadar y bucear son capacidades del motor: aquí solo se activan y ajustan.'),
     terrain,
     palette,
