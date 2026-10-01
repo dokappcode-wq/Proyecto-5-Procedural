@@ -28,7 +28,7 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
-| 1d | Importar sistemas solares: panel con archivo, arrastrar o pegar; comprobación segura (solo JSON, 256 KB, nada se ejecuta), vista previa, avisos de claves ignoradas, ideas no soportadas, errores con *Copiar error para Claude* y *Copiar guía del formato*; guardados en el navegador (IndexedDB) para jugarlos o borrarlos, y como destinos del hiperespacio |
+| 1d | Importar sistemas solares: panel con archivo, arrastrar o pegar; comprobación segura (solo JSON, 256 KB, nada se ejecuta), vista previa, avisos de claves ignoradas, ideas no soportadas, errores con *Copiar error para Claude* y *Copiar prompt para Claude*; guardados en el navegador (IndexedDB) para jugarlos o borrarlos, y como destinos del hiperespacio |
 | K | Sistema Kappa: Thalassa (mundo oceánico), Pontos (solo mar, sin una isla, con una ola gigante cada 24 h) y Ferrum (enorme desierto rojo de dunas). Generador `open_ocean`, nave que amerriza y `water.giant_wave` |
 | 1c | Generadores `archipelago`, `ocean_world`, `highlands` y `dunes`; nadar y bucear (capacidad del motor: cada sistema la activa o ajusta con `water.swim/dive/visibility_m`; bajo el agua no se respira sin traje); fauna con `name`, `size`, `color`, `temperament` y `biome`; flora con `color`, `fruit_color` y `size` |
 | HS | Hiperespacio: al terminar el tutorial (el Edén) la IA convierte el nodo galáctico en un nodo de velocidad-luz. En el borde de cualquier sistema, la IA pregunta a qué sistema ir (panel de navegación con el catálogo `systems/catalogo.json`); cada salto gasta 1 batería de la nave y la partida (mochila, traje, nave, baterías) viaja contigo |
@@ -259,7 +259,8 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 ## Cómo probar las últimas fases
 
 - **Importar sistemas (1d)**: en la pantalla de inicio pulsa *📥 Importar sistema solar* (o Admin →
-  Mundo → *Importar sistema solar…*, o el botón del panel de hiperespacio). *Copiar guía del formato*
+  Mundo → *Importar sistema solar…*, o el botón del panel de hiperespacio). El prompt también está en
+  `systems/PROMPT_PARA_CLAUDE.txt` (se regenera con `npm run prompt`). *Copiar prompt para Claude*
   copia las instrucciones para pedirle a Claude un sistema. Pega su JSON (o arrastra el `.json`) y
   pulsa *Comprobar*: verás los planetas, lunas, tamaños y tipos de terreno, los avisos y las ideas
   que el motor aún no permite. Si hay errores, *Copiar error para Claude* deja un texto listo para

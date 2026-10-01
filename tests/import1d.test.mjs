@@ -84,3 +84,9 @@ test('guía del formato: cubre todos los generadores y su ejemplo es válido', (
   assert.equal(r.ok, true, JSON.stringify(r.errors));
   assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
 });
+
+test('systems/PROMPT_PARA_CLAUDE.txt está al día con el formato (npm run prompt)', () => {
+  const file = fs.readFileSync(new URL('../systems/PROMPT_PARA_CLAUDE.txt', import.meta.url), 'utf8');
+  assert.equal(file, `${formatGuide()}\n`);
+  assert.ok(file.includes('PLANETA 1'));
+});

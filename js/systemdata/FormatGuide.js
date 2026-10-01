@@ -29,10 +29,42 @@ export const GUIDE_EXAMPLE = {
   ],
 };
 
-/** Texto completo de la guía. */
+/** Lo que rellena el jugador: cómo quiere su sistema, con palabras normales. */
+export const REQUEST_TEMPLATE = Object.freeze([
+  '=== CÓMO LO QUIERO (rellena lo que quieras; lo que dejes en blanco, invéntalo tú con sentido) ===',
+  '',
+  'Nombre del sistema:',
+  'Estrella (nombre y tipo: enana amarilla, enana naranja, enana roja, enana blanca, gigante azul o gigante roja):',
+  'Ambiente o historia del sistema:',
+  'Número de planetas (1 a 8):',
+  'Frecuencia de meteoritos (ninguno, pocos, muchos):',
+  '',
+  'PLANETA 1 (aquí empieza el jugador; mejor que tenga aire y algo de comida):',
+  '- Nombre:',
+  '- Tamaño (enano 0,5 km · pequeño 1 km · mediano 5 km · grande 10 km · enorme 20 km):',
+  '- Terreno (isla · archipiélago · mundo oceánico · solo mar sin islas · altiplano de mesetas · desierto de dunas · desierto de cráteres):',
+  '- ¿Se respira? Gravedad (1 = la Tierra) y temperatura:',
+  '- Agua (mar sí/no, charcas, ¿se puede nadar y bucear?, ¿ola gigante cada cuántas horas y de qué altura?):',
+  '- Colores (suelo, mar, cumbres, plantas):',
+  '- Plantas y rocas (árboles, pinos, frutales, arbustos, rocas, vetas de mineral; ¿muchas o pocas?, color, tamaño):',
+  '- Animales (tipo ciervo, cabra o vaca; nombre propio, tamaño, color, carácter: tranquilo, asustadizo, curioso o bravo):',
+  '- Lunas (0 a 4: nombre y cómo es cada una):',
+  '',
+  'PLANETA 2:',
+  '- (copia el bloque del planeta 1 para cada planeta más)',
+  '',
+  'Otras ideas (si el formato no las permite, ponlas en "unsupported_requests"):',
+]);
+
+/** Texto completo de la guía: plantilla para rellenar + formato exacto. */
 export function formatGuide() {
   const lines = [
-    'Quiero que me crees un sistema solar para el juego Mundo Cero. Devuélveme SOLO un archivo JSON (sin comentarios) con este formato.',
+    'Quiero que me crees un sistema solar para el juego Mundo Cero. Abajo te digo cómo lo quiero y después tienes el formato exacto.',
+    'Devuélveme SOLO el archivo JSON completo (sin comentarios), listo para importarlo en el juego.',
+    '',
+    ...REQUEST_TEMPLATE,
+    '',
+    '=== FORMATO (no hace falta tocar nada de aquí abajo) ===',
     '',
     'Reglas:',
     `- Solo JSON. Tamaño máximo ${Math.round(LIMITS.FILE_BYTES / 1024)} KB. Pon "schema_version": "${SCHEMA_VERSION}".`,

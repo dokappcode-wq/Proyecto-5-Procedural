@@ -73,8 +73,8 @@ export class ImportPanel extends ModalPanel {
 
   _build() {
     const intro = el('p', 'imp-intro', 'Pega el JSON que te ha dado Claude, arrastra aquí el archivo .json o elígelo. Se comprueba antes de guardarlo: nunca se ejecuta nada del archivo.');
-    const guideBtn = button('📋 Copiar guía del formato (para pedirle un sistema a Claude)', 'imp-secondary');
-    guideBtn.addEventListener('click', () => this._copy(formatGuide(), guideBtn, 'Guía copiada: pégala en el chat de Claude y dile qué sistema quieres.'));
+    const guideBtn = button('📋 Copiar prompt para Claude (plantilla para rellenar + formato)', 'imp-secondary');
+    guideBtn.addEventListener('click', () => this._copy(formatGuide(), guideBtn, 'Copiado: pégalo en el chat de Claude, rellena la parte de arriba y envíalo.'));
 
     // Zona de entrada: arrastrar + selector + texto.
     this._drop = el('div', 'imp-drop');
