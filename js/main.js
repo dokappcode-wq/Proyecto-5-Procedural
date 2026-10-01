@@ -37,6 +37,8 @@ import { WorldManager } from './world/WorldManager.js';
 import { loadSystem } from './systemdata/SystemLoader.js';
 import { SolarSystem, withPrep } from './systemdata/SolarSystem.js';
 import { parseSystemCatalog } from './systemdata/SystemCatalog.js';
+import { SystemStore, importIdFromParam, IMPORT_PREFIX } from './systemdata/SystemStore.js';
+import { ImportPanel } from './ui/ImportPanel.js';
 import { captureState, saveHandoff, takeHandoff, applyState } from './core/TravelHandoff.js';
 import { HyperspacePanel, WarpOverlay } from './ui/HyperspaceUI.js';
 import { createPlanetTextures } from './space/PlanetTexture.js';
@@ -85,7 +87,7 @@ import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 
-function boot(system, { file, catalog = [], handoff = null } = {}) {
+function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [] } = {}) {
   const cfg = GameConfig;
   const events = new EventBus();
   const HOME = system.homeId;
@@ -840,12 +842,15 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   spaceTravel.hyperdrive = hasLightspeed;
   const campaignSeed = file === cfg.CAMPAIGN.SYSTEM_FILE ? system.seed : handoff?.campaignSeed ?? null;
   const HS = cfg.SPACE.HYPERSPACE;
+  // Sistemas importados (IndexedDB): también son destinos del hiperespacio.
+  const toEntry = (s) => ({ id: `import-${s.id}`, file: `${IMPORT_PREFIX}${s.id}`, name: s.name, description: s.description, imported: true });
+  let importedEntries = imported.map(toEntry);
   const hyperPanel = new HyperspacePanel({
     container: hudRoot,
     input,
     events,
     sources: {
-      catalog: () => catalog,
+      catalog: () => [...catalog, ...importedEntries],
       currentFile: file,
       systemName: system.name,
       aiName: () => shipAI.aiName,
@@ -879,6 +884,35 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
       window.location.assign(`${window.location.pathname}?system=${encodeURIComponent(entry.file)}${seed}`);
     });
   });
+
+  // ---- Importar sistemas (bloque 1d) ------------------------------------------------
+  let importFrom = null; // 'hyperspace' si se abrió desde la navegación hiperespacial
+  const importPanel = new ImportPanel({
+    input, events, store,
+    inGame: () => gameStarted,
+    onChange: (list) => (importedEntries = list.map(toEntry)),
+    play: (id) => {
+      const target = `${IMPORT_PREFIX}${id}`;
+      if (importFrom === 'hyperspace') {
+        // En el borde del sistema, "jugar" es saltar allí (gasta batería y te llevas la partida).
+        importFrom = null;
+        importPanel.setOpen(false);
+        const s = importPanel.saved.find((e) => e.id === id);
+        events.emit(GameEvents.HYPERSPACE_JUMP, { entry: toEntry(s ?? { id, name: 'sistema importado', description: '' }) });
+        return;
+      }
+      if (gameStarted && !window.confirm('¿Empezar una partida nueva en ese sistema? Lo que llevas en esta partida no viaja contigo (para eso, usa el hiperespacio).')) return;
+      window.location.assign(`${window.location.pathname}?system=${encodeURIComponent(target)}`);
+    },
+  });
+  events.on(GameEvents.IMPORT_PANEL_REQUEST, ({ from } = {}) => {
+    importFrom = from ?? null;
+    importPanel.open(() => {
+      if (importFrom === 'hyperspace') events.emit(GameEvents.HYPERSPACE_PANEL_REQUEST, {});
+      importFrom = null;
+    });
+  });
+  document.getElementById('import-button')?.addEventListener('click', () => events.emit(GameEvents.IMPORT_PANEL_REQUEST, {}));
 
   // Mapa estelar 3D (tecnología Mapa): la escena espacial "de mapa".
   const starMap = new StarMap({
@@ -943,6 +977,7 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
+  admin.registerTool({ category: 'Mundo', label: 'Importar sistema solar…', run: () => events.emit(GameEvents.IMPORT_PANEL_REQUEST, {}) });
   admin.registerTool({ category: 'Mundo', type: 'info', label: 'Ola gigante', read: () => giantWave.describe() ?? 'Este cuerpo no tiene' });
   admin.registerTool({
     category: 'Mundo',
@@ -1021,6 +1056,7 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   loop.add(aiPanel);
   loop.add(podPanel);
   loop.add(hyperPanel);
+  loop.add(importPanel);
   loop.add(admin);
   loop.add(input);       // lateUpdate: limpia el estado por frame
 
@@ -1032,7 +1068,7 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel,
   };
 }
 
@@ -1055,28 +1091,40 @@ function gameSeed() {
 async function loadCampaign() {
   const params = new URLSearchParams(window.location.search);
   const param = params.get('system');
-  const file = param && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*$/.test(param) ? param : GameConfig.CAMPAIGN.SYSTEM_FILE;
+  const store = new SystemStore();
+  // ?system=import:<id> → sistema importado guardado en este navegador (IndexedDB).
+  const importId = importIdFromParam(param);
+  const file = importId ? `${IMPORT_PREFIX}${importId}` : param && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*$/.test(param) ? param : GameConfig.CAMPAIGN.SYSTEM_FILE;
   const url = `systems/${file}.system.json`;
-  const [res, catalogText] = await Promise.all([
-    fetch(url),
+  const [text, catalogText, imported] = await Promise.all([
+    importId
+      ? store.get(importId).then((rec) => {
+        if (!rec) throw Object.assign(new Error('ese sistema importado no está guardado en este navegador (¿se borró?). Quita "?system=…" de la dirección para volver al juego normal'), { dataError: true });
+        return rec.text;
+      })
+      : fetch(url).then((res) => {
+        if (!res.ok) throw new Error(`no se pudo leer ${url} (${res.status})`);
+        return res.text();
+      }),
     fetch(GameConfig.CAMPAIGN.CATALOG_URL).then((r) => (r.ok ? r.text() : '')).catch(() => ''),
+    store.list().catch(() => []),
   ]);
-  if (!res.ok) throw new Error(`no se pudo leer ${url} (${res.status})`);
   const campaign = file === GameConfig.CAMPAIGN.SYSTEM_FILE;
   const seed = campaign || params.has('seed') ? gameSeed() : undefined;
-  const result = loadSystem(await res.text(), { seed });
-  if (!result.ok) throw new Error(`el sistema ${file} no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+  // Lo guardado se vuelve a comprobar entero, como si se importara de nuevo.
+  const result = loadSystem(text, { seed });
+  if (!result.ok) throw Object.assign(new Error(`el sistema ${file} no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`), { dataError: true });
   for (const w of result.warnings) console.warn(`[sistema] ${w.path}: ${w.message}`);
   const catalog = catalogText ? parseSystemCatalog(catalogText) : { entries: [], errors: [] };
   for (const e of catalog.errors) console.warn(`[catálogo] ${e.path}: ${e.message}`);
-  return { system: new SolarSystem(result.system), file, catalog: catalog.entries, handoff: takeHandoff(file) };
+  return { system: new SolarSystem(result.system), file, catalog: catalog.entries, handoff: takeHandoff(file), store, imported };
 }
 
 loadCampaign()
-  .then(({ system, file, catalog, handoff }) => boot(system, { file, catalog, handoff }))
+  .then(({ system, file, catalog, handoff, store, imported }) => boot(system, { file, catalog, handoff, store, imported }))
   .catch((err) => {
     console.error(err);
     const el = document.getElementById('fatal-error');
-    el.textContent = `No se pudo iniciar ${GameConfig.GAME.TITLE}: ${err.message}. ¿Tu navegador soporta WebGL?`;
+    el.textContent = `No se pudo iniciar ${GameConfig.GAME.TITLE}: ${err.message}.${err.dataError ? '' : ' ¿Tu navegador soporta WebGL?'}`;
     el.classList.remove('hidden');
   });

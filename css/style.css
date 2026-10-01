@@ -111,6 +111,11 @@ kbd {
   cursor: pointer;
 }
 #start-button:hover { filter: brightness(1.1); }
+.start-secondary {
+  display: block; margin: 12px auto 0; font: inherit; font-size: 0.9rem; padding: 8px 18px; cursor: pointer;
+  border: 1px solid rgba(124, 196, 255, 0.55); border-radius: var(--radius); background: transparent; color: var(--ui-accent);
+}
+.start-secondary:hover { background: rgba(124, 196, 255, 0.12); }
 
 .controls {
   list-style: none;
@@ -1036,4 +1041,66 @@ body.underwater #vignette {
   background:
     radial-gradient(ellipse at center, rgba(40, 120, 170, 0.18) 0%, rgba(8, 40, 70, 0.55) 75%, rgba(2, 16, 34, 0.85) 100%);
   opacity: 1;
+}
+
+/* ---- Importar sistemas (bloque 1d) -------------------------------------------- */
+#hyperspace-panel .hyper-import {
+  margin-top: 12px; width: 100%; font: inherit; padding: 8px 14px; border-radius: 4px; cursor: pointer;
+  border: 1px dashed rgba(110, 220, 255, 0.6); background: transparent; color: #9fe8ff;
+}
+#hyperspace-panel .hyper-import:hover { background: rgba(60, 190, 255, 0.15); }
+#import-panel.tech-panel {
+  z-index: 40;
+  width: min(760px, calc(100vw - 32px));
+  background: radial-gradient(ellipse at top, rgb(20, 58, 92), rgb(6, 14, 28) 70%);
+  border: 1px solid rgba(110, 220, 255, 0.6);
+  box-shadow: 0 0 24px rgba(80, 200, 255, 0.35);
+  color: #cfefff;
+}
+#import-panel .panel-title { color: #9fe8ff; }
+#import-panel .panel-body { padding-bottom: 6px; }
+#import-panel p { margin: 6px 0; line-height: 1.4; }
+#import-panel .imp-intro { color: #dff3ff; }
+#import-panel button { cursor: pointer; border-radius: 4px; padding: 7px 12px; }
+#import-panel .imp-primary { border: 1px solid #6fe0ff; background: rgba(60, 190, 255, 0.22); color: #eafaff; font-weight: 700; }
+#import-panel .imp-primary:hover:not(:disabled) { background: rgba(60, 190, 255, 0.42); }
+#import-panel .imp-secondary { border: 1px solid rgba(110, 220, 255, 0.45); background: transparent; color: #9fe8ff; }
+#import-panel .imp-danger { border: 1px solid rgba(255, 130, 120, 0.6); background: transparent; color: #ffb0a8; }
+#import-panel button:disabled { opacity: 0.55; cursor: default; }
+#import-panel .imp-drop {
+  margin: 10px 0 6px; padding: 14px; text-align: center; border: 2px dashed rgba(110, 220, 255, 0.45);
+  border-radius: 8px; color: #9fc8dc;
+}
+#import-panel .imp-drop.over { border-color: #6fe0ff; background: rgba(60, 190, 255, 0.12); color: #eafaff; }
+#import-panel .imp-file { display: none; }
+#import-panel .imp-text {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 110px; max-height: 40vh;
+  font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem;
+  background: rgba(0, 10, 20, 0.65); color: #dff7ff; border: 1px solid rgba(110, 220, 255, 0.35); border-radius: 6px; padding: 8px;
+}
+#import-panel .imp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+#import-panel .imp-result { margin: 8px 0; }
+#import-panel .imp-result.good, #import-panel .imp-result.bad { padding: 10px 12px; border-radius: 8px; }
+#import-panel .imp-result.good { border: 1px solid rgba(120, 230, 160, 0.55); background: rgba(40, 120, 70, 0.18); }
+#import-panel .imp-result.bad { border: 1px solid rgba(255, 130, 120, 0.6); background: rgba(140, 40, 40, 0.2); }
+#import-panel .imp-result ul { margin: 6px 0; padding-left: 20px; }
+#import-panel .imp-result li { margin: 3px 0; overflow-wrap: anywhere; }
+#import-panel .imp-errors code { color: #ffd2a0; }
+#import-panel .imp-desc { color: #b9d8e8; font-size: 0.9em; }
+#import-panel .imp-meta { color: #8fb8cc; font-size: 0.85em; }
+#import-panel .imp-warnings { margin-top: 8px; color: #ffe2a0; font-size: 0.88em; }
+#import-panel .imp-unsupported { margin-top: 8px; color: #d8c8ff; font-size: 0.88em; }
+#import-panel .imp-status { font-size: 0.88em; color: #a8f0c0; }
+#import-panel .imp-status.bad { color: #ffb0a8; }
+#import-panel .imp-saved { margin: 12px 0 4px; border-top: 1px solid rgba(110, 220, 255, 0.25); padding-top: 8px; }
+#import-panel .imp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 32vh; overflow-y: auto; }
+#import-panel .imp-list li {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid rgba(110, 220, 255, 0.3);
+  border-radius: 6px; background: rgba(10, 40, 70, 0.45);
+}
+#import-panel .imp-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+#import-panel .imp-name { color: #fff; font-weight: 700; overflow-wrap: anywhere; }
+#import-panel .imp-copy-fallback { width: 100%; height: 80px; margin-top: 6px; font-size: 0.75rem; }
+@media (max-width: 560px) {
+  #import-panel .imp-list li { flex-wrap: wrap; }
 }

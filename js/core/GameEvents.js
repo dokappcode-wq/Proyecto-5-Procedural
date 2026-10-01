@@ -126,6 +126,7 @@ export const GameEvents = Object.freeze({
   HYPERSPACE_EDGE: 'hyperspace:edge',           // la nave con nodo de velocidad-luz llega al borde del sistema
   HYPERSPACE_PANEL_REQUEST: 'hyperspace:panel', // abrir la navegación hiperespacial
   HYPERSPACE_JUMP: 'hyperspace:jump',           // { entry } saltar al sistema elegido
+  IMPORT_PANEL_REQUEST: 'import:panel',         // { from? } abrir el panel de importar sistemas
   HYPERSPACE_ARRIVED: 'hyperspace:arrived',     // { from } llegada tras un salto
   AI_PANEL_REQUEST: 'ai:panel',                     // {}
 

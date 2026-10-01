@@ -39,7 +39,7 @@ export class HyperspacePanel extends ModalPanel {
       const li = el('li', here ? 'here' : null);
       const info = el('div', 'hyper-info');
       info.append(el('span', 'hyper-index', String(i + 1).padStart(2, '0')), el('span', 'hyper-name', e.name));
-      if (e.description) info.append(el('span', 'hyper-desc', e.description));
+      if (e.description || e.imported) info.append(el('span', 'hyper-desc', `${e.imported ? '📥 Importado' : ''}${e.imported && e.description ? ' · ' : ''}${e.description ?? ''}`));
       const btn = el('button', null, here ? 'Estás aquí' : `Saltar · 🔋 −${s.cost}`);
       btn.type = 'button';
       btn.disabled = here || !canJump;
@@ -50,7 +50,14 @@ export class HyperspacePanel extends ModalPanel {
       li.append(info, btn);
       list.append(li);
     });
-    this.body.replaceChildren(ai, status, list);
+    // Importar un sistema nuevo (bloque 1d): al guardarlo aparece en esta lista.
+    const imp = el('button', 'hyper-import', '📥 Importar un sistema nuevo…');
+    imp.type = 'button';
+    imp.addEventListener('click', () => {
+      this.setOpen(false);
+      this._events.emit(GameEvents.IMPORT_PANEL_REQUEST, { from: 'hyperspace' });
+    });
+    this.body.replaceChildren(ai, status, list, imp);
   }
 }
 
