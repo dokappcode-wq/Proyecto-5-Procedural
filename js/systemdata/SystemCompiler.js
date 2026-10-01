@@ -89,12 +89,14 @@ function compileBody(b, kind, ctx) {
   for (const [k, def] of Object.entries(gen.params)) params[k] = b.terrain?.params?.[k] ?? def.default;
   const TERRAIN = gen.build(params);
   TERRAIN.SEA_FLOOR = hasSea ? -9 : 2; // sin mar, el borde baja a una depresión seca
+  if (TERRAIN.ISLANDS && !hasSea) TERRAIN.ISLANDS.FLOOR = 2; // sin mar: hondonadas secas entre "islas"
 
   // Colores: paleta (propia, a partir del color o la de luna por defecto) o los del Edén.
   let palette = null;
   if (b.palette) palette = paletteFrom(b.palette, b.color ?? b.palette.light ?? '#bdb9b1');
   else if (kind === 'MOON' && b.color) palette = paletteFromColor(hex(b.color));
   else if (kind === 'MOON') palette = tintPalette(D.palette, new SeededRandom(deriveSeed(ctx.systemSeed, ctx.id)).range(-0.08, 0.08));
+  else if (look.PALETTE) palette = { ...look.PALETTE }; // p. ej. las dunas: arena dorada
   const base = palette ? paletteColors(palette) : BODY_DEFAULTS.PLANET.colors;
   const surface = { ...base.surface, ...mapHex(b.surface_colors) };
 
@@ -126,9 +128,15 @@ function compileBody(b, kind, ctx) {
   // Flora y rocas.
   const floraList = b.flora ?? (livingDefaults ? DEFAULT_LIFE.flora : BARREN_FLORA);
   const DENSITY = { PLAINS: {}, FOREST: {}, FROZEN_MOUNTAINS: {} };
+  const floraColors = {};
+  const floraSize = {};
   floraList.forEach((f, i) => {
     const slot = BIOME_SLOTS[f.biome].slot;
     const res = FLORA_TEMPLATES[f.template].resource;
+    // Color y tamaño propios: uno por tipo en todo el cuerpo (vale el último).
+    if (f.color) for (const key of FLORA_TEMPLATES[f.template].colorKeys) floraColors[key] = key.endsWith('_ALT') ? shadeHex(hex(f.color), 1.12) : hex(f.color);
+    if (f.fruit_color && f.template === 'fruit_tree') floraColors.APPLE = hex(f.fruit_color);
+    if (f.size !== undefined) floraSize[res] = f.size;
     if (DENSITY[slot][res] !== undefined) notes.push({ path: `${path}.flora[${i}]`, message: `"${f.template}" ya estaba en la zona "${f.biome}": vale la última densidad.` });
     DENSITY[slot][res] = f.density;
   });
@@ -139,9 +147,21 @@ function compileBody(b, kind, ctx) {
     ? DEFAULT_LIFE.fauna.map((f) => ({ ...f, herds: Math.max(1, Math.round(f.herds * Math.min(sizeFactor, 2))) }))
     : []);
   const HERDS = {};
+  const VARIANTS = {};
   let herdTotal = 0;
   faunaList.forEach((f, i) => {
-    const sp = FAUNA_TEMPLATES[f.template].species;
+    const base = FAUNA_TEMPLATES[f.template].species;
+    // Con nombre, tamaño, color, carácter o bioma propios es una especie nueva de este cuerpo.
+    const custom = ['name', 'size', 'color', 'temperament', 'biome'].some((k) => f[k] !== undefined);
+    const sp = custom ? `${ctx.id}:${base}:${i + 1}` : base;
+    if (custom) {
+      VARIANTS[sp] = { BASE: base };
+      if (f.name) VARIANTS[sp].NAME = f.name.trim();
+      if (f.size !== undefined) VARIANTS[sp].SIZE = f.size;
+      if (f.color) VARIANTS[sp].COLOR = hex(f.color);
+      if (f.temperament) VARIANTS[sp].TEMPERAMENT = f.temperament;
+      if (f.biome) VARIANTS[sp].BIOME = f.biome;
+    }
     let herds = f.herds;
     if (HERDS[sp] !== undefined) {
       notes.push({ path: `${path}.fauna[${i}]`, message: `"${f.template}" está repetido: vale el último.` });
@@ -154,7 +174,7 @@ function compileBody(b, kind, ctx) {
     HERDS[sp] = herds;
     herdTotal += herds;
   });
-  const hasWool = faunaList.some((f) => FAUNA_TEMPLATES[f.template].wool && HERDS[FAUNA_TEMPLATES[f.template].species] > 0);
+  const hasWool = faunaList.some((f) => FAUNA_TEMPLATES[f.template].wool && f.herds > 0);
 
   // Agua.
   const ponds = b.water?.ponds ?? (livingDefaults ? Math.min(LIMITS.PONDS, Math.max(4, Math.round(WATER_DEFAULTS.PONDS_BREATHABLE * sizeFactor))) : 0);
@@ -199,9 +219,15 @@ function compileBody(b, kind, ctx) {
       DENSITY,
       GRASS_TUFTS_PER_CHUNK: grass,
     },
-    FAUNA: { HERDS, HERD_RADIUS: 24, NEAR_SPAWN_DISTANCE: [35, 120] },
+    FAUNA: { HERDS, HERD_RADIUS: 24, NEAR_SPAWN_DISTANCE: [35, 120], ...(Object.keys(VARIANTS).length ? { VARIANTS } : {}) },
   });
   if (palette) profile.PROP_COLORS = { ROCK: palette.mid };
+  if (Object.keys(floraColors).length) profile.PROP_COLORS = { ...(profile.PROP_COLORS ?? {}), ...floraColors };
+  if (Object.keys(floraSize).length) profile.RESOURCES.SIZE = floraSize;
+  // Nadar y bucear (capacidad del motor): solo si el archivo lo ajusta; si no, valores por defecto.
+  if (b.water && (b.water.swim !== undefined || b.water.dive !== undefined || b.water.visibility_m !== undefined)) {
+    profile.FLUID = { SWIM: b.water.swim ?? true, DIVE: b.water.dive ?? true, VISIBILITY: b.water.visibility_m ?? 25 };
+  }
   profile.DATA = describe(b, kind, { breathable, gravity, baseTemp, floraList, herdTotal, moonNames: ctx.moonNames, regionKm: SIZE_CATEGORIES[size].regionKm, gen });
 
   return {
@@ -283,6 +309,7 @@ const ch = (c, s) => (c >> s) & 255;
 const rgb = (r, g, b) => (clampByte(r) << 16) | (clampByte(g) << 8) | clampByte(b);
 const clampByte = (v) => Math.max(0, Math.min(255, Math.round(v)));
 const scale = (c, k) => rgb(ch(c, 16) * k, ch(c, 8) * k, ch(c, 0) * k);
+const shadeHex = scale;
 const lighten = (c, k) => rgb(ch(c, 16) + (255 - ch(c, 16)) * k, ch(c, 8) + (255 - ch(c, 8)) * k, ch(c, 0) + (255 - ch(c, 0)) * k);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 

@@ -64,12 +64,12 @@ export const BIOME_SLOTS = Object.freeze({
 
 /** Flora (y rocas): plantilla → tipo de recurso del motor. `density` = probabilidad por celda de 4×4 m. */
 export const FLORA_TEMPLATES = Object.freeze({
-  broadleaf_tree: { resource: 'TREE', label: 'Árbol de hoja ancha (da madera)', wood: true },
-  pine: { resource: 'PINE', label: 'Pino / conífera (da madera)', wood: true },
-  fruit_tree: { resource: 'APPLE_TREE', label: 'Árbol frutal (da fruta comestible)' },
-  bush: { resource: 'BUSH', label: 'Arbusto (decorativo)' },
-  rock: { resource: 'ROCK', label: 'Roca (da piedra)' },
-  mineral_rock: { resource: 'MINERAL_ROCK', label: 'Veta de mineral (da mineral)' },
+  broadleaf_tree: { resource: 'TREE', label: 'Árbol de hoja ancha (da madera)', wood: true, colorKeys: ['LEAVES', 'LEAVES_ALT'] },
+  pine: { resource: 'PINE', label: 'Pino / conífera (da madera)', wood: true, colorKeys: ['PINE_LEAVES'] },
+  fruit_tree: { resource: 'APPLE_TREE', label: 'Árbol frutal (da fruta comestible)', colorKeys: ['APPLE_LEAVES'] },
+  bush: { resource: 'BUSH', label: 'Arbusto (decorativo)', colorKeys: ['BUSH'] },
+  rock: { resource: 'ROCK', label: 'Roca (da piedra)', colorKeys: ['ROCK'] },
+  mineral_rock: { resource: 'MINERAL_ROCK', label: 'Veta de mineral (da mineral)', colorKeys: ['MINERAL'] },
 });
 
 /** Fauna: plantilla → especie del motor. */
@@ -154,6 +154,30 @@ function shapeTerrain(base, p) {
   return t;
 }
 
+// Parámetros extra de algunos generadores.
+const ISLAND_PARAMS = {
+  land_fraction: { min: 0.02, max: 0.9, default: 0.4, description: 'Cuánta superficie es tierra (0.05 = casi todo agua, 0.9 = casi todo tierra).' },
+  island_size: { min: 0.3, max: 3, default: 1, description: 'Tamaño de las islas (0.5 = islotes pequeños, 2 = islas grandes).' },
+  sea_depth: { min: 2, max: 60, default: 14, description: 'Profundidad del mar entre islas (m).' },
+};
+
+/** Capa de islas (ver TerrainGenerator): umbral según la fracción de tierra. */
+function islandLayer(p, freq) {
+  return { FREQUENCY: freq / p.island_size, THRESHOLD: 0.42 - 0.84 * p.land_fraction, CENTER_RADIUS: 70, DEPTH: p.sea_depth, FLOOR: -p.sea_depth };
+}
+
+const ISLAND_LOOK = {
+  COLORS: { ROCK_SLOPE_NORMAL_Y: 0.8, PATCH_FREQUENCY: 1 / 20, AO_STRENGTH: 0.22 },
+  BIOME_DISTRIBUTION: {
+    MOUNTAIN_BIOME_START: 0.3, MOUNTAIN_BIOME_END: 0.6,
+    FOREST_FREQUENCY: 1 / 320, FOREST_THRESHOLD: 0.0, FOREST_BLEND: 0.12, SPAWN_MIN_PLAINS: 0.8,
+  },
+  RESOURCES: { MAX_SLOPE: 0.75, TREE_MAX_HEIGHT: 38 },
+  SNOW: { SNOW_START_HEIGHT: 24, SNOW_MIN_NORMAL_Y: 0.42 },
+  TEMPERATURE_OFFSETS: { low: 0, mid: -4, high: -22 },
+  SCALES: { low: [0.35, 0.6], mid: [1.15, 1.3], high: [1.0, 1.5] },
+};
+
 export const TERRAIN_GENERATORS = Object.freeze({
   island: {
     label: 'Isla',
@@ -171,6 +195,70 @@ export const TERRAIN_GENERATORS = Object.freeze({
       BIOME_NAMES: { low: 'Explanada', mid: 'Bosque', high: 'Montañas Heladas' },
       TEMPERATURE_OFFSETS: { low: 0, mid: -4, high: -22 },
       SCALES: { low: [0.35, 0.6], mid: [1.15, 1.3], high: [1.0, 1.5] }, // [relieve, rugosidad]
+    },
+  },
+  archipelago: {
+    label: 'Archipiélago',
+    description: 'Muchas islas separadas por brazos de mar. Siempre hay una isla en el centro (donde se empieza).',
+    params: { ...TERRAIN_PARAMS, ...ISLAND_PARAMS, mountains: { ...TERRAIN_PARAMS.mountains, default: 0.6 } },
+    build: (p) => ({ ...shapeTerrain(ISLAND_TERRAIN, p), ISLANDS: islandLayer(p, 1 / 260) }),
+    look: { ...ISLAND_LOOK, BIOME_NAMES: { low: 'Playas', mid: 'Bosque isleño', high: 'Picos' } },
+  },
+  ocean_world: {
+    label: 'Mundo oceánico',
+    description: 'Casi todo es mar abierto y profundo, con pocas islas. Ideal para nadar y bucear.',
+    params: {
+      ...TERRAIN_PARAMS, ...ISLAND_PARAMS,
+      land_fraction: { ...ISLAND_PARAMS.land_fraction, default: 0.12 },
+      sea_depth: { ...ISLAND_PARAMS.sea_depth, default: 30 },
+      mountains: { ...TERRAIN_PARAMS.mountains, default: 0.4 },
+    },
+    build: (p) => ({ ...shapeTerrain(ISLAND_TERRAIN, p), ISLANDS: islandLayer(p, 1 / 420) }),
+    look: { ...ISLAND_LOOK, BIOME_NAMES: { low: 'Arenales', mid: 'Selva costera', high: 'Peñas' } },
+  },
+  highlands: {
+    label: 'Altiplano',
+    description: 'Mesetas altas en escalones con cortados, valles y cumbres. Fresco y con mucho relieve.',
+    params: {
+      ...TERRAIN_PARAMS,
+      relief: { ...TERRAIN_PARAMS.relief, default: 1.6 },
+      mountains: { ...TERRAIN_PARAMS.mountains, default: 1.2 },
+      terrace_height: { min: 2, max: 20, default: 6, description: 'Altura de cada escalón de las mesetas (m).' },
+    },
+    build: (p) => {
+      const t = shapeTerrain({ ...ISLAND_TERRAIN, BASE_HEIGHT: 22, MOUNTAIN_COAST_FADE: 160 }, p);
+      t.TERRACES = { STEP: p.terrace_height, SHARPNESS: 7 };
+      return t;
+    },
+    look: {
+      ...ISLAND_LOOK,
+      SNOW: { SNOW_START_HEIGHT: 48, SNOW_MIN_NORMAL_Y: 0.42 },
+      RESOURCES: { MAX_SLOPE: 0.75, TREE_MAX_HEIGHT: 62 },
+      BIOME_NAMES: { low: 'Mesetas', mid: 'Laderas', high: 'Cumbres' },
+      TEMPERATURE_OFFSETS: { low: 0, mid: -5, high: -18 },
+    },
+  },
+  dunes: {
+    label: 'Desierto de dunas',
+    description: 'Mares de dunas largas y onduladas, hondonadas y algún risco. Arena dorada si no se dan colores.',
+    params: {
+      ...TERRAIN_PARAMS,
+      relief: { ...TERRAIN_PARAMS.relief, default: 0.4 },
+      mountains: { ...TERRAIN_PARAMS.mountains, default: 0.35 },
+      dune_height: { min: 0, max: 20, default: 7, description: 'Altura de las dunas (m).' },
+      dune_spacing: { min: 15, max: 150, default: 45, description: 'Distancia entre crestas de dunas (m).' },
+    },
+    build: (p) => {
+      const t = shapeTerrain(ISLAND_TERRAIN, p);
+      t.DUNES = { HEIGHT: p.dune_height, WAVELENGTH: p.dune_spacing, ANGLE: 0.6, WARP: 0.6 };
+      return t;
+    },
+    look: {
+      ...ISLAND_LOOK,
+      COLORS: { ROCK_SLOPE_NORMAL_Y: 0.7, PATCH_FREQUENCY: 1 / 30, AO_STRENGTH: 0.3 },
+      BIOME_NAMES: { low: 'Dunas', mid: 'Hondonadas', high: 'Riscos' },
+      TEMPERATURE_OFFSETS: { low: 0, mid: -2, high: -10 },
+      PALETTE: { light: 0xe3c48a, mid: 0xc9a66b, dark: 0x9c7b4c, highlight: 0xf2dcae },
     },
   },
   cratered: {

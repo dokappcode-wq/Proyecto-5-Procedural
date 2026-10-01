@@ -31,6 +31,8 @@ export class Player {
       isRunning: false,
       isMoving: false,
       isFlying: false,
+      isSwimming: false,     // en el agua (mar o charca honda)
+      headUnderwater: false, // buceando: sin aire salvo con el traje
     };
 
     this.model = new PlayerModel({ colors: config.COLORS });

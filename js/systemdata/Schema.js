@@ -2,6 +2,7 @@ import {
   LIMITS, SCHEMA_VERSION, SIZE_CATEGORIES, STAR_TYPES, BIOME_SLOTS,
   FLORA_TEMPLATES, FAUNA_TEMPLATES, TERRAIN_GENERATORS,
 } from './Catalog.js';
+import { TEMPERAMENTS } from '../animals/SpeciesVariants.js';
 
 /**
  * Schema — forma de un archivo de sistema solar (versión 1), derivada del
@@ -78,12 +79,20 @@ const flora = arr(obj({
   template: enm(labels(FLORA_TEMPLATES), 'Tipo de planta o roca.'),
   biome: enm(labels(BIOME_SLOTS), 'Zona en la que crece.'),
   density: num(0, 0.4, 'Probabilidad por celda de 4×4 m (0.01 = disperso, 0.25 = bosque denso).'),
+  color: color('Color de las hojas (o de la roca / del mineral). Uno por tipo en todo el cuerpo.'),
+  fruit_color: color('Color de la fruta (solo fruit_tree).'),
+  size: num(0.3, 3, 'Tamaño (1 = normal, 2 = el doble). Uno por tipo en todo el cuerpo.'),
 }, 'Una planta o roca en una zona.', ['template', 'biome', 'density']), LIMITS.FLORA, 'Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.');
 
 const fauna = arr(obj({
   template: enm(labels(FAUNA_TEMPLATES), 'Tipo de animal.'),
   herds: int(0, 30, 'Número de rebaños en toda la región.'),
-}, 'Una especie animal.', ['template', 'herds']), LIMITS.FAUNA, 'Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.');
+  name: str(30, 'Nombre de la especie en singular (p. ej. "Ramoneador"). Si se pone, es una especie propia de este cuerpo.', { minLength: 1 }),
+  size: num(0.3, 3, 'Tamaño (1 = el de la plantilla). Los grandes tienen más vida y golpean más fuerte.'),
+  color: color('Color del cuerpo (la tripa y las patas salen de él).'),
+  temperament: enm(Object.fromEntries(Object.entries(TEMPERAMENTS).map(([k, v]) => [k, v.label])), 'Carácter.'),
+  biome: enm(labels(BIOME_SLOTS), 'Zona donde prefiere vivir.'),
+}, 'Una especie animal (a partir de una plantilla).', ['template', 'herds']), LIMITS.FAUNA, 'Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.');
 
 const lore = obj({
   life: str(LIMITS.LORE_LENGTH, 'Qué vida hay (lo cuenta la IA de la nave).'),
@@ -110,7 +119,10 @@ function bodyProperties(kind) {
       ponds: int(0, LIMITS.PONDS, 'Charcas de agua dulce en toda la región.'),
       sea_color: color('Color del mar.'),
       pond_color: color('Color de las charcas.'),
-    }, 'Agua.'),
+      swim: bool('¿Se puede nadar en el agua? (por defecto sí)'),
+      dive: bool('¿Se puede bucear bajo el agua? (por defecto sí; bajo el agua no se respira sin traje)'),
+      visibility_m: num(3, 120, 'Visibilidad bajo el agua en metros (agua turbia 5, cristalina 60).'),
+    }, 'Agua (mar y charcas). Nadar y bucear son capacidades del motor: aquí solo se activan y ajustan.'),
     terrain,
     palette,
     surface_colors: obj({

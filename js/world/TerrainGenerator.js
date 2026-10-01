@@ -45,6 +45,9 @@ export class TerrainGenerator {
     this._detail = new SimplexNoise(deriveSeed(seed, 'detail'));
     this._coast = new SimplexNoise(deriveSeed(seed, 'coast'));
     this._craterSeed = deriveSeed(seed, 'craters');
+    // Capas opcionales (solo si el perfil las pide: el Edén no las usa).
+    this._islands = p0(profile.ISLANDS) && new SimplexNoise(deriveSeed(seed, 'islands'));
+    this._dunes = p0(profile.DUNES) && new SimplexNoise(deriveSeed(seed, 'dunes'));
 
     this._sample = { height: 0, mountain: 0, coast: 0, biomes: {} };
     this._water = null;
@@ -107,6 +110,17 @@ export class TerrainGenerator {
       mountainHeight;
 
     if (p.CRATERS) height += this._craters(x, z) * (1 - coast);
+    if (p.DUNES) height += this._dunesAt(x, z) * (1 - mountain) * (1 - coast);
+    if (p.TERRACES) height = terrace(height, p.TERRACES, p.BASE_HEIGHT) * (1 - coast) + height * coast;
+    // Islas: el ruido hunde zonas enteras bajo el mar (archipiélagos, mundos oceánicos).
+    // Cerca del centro siempre hay tierra (ahí se empieza y aterriza la nave).
+    if (p.ISLANDS) {
+      const I = p.ISLANDS;
+      const n = this._islands.fbm(x, z, { frequency: I.FREQUENCY, octaves: 3 });
+      const center = 1 - smoothstep(I.CENTER_RADIUS * 0.6, I.CENTER_RADIUS, Math.hypot(x, z));
+      const land = smoothstep(I.THRESHOLD - 0.1, I.THRESHOLD + 0.1, n + center * 0.8);
+      height = I.FLOOR + (height - I.FLOOR) * land;
+    }
 
     // Costa: el terreno desciende hacia el fondo marino.
     height += (p.SEA_FLOOR - height) * coast;
@@ -117,6 +131,18 @@ export class TerrainGenerator {
     s.mountain = mountain;
     s.coast = coast;
     return s;
+  }
+
+  /** Dunas: crestas alargadas en una dirección, deformadas por ruido (lado suave y lado empinado). */
+  _dunesAt(x, z) {
+    const D = this._p.DUNES;
+    const along = x * Math.cos(D.ANGLE) + z * Math.sin(D.ANGLE);
+    const warp = this._dunes.noise2D(x / (D.WAVELENGTH * 3), z / (D.WAVELENGTH * 3)) * D.WAVELENGTH * D.WARP;
+    const t = ((along + warp) / D.WAVELENGTH) % 1;
+    const f = t < 0 ? t + 1 : t;
+    const profile = f < 0.75 ? f / 0.75 : (1 - f) / 0.25; // sube despacio, baja de golpe
+    const strength = 0.55 + 0.45 * this._dunes.noise2D(x / (D.WAVELENGTH * 7) + 50, z / (D.WAVELENGTH * 7));
+    return D.HEIGHT * profile * profile * (3 - 2 * profile) * strength;
   }
 
   /** Suma de los cráteres de las 3×3 celdas vecinas (cuenco + borde). */
@@ -140,4 +166,17 @@ export class TerrainGenerator {
     }
     return dh;
   }
+}
+
+function p0(v) {
+  return v !== undefined && v !== null;
+}
+
+/** Mesetas escalonadas: casi planas y con un escalón corto (cortados). */
+function terrace(h, T, base) {
+  const rel = (h - base) / T.STEP;
+  const i = Math.floor(rel);
+  const t = rel - i;
+  const k = Math.min(1, Math.max(0, (t - (1 - 1 / T.SHARPNESS)) * T.SHARPNESS));
+  return base + (i + k * k * (3 - 2 * k)) * T.STEP;
 }

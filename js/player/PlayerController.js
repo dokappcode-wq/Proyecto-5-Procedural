@@ -51,6 +51,14 @@ export class PlayerController {
   }
 
   /** Cambia el terreno activo (p. ej. otro planeta en el futuro). */
+  /**
+   * Agua del cuerpo activo: { surfaceAt(x, z) → altura | null, fluid() → { swim, dive } }.
+   * Nadar y bucear son capacidades del motor; el sistema solar solo las activa o desactiva.
+   */
+  setWater(water) {
+    this._water = water;
+  }
+
   setTerrain(terrain) {
     this._terrain = terrain;
   }
@@ -151,6 +159,17 @@ export class PlayerController {
     const cfg = this._cfg;
     const v = p.velocity;
 
+    // ¿En el agua lo bastante honda para nadar?
+    const surface = this._water?.surfaceAt(p.position.x, p.position.z) ?? null;
+    const fluid = surface !== null ? this._water.fluid() : null;
+    const depth = surface === null ? -1 : surface - p.position.y;
+    const enter = cfg.SWIM.ENTER_DEPTH - (p.state.isSwimming ? 0.15 : 0);
+    if (fluid?.swim && depth > enter) {
+      this._updateSwimming(dt, surface, fluid);
+      return;
+    }
+    this._setSwimming(false, false, surface);
+
     const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
     this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, accel * dt);
@@ -218,6 +237,60 @@ export class PlayerController {
     } else {
       p.state.onGround = false;
     }
+  }
+
+  /** Nadar: flotar con la cabeza fuera; Espacio sube, C bucea (si se puede), Shift más rápido. */
+  _updateSwimming(dt, surface, fluid) {
+    const p = this._player;
+    const cfg = this._cfg;
+    const S = cfg.SWIM;
+    const v = p.velocity;
+    if (!p.state.isSwimming && v.y < -3) v.y *= S.ENTRY_DAMPING; // al caer al agua, frena
+    const speed = (p.state.isRunning ? S.RUN_SPEED : S.SPEED) * this._mods.speedMultiplier;
+    this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, cfg.GROUND_ACCELERATION * 0.5 * dt);
+
+    const ground = this._groundHeight(p.position.x, p.position.z);
+    const floatFeet = surface - S.FLOAT_DEPTH;
+    const up = this._input.isDown('JUMP');
+    const down = this._input.isDown('DESCEND') && fluid.dive;
+    // Salir del agua: en la orilla (suelo justo bajo los pies) Espacio salta.
+    if (this._input.wasPressed('JUMP') && p.position.y - ground < 0.4) {
+      v.y = cfg.JUMP_VELOCITY;
+      this._events.emit(GameEvents.PLAYER_JUMPED);
+    } else if (up) {
+      v.y = p.position.y < floatFeet ? S.VERTICAL_SPEED : Math.min(v.y, 0.5);
+    } else if (down) {
+      v.y = -S.VERTICAL_SPEED;
+    } else {
+      // Sin pulsar nada se vuelve a flotar poco a poco.
+      v.y += ((floatFeet - p.position.y) * S.BUOYANCY - v.y) * Math.min(1, 3 * dt);
+    }
+
+    const nx = p.position.x + v.x * dt;
+    if (this._isBlocked(nx, p.position.z)) v.x = 0;
+    else p.position.x = nx;
+    const nz = p.position.z + v.z * dt;
+    if (this._isBlocked(p.position.x, nz)) v.z = 0;
+    else p.position.z = nz;
+    if (this._obstacles) this._obstacles.resolveCollisions(p.position, cfg.RADIUS, p.position.y + 0.05, p.position.y + cfg.HEIGHT);
+
+    p.position.y += v.y * dt;
+    if (!fluid.dive && p.position.y < floatFeet - 0.15) p.position.y = floatFeet - 0.15; // sin buceo: no se hunde
+    if (p.position.y > floatFeet + 0.6 && v.y > 0 && !(p.position.y - ground < 0.6)) v.y = Math.min(v.y, 1); // no "volar" fuera del agua
+    if (p.position.y <= ground) {
+      p.position.y = ground;
+      if (v.y < 0) v.y = 0;
+    }
+    p.state.onGround = p.position.y - ground < 0.02;
+    this._setSwimming(true, p.position.y + cfg.HEIGHT * 0.9 < surface, surface);
+  }
+
+  _setSwimming(swimming, underwater, surface) {
+    const s = this._player.state;
+    if (s.isSwimming === swimming && s.headUnderwater === underwater) return;
+    s.isSwimming = swimming;
+    s.headUnderwater = underwater;
+    this._events.emit(GameEvents.PLAYER_SWIM_CHANGED, { swimming, underwater, surface });
   }
 
   _updateFlying(dt) {

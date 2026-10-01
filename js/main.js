@@ -274,10 +274,28 @@ function boot(system, { file, catalog = [], handoff = null } = {}) {
   const isBreathableAt = (x, y, z) => {
     const inShip = ship.breathableAt(x, y, z);
     if (inShip !== null) return inShip;
+    // Bajo el agua no se respira (el traje con oxígeno sí deja bucear).
+    const surface = world.waterSurfaceAt?.(x, z) ?? null;
+    if (surface !== null && y < surface) return false;
     if (bubbles.contains(worlds.activeId, x, y, z)) return true;
     return worlds.profile()?.BREATHABLE !== false;
   };
   construction.addBlocker(ship); // no se construye encima de la nave
+  // Nadar y bucear: capacidad del motor; cada cuerpo la activa o ajusta (water.swim/dive/visibility_m).
+  controller.setWater({ surfaceAt: (x, z) => world.waterSurfaceAt?.(x, z) ?? null, fluid: () => world.fluid });
+  let swimHint = false;
+  events.on(GameEvents.PLAYER_SWIM_CHANGED, ({ swimming, underwater }) => {
+    document.body.classList.toggle('underwater', underwater);
+    const f = world.fluid;
+    atmosphere.setUnderwater(underwater && f ? { color: f.seaColor || f.pondColor || 0x2d6f98, visibility: f.visibility } : null);
+    if (swimming && !swimHint) {
+      swimHint = true;
+      events.emit(GameEvents.UI_MESSAGE, {
+        text: f?.dive ? 'Nadando: [Espacio] subir · [C] bucear · [Shift] más rápido. Bajo el agua no se respira (el traje con oxígeno sí).' : 'Nadando: [Espacio] subir · [Shift] más rápido. Aquí no se puede bucear.',
+        type: 'biome',
+      });
+    }
+  });
   // Las vallas, paredes y patas de la nave también frenan a los animales.
   animals.setObstacles({ resolveCollisions: (pos, r, y0, y1) => combinedStructures.resolveCollisions(pos, r, y0, y1) });
   events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId }) => {

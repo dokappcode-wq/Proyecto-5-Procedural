@@ -5,6 +5,7 @@ import { AnimalRenderer } from './AnimalRenderer.js';
 import { Deer } from './Deer.js';
 import { Goat } from './Goat.js';
 import { Cow } from './Cow.js';
+import { resolveSpecies } from './SpeciesVariants.js';
 import { pickWeighted } from './Animal.js';
 
 /** Registro de especies: añadir una especie = crear su clase y añadirla aquí + config. */
@@ -38,18 +39,12 @@ export class AnimalSystem {
     this.herds = [];
     this.activeCount = 0;
 
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    this._scene = scene;
+    this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    // Un dibujante por especie (las de un sistema solar pueden tener otro color): se crean al usarse.
     this._renderers = {};
     this._visible = {};
-    for (const [id, Cls] of Object.entries(SPECIES_CLASSES)) {
-      this._renderers[id] = new AnimalRenderer({
-        scene,
-        model: Cls.buildModel(config.SPECIES[id].COLORS),
-        maxInstances: config.MAX_PER_SPECIES,
-        material,
-      });
-      this._visible[id] = [];
-    }
+    for (const id of Object.keys(SPECIES_CLASSES)) this._rendererFor(id);
 
     // Entorno que consultan los animales (sin acoplarlos a WorldGenerator).
     const bounds = () => this._world.getBounds();
@@ -118,6 +113,25 @@ export class AnimalSystem {
     this.setActive(!!world && this.animals.length > 0);
   }
 
+  /** Definición de una especie en el cuerpo actual (plantilla del motor o variante del sistema). */
+  speciesDef(key) {
+    return resolveSpecies(key, this._fauna, this._cfg.SPECIES)?.def ?? null;
+  }
+
+  _rendererFor(key) {
+    if (this._renderers[key]) return this._renderers[key];
+    const r = resolveSpecies(key, this._fauna, this._cfg.SPECIES);
+    if (!r) return null;
+    this._renderers[key] = new AnimalRenderer({
+      scene: this._scene,
+      model: SPECIES_CLASSES[r.base].buildModel(r.def.COLORS),
+      maxInstances: this._cfg.MAX_PER_SPECIES,
+      material: this._material,
+    });
+    this._visible[key] = [];
+    return this._renderers[key];
+  }
+
   /**
    * Sin animales (cuerpos sin fauna, el espacio) el sistema se pausa y no dibuja nada.
    */
@@ -145,7 +159,8 @@ export class AnimalSystem {
     this.herds = [];
 
     for (const [species, count] of Object.entries(F.HERDS)) {
-      const def = this._cfg.SPECIES[species];
+      const def = this.speciesDef(species);
+      if (!def || !this._rendererFor(species)) continue;
       for (let h = 0; h < count; h++) {
         const near = h === 0; // el primero de cada especie, cerca del inicio
         for (let attempt = 0; attempt < 120; attempt++) {
@@ -177,7 +192,7 @@ export class AnimalSystem {
   }
 
   _createHerd(species, def, x, z, rng, seed) {
-    const Cls = SPECIES_CLASSES[species];
+    const Cls = SPECIES_CLASSES[resolveSpecies(species, this._fauna, this._cfg.SPECIES).base];
     const herd = { id: this.herds.length, species, x, z, radius: this._fauna.HERD_RADIUS, members: [] };
     this.herds.push(herd);
     const size = rng.int(def.HERD_SIZE[0], def.HERD_SIZE[1]);
@@ -228,11 +243,11 @@ export class AnimalSystem {
       const d2 = (a.x - p.x) ** 2 + (a.z - p.z) ** 2;
       if (d2 > r2) continue;
       a.update(dt, env);
-      this._visible[a.species].push(a);
+      (this._visible[a.species] ??= []).push(a);
       active++;
     }
     this.activeCount = active;
-    for (const id in this._renderers) this._renderers[id].update(this._visible[id]);
+    for (const id in this._renderers) this._renderers[id].update(this._visible[id] ?? []);
   }
 
   // ---- Consultas ---------------------------------------------------------------

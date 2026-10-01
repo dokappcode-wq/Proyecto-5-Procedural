@@ -78,11 +78,29 @@ export class AtmosphereSystem {
     this.apply();
   }
 
+  /** Bajo el agua: niebla cercana del color del agua ({ color, visibility } o null). */
+  setUnderwater(state) {
+    this._underwater = state;
+    this.apply();
+  }
+
   apply() {
-    if (this.airless) {
-      this._applyAirless();
-      return;
-    }
+    if (this.airless) this._applyAirless();
+    else this._applyAir();
+    this._applyUnderwater();
+  }
+
+  _applyUnderwater() {
+    const u = this._underwater;
+    const fog = this._scene.fog;
+    if (!u || !fog) return;
+    fog.color.set(u.color).multiplyScalar(0.55);
+    fog.near = 0.5;
+    fog.far = Math.max(4, u.visibility);
+    if (this._scene.background?.isColor) this._scene.background.copy(fog.color);
+  }
+
+  _applyAir() {
     const P = this._P;
     const p = this._p;
     const sun = this._time.getSunDirection(this._sunDir);

@@ -42,7 +42,7 @@ export class DiscoveryTracker {
     for (const a of this._animals.getAnimalsNear(p.x, p.z, this._animalDistance)) {
       if (this._seenSpecies.has(a.species)) continue;
       this._seenSpecies.add(a.species);
-      const def = this._species[a.species];
+      const def = a.def ?? this._species[a.species];
       this._events.emit(GameEvents.ANIMAL_DISCOVERED, { species: a.species, name: def.NAME, namePlural: def.NAME_PLURAL });
     }
   }

@@ -20,6 +20,7 @@ export const GameEvents = Object.freeze({
   // Jugador
   PLAYER_JUMPED: 'player:jumped',
   PLAYER_LANDED: 'player:landed',                   // { fallSpeed }
+  PLAYER_SWIM_CHANGED: 'player:swim',                // { swimming, underwater, surface }
   PLAYER_FLY_CHANGED: 'player:flyChanged',          // { flying }
   PLAYER_BIOME_CHANGED: 'player:biomeChanged',      // { biome: { id, name, weights, temperature }, first }
   PLAYER_DAMAGED: 'player:damaged',                 // { amount, source, sourceName, fromX, fromZ }

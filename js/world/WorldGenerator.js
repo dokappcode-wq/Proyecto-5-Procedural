@@ -217,6 +217,29 @@ export class WorldGenerator {
     return this._cfg.SEA_LEVEL;
   }
 
+  /**
+   * Altura de la superficie del agua en (x, z) si ahí hay agua (charca o mar), o null.
+   * Lo usan el nado/buceo y la respiración bajo el agua.
+   */
+  waterSurfaceAt(x, z) {
+    const pond = this.water.getPondAt(x, z);
+    if (pond) return pond.level;
+    if (this._planet.HAS_SEA !== false && this.getHeightAt(x, z) < this._cfg.SEA_LEVEL) return this._cfg.SEA_LEVEL;
+    return null;
+  }
+
+  /** Cómo es el agua de este cuerpo: { swim, dive, visibility, seaColor, pondColor }. */
+  get fluid() {
+    const F = this._planet.FLUID ?? {};
+    return {
+      swim: F.SWIM ?? true,
+      dive: F.DIVE ?? true,
+      visibility: F.VISIBILITY ?? 25,
+      seaColor: this._planet.COLORS.SEA,
+      pondColor: this._planet.WATER.COLOR,
+    };
+  }
+
   /** Área jugable (el mar del borde queda fuera). */
   getBounds() {
     const h = this._half - this._cfg.EDGE_MARGIN;

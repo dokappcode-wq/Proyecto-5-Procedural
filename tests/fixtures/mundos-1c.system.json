@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "name": "Pruebas 1c",
+  "description": "Sistema de prueba de los generadores, el agua y la vida parametrizada (no es parte del juego).",
+  "star": { "name": "Prueba", "type": "white_dwarf" },
+  "planets": [
+    {
+      "name": "Piélago",
+      "size": "medium",
+      "terrain": { "generator": "archipelago", "params": { "land_fraction": 0.35, "sea_depth": 18 } },
+      "water": { "sea": true, "sea_color": "#1a7fa0", "visibility_m": 40 },
+      "flora": [
+        { "template": "broadleaf_tree", "biome": "low", "density": 0.05, "color": "#d06a2a", "size": 1.6 },
+        { "template": "fruit_tree", "biome": "mid", "density": 0.05, "color": "#8a3fa0", "fruit_color": "#ffd23a" },
+        { "template": "rock", "biome": "low", "density": 0.02 }
+      ],
+      "fauna": [
+        { "template": "goat", "herds": 6, "name": "Saltarrocas", "size": 0.6, "color": "#d8b0f0", "temperament": "curious" },
+        { "template": "cow", "herds": 4, "name": "Coloso", "size": 2.2, "color": "#4a5a7a", "temperament": "aggressive", "biome": "mid" },
+        { "template": "deer", "herds": 5 }
+      ],
+      "moons": [
+        { "name": "Duna Menor", "terrain": { "generator": "dunes", "params": { "dune_height": 8 } }, "physics": { "gravity": 0.4, "breathable": false } }
+      ]
+    },
+    { "name": "Mesa Alta", "size": "small", "orbit": { "distance": 2 }, "terrain": { "generator": "highlands" } },
+    { "name": "Hondo", "size": "small", "orbit": { "distance": 3 }, "terrain": { "generator": "ocean_world" }, "water": { "dive": false } }
+  ]
+}

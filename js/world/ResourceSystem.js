@@ -192,7 +192,8 @@ export class ResourceSystem {
         if (!this._isValidSpot(type, x, z, y)) continue;
 
         const def = this._types[type];
-        const scale = def.SCALE[0] + (def.SCALE[1] - def.SCALE[0]) * rScale;
+        const size = this._cfg.SIZE?.[type] ?? 1; // tamaño propio del sistema solar
+        const scale = (def.SCALE[0] + (def.SCALE[1] - def.SCALE[0]) * rScale) * size;
         const id = `${cx}:${cz}:${index++}`;
         nodes.push({
           id,
@@ -204,7 +205,7 @@ export class ResourceSystem {
           rotation: rRot * Math.PI * 2,
           variant: Math.floor(rVar * 3),
           tint: rTint,
-          radius: def.COLLISION_RADIUS * (type === 'ROCK' ? scale : 1),
+          radius: def.COLLISION_RADIUS * (type === 'ROCK' ? scale : size),
           remaining: def.HARVEST ? def.HARVEST.AMOUNT : 0,
           depleted: false,
           removed: this._removed.has(id),

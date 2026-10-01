@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.4.0',
+    VERSION: '1.5.0',
   },
 
   RENDER: {
@@ -92,6 +92,16 @@ export const GameConfig = deepFreeze({
     RADIUS: 0.35,
     WALK_SPEED: 4.3,
     RUN_SPEED: 7.5,
+    // Nadar y bucear (en el mar o en una charca más honda que ENTER_DEPTH).
+    SWIM: {
+      SPEED: 2.4,               // m/s
+      RUN_SPEED: 3.6,           // con Shift
+      VERTICAL_SPEED: 2.2,      // Espacio sube, C bucea
+      ENTER_DEPTH: 1.15,        // m de agua sobre los pies a partir de los que se nada
+      FLOAT_DEPTH: 1.3,         // pies bajo la superficie al flotar (la cabeza queda fuera)
+      BUOYANCY: 2.5,            // lo deprisa que se vuelve a flotar sin pulsar nada
+      ENTRY_DAMPING: 0.25,      // al caer al agua la velocidad vertical se reduce a esto
+    },
     FLY_SPEED: 18,
     GROUND_ACCELERATION: 40,  // m/s² — respuesta en suelo
     AIR_ACCELERATION: 10,     // m/s² — control en el aire

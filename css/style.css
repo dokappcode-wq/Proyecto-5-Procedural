@@ -1030,3 +1030,10 @@ body.ship-alarm #alarm-overlay { animation: alarm-pulse 1s ease-in-out infinite;
   font-family: ui-monospace, Consolas, monospace; letter-spacing: 0.12em; text-transform: uppercase;
   color: #cfefff; text-shadow: 0 0 12px rgba(100, 200, 255, 0.9); font-size: 1.1rem; text-align: center;
 }
+
+/* ---- Bajo el agua: tinte azulado y viñeta ----------------------------------------- */
+body.underwater #vignette {
+  background:
+    radial-gradient(ellipse at center, rgba(40, 120, 170, 0.18) 0%, rgba(8, 40, 70, 0.55) 75%, rgba(2, 16, 34, 0.85) 100%);
+  opacity: 1;
+}
