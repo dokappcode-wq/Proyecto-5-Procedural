@@ -3,7 +3,7 @@
 Prototipo conceptual 3D en navegador: HTML + CSS + JavaScript (ES modules) + Three.js/WebGL.
 Sin motores externos y sin paso de compilación.
 
-**Estado actual: v1.4.0 — el Edén es el tutorial: al terminarlo, la nave recibe el nodo de velocidad-luz y salta por el hiperespacio a los sistemas del catálogo (el primero, Kappa). Además: las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y los bloques 1a y 1b de los sistemas solares importables: el juego se construye a partir de un sistema descrito en JSON, con regiones de 0,5 a 20 km, varios planetas y crucero interplanetario.**
+**Estado actual: v1.5.0 — nuevos tipos de terreno (archipiélago, mundo oceánico, altiplano, dunas), nadar y bucear, y flora y fauna con nombre, tamaño, color y carácter propios. Antes: el Edén es el tutorial: al terminarlo, la nave recibe el nodo de velocidad-luz y salta por el hiperespacio a los sistemas del catálogo (el primero, Kappa). Además: las 14 fases, la ampliación del sistema solar (etapas E1–E6 y la IA, con final de demo) y los bloques 1a y 1b de los sistemas solares importables: el juego se construye a partir de un sistema descrito en JSON, con regiones de 0,5 a 20 km, varios planetas y crucero interplanetario.**
 
 Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El Jardín del Edén** (antes "MUNDO 0"), con sus dos lunas.
 
@@ -28,6 +28,7 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
+| 1c | Generadores `archipelago`, `ocean_world`, `highlands` y `dunes`; nadar y bucear (capacidad del motor: cada sistema la activa o ajusta con `water.swim/dive/visibility_m`; bajo el agua no se respira sin traje); fauna con `name`, `size`, `color`, `temperament` y `biome`; flora con `color`, `fruit_color` y `size` |
 | HS | Hiperespacio: al terminar el tutorial (el Edén) la IA convierte el nodo galáctico en un nodo de velocidad-luz. En el borde de cualquier sistema, la IA pregunta a qué sistema ir (panel de navegación con el catálogo `systems/catalogo.json`); cada salto gasta 1 batería de la nave y la partida (mochila, traje, nave, baterías) viaja contigo |
 | 1b | Regiones de tamaño real (enano 0,5 km · pequeño 1 · mediano 5 · grande 10 · enorme 20) con caché de terreno que descarta lo más antiguo; varios planetas por sistema alrededor de una estrella, todas las lunas visitables, animales en cada cuerpo con fauna, crucero interplanetario y rumbo automático que rodea los planetas |
 | 1a | Sistemas solares como datos: catálogo del motor, esquema v1, lectura segura de JSON, validador con rutas de error, compilador. El Jardín del Edén vive en `systems/jardin-del-eden.system.json` y cada partida tiene una semilla numérica aleatoria |
@@ -60,6 +61,7 @@ Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 | `C` | Bajar (solo en vuelo) |
 | Ratón | Mirar (clic en el juego para capturarlo, `Esc` para liberarlo) |
 | `V` | Alternar 1ª / 3ª persona |
+| En el agua: `Espacio` · `C` · `Shift` | Subir · bucear · nadar más rápido (sin traje, bajo el agua se aguanta la respiración) |
 | `E` | Recoger (talar, picar, coger manzanas) / beber (mirando al agua) |
 | Clic izquierdo / `F` | Golpear animal (o recoger) |
 | `1`–`9` | Seleccionar objeto de la barra |
