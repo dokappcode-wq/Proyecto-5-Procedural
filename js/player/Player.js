@@ -33,6 +33,7 @@ export class Player {
       isFlying: false,
       isSwimming: false,     // en el agua (mar o charca honda)
       headUnderwater: false, // buceando: sin aire salvo con el traje
+      isClimbing: false,     // trepando una pendiente empinada (gasta energía)
     };
 
     this.model = new PlayerModel({ colors: config.COLORS });
@@ -79,6 +80,8 @@ export class Player {
       horizontalSpeed,
       maxSpeed: this._cfg.RUN_SPEED,
       onGround: this.state.onGround || this.state.isFlying,
+      climbing: this.state.isClimbing,
+      climbMoving: this.state.isClimbing && this.state.isMoving,
       headPitch: THREE.MathUtils.clamp(this.pitch, -0.7, 0.7),
       headYaw: THREE.MathUtils.clamp(wrapAngle(this.yaw - this.bodyYaw), -1.1, 1.1),
     });

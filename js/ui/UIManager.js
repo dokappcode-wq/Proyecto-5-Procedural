@@ -138,14 +138,8 @@ export class UIManager {
     events.on(GameEvents.PLAYER_BIOME_CHANGED, ({ biome, first }) => {
       this.el.biome.textContent = biome.name;
       this.el.biome.dataset.biome = biome.id;
-      if (!first && this._started) this.showMessage(`Has entrado en: ${biome.name}`, 'biome');
     });
-    events.on(GameEvents.WATER_DISCOVERED, ({ first }) =>
-      this.showMessage(first ? 'Has encontrado agua.' : 'Has encontrado otra fuente de agua.', 'biome'),
-    );
-    events.on(GameEvents.ANIMAL_DISCOVERED, ({ namePlural }) =>
-      this.showMessage(`Has encontrado ${namePlural.toLowerCase()}.`, 'biome'),
-    );
+    // (Sin avisos de "Has entrado en…" ni "Has encontrado…": se descubre mirando.)
     events.on(GameEvents.INTERACTION_TARGET_CHANGED, ({ target }) => this._showTarget(target));
     events.on(GameEvents.PLAYER_ACTION, () => this._pulseCrosshair());
     events.on(GameEvents.INVENTORY_CHANGED, (e) => this._renderInventory(e));

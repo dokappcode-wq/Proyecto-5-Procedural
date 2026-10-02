@@ -24,7 +24,7 @@ export class PropMesher {
       nodes.map((n) => ({
         template: this._pick(n.type === 'APPLE_TREE' && n.depleted ? 'APPLE_TREE_EMPTY' : n.type, n.variant),
         x: n.x,
-        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : 0.12),
+        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' ? 0 : 0.12),
         z: n.z,
         scale: n.scale,
         rotation: n.rotation,
@@ -114,6 +114,26 @@ export class PropMesher {
       return b.build();
     };
 
+    // Telaraña: radios y anillos finos en el plano XY local (radio 1, centro en el origen).
+    const cobweb = () => {
+      const b = new PartsBuilder();
+      const box = new THREE.BoxGeometry(1, 1, 1);
+      const white = C.COBWEB ?? 0xe9eef2;
+      const spokes = 8;
+      for (let i = 0; i < spokes; i++) {
+        const a = (i / spokes) * Math.PI * 2;
+        b.add(box, { position: [Math.cos(a) * 0.5, Math.sin(a) * 0.5, 0], rotation: [0, 0, a], scale: [1, 0.022, 0.015], color: white });
+      }
+      for (const r of [0.28, 0.55, 0.82]) {
+        for (let i = 0; i < spokes; i++) {
+          const a = ((i + 0.5) / spokes) * Math.PI * 2;
+          const len = 2 * r * Math.sin(Math.PI / spokes);
+          b.add(box, { position: [Math.cos(a) * r, Math.sin(a) * r, 0], rotation: [0, 0, a + Math.PI / 2], scale: [len, 0.018, 0.012], color: white });
+        }
+      }
+      return b.build();
+    };
+
     const pine = (variant) => {
       const b = new PartsBuilder();
       b.add(trunk, { position: [0, 0.7, 0], scale: [0.2, 1.4, 0.2], color: C.TRUNK });
@@ -196,6 +216,7 @@ export class PropMesher {
     };
 
     return {
+      COBWEB: [cobweb()],
       TREE: [tree(0), tree(1), tree(2)],
       PINE: [pine(0), pine(1)],
       APPLE_TREE: [appleTree(0), appleTree(1)],

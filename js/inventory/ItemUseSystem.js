@@ -28,6 +28,11 @@ export class ItemUseSystem {
     this._events = events;
     this._cooldown = 0;
     this._queued = false;
+    // El agua solo se lleva en el odre: sin odres (o con menos), la que no cabe se pierde.
+    events.on(GameEvents.INVENTORY_CHANGED, () => {
+      const extra = this._inventory.getItemCount('WATER') - this.waterCapacity;
+      if (extra > 0) this._inventory.removeItem('WATER', extra);
+    });
   }
 
   update(dt) {
@@ -75,6 +80,11 @@ export class ItemUseSystem {
         break;
       case 'BATTERY':
         this._events.emit(GameEvents.BATTERY_USE_REQUEST, { itemId });
+        ok = true;
+        break;
+      case 'BUILD':
+        // Una estación fabricada (mesa de refinería): se coloca en el modo construcción.
+        this._events.emit(GameEvents.BUILD_PIECE_REQUEST, { pieceId: def.BUILD_PIECE });
         ok = true;
         break;
       case 'MAP':

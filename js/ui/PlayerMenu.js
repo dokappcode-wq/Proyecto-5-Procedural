@@ -21,11 +21,11 @@ import { GameEvents } from '../core/GameEvents.js';
  * Solo vista: inventario, ropa y fabricación viven en sus sistemas. Todo el
  * texto se pinta con textContent.
  */
-export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTING' });
+export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTING', STATION: 'STATION' });
 const KEY_TAB = { Tab: MenuTab.CRAFTING, KeyI: MenuTab.INVENTORY };
 
 export class PlayerMenu extends ModalPanel {
-  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop }) {
+  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop, stations = {} }) {
     super({
       id: 'player-menu', title: 'Reloj de pulsera', container, input, events,
       footer: '<kbd>Clic</kbd> coger / dejar · <kbd>Clic dcho</kbd> la mitad / una · <kbd>Shift</kbd>+<kbd>Clic</kbd> mover rápido · <kbd>Doble clic</kbd> fabricar · <kbd>Esc</kbd> cerrar',
@@ -40,6 +40,8 @@ export class PlayerMenu extends ModalPanel {
     this._time = time;
     this._hotbar = hotbar;
     this._onDrop = onDrop ?? (() => {});
+    this._stations = stations;   // { REFINERY: { NAME, ICON } }
+    this.station = null;         // estación desde la que se ha abierto (o null)
     this.tab = MenuTab.CRAFTING;
     this._hover = null;
     this._recipe = null;      // receta seleccionada
@@ -58,6 +60,7 @@ export class PlayerMenu extends ModalPanel {
     events.on(GameEvents.INVENTORY_CHANGED, redraw);
     events.on(GameEvents.EQUIPMENT_CHANGED, redraw);
     events.on(GameEvents.HOTBAR_CHANGED, redraw);
+    events.on(GameEvents.CRAFT_QUEUE_CHANGED, () => this.isOpen && this._renderQueue());
   }
 
   update(dt) {
@@ -65,7 +68,7 @@ export class PlayerMenu extends ModalPanel {
     if (this._keyRequest) {
       const want = this._keyRequest;
       this._keyRequest = null;
-      if (want === this.tab) this.setOpen(false);
+      if (want === this.tab || (want === MenuTab.CRAFTING && this.tab === MenuTab.STATION)) this.setOpen(false);
       else this.setTab(want);
       return;
     }
@@ -79,29 +82,41 @@ export class PlayerMenu extends ModalPanel {
     if (this._statTimer > 0) return;
     this._statTimer = 0.25;
     this._renderStats();
+    this._renderQueue();
   }
 
-  open(tab) {
+  /** @param {string} tab @param {{ station?: string }} [opts] estación (mesa de refinería) */
+  open(tab, { station = null } = {}) {
+    this.station = station;
+    const def = station ? this._stations[station] : null;
+    this._tabButtons.STATION.classList.toggle('hidden', !def);
+    if (def) this._tabButtons.STATION.textContent = def.NAME.replace(/^Mesa de /i, '');
     this.setTab(tab);
     this.setOpen(true);
   }
 
   setOpen(open) {
-    if (!open) this._inv.returnCursor();
+    if (!open) {
+      this._inv.returnCursor();
+      this.station = null;
+      this._tabButtons.STATION.classList.add('hidden');
+      if (this.tab === MenuTab.STATION) this.tab = MenuTab.CRAFTING;
+    }
     if (this.isOpen === open) return;
     super.setOpen(open);
     this._cursorEl.classList.add('hidden');
-    this._events.emit(GameEvents.CRAFTING_PANEL_TOGGLED, { open: open && this.tab === MenuTab.CRAFTING });
+    this._events.emit(GameEvents.CRAFTING_PANEL_TOGGLED, { open: open && this.tab !== MenuTab.INVENTORY });
   }
 
   setTab(tab) {
-    if (!MenuTab[tab]) return;
+    if (!MenuTab[tab] || (tab === MenuTab.STATION && !this.station)) return;
     if (tab !== this.tab) this._inv.returnCursor();
     this.tab = tab;
+    const crafting = tab !== MenuTab.INVENTORY;
     for (const [t, b] of Object.entries(this._tabButtons)) b.classList.toggle('active', t === tab);
-    this._invSection.classList.toggle('hidden', tab !== MenuTab.INVENTORY);
-    this._craftSection.classList.toggle('hidden', tab !== MenuTab.CRAFTING);
-    this._toolbar.classList.toggle('hidden', tab !== MenuTab.CRAFTING);
+    this._invSection.classList.toggle('hidden', crafting);
+    this._craftSection.classList.toggle('hidden', !crafting);
+    this._toolbar.classList.toggle('hidden', !crafting);
     if (this.isOpen) this.render();
   }
 
@@ -113,12 +128,13 @@ export class PlayerMenu extends ModalPanel {
     // Pestañas.
     const tabs = el('nav', 'pm-tabs');
     this._tabButtons = {};
-    for (const [tab, label] of [[MenuTab.INVENTORY, 'Inventario'], [MenuTab.CRAFTING, 'Fabricación']]) {
+    for (const [tab, label] of [[MenuTab.INVENTORY, 'Inventario'], [MenuTab.CRAFTING, 'Fabricación'], [MenuTab.STATION, 'Estación']]) {
       const b = button(label, 'pm-tab');
       b.addEventListener('click', () => this.setTab(tab));
       this._tabButtons[tab] = b;
       tabs.append(b);
     }
+    this._tabButtons.STATION.classList.add('hidden');
     const close = button('✕', 'pm-close');
     close.setAttribute('aria-label', 'Cerrar');
     close.addEventListener('click', () => this.setOpen(false));
@@ -186,7 +202,9 @@ export class PlayerMenu extends ModalPanel {
     // Fabricación: rejilla de recetas.
     this._craftSection = el('section', 'pm-crafting');
     this._recipeGrid = el('div', 'pm-grid pm-recipes');
-    this._craftSection.append(this._recipeGrid);
+    // Cola de fabricación: lo que se está haciendo (con tiempo); clic para cancelar.
+    this._queueEl = el('div', 'pm-queue');
+    this._craftSection.append(this._recipeGrid, this._queueEl);
 
     // Detalle (objeto señalado o receta seleccionada).
     this._detail = el('div', 'pm-detail');
@@ -285,7 +303,10 @@ export class PlayerMenu extends ModalPanel {
   }
 
   _recipeList() {
+    // En la pestaña de la estación, sus recetas; en Fabricación, todas (las de estación, bloqueadas).
+    const atStation = this.tab === MenuTab.STATION;
     return this._crafting.getRecipes().filter((r) => {
+      if (atStation && r.station !== this.station) return false;
       if (this._category === 'READY' && !r.canCraft) return false;
       if (this._category !== 'ALL' && this._category !== 'READY' && r.category !== this._category) return false;
       return !this._query || r.name.toLowerCase().includes(this._query);
@@ -298,9 +319,11 @@ export class PlayerMenu extends ModalPanel {
     this._recipeGrid.replaceChildren();
     if (!list.length) this._recipeGrid.append(el('p', 'pm-empty', 'No hay recetas con ese filtro.'));
     for (const r of list) {
-      const tile = el('div', `pm-slot pm-recipe${r.canCraft ? ' ready' : ''}${r.id === this._recipe ? ' selected' : ''}`);
+      const locked = this._locked(r);
+      const tile = el('div', `pm-slot pm-recipe${r.canCraft && !locked ? ' ready' : ''}${locked ? ' locked' : ''}${r.id === this._recipe ? ' selected' : ''}`);
       tile.append(el('span', 'icon', r.icon), el('span', 'pm-recipe-name', r.name));
-      if (r.canCraft) tile.append(el('span', 'pm-badge', `×${r.max}`));
+      if (locked) tile.append(el('span', 'pm-badge pm-lock', this._stations[r.station]?.ICON ?? '🔒'));
+      else if (r.canCraft) tile.append(el('span', 'pm-badge', `×${r.max}`));
       tile.addEventListener('click', () => {
         this._recipe = r.id;
         this._renderRecipes();
@@ -317,8 +340,41 @@ export class PlayerMenu extends ModalPanel {
     if (got) this._onDrop(got.id, got.count);
   }
 
+  /** Receta de una estación vista fuera de ella. */
+  _locked(r) {
+    return !!r.station && r.station !== this.station;
+  }
+
   _craft(id, times) {
-    for (let i = 0; i < times; i++) if (!this._crafting.craft(id)) break;
+    for (let i = 0; i < times; i++) if (!this._crafting.craft(id, { station: this.station })) break;
+    this._renderQueue();
+  }
+
+  /** Cola de fabricación: el primero con barra de progreso y el tiempo que le queda. */
+  _renderQueue() {
+    const box = this._queueEl;
+    if (!box) return;
+    const q = this._crafting.queue;
+    box.replaceChildren();
+    box.classList.toggle('hidden', !q.length);
+    if (!q.length) return;
+    box.append(el('span', 'pm-sub', 'Fabricando'));
+    q.forEach((entry, i) => {
+      const r = this._crafting.getRecipes().find((x) => x.id === entry.recipeId);
+      const item = el('button', `pm-queue-item${i === 0 ? ' active' : ''}`);
+      item.type = 'button';
+      item.title = 'Clic: cancelar (se devuelven los materiales)';
+      item.append(el('span', 'icon', r?.icon ?? '?'));
+      if (i === 0) {
+        const bar = el('span', 'pm-queue-bar');
+        const fill = el('span');
+        fill.style.width = `${Math.round(this._crafting.progress * 100)}%`;
+        bar.append(fill);
+        item.append(bar, el('span', 'pm-queue-time', `${Math.ceil(Math.max(0, entry.left))} s`));
+      }
+      item.addEventListener('click', () => this._crafting.cancel(entry.uid));
+      box.append(item);
+    });
   }
 
   /** Abajo: el objeto bajo el ratón o, en fabricación, la receta seleccionada. */
@@ -332,7 +388,7 @@ export class PlayerMenu extends ModalPanel {
       d.append(el('p', 'pm-hint', `Ranura de ropa: ${slot?.NAME.toLowerCase() ?? ''}. Coge una prenda con clic y déjala aquí (o Shift+clic sobre ella).`));
       return;
     }
-    if (this.tab === MenuTab.CRAFTING && this._recipe) return this._recipeDetail(d);
+    if (this.tab !== MenuTab.INVENTORY && this._recipe) return this._recipeDetail(d);
     d.append(el('p', 'pm-hint', this._inv.cursor ? 'Haz clic en un hueco para dejarlo.' : 'Pasa el ratón sobre un objeto para ver qué es.'));
   }
 
@@ -361,12 +417,14 @@ export class PlayerMenu extends ModalPanel {
       ing.append(el('li', i.have >= i.amount ? 'ok' : 'missing', `${i.icon} ${i.name} ${i.have}/${i.amount}`));
     }
     info.append(ing);
+    const locked = this._locked(r);
+    info.append(el('span', 'pm-time', `⏱ ${r.time} s${locked ? ` · se fabrica en: ${this._stations[r.station]?.ICON ?? ''} ${this._stations[r.station]?.NAME ?? r.station}` : ''}`));
     const actions = el('div', 'pm-actions');
     const one = button('Fabricar', 'pm-craft');
-    one.disabled = !r.canCraft;
+    one.disabled = !r.canCraft || locked;
     one.addEventListener('click', () => this._craft(r.id, 1));
     const five = button(`×${Math.min(5, Math.max(1, r.max))}`, 'pm-craft');
-    five.disabled = !r.canCraft;
+    five.disabled = !r.canCraft || locked;
     five.title = 'Fabricar varios';
     five.addEventListener('click', () => this._craft(r.id, Math.min(5, r.max)));
     actions.append(one, five);

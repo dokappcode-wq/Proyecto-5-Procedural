@@ -1160,3 +1160,27 @@ body.underwater #vignette {
 }
 .message.bump { animation: msg-bump 0.25s ease-out; }
 @keyframes msg-bump { 50% { transform: scale(1.08); } }
+
+/* HUD limpio: sin bioma, día/hora, versión/seed/cámara ni indicador de dieta en pantalla
+   (la hora está en el reloj de pulsera; el resto, en el modo Admin). */
+#biome, #clock, #top-left, #stats .diet { display: none !important; }
+
+/* Menú: recetas de estación bloqueadas, tiempo y cola de fabricación. */
+#player-menu .pm-recipe.locked { opacity: 0.4; }
+#player-menu .pm-lock { color: #ffd27a; }
+#player-menu .pm-time { color: #9fe8ff; font-size: 0.82rem; }
+#player-menu .pm-queue { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+#player-menu .pm-queue-item {
+  position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; cursor: pointer;
+  font: inherit; color: #dff7ff; background: rgba(4, 22, 40, 0.8); border: 1px solid rgba(110, 220, 255, 0.35);
+}
+#player-menu .pm-queue-item .icon { font-size: 1.3rem; }
+#player-menu .pm-queue-item:hover { border-color: #ff9a8a; }
+#player-menu .pm-queue-item.active { border-color: var(--pm-cyan); }
+#player-menu .pm-queue-bar { width: 90px; height: 6px; background: rgba(255, 255, 255, 0.12); }
+#player-menu .pm-queue-bar span { display: block; height: 100%; background: linear-gradient(90deg, #39c49a, #7af0c6); }
+#player-menu .pm-queue-time { font-size: 0.78rem; color: #9fe8ff; min-width: 2.5em; }
+
+/* Con tres pestañas (estación) los títulos se encogen para no invadir la columna «Tú». */
+#player-menu .pm-tabs { gap: clamp(10px, 1.6vw, 26px); min-width: 0; }
+#player-menu .pm-tab { font-size: clamp(1rem, 1.7vw, 2rem); white-space: nowrap; }

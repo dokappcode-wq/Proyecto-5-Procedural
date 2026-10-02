@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.9.1',
+    VERSION: '1.10.0',
   },
 
   RENDER: {
@@ -111,7 +111,14 @@ export const GameConfig = deepFreeze({
     GRAVITY: 9.81 * 1.0,
     TERMINAL_VELOCITY: 40,
     MAX_STEP_HEIGHT: 0.45,    // escalones que se suben sin saltar
-    MAX_WALKABLE_SLOPE_DEG: 50, // pendientes más inclinadas no se pueden subir caminando
+    MAX_WALKABLE_SLOPE_DEG: 40, // pendientes más inclinadas no se suben caminando: se escalan
+    // Escalada: al avanzar contra una pendiente de más de START_SLOPE_DEG el personaje trepa
+    // (gasta energía: ENERGY_CLIMB_COST). Sin energía no puede y resbala pendiente abajo.
+    CLIMB: {
+      START_SLOPE_DEG: 40,
+      SPEED: 1.5,             // m/s a lo largo de la pendiente
+      SLIDE_SPEED: 3.5,       // m/s resbalando agotado
+    },
     PITCH_LIMIT: Math.PI / 2 - 0.05,
     BODY_TURN_SPEED: 10,      // rad/s con que el cuerpo gira hacia la dirección de avance
     // Se empieza desnudo: sin ropa, el cuerpo es del color de la piel y tres hojas
@@ -165,7 +172,8 @@ export const GameConfig = deepFreeze({
   },
 
   // Supervivencia (Fase 6). Valores por segundo de juego.
-  // Duraciones aproximadas de 100 → 0: hambre 25 min, sed 15 min, energía 40 min.
+  // Duraciones aproximadas de 100 → 0: hambre 25 min, sed 15 min. La energía no baja con el
+  // tiempo: se gasta al esforzarse y se recupera descansando (EnergySystem).
   SURVIVAL: {
     MAX_HEALTH: 100,
     MAX_HUNGER: 100,
@@ -174,7 +182,6 @@ export const GameConfig = deepFreeze({
 
     HUNGER_DECAY: 100 / 1500,
     THIRST_DECAY: 100 / 900,
-    ENERGY_DECAY: 100 / 2400,
 
     STARVING_DAMAGE: 0.8,           // vida/s con hambre a 0
     DEHYDRATION_DAMAGE: 1.2,        // vida/s con sed a 0
@@ -189,12 +196,19 @@ export const GameConfig = deepFreeze({
 
     DRINK_AMOUNT: 20,               // sed recuperada por trago en una fuente
 
-    ENERGY_RUN_EXTRA: 0.35,         // energía/s extra corriendo
-    ENERGY_ACTION_COST: 0.6,        // por golpear o recoger
-    ENERGY_CHOP_COST: 0.25,         // por cada golpe al talar (se golpea a menudo)
-    ENERGY_JUMP_COST: 0.3,
-    ENERGY_NO_RUN_RATIO: 0.15,      // por debajo no se puede correr
-    EXHAUSTED_SPEED_MULTIPLIER: 0.7, // velocidad con energía a 0
+    // Energía (esfuerzo): gastos por segundo o por acción, y recuperación al descansar.
+    ENERGY_RUN_COST: 5,             // /s corriendo (20 s de carrera con la energía llena)
+    ENERGY_SWIM_RUN_COST: 7,        // /s nadando deprisa
+    ENERGY_CLIMB_COST: 9,           // /s escalando una pendiente
+    ENERGY_CLIMB_HOLD_COST: 3,      // /s agarrado a la pendiente sin moverse
+    ENERGY_ACTION_COST: 4,          // por golpear (animales, rocas) o recoger
+    ENERGY_CHOP_COST: 2.5,          // por golpe al talar, picar o romper
+    ENERGY_JUMP_COST: 4,
+    ENERGY_REGEN: 10,               // /s recuperada al descansar
+    ENERGY_REGEN_DELAY: 1.5,        // s sin esfuerzo antes de empezar a recuperarse
+    ENERGY_REGEN_HUNGRY: 0.5,       // la recuperación se reduce con hambre o sed bajas
+    ENERGY_NO_RUN_RATIO: 0.25,      // agotado: no se corre ni escala hasta recuperar este %
+    EXHAUSTED_SPEED_MULTIPLIER: 0.8, // velocidad agotado
 
     LOW_RATIO: 0.25,                // aviso "tienes sed/hambre/estás cansado"
     CRITICAL_RATIO: 0.1,            // aviso más fuerte y barra parpadeando
@@ -223,11 +237,11 @@ export const GameConfig = deepFreeze({
   RESOURCE_TYPES: {
     TREE: {
       NAME: 'Árbol', COLLISION_RADIUS: 0.24, SCALE_COLLISION: true, SCALE: [1.7, 2.4], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
     },
     PINE: {
       NAME: 'Pino', COLLISION_RADIUS: 0.22, SCALE_COLLISION: true, SCALE: [1.6, 2.5], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
     },
     APPLE_TREE: {
       NAME: 'Manzano', COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1], AIM_HEIGHT: 1.8, AIM_RADIUS: 1.3,
@@ -239,6 +253,13 @@ export const GameConfig = deepFreeze({
       HARVEST: { ITEM: 'STONE', AMOUNT: 2, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 600, VERB: 'Coger piedra suelta' },
       // Romperla entera: solo con un pico (TOOL.MINE_SPEED); a puñetazos no se rompe y duele.
       BREAK: { ITEM: 'STONE', AMOUNT: 5, TIME: 6, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar (mantén el clic)' },
+    },
+    // Telarañas: aparecen tendidas entre dos árboles cercanos (SPAWN). Se rompen a golpes
+    // (1,5 s con el puño) y dan entre 5 y 10 telarañas.
+    COBWEB: {
+      NAME: 'Telaraña', COLLISION_RADIUS: 0, SCALE: [1, 1], AIM_HEIGHT: 0, AIM_RADIUS: 0.8,
+      HARVEST: { ITEM: 'SPIDER_SILK', AMOUNT: 5, AMOUNT_RANGE: [5, 10], REMOVE_WHEN_EMPTY: true, VERB: 'Recoger', METHOD: 'HIT', CHOP_TIME: 1.5, MATERIAL: 'web' },
+      SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.4, MAX_GAP: 3.8, CHANCE: 0.12, HEIGHT: 1.7, MAX_SIZE: 1.45 },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
     MINERAL_ROCK: {
@@ -256,8 +277,14 @@ export const GameConfig = deepFreeze({
     WOOD: { NAME: 'Madera', ICON: '🪵', DESC: 'Trozos de madera: golpea el tronco de un árbol para sacarlos.' },
     STONE: { NAME: 'Piedra', ICON: '🪨' },
     WOOL: { NAME: 'Lana', ICON: '🧶' },
+    SPIDER_SILK: { NAME: 'Telaraña', ICON: '🕸️', DESC: 'Se saca golpeando las telarañas que hay entre algunos árboles. Con 5 se hace una cuerda.' },
+    ROPE: { NAME: 'Cuerda', ICON: '🪢', DESC: 'Hecha con 5 telarañas.' },
     MINERAL: { NAME: 'Mineral', ICON: '💎' },
-    LEATHER: { NAME: 'Cuero', ICON: '🟫' },
+    LEATHER: { NAME: 'Cuero', ICON: '🟫', DESC: 'Se refina en la mesa de refinería.' },
+    REFINED_LEATHER: { NAME: 'Cuero refinado', ICON: '🟤', DESC: 'Cuero curtido en la mesa de refinería: para la ropa y el odre.' },
+    REFINED_STONE: { NAME: 'Piedra refinada', ICON: '⬜', DESC: 'Bloque de piedra tallada (4 piedras).' },
+    REFINED_WOOD: { NAME: 'Madera refinada', ICON: '🟧', DESC: 'Tabla de madera trabajada (2 de madera).' },
+    REFINERY_KIT: { NAME: 'Mesa de refinería', ICON: '🛠️', STACK: 1, USE: 'BUILD', BUILD_PIECE: 'REFINERY', DESC: 'Selecciónala y clic derecho / R para colocarla. Con E en ella: cuero refinado, ropa de cuero y odre.' },
     MEAT: { NAME: 'Carne', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION' },
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
@@ -315,17 +342,31 @@ export const GameConfig = deepFreeze({
   // Recetas (Fase 9): ingredientes → resultado. Solo configuración.
   // (La cama y las piezas de casa se construyen en el modo construcción: BUILD.)
   //   CATEGORY agrupa las recetas en el menú de fabricación (RECIPE_CATEGORIES).
+  //   TIME: segundos que tarda en fabricarse (va a una cola; sigue aunque se cierre el menú).
+  //   STATION: solo se fabrica usando esa estación (E sobre ella), p. ej. la mesa de refinería.
   RECIPES: {
-    WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, CATEGORY: 'SURVIVAL', INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
-    STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', INGREDIENTS: { WOOD: 3, STONE: 2 } },
-    STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', INGREDIENTS: { WOOD: 3, STONE: 3 } },
-    LEATHER_CAP: { RESULT: 'LEATHER_CAP', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 1 } },
-    LEATHER_SHIRT: { RESULT: 'LEATHER_SHIRT', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 3 } },
-    LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 2 } },
-    LEATHER_SHOES: { RESULT: 'LEATHER_SHOES', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 2 } },
-    LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 1 } },
+    REFINED_STONE: { RESULT: 'REFINED_STONE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 5, INGREDIENTS: { STONE: 4 } },
+    REFINED_WOOD: { RESULT: 'REFINED_WOOD', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { WOOD: 2 } },
+    ROPE: { RESULT: 'ROPE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { SPIDER_SILK: 5 } },
+    STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 6, INGREDIENTS: { WOOD: 3, STONE: 2 } },
+    STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 6, INGREDIENTS: { WOOD: 3, STONE: 3 } },
+    REFINERY_KIT: { RESULT: 'REFINERY_KIT', AMOUNT: 1, CATEGORY: 'STATIONS', TIME: 15, INGREDIENTS: { REFINED_STONE: 4, REFINED_WOOD: 2 } },
+    // Mesa de refinería.
+    REFINED_LEATHER: { RESULT: 'REFINED_LEATHER', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { LEATHER: 1 } },
+    WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 2, WOOD: 1 } },
+    LEATHER_CAP: { RESULT: 'LEATHER_CAP', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 6, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 1 } },
+    LEATHER_SHIRT: { RESULT: 'LEATHER_SHIRT', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 12, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 3 } },
+    LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 10, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 2 } },
+    LEATHER_SHOES: { RESULT: 'LEATHER_SHOES', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 2 } },
+    LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 5, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 1 } },
+  },
+  // Estaciones de fabricación (piezas construidas que se usan con E).
+  STATIONS: {
+    REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️' },
   },
   RECIPE_CATEGORIES: {
+    MATERIALS: 'Materiales',
+    STATIONS: 'Estaciones',
     TOOLS: 'Herramientas',
     CLOTHING: 'Ropa',
     SURVIVAL: 'Supervivencia',
@@ -341,6 +382,7 @@ export const GameConfig = deepFreeze({
     GRID: 2,
     RANGE: 7,               // m máximos desde el jugador
     REFUND: 1,              // fracción de materiales devuelta al quitar una pieza
+    BREAK_TIME: 3,          // s de golpes (manteniendo el clic) para romper una pieza fuera del modo construcción; un hacha o un pico lo reducen a la mitad
     PIECES: {
       FOUNDATION: { NAME: 'Cimiento', ICON: '🪨', COST: { STONE: 4 } },
       FLOOR: { NAME: 'Suelo', ICON: '🟫', COST: { WOOD: 2 } },
@@ -352,6 +394,8 @@ export const GameConfig = deepFreeze({
       STAIRS: { NAME: 'Escalera', ICON: '🪜', COST: { WOOD: 4 } },
       ROOF: { NAME: 'Tejado', ICON: '🔺', COST: { WOOD: 3 } },
       BED: { NAME: 'Cama', ICON: '🛏️', COST: { WOOL: 3, WOOD: 3 } },
+      // Se fabrica en el menú (Tab) y se coloca usándola; al quitarla vuelve al inventario.
+      REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️', COST: { REFINERY_KIT: 1 } },
       // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
       CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', COST: { STONE: 4, MINERAL: 3 }, BODIES: 'MOON' },
       OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', COST: { STONE: 4, MINERAL: 4 }, BODIES: 'MOON' },

@@ -99,22 +99,34 @@ test('invulnerable: el daño no afecta', () => {
   assert.equal(health.value, 100);
 });
 
-test('energía: correr y actuar la gastan; agotado no se corre y se camina más lento', () => {
+test('energía: se gasta al esforzarse, se recupera descansando; agotado no se corre ni escala', () => {
   const { events, energy, player } = setup();
   run(energy, 10);
-  const idle = 100 - energy.value;
-  energy.fill();
+  assert.equal(energy.value, 100, 'quieto no se gasta');
   player.state.isRunning = true;
-  run(energy, 10);
-  assert.ok(100 - energy.value > idle * 2, 'correr cansa más');
+  player.state.isMoving = true;
+  run(energy, 4);
+  assert.ok(Math.abs(100 - energy.value - S.ENERGY_RUN_COST * 4) < 0.5, 'correr gasta por segundo');
+  player.state.isRunning = false;
+  player.state.isClimbing = true;
+  const c0 = energy.value;
+  run(energy, 2);
+  assert.ok(c0 - energy.value > S.ENERGY_RUN_COST * 2, 'escalar cansa más que correr');
+  player.state.isClimbing = false;
   const v = energy.value;
-  events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
-  assert.ok(Math.abs(v - energy.value - S.ENERGY_ACTION_COST) < 1e-9);
-  assert.deepEqual(energy.getMovementModifiers(), { canRun: true, speedMultiplier: 1 });
-  energy.set(S.ENERGY_NO_RUN_RATIO * 100 - 1);
-  assert.equal(energy.getMovementModifiers().canRun, false);
+  events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
+  assert.ok(Math.abs(v - energy.value - S.ENERGY_CHOP_COST) < 1e-9, 'cada golpe al talar cuesta');
+  const v2 = energy.value;
+  run(energy, S.ENERGY_REGEN_DELAY + 2);
+  assert.ok(energy.value > v2, 'descansando se recupera');
   energy.set(0);
-  assert.equal(energy.getMovementModifiers().speedMultiplier, S.EXHAUSTED_SPEED_MULTIPLIER);
+  const m = energy.getMovementModifiers();
+  assert.deepEqual([m.canRun, m.canClimb, m.speedMultiplier], [false, false, S.EXHAUSTED_SPEED_MULTIPLIER]);
+  assert.equal(energy.canWork, false, 'agotado no se puede golpear');
+  energy.set(S.ENERGY_NO_RUN_RATIO * 100 - 1);
+  assert.equal(energy.getMovementModifiers().canRun, false, 'hasta recuperar un poco sigue sin correr');
+  energy.set(S.ENERGY_NO_RUN_RATIO * 100 + 1);
+  assert.equal(energy.getMovementModifiers().canRun, true);
 });
 
 test('los avisos de umbral se emiten al cruzar low y critical', () => {

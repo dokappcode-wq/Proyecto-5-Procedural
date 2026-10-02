@@ -141,6 +141,22 @@ export const BUILD_MODELS = {
     b.add(box, { position: [0, 0.46, 0.36], scale: [0.96, 0.06, 1.15], color: BLANKET });
     return b.build();
   },
+  REFINERY() {
+    const b = new PartsBuilder();
+    const wood = 0x8a5a32;
+    const dark = 0x5e3b20;
+    for (const [x, z] of [[-0.78, -0.4], [0.78, -0.4], [-0.78, 0.4], [0.78, 0.4]]) {
+      b.add(box, { position: [x, 0.42, z], scale: [0.12, 0.84, 0.12], color: dark });
+    }
+    b.add(box, { position: [0, 0.88, 0], scale: [1.8, 0.1, 1.0], color: wood });   // tablero
+    b.add(box, { position: [0, 0.3, 0], scale: [1.6, 0.06, 0.85], color: dark });  // balda
+    // Piedra de afilar, cuero tensado y herramientas encima.
+    b.add(box, { position: [-0.5, 1.03, 0.1], scale: [0.42, 0.2, 0.42], color: 0x9a968f });
+    b.add(box, { position: [0.35, 0.95, -0.05], scale: [0.7, 0.03, 0.55], color: 0xb07a45 });
+    b.add(box, { position: [0.62, 0.99, 0.32], scale: [0.3, 0.05, 0.06], color: 0x6a6f76 });
+    b.add(box, { position: [0, 0.38, 0.2], scale: [0.5, 0.12, 0.3], color: 0xc9b089 });
+    return b.build();
+  },
   CHARGING_STATION() {
     const b = new PartsBuilder();
     b.add(box, { position: [0, 0.08, 0], scale: [1.0, 0.16, 0.8], color: STONE_DARK });

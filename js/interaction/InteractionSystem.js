@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
+import { SHAPES } from '../construction/BuildRules.js';
 
 /**
  * InteractionSystem — qué señala el jugador y qué puede hacer con ello.
@@ -29,7 +30,7 @@ import { GameEvents } from '../core/GameEvents.js';
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -43,6 +44,7 @@ export class InteractionSystem {
     this._construction = construction;
     this._providers = providers;
     this._tool = tool ?? (() => null); // herramienta seleccionada ({ CHOP_SPEED }) o null
+    this._canWork = canWork ?? (() => true); // ¿queda energía para golpear?
     this._swing = 0;                   // s hasta el siguiente golpe al tronco
     this._chopProgress = new Map();    // id del árbol → 0..1 de tala
 
@@ -71,11 +73,20 @@ export class InteractionSystem {
       this._events.emit(GameEvents.INTERACTION_TARGET_CHANGED, { target: this.target });
     }
 
-    // Talar: mientras se mantiene el clic sobre un tronco se golpea cada CHOP_SWING s.
+    // Talar / picar / romper: mientras se mantiene el clic se golpea cada CHOP_SWING s.
     const attack = this._input.wasPressed('ATTACK') || this._input.isDown('ATTACK');
-    if ((t?.hit || t?.breakable) && attack) {
+    if (t?.kind === 'structure' && attack) {
+      this._swing -= dt;
+      if (this._swing <= 0) {
+        this._swing = this._cfg.CHOP_SWING ?? 0.6;
+        if (!this._tired()) this._breakSwing(t.ref);
+      }
+      if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
+    } else if ((t?.hit || t?.breakable) && attack) {
       const B = this._types[t.ref.type].BREAK;
-      if (t.hit || this._tool()?.[B.TOOL]) {
+      if (this._tired()) {
+        // agotado: no golpea (aviso en _tired)
+      } else if (t.hit || this._tool()?.[B.TOOL]) {
         this._swing -= dt;
         if (this._swing <= 0) {
           this._swing = this._cfg.CHOP_SWING ?? 0.6;
@@ -145,7 +156,7 @@ export class InteractionSystem {
     const rock = !!def.BREAK && def.HARVEST?.METHOD !== 'HIT';
     const job = rock
       ? { time: def.BREAK.TIME, speed: this._tool()?.[def.BREAK.TOOL] ?? 0, amount: def.BREAK.AMOUNT }
-      : { time: def.HARVEST.CHOP_TIME ?? 15, speed: this._tool()?.CHOP_SPEED ?? 1, amount: def.HARVEST.AMOUNT };
+      : { time: def.HARVEST.CHOP_TIME ?? 15, speed: def.HARVEST.MATERIAL === 'web' ? 1 : this._tool()?.CHOP_SPEED ?? 1, amount: node.total ?? def.HARVEST.AMOUNT };
     const swing = this._cfg.CHOP_SWING ?? 0.6;
     const work = this._chopProgress.get(node.id) ?? { progress: 0, given: 0 };
     work.progress = Math.min(1, work.progress + (swing * job.speed) / job.time);
@@ -171,8 +182,40 @@ export class InteractionSystem {
     const p = this._player.position;
     this._events.emit(GameEvents.RESOURCE_HIT, {
       node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z,
-      felled: done, progress: work.progress, material: rock ? 'stone' : 'wood',
+      felled: done, progress: work.progress, material: rock ? 'stone' : def.HARVEST.MATERIAL ?? 'wood',
     });
+  }
+
+  /** Sin energía no se puede golpear: avisa (de vez en cuando) y devuelve true. */
+  _tired() {
+    if (this._canWork()) return false;
+    this._hint('Estás agotado: para un momento para recuperar energía.');
+    return true;
+  }
+
+  /** Golpe a una pieza construida: al completar BUILD.BREAK_TIME se rompe y devuelve los materiales. */
+  _breakSwing(piece) {
+    const C = this._construction;
+    if (!C?.exists(piece)) return;
+    const tool = this._tool();
+    const speed = tool?.CHOP_SPEED || tool?.MINE_SPEED ? 2 : 1;
+    const key = `st-${piece.id}`;
+    const work = this._chopProgress.get(key) ?? { progress: 0 };
+    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed) / (C._cfg.BREAK_TIME ?? 3));
+    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
+    const stone = Object.keys(piece.cost ?? C.costOf(piece.type) ?? {}).some((k) => k === 'STONE' || k === 'MINERAL');
+    const done = work.progress >= 1;
+    const p = this._player.position;
+    this._events.emit(GameEvents.RESOURCE_HIT, {
+      node: { radius: 0.3 }, x: piece.x, y: piece.y + 0.8, z: piece.z, fromX: p.x, fromZ: p.z, felled: false,
+      material: stone ? 'stone' : 'wood', small: !done,
+    });
+    if (done) {
+      this._chopProgress.delete(key);
+      C.breakPiece(piece);
+    } else {
+      this._chopProgress.set(key, work);
+    }
   }
 
   /** Puñetazo a una roca: no se rompe y duele. */
@@ -266,6 +309,15 @@ export class InteractionSystem {
       );
     }
 
+    // Cualquier pieza construida a lo largo de la mira: se puede romper a golpes.
+    const ray = this._construction?.active ? null : this._construction?.pieceOnRay(this._origin, this._dir, range + 6);
+    if (ray && ray.distance < bestT && Math.hypot(ray.point.x - p.x, ray.point.z - p.z) <= range + 0.6) {
+      if (!(best?.kind === 'structure' && best.ref === ray.piece)) {
+        bestT = ray.distance;
+        best = { kind: 'structure', id: `st-${ray.piece.id}`, ref: ray.piece };
+      }
+    }
+
     // Otros sistemas (nave): botones, puertas, asiento, tecnologías.
     for (const provider of this._providers) {
       for (const it of provider.getInteractablesNear(p.x, p.y, p.z, range)) {
@@ -296,7 +348,10 @@ export class InteractionSystem {
     if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
     if (t.kind === 'provided') return { ...t, label: t.ref.label, action: t.ref.action, key: t.ref.key ?? 'E' };
     if (t.kind === 'structure') {
-      const action = t.ref.actionText ?? (t.ref.type === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : 'Dormir');
+      // Las piezas sin uso (paredes, suelos…) no muestran letrero: se rompen manteniendo el clic.
+      if (!SHAPES[t.ref.type]?.interact) return { ...t, silent: true, label: t.ref.def.NAME, action: null };
+      const kind = SHAPES[t.ref.type].interact;
+      const action = t.ref.actionText ?? (kind === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : kind === 'REFINERY' ? 'Usar' : 'Dormir');
       return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };
     }
     if (t.kind === 'animal') {

@@ -212,7 +212,51 @@ export class ResourceSystem {
         });
       }
     }
+    this._addCobwebs(cx, cz, nodes);
     return nodes;
+  }
+
+  /**
+   * Telarañas tendidas entre dos árboles cercanos (RESOURCE_TYPES.COBWEB.SPAWN).
+   * Usan su propia secuencia aleatoria: no cambian el resto de recursos de la seed.
+   */
+  _addCobwebs(cx, cz, nodes) {
+    const def = this._types.COBWEB;
+    const sp = def?.SPAWN;
+    if (!sp) return;
+    const trees = nodes.filter((n) => sp.BETWEEN.includes(n.type));
+    if (trees.length < 2) return;
+    const rng = new SeededRandom(deriveSeed(this._seed, `webs:${cx},${cz}`));
+    const used = new Set();
+    let k = 0;
+    for (let a = 0; a < trees.length; a++) {
+      for (let b = a + 1; b < trees.length; b++) {
+        const A = trees[a];
+        const B = trees[b];
+        const dx = B.x - A.x;
+        const dz = B.z - A.z;
+        const d = Math.hypot(dx, dz);
+        const roll = rng.next();
+        const rAmount = rng.next();
+        if (d < sp.MIN_GAP || d > sp.MAX_GAP || used.has(A.id) || used.has(B.id) || roll > sp.CHANCE) continue;
+        used.add(A.id);
+        used.add(B.id);
+        const x = (A.x + B.x) / 2;
+        const z = (A.z + B.z) / 2;
+        const id = `${cx}:${cz}:w${k++}`;
+        const [lo, hi] = def.HARVEST.AMOUNT_RANGE;
+        const amount = lo + Math.floor(rAmount * (hi - lo + 1));
+        nodes.push({
+          id, type: 'COBWEB', x, z,
+          y: (A.y + B.y) / 2 + sp.HEIGHT,     // centro de la telaraña
+          scale: Math.min(sp.MAX_SIZE, (d / 2) * 0.85),
+          rotation: Math.atan2(-dz / d, dx / d), // de un tronco al otro
+          variant: 0, tint: rAmount, radius: 0,
+          remaining: amount, total: amount,
+          depleted: false, removed: this._removed.has(id),
+        });
+      }
+    }
   }
 
   _pickType(x, z, roll) {

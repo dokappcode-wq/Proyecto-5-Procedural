@@ -96,17 +96,28 @@ test('dieta: poca comida reciente no se juzga y el tiempo la olvida', () => {
 
 // ---- Fase 9: fabricación ----------------------------------------------------------
 
-test('fabricar consume los ingredientes de la receta y da el resultado', () => {
+test('fabricar consume los ingredientes, tarda su tiempo y da el resultado', () => {
   const w = world();
-  assert.ok(!w.crafting.canCraft('WATERSKIN'));
-  w.inventory.addItem('LEATHER', 3);
+  assert.ok(!w.crafting.canCraft('REFINED_WOOD'));
   w.inventory.addItem('WOOD', 5);
-  w.events.emit(GameEvents.CRAFT_REQUEST, { recipeId: 'WATERSKIN' });
-  assert.equal(w.inventory.getItemCount('WATERSKIN'), 1);
-  assert.equal(w.inventory.getItemCount('LEATHER'), 1);
-  assert.equal(w.inventory.getItemCount('WOOD'), 4);
-  assert.ok(!w.crafting.craft('WATERSKIN'), 'sin materiales no fabrica');
-  assert.equal(w.inventory.getItemCount('WATERSKIN'), 1);
+  w.events.emit(GameEvents.CRAFT_REQUEST, { recipeId: 'REFINED_WOOD' });
+  assert.equal(w.inventory.getItemCount('WOOD'), 3, 'los ingredientes se gastan al empezar');
+  assert.equal(w.inventory.getItemCount('REFINED_WOOD'), 0, 'todavía no está hecho');
+  w.crafting.update(C.RECIPES.REFINED_WOOD.TIME - 0.1);
+  assert.equal(w.inventory.getItemCount('REFINED_WOOD'), 0);
+  w.crafting.update(0.2);
+  assert.equal(w.inventory.getItemCount('REFINED_WOOD'), 1, 'sale al terminar');
+  // Cola y cancelar.
+  assert.ok(w.crafting.craft('REFINED_WOOD'));
+  assert.ok(!w.crafting.craft('REFINED_STONE'), 'sin materiales no fabrica');
+  w.crafting.cancel(w.crafting.queue[0].uid);
+  assert.equal(w.inventory.getItemCount('WOOD'), 3, 'cancelar devuelve los materiales');
+  // Recetas de estación: solo en la mesa de refinería.
+  w.inventory.addItem('LEATHER', 2);
+  assert.ok(!w.crafting.craft('REFINED_LEATHER'), 'fuera de la mesa no');
+  assert.ok(w.crafting.craft('REFINED_LEATHER', { station: 'REFINERY' }));
+  w.crafting.update(C.RECIPES.REFINED_LEATHER.TIME + 0.1);
+  assert.equal(w.inventory.getItemCount('REFINED_LEATHER'), 1);
 });
 
 test('todas las recetas producen objetos definidos con ingredientes definidos', () => {
@@ -152,6 +163,8 @@ test('ropa: cinco ranuras, sale del inventario al ponérsela y abriga sumando', 
 
 test('odre: se llena mirando al agua hasta su capacidad y se bebe de él', () => {
   const w = world();
+  w.inventory.addItem('WATER', 2);
+  assert.equal(w.inventory.getItemCount('WATER'), 0, 'sin odre el agua no se puede llevar');
   w.inventory.addItem('WATERSKIN', 1);
   w.itemUse.use('WATERSKIN');
   assert.ok(w.messages.at(-1).includes('vacío'));

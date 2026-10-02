@@ -150,11 +150,20 @@ test('fabricación: categorías y cuántas veces se puede fabricar', async () =>
   const { CraftingSystem } = await import('../js/crafting/CraftingSystem.js');
   const { events, inv } = setup();
   const crafting = new CraftingSystem({ recipes: C.RECIPES, items: C.ITEMS, inventory: inv, events });
-  inv.addItem('LEATHER', 7);
+  inv.addItem('REFINED_LEATHER', 7);
   const r = Object.fromEntries(crafting.getRecipes().map((x) => [x.id, x]));
   assert.equal(r.LEATHER_SHIRT.max, 2);
   assert.equal(r.LEATHER_GLOVES.max, 7);
   assert.equal(r.WATERSKIN.max, 0, 'falta madera');
+  for (const id of ['LEATHER_CAP', 'LEATHER_SHIRT', 'LEATHER_PANTS', 'LEATHER_SHOES', 'LEATHER_GLOVES', 'WATERSKIN', 'REFINED_LEATHER']) {
+    assert.equal(r[id].station, 'REFINERY', `${id} se hace en la mesa de refinería`);
+  }
+  for (const x of Object.values(r)) assert.ok(x.time > 0, `${x.id} tarda algo`);
+  assert.deepEqual(C.RECIPES.REFINED_STONE.INGREDIENTS, { STONE: 4 });
+  assert.deepEqual(C.RECIPES.REFINED_WOOD.INGREDIENTS, { WOOD: 2 });
+  assert.deepEqual(C.RECIPES.REFINERY_KIT.INGREDIENTS, { REFINED_STONE: 4, REFINED_WOOD: 2 });
+  assert.deepEqual(C.RECIPES.REFINED_LEATHER.INGREDIENTS, { LEATHER: 1 });
+  assert.deepEqual(C.RECIPES.ROPE.INGREDIENTS, { SPIDER_SILK: 5 });
   for (const x of Object.values(r)) assert.ok(C.RECIPE_CATEGORIES[x.category], `${x.id}: categoría conocida`);
 });
 
@@ -169,4 +178,29 @@ test('tirar: se saca de un hueco o de la mano', () => {
   assert.equal(inv.cursor, null);
   assert.equal(inv.getItemCount('STONE'), 0);
   assert.equal(inv.takeFromSlot(0, 1), null);
+});
+
+test('telarañas: entre dos árboles cercanos, dan 5–10 telarañas y con 5 se hace una cuerda', async () => {
+  const { ResourceSystem } = await import('../js/world/ResourceSystem.js');
+  const { loadSystem } = await import('../js/systemdata/SystemLoader.js');
+  const fs = await import('node:fs');
+  const eden = loadSystem(fs.readFileSync(new URL('../systems/jardin-del-eden.system.json', import.meta.url), 'utf8'), { seed: 1 });
+  const res = new ResourceSystem({
+    config: eden.system.bodies[0].profile.RESOURCES, types: C.RESOURCE_TYPES, seed: 4321,
+    world: {
+      chunkSize: 64, half: 512, chunkCount: 16, seaLevel: 0, spawn: { x: 9999, z: 9999 },
+      heightAt: () => 5, sample: () => ({ biomes: { PLAINS: 0, FOREST: 1, FROZEN_MOUNTAINS: 0 } }), isWater: () => false,
+    },
+  });
+  const webs = [];
+  for (let c = 0; c < 16; c++) webs.push(...res.getChunk(c, 3).nodes.filter((n) => n.type === 'COBWEB'));
+  assert.ok(webs.length > 0, 'hay telarañas en el bosque');
+  for (const w of webs) {
+    assert.ok(w.remaining >= 5 && w.remaining <= 10 && w.total === w.remaining, `${w.remaining} telarañas`);
+    assert.equal(w.radius, 0, 'no estorban al pasar');
+  }
+  // Reproducible con la misma seed.
+  const again = res.getChunk(0, 3).nodes.filter((n) => n.type === 'COBWEB').length;
+  assert.equal(again, res.getChunk(0, 3).nodes.filter((n) => n.type === 'COBWEB').length);
+  assert.deepEqual(C.RECIPES.ROPE.INGREDIENTS, { SPIDER_SILK: 5 });
 });

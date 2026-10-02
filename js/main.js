@@ -342,6 +342,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     construction,
     providers: interactionProviders, // nave (botones, puertas, asiento, tecnologías), objetos sueltos, burbujas, meteoritos
     tool: () => cfg.ITEMS[hotbar.selectedId]?.TOOL ?? null, // herramienta seleccionada (hacha: tala más rápido)
+    canWork: () => energy.canWork, // sin energía no se golpea
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -349,7 +350,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const S = cfg.SURVIVAL;
   const hunger = new HungerSystem({ config: S, events });
   const thirst = new ThirstSystem({ config: S, events });
-  const energy = new EnergySystem({ config: S, events, player });
+  const energy = new EnergySystem({ config: S, events, player, hunger, thirst });
   const health = new HealthSystem({
     config: S,
     events,
@@ -513,7 +514,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Menú del reloj de pulsera: Tab = fabricación, I = inventario (mochila 9×3, barra, ropa) + "Tú".
   const playerMenu = new PlayerMenu({
     container: hudRoot, input, events, inventory, equipment, crafting, hotbar, time,
-    items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stats: { health, hunger, thirst, energy },
+    items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stations: cfg.STATIONS, stats: { health, hunger, thirst, energy },
     onDrop: (itemId, count) => {
       dropItems(itemId, count);
       message(`Tiras ${count > 1 ? `${count} × ` : ''}${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'info');
@@ -531,6 +532,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       }
     },
   };
+  // Estaciones (mesa de refinería): E sobre ella abre su pestaña del menú.
+  events.on(GameEvents.CRAFT_STATION_OPEN, ({ station }) => playerMenu.open('STATION', { station }));
+  // Colocar una estación fabricada: modo construcción con esa pieza seleccionada.
+  events.on(GameEvents.BUILD_PIECE_REQUEST, ({ pieceId }) => {
+    if (!construction.active) construction.setActive(true);
+    construction.select(pieceId);
+  });
   // Al abrirlo, el jugador se gira hacia donde miraba, levanta la muñeca para mirar
   // el reloj y la cámara se coloca delante de él (retrato, con el menú a la derecha).
   events.on(GameEvents.UI_PANEL_TOGGLED, ({ id, open }) => {
@@ -688,22 +696,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       mapLabel: 'Señal del nodo espacial', mapColor: '#6fdcff',
     });
   };
-  // Mapa de papel con la señal: se recibe al empezar (y otra vez si se pierde).
-  const giveNodeMap = () => {
-    const node = pickups.get('SPACE_NODE');
-    if (!gameStarted || !node || node.taken || ship.hasSpaceNode || inventory.hasItem(cfg.SHIP.NODE_MAP_ITEM, 1)) return;
-    inventory.addItem(cfg.SHIP.NODE_MAP_ITEM, 1);
-    message(`📡 Una señal: el nodo espacial ha caído ${withPrep('en', homeName)}. Usa el 📜 mapa (selecciónalo y clic derecho / R) y busca el haz de luz azul.`);
-  };
-  events.on(GameEvents.WORLD_GENERATED, () => {
-    dropSpaceNode();
-    giveNodeMap();
-  });
+  // (Ya no se da el mapa de papel de la señal: el nodo se encuentra por su haz de luz azul.)
+  events.on(GameEvents.WORLD_GENERATED, () => dropSpaceNode());
   events.on(GameEvents.GAME_STARTED, () => {
     gameStarted = true;
-    giveNodeMap();
   });
-  events.on(GameEvents.PLAYER_RESPAWNED, giveNodeMap);
   events.on(GameEvents.PICKUP_TAKEN, ({ id }) => {
     if (id === 'SPACE_NODE') message('Llévalo a la nave e instálalo en una ranura libre (E sobre la ranura).');
   });
@@ -1095,6 +1092,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(spaceHUD);
   loop.add(starMapHUD);
   loop.add(playerMenu);
+  loop.add(crafting);     // cola de fabricación (con tiempo)
   loop.add(dropKey);     // Q: tirar el objeto seleccionado
   loop.add(shipMapPanel);
   loop.add(shipChargerPanel);

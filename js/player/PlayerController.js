@@ -41,9 +41,10 @@ export class PlayerController {
     this._events = events;
 
     this._maxSlopeTan = Math.tan(THREE.MathUtils.degToRad(config.MAX_WALKABLE_SLOPE_DEG));
+    this._climbTan = config.CLIMB ? Math.tan(THREE.MathUtils.degToRad(config.CLIMB.START_SLOPE_DEG)) : Infinity;
     this._edgeNoticeCooldown = 0;
     this._wasAtEdge = false;
-    this._mods = { canRun: true, speedMultiplier: 1 };
+    this._mods = { canRun: true, canClimb: true, speedMultiplier: 1 };
     this.gravityScale = 1; // lunas: menos gravedad (se salta más y se cae más despacio)
     this._jumpBuffer = 0;
     this._coyote = 0;
@@ -136,7 +137,7 @@ export class PlayerController {
     if (moving) this._wish.normalize();
 
     p.state.isMoving = moving;
-    p.state.isRunning = moving && input.isDown('RUN') && !p.state.isFlying && this._mods.canRun;
+    p.state.isRunning = moving && input.isDown('RUN') && !p.state.isFlying && !p.state.isClimbing && this._mods.canRun;
 
     if (p.state.isFlying) {
       this._setSwimming(false, false, null); // volando (Admin) no se nada
@@ -178,6 +179,7 @@ export class PlayerController {
       return;
     }
     this._setSwimming(false, false, surface);
+    if (this._updateClimbing(dt)) return;
 
     const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
@@ -312,6 +314,92 @@ export class PlayerController {
       if (h - feet > 0.3 && h - feet < 2.0) return h;
     }
     return null;
+  }
+
+  /**
+   * Escalada: avanzar contra una pendiente de más de CLIMB.START_SLOPE_DEG la trepa
+   * (pegado al terreno, sin gravedad); parado en ella, se queda agarrado. Ambas cosas
+   * gastan energía (EnergySystem lee state.isClimbing). Sin energía no se puede: en
+   * una pendiente así se resbala hacia abajo. Espacio se suelta.
+   * @returns {boolean} true si se ha encargado del movimiento este frame
+   */
+  _updateClimbing(dt) {
+    const C = this._cfg.CLIMB;
+    const p = this._player;
+    const pos = p.position;
+    const t = this._terrain;
+    if (!C || p.state.isFlying) return this._setClimbing(false);
+    // Altura del terreno bajo la huella (en una pendiente, el punto más alto).
+    const foot = (x, z) => {
+      const r = this._cfg.RADIUS;
+      let h = -Infinity;
+      for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) h = Math.max(h, t.getHeightAt(x + dx, z + dz));
+      return h;
+    };
+    const ground = foot(pos.x, pos.z);
+    const center = t.getHeightAt(pos.x, pos.z);
+    const onStructure = this._structures?.surfaceAt(pos.x, pos.z, pos.y + this._cfg.MAX_STEP_HEIGHT) != null;
+    if (onStructure || pos.y - ground > (p.state.isClimbing ? 0.6 : 0.25)) return this._setClimbing(false);
+
+    const d = 0.4;
+    const gx = (t.getHeightAt(pos.x + d, pos.z) - t.getHeightAt(pos.x - d, pos.z)) / (2 * d);
+    const gz = (t.getHeightAt(pos.x, pos.z + d) - t.getHeightAt(pos.x, pos.z - d)) / (2 * d);
+    const steepHere = Math.hypot(gx, gz) > this._climbTan;
+    const moving = this._wish.lengthSq() > 0;
+    let along = 0; // pendiente en la dirección en que se quiere ir
+    if (moving) {
+      const ahead = 0.6;
+      along = (t.getHeightAt(pos.x + this._wish.x * ahead, pos.z + this._wish.z * ahead) - center) / ahead;
+    }
+    const wantsUp = moving && along > this._climbTan;
+    const canClimb = this._mods.canClimb !== false;
+
+    if ((wantsUp || (p.state.isClimbing && steepHere)) && canClimb) {
+      if (this._input.wasPressed('JUMP')) {
+        // Soltarse: pequeño salto hacia atrás.
+        p.velocity.set(-this._wish.x * 2, this._cfg.JUMP_VELOCITY * 0.5, -this._wish.z * 2);
+        p.state.onGround = false;
+        return this._setClimbing(false);
+      }
+      if (moving) {
+        const step = C.SPEED * this._mods.speedMultiplier * dt / Math.sqrt(1 + Math.max(0, along) ** 2);
+        const nx = pos.x + this._wish.x * step;
+        const nz = pos.z + this._wish.z * step;
+        const blocked = this._structures?.blocksAt(nx, nz, this._cfg.RADIUS, pos.y + this._cfg.MAX_STEP_HEIGHT, pos.y + this._cfg.HEIGHT);
+        if (!blocked) {
+          pos.x = nx;
+          pos.z = nz;
+        }
+        this._obstacles?.resolveCollisions(pos, this._cfg.RADIUS, pos.y + 0.05, pos.y + this._cfg.HEIGHT);
+      }
+      pos.y = foot(pos.x, pos.z);
+      p.velocity.set(0, 0, 0);
+      p.state.onGround = true;
+      return this._setClimbing(true);
+    }
+    if (steepHere && !canClimb) {
+      // Agotado en una pendiente demasiado empinada: resbala hacia abajo.
+      const m = Math.hypot(gx, gz);
+      pos.x -= (gx / m) * C.SLIDE_SPEED * dt;
+      pos.z -= (gz / m) * C.SLIDE_SPEED * dt;
+      this._obstacles?.resolveCollisions(pos, this._cfg.RADIUS, pos.y + 0.05, pos.y + this._cfg.HEIGHT);
+      pos.y = foot(pos.x, pos.z);
+      p.velocity.set(0, 0, 0);
+      p.state.onGround = true;
+      this._setClimbing(false);
+      return true;
+    }
+    return this._setClimbing(false);
+  }
+
+  /** @returns {boolean} el mismo valor (para usarlo en `return`) */
+  _setClimbing(on) {
+    const s = this._player.state;
+    if (s.isClimbing !== on) {
+      s.isClimbing = on;
+      this._events.emit(GameEvents.PLAYER_CLIMB_CHANGED, { climbing: on });
+    }
+    return on;
   }
 
   _setSwimming(swimming, underwater, surface) {

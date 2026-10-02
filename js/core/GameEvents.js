@@ -18,6 +18,7 @@ export const GameEvents = Object.freeze({
   CAMERA_BODY_VISIBILITY: 'camera:bodyVisibility',  // { visible }
 
   // Jugador
+  PLAYER_CLIMB_CHANGED: 'player:climbChanged',      // { climbing } escalando una pendiente
   PLAYER_JUMPED: 'player:jumped',
   PLAYER_LANDED: 'player:landed',                   // { fallSpeed }
   PLAYER_SWIM_CHANGED: 'player:swim',                // { swimming, underwater, surface }
@@ -51,6 +52,9 @@ export const GameEvents = Object.freeze({
   // Fabricación, construcción y sueño
   CRAFT_REQUEST: 'crafting:request',                // { recipeId }
   ITEM_CRAFTED: 'crafting:crafted',                 // { recipeId, result, amount }
+  CRAFT_QUEUE_CHANGED: 'crafting:queue',          // { queue } cola de fabricación (con tiempo)
+  CRAFT_STATION_OPEN: 'crafting:station',         // { station, piece } usar una estación (mesa de refinería)
+  BUILD_PIECE_REQUEST: 'build:pieceRequest',      // { pieceId } entrar en el modo construcción con esa pieza
   CRAFTING_PANEL_TOGGLED: 'crafting:panelToggled',  // { open }
   BUILD_MODE_CHANGED: 'construction:mode',          // { active, pieceId }
   BUILD_SELECTION_CHANGED: 'construction:selection', // { pieceId }

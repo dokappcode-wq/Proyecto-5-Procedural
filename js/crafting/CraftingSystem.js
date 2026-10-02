@@ -1,16 +1,19 @@
 import { GameEvents } from '../core/GameEvents.js';
 
 /**
- * CraftingSystem — fabricación a partir de recetas definidas en configuración
- * (GameConfig.RECIPES). Sin Three.js ni DOM.
+ * CraftingSystem — fabricación a partir de recetas (GameConfig.RECIPES). Sin Three.js ni DOM.
  *
- * Las recetas están separadas de los objetos: una receta solo dice qué
- * ingredientes consume y qué objeto produce. Añadir una receta = añadir una
- * entrada en la configuración.
+ * - Fabricar lleva tiempo (RECIPES.*.TIME s): al pedirlo se gastan los ingredientes y la
+ *   receta entra en una cola; el objeto sale cuando termina (aunque se cierre el menú).
+ *   Lo que está en cola se puede cancelar y se devuelven los ingredientes.
+ * - Algunas recetas solo se hacen en una estación (RECIPES.*.STATION, p. ej. la mesa de
+ *   refinería): `craft(id, { station })` con la estación desde la que se fabrica.
  *
- * La UI no llama a craft() directamente: emite CRAFT_REQUEST y este sistema
- * responde con ITEM_CRAFTED o con un mensaje.
+ * La UI pide fabricar con craft() o emitiendo CRAFT_REQUEST; al terminar cada objeto se
+ * emite ITEM_CRAFTED, y CRAFT_QUEUE_CHANGED cuando cambia la cola.
  */
+export const MAX_QUEUE = 20;
+
 export class CraftingSystem {
   constructor({ recipes, items, inventory, events }) {
     this.name = 'crafting';
@@ -18,7 +21,9 @@ export class CraftingSystem {
     this._items = items;
     this._inventory = inventory;
     this._events = events;
-    events.on(GameEvents.CRAFT_REQUEST, ({ recipeId }) => this.craft(recipeId));
+    this.queue = [];   // [{ uid, recipeId, time, left }]
+    this._uid = 0;
+    events.on(GameEvents.CRAFT_REQUEST, ({ recipeId, station }) => this.craft(recipeId, { station }));
   }
 
   /** Lista de recetas con su disponibilidad actual (para la UI). */
@@ -39,7 +44,15 @@ export class CraftingSystem {
       canCraft: this.canCraft(id),
       max: this.maxCraftable(id),
       category: r.CATEGORY ?? 'OTHER',
+      station: r.STATION ?? null,
+      time: r.TIME ?? 0,
     }));
+  }
+
+  canCraft(recipeId) {
+    const r = this._recipes[recipeId];
+    if (!r) return false;
+    return Object.entries(r.INGREDIENTS).every(([item, n]) => this._inventory.hasItem(item, n));
   }
 
   /** Cuántas veces se puede fabricar ahora con lo que se lleva. */
@@ -49,23 +62,74 @@ export class CraftingSystem {
     return Math.min(...Object.entries(r.INGREDIENTS).map(([item, n]) => Math.floor(this._inventory.getItemCount(item) / n)));
   }
 
-  canCraft(recipeId) {
+  /**
+   * Pone una receta en la cola (gasta ya los ingredientes).
+   * @param {{ station?: string|null }} [opts] estación desde la que se fabrica
+   * @returns {boolean}
+   */
+  craft(recipeId, { station = null } = {}) {
     const r = this._recipes[recipeId];
     if (!r) return false;
-    return Object.entries(r.INGREDIENTS).every(([item, n]) => this._inventory.hasItem(item, n));
-  }
-
-  /** @returns {boolean} */
-  craft(recipeId) {
-    const r = this._recipes[recipeId];
-    if (!r) return false;
+    const name = this._items[r.RESULT].NAME;
+    if (r.STATION && r.STATION !== station) {
+      this._message(`${name} se fabrica en una estación (${r.STATION_NAME ?? r.STATION}).`, 'danger');
+      return false;
+    }
     if (!this.canCraft(recipeId)) {
-      this._events.emit(GameEvents.UI_MESSAGE, { text: `Te faltan materiales para: ${this._items[r.RESULT].NAME}`, type: 'danger' });
+      this._message(`Te faltan materiales para: ${name}`, 'danger');
+      return false;
+    }
+    if (this.queue.length >= MAX_QUEUE) {
+      this._message('La cola de fabricación está llena.', 'danger');
       return false;
     }
     for (const [item, n] of Object.entries(r.INGREDIENTS)) this._inventory.removeItem(item, n);
-    this._inventory.addItem(r.RESULT, r.AMOUNT);
-    this._events.emit(GameEvents.ITEM_CRAFTED, { recipeId, result: r.RESULT, amount: r.AMOUNT });
+    const time = Math.max(0, r.TIME ?? 0);
+    this.queue.push({ uid: ++this._uid, recipeId, time, left: time });
+    this._changed();
+    if (time === 0) this.update(0);
     return true;
+  }
+
+  /** Cancela una entrada de la cola y devuelve los ingredientes. */
+  cancel(uid) {
+    const i = this.queue.findIndex((q) => q.uid === uid);
+    if (i < 0) return false;
+    const [q] = this.queue.splice(i, 1);
+    for (const [item, n] of Object.entries(this._recipes[q.recipeId].INGREDIENTS)) this._inventory.addItem(item, n);
+    this._changed();
+    return true;
+  }
+
+  /** Progreso (0..1) de lo que se está fabricando ahora. */
+  get progress() {
+    const q = this.queue[0];
+    return q ? (q.time > 0 ? 1 - q.left / q.time : 1) : 0;
+  }
+
+  update(dt) {
+    while (this.queue.length) {
+      const q = this.queue[0];
+      q.left -= dt;
+      dt = 0;
+      if (q.left > 0) return;
+      this.queue.shift();
+      const r = this._recipes[q.recipeId];
+      this._inventory.addItem(r.RESULT, r.AMOUNT);
+      this._events.emit(GameEvents.ITEM_CRAFTED, { recipeId: q.recipeId, result: r.RESULT, amount: r.AMOUNT });
+      this._changed();
+    }
+  }
+
+  clearQueue() {
+    for (const q of [...this.queue]) this.cancel(q.uid);
+  }
+
+  _changed() {
+    this._events.emit(GameEvents.CRAFT_QUEUE_CHANGED, { queue: this.queue.map((q) => ({ ...q })) });
+  }
+
+  _message(text, type) {
+    this._events.emit(GameEvents.UI_MESSAGE, { text, type });
   }
 }

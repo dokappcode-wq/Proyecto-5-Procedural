@@ -248,6 +248,17 @@ export class PlayerModel {
       this.rightArm.rotation.z = 0.35;
     }
 
+    // Escalando: brazos arriba alternándose (y piernas), como trepando.
+    if (s.climbing) {
+      if (s.climbMoving) this._climbPhase = (this._climbPhase ?? 0) + dt * 7;
+      const c = Math.sin(this._climbPhase ?? 0);
+      this.leftArm.rotation.x = 2.5 + c * 0.45;
+      this.rightArm.rotation.x = 2.5 - c * 0.45;
+      this.leftArm.rotation.z = this.rightArm.rotation.z = 0;
+      this.leftLeg.rotation.x = 0.4 - c * 0.35;
+      this.rightLeg.rotation.x = 0.4 + c * 0.35;
+    }
+
     // Golpe/recogida: el brazo derecho se lanza hacia delante.
     if (this._actionTime > 0) {
       this._actionTime = Math.max(0, this._actionTime - dt);

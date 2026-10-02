@@ -204,13 +204,19 @@ export class ConstructionSystem {
     const structure = this.addPiece({ ...pl.piece, cost });
     this._events.emit(GameEvents.STRUCTURE_PLACED, { structure });
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
+    // Una estación fabricada (mesa de refinería): colocada, se sale del modo construcción.
+    if (Object.keys(cost).some((k) => this._items[k]?.USE === 'BUILD')) this.setActive(false);
     return true;
   }
 
   /** Quita la pieza apuntada y devuelve los materiales. */
   removeTarget() {
-    const piece = this._target;
-    if (!piece) return false;
+    return this._target ? this.breakPiece(this._target) : false;
+  }
+
+  /** Rompe una pieza (modo construcción o a golpes) y devuelve los materiales. */
+  breakPiece(piece) {
+    if (!this.exists(piece)) return false;
     this.removePiece(piece);
     if (!this.freeBuild) {
       for (const [item, n] of Object.entries(piece.cost ?? this.costOf(piece.type))) {
@@ -317,6 +323,8 @@ export class ConstructionSystem {
       piece.object.updateMatrixWorld(true);
     } else if (kind === 'SLEEP') {
       this._events.emit(GameEvents.SLEEP_REQUEST, { bed: piece });
+    } else if (kind === 'REFINERY') {
+      this._events.emit(GameEvents.CRAFT_STATION_OPEN, { station: 'REFINERY', piece });
     }
   }
 
@@ -523,6 +531,17 @@ export class ConstructionSystem {
   /** Piezas con las que se puede interactuar (puertas, camas) cerca de (x, z). */
   getInteractablesNear(x, z, radius) {
     return this.pieces.filter((p) => SHAPES[p.type].interact && Math.hypot(p.x - x, p.z - z) <= radius);
+  }
+
+  /** Primera pieza a lo largo de un rayo: { piece, distance, point } o null (romper a golpes). */
+  pieceOnRay(origin, dir, maxDist) {
+    if (!this.pieces.length) return null;
+    this._raycaster.set(origin, dir);
+    this._raycaster.far = maxDist;
+    const hit = this._raycaster.intersectObjects(this.group.children, true)[0];
+    if (!hit) return null;
+    const piece = this.pieces.find((p) => p.id === hit.object.userData.pieceId);
+    return piece ? { piece, distance: hit.distance, point: hit.point } : null;
   }
 
   /** Distancia a la primera pieza a lo largo de un rayo (cámara en 3ª persona), o null. */
