@@ -23,6 +23,7 @@ import { HealthSystem } from './player/HealthSystem.js';
 import { HungerSystem } from './player/HungerSystem.js';
 import { ThirstSystem } from './player/ThirstSystem.js';
 import { EnergySystem } from './player/EnergySystem.js';
+import { ProgressionSystem } from './player/ProgressionSystem.js';
 import { registerSurvivalTools } from './admin/tools/SurvivalTools.js';
 import { NutritionSystem } from './nutrition/NutritionSystem.js';
 import { CraftingSystem } from './crafting/CraftingSystem.js';
@@ -346,6 +347,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     tool: () => cfg.ITEMS[hotbar.selectedId]?.TOOL ?? null, // herramienta seleccionada (hacha: tala más rápido)
     canWork: () => energy.canWork, // sin energía no se golpea
     wearTool: () => hotbar.selectedIndex !== null && inventory.wearSlot(hotbar.selectedIndex, 1), // aguante de la herramienta
+    power: () => progression.damageMultiplier, // nivel: más daño y más rapidez al talar/picar/romper
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -363,6 +365,24 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       thirst.ratio >= S.HEALTH_REGEN_MIN_RATIO &&
       !(cfg.NUTRITION.UNBALANCED_BLOCKS_REGEN && nutrition.isUnbalanced),
   });
+
+  // Niveles: XP por recoger, talar, picar, fabricar y cazar; puntos para subir estadísticas.
+  const PG = cfg.PROGRESSION;
+  const progression = new ProgressionSystem({ config: PG, events });
+  progression.applyTo({ health, energy });
+  events.on(GameEvents.RESOURCE_HARVESTED, ({ amount }) => progression.addXp(PG.XP.HARVEST * (amount ?? 1)));
+  events.on(GameEvents.RESOURCE_HIT, ({ felled, material, node }) => {
+    if (!felled) return;
+    if (material === 'web') progression.addXp(PG.XP.COBWEB);
+    else if (material === 'stone' && node?.type) progression.addXp(PG.XP.BREAK_ROCK);
+    else if (material === 'wood') progression.addXp(PG.XP.FELL_TREE);
+  });
+  events.on(GameEvents.ITEM_CRAFTED, ({ recipeId }) => progression.addXp(Math.max(1, Math.round((cfg.RECIPES[recipeId]?.TIME ?? 0) * PG.XP.CRAFT_PER_SECOND))));
+  events.on(GameEvents.ANIMAL_KILLED, () => progression.addXp(PG.XP.KILL));
+  events.on(GameEvents.PLAYER_LEVEL_UP, ({ level, points }) =>
+    events.emit(GameEvents.UI_MESSAGE, { text: `⭐ ¡Nivel ${level}! Tienes ${points} ${points === 1 ? 'punto' : 'puntos'}: repártelos en el reloj (Tab → Tú).`, type: 'pickup' }),
+  );
+  events.on(GameEvents.PROGRESSION_CHANGED, () => (controller.speedBonus = progression.speedMultiplier));
 
   // ---- Alimentación, uso de objetos y sueño (Fases 7–9) ----------------------
   const nutrition = new NutritionSystem({ config: cfg.NUTRITION, items: cfg.ITEMS, hunger, events });
@@ -518,6 +538,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const playerMenu = new PlayerMenu({
     container: hudRoot, input, events, inventory, equipment, crafting, hotbar, time,
     items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stations: cfg.STATIONS, stats: { health, hunger, thirst, energy },
+    progression, statDefs: PG.STATS,
     onDrop: (itemId, count, dur) => {
       dropItems(itemId, count, dur);
       message(`Tiras ${count > 1 ? `${count} × ` : ''}${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'info');
@@ -921,7 +942,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     warp.enter(`Hiperespacio · rumbo al ${entry.name}`, HS.JUMP_TIME, () => {
       saveHandoff(captureState({
         systemName: system.name, target: entry.file, campaignSeed,
-        inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time,
+        inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression,
       }));
       const seed = entry.file === cfg.CAMPAIGN.SYSTEM_FILE && campaignSeed !== null ? `&seed=${campaignSeed}` : '';
       window.location.assign(`${window.location.pathname}?system=${encodeURIComponent(entry.file)}${seed}`);
@@ -1000,7 +1021,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Llegada desde el hiperespacio: se recupera la partida y la nave aparece en el espacio.
   if (handoff) {
     applyState(handoff, {
-      items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time,
+      items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression,
     });
     if (ship.isExplorer) {
       pickups.remove('SPACE_NODE'); // la nave ya tiene el nodo espacial
@@ -1116,7 +1137,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
   };
 }
 

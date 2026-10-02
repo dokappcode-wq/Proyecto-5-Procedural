@@ -26,7 +26,7 @@ export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTI
 const KEY_TAB = { Tab: MenuTab.CRAFTING, KeyI: MenuTab.INVENTORY };
 
 export class PlayerMenu extends ModalPanel {
-  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop, stations = {} }) {
+  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop, stations = {}, progression = null, statDefs = {} }) {
     super({
       id: 'player-menu', title: 'Reloj de pulsera', container, input, events,
       footer: '<kbd>Clic</kbd> coger / dejar · <kbd>Clic dcho</kbd> la mitad / una · <kbd>Shift</kbd>+<kbd>Clic</kbd> mover rápido · <kbd>Doble clic</kbd> fabricar · <kbd>Esc</kbd> cerrar',
@@ -43,6 +43,8 @@ export class PlayerMenu extends ModalPanel {
     this._onDrop = onDrop ?? (() => {});
     this._stations = stations;   // { REFINERY: { NAME, ICON } }
     this.station = null;         // estación desde la que se ha abierto (o null)
+    this._prog = progression;    // niveles y puntos (ProgressionSystem)
+    this._statDefs = statDefs;   // PROGRESSION.STATS
     this.tab = MenuTab.CRAFTING;
     this._hover = null;
     this._recipe = null;      // receta seleccionada
@@ -62,6 +64,7 @@ export class PlayerMenu extends ModalPanel {
     events.on(GameEvents.EQUIPMENT_CHANGED, redraw);
     events.on(GameEvents.HOTBAR_CHANGED, redraw);
     events.on(GameEvents.CRAFT_QUEUE_CHANGED, () => this.isOpen && this._renderQueue());
+    events.on(GameEvents.PROGRESSION_CHANGED, () => this.isOpen && this._renderStats());
   }
 
   update(dt) {
@@ -440,27 +443,65 @@ export class PlayerMenu extends ModalPanel {
     const t = this._time;
     this._clock.textContent = t ? `Día ${t.day} · ${t.clockText}` : '';
     const S = this._stats;
-    const rows = [
-      ['❤️', 'Vida', S.health],
-      ['🍗', 'Hambre', S.hunger],
-      ['💧', 'Sed', S.thirst],
-      ['⚡', 'Energía', S.energy],
-    ];
+    const P = this._prog;
+    const D = this._statDefs;
     this._statList.replaceChildren();
-    for (const [icon, name, stat] of rows) {
-      if (!stat) continue;
+
+    // Nivel y experiencia.
+    if (P) {
+      const lv = el('li', 'pm-level');
+      lv.append(el('span', 'pm-stat-name', `⭐ Nivel ${P.level}`), el('span', 'pm-stat-value', P.maxed ? 'máx.' : `${Math.floor(P.xp)} / ${P.xpToNext()} XP`));
+      lv.append(meter(P.maxed ? 1 : P.xp / P.xpToNext(), 'xp'));
+      if (P.points > 0) lv.append(el('span', 'pm-points', `${P.points} ${P.points === 1 ? 'punto' : 'puntos'} para repartir: pulsa + en una estadística`));
+      this._statList.append(lv);
+    }
+    const plus = (stat) => {
+      if (!P || P.points <= 0) return null;
+      const b = button('+', 'pm-plus');
+      b.title = `Subir ${D[stat]?.NAME.toLowerCase()} (${this._bonusText(stat, 1)})`;
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        P.spend(stat);
+      });
+      return b;
+    };
+    const row = (icon, name, valueText, ratio, stat = null) => {
       const li = el('li');
-      const bar = el('span', 'pm-meter');
-      const fill = el('span', 'pm-fill');
-      fill.style.width = `${Math.round(Math.max(0, Math.min(1, stat.ratio)) * 100)}%`;
-      bar.append(fill);
-      li.append(el('span', 'pm-stat-name', `${icon} ${name}`), el('span', 'pm-stat-value', String(Math.round(stat.value))), bar);
+      const head = el('span', 'pm-stat-name', `${icon} ${name}`);
+      const value = el('span', 'pm-stat-value', valueText);
+      const p = stat ? plus(stat) : null;
+      if (p) value.append(p);
+      li.append(head, value);
+      if (ratio !== null) li.append(meter(ratio));
       this._statList.append(li);
+    };
+    if (S.health) row(D.HEALTH?.ICON ?? '❤️', 'Vida', `${Math.round(S.health.value)} / ${S.health.max}`, S.health.ratio, 'HEALTH');
+    if (S.energy) row(D.STAMINA?.ICON ?? '⚡', 'Estamina', `${Math.round(S.energy.value)} / ${S.energy.max}`, S.energy.ratio, 'STAMINA');
+    if (S.hunger) row('🍗', 'Hambre', String(Math.round(S.hunger.value)), S.hunger.ratio);
+    if (S.thirst) row('💧', 'Sed', String(Math.round(S.thirst.value)), S.thirst.ratio);
+    if (P) {
+      row(D.DAMAGE?.ICON ?? '👊', 'Daño', `${Math.round(P.damageMultiplier * 100)} %`, null, 'DAMAGE');
+      row(D.SPEED?.ICON ?? '👟', 'Velocidad', `${Math.round(P.speedMultiplier * 100)} %`, null, 'SPEED');
     }
     const cold = el('li', 'pm-cold');
     cold.append(el('span', 'pm-stat-name', '🌡️ Protección frío'), el('span', 'pm-stat-value', `${Math.round(this._eq.coldProtection * 100)} %`));
     this._statList.append(cold);
   }
+
+  /** "+10" o "+8 %" de un punto en esa estadística. */
+  _bonusText(stat, points) {
+    const d = this._statDefs[stat];
+    if (!d) return '';
+    return d.UNIT === '%' ? `+${Math.round(d.PER_POINT * points * 100)} %` : `+${d.PER_POINT * points}`;
+  }
+}
+
+function meter(ratio, cls = '') {
+  const bar = el('span', `pm-meter${cls ? ` ${cls}` : ''}`);
+  const fill = el('span', 'pm-fill');
+  fill.style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+  bar.append(fill);
+  return bar;
 }
 
 function el(tag, cls, text) {

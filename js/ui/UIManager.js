@@ -19,7 +19,7 @@ const STAT_UI = [
   { id: 'HEALTH', icon: '❤️', name: 'Vida' },
   { id: 'HUNGER', icon: '🍗', name: 'Hambre' },
   { id: 'THIRST', icon: '💧', name: 'Sed' },
-  { id: 'ENERGY', icon: '⚡', name: 'Energía' },
+  { id: 'ENERGY', icon: '⚡', name: 'Estamina' },
 ];
 
 const STAT_WARNINGS = {
@@ -231,7 +231,7 @@ export class UIManager {
     });
     events.on(GameEvents.PLAYER_SLEPT, ({ hours }) => {
       this.el.sleepOverlay.classList.remove('active');
-      this.showMessage(`Has dormido ${hours} horas. Energía recuperada.`, 'biome');
+      this.showMessage(`Has dormido ${hours} horas. Estamina recuperada.`, 'biome');
     });
     events.on(GameEvents.WORLD_EDGE_REACHED, () => this.showMessage('Has llegado al límite de la región explorable.'));
 

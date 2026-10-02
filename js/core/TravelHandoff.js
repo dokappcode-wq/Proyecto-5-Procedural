@@ -14,7 +14,7 @@
 const KEY = 'mundo0.hyperjump';
 const MAX_AGE_MS = 10 * 60 * 1000;
 
-export function captureState({ systemName, target, campaignSeed, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time }) {
+export function captureState({ systemName, target, campaignSeed, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression = null }) {
   return {
     v: 1,
     at: Date.now(),
@@ -24,6 +24,7 @@ export function captureState({ systemName, target, campaignSeed, inventory, equi
     totalHours: time.totalHours,
     slots: inventory.snapshot(),
     worn: { ...equipment.slots },
+    progression: progression?.snapshot() ?? null,
     vitals: { health: health.value, hunger: hunger.value, thirst: thirst.value, energy: energy.value },
     life: { wearing: lifeSupport.wearing, oxygen: lifeSupport.oxygen, battery: lifeSupport.battery, gas: lifeSupport.gas },
     ship: {
@@ -57,7 +58,7 @@ export function takeHandoff(target, storage = safeStorage()) {
  * Aplica un traspaso (ya en el nuevo sistema).
  * @param {object} deps { items, techs, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time }
  */
-export function applyState(s, { items, techs, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time }) {
+export function applyState(s, { items, techs, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression = null }) {
   const num = (v, min, max, def) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def);
   const known = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(items, id);
   // Huecos del inventario tal cual (se comprueba cada uno) y la ropa puesta.
@@ -66,6 +67,8 @@ export function applyState(s, { items, techs, inventory, equipment, health, hung
   for (const [slot, id] of Object.entries(s.worn && typeof s.worn === 'object' ? s.worn : {})) {
     if (known(id) && Object.prototype.hasOwnProperty.call(equipment.slots, slot)) equipment.equipDirect(slot, id);
   }
+  // Niveles antes que las vitales: la vida y la energía máximas dependen de ellos.
+  if (progression && s.progression) progression.restore(s.progression);
   const v = s.vitals ?? {};
   for (const [stat, key] of [[health, 'health'], [hunger, 'hunger'], [thirst, 'thirst'], [energy, 'energy']]) {
     stat.set(num(v[key], 1, 1e6, stat.value));

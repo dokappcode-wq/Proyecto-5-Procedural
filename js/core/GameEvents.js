@@ -19,6 +19,8 @@ export const GameEvents = Object.freeze({
 
   // Jugador
   PLAYER_CLIMB_CHANGED: 'player:climbChanged',      // { climbing } escalando una pendiente
+  PLAYER_LEVEL_UP: 'player:levelUp',              // { level, points }
+  PROGRESSION_CHANGED: 'player:progression',      // { level, xp, points, stats }
   PLAYER_JUMPED: 'player:jumped',
   PLAYER_LANDED: 'player:landed',                   // { fallSpeed }
   PLAYER_SWIM_CHANGED: 'player:swim',                // { swimming, underwater, surface }

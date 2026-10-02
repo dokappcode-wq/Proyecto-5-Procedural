@@ -46,6 +46,7 @@ export class PlayerController {
     this._wasAtEdge = false;
     this._mods = { canRun: true, canClimb: true, speedMultiplier: 1 };
     this.gravityScale = 1; // lunas: menos gravedad (se salta más y se cae más despacio)
+    this.speedBonus = 1;   // niveles: velocidad (ProgressionSystem)
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
@@ -181,7 +182,7 @@ export class PlayerController {
     this._setSwimming(false, false, surface);
     if (this._updateClimbing(dt)) return;
 
-    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier;
+    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
     this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, accel * dt);
 
@@ -257,7 +258,7 @@ export class PlayerController {
     const S = cfg.SWIM;
     const v = p.velocity;
     if (!p.state.isSwimming && v.y < -3) v.y *= S.ENTRY_DAMPING; // al caer al agua, frena
-    const speed = (p.state.isRunning ? S.RUN_SPEED : S.SPEED) * this._mods.speedMultiplier;
+    const speed = (p.state.isRunning ? S.RUN_SPEED : S.SPEED) * this._mods.speedMultiplier * this.speedBonus;
     this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, cfg.GROUND_ACCELERATION * 0.5 * dt);
 
     const ground = this._groundHeight(p.position.x, p.position.z);
@@ -362,7 +363,7 @@ export class PlayerController {
         return this._setClimbing(false);
       }
       if (moving) {
-        const step = C.SPEED * this._mods.speedMultiplier * dt / Math.sqrt(1 + Math.max(0, along) ** 2);
+        const step = C.SPEED * this._mods.speedMultiplier * this.speedBonus * dt / Math.sqrt(1 + Math.max(0, along) ** 2);
         const nx = pos.x + this._wish.x * step;
         const nz = pos.z + this._wish.z * step;
         const blocked = this._structures?.blocksAt(nx, nz, this._cfg.RADIUS, pos.y + this._cfg.MAX_STEP_HEIGHT, pos.y + this._cfg.HEIGHT);

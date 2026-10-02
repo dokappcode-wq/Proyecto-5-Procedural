@@ -261,6 +261,11 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Niveles**: recoger (1 XP por unidad), talar un árbol (12), romper una roca (12), recoger una telaraña (4),
+  fabricar (según lo que tarda) y cazar (20) dan experiencia. Cada nivel da 1 punto: en el reloj (`Tab`), columna
+  «Tú», pulsa **+** en Vida (+10), Estamina (+10), Daño (+8 % de daño y de rapidez al talar/picar) o Velocidad (+3 %).
+  Los niveles viajan contigo por el hiperespacio.
+- **Ritmo de golpes**: talar, picar y romper van a un ritmo fijo; hacer clic muchas veces no es más rápido que mantenerlo.
 - **Fabricar con tiempo**: en `Tab` cada receta dice cuánto tarda (⏱); al fabricar entra en la cola
   «Fabricando» (barra de progreso; clic en ella para cancelar y recuperar los materiales) y sigue aunque cierres el menú.
   Piedra refinada (4 🪨, 5 s), madera refinada (2 🪵, 4 s), cuerda (5 🕸️), hacha y pico (3 maderas refinadas + 2 piedras

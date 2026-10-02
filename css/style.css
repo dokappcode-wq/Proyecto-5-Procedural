@@ -1190,3 +1190,14 @@ body.underwater #vignette {
   position: absolute; left: 6px; right: 6px; bottom: 4px; height: 4px; background: rgba(0, 0, 0, 0.55); border-radius: 2px; overflow: hidden;
 }
 .inv-slot .dur span, #player-menu .pm-slot .dur span { display: block; height: 100%; }
+
+/* Niveles en la columna «Tú». */
+#player-menu .pm-level { padding: 6px 8px; background: rgba(255, 210, 122, 0.08); border: 1px solid rgba(255, 210, 122, 0.3); }
+#player-menu .pm-level .pm-stat-name { color: #ffd27a; }
+#player-menu .pm-meter.xp .pm-fill { background: linear-gradient(90deg, #e0a83a, #ffd27a); }
+#player-menu .pm-points { grid-column: 1 / -1; font-family: inherit; text-transform: none; font-size: 0.76rem; color: #ffe2a0; letter-spacing: 0; }
+#player-menu .pm-plus {
+  margin-left: 8px; width: 22px; height: 22px; line-height: 18px; padding: 0; cursor: pointer; font-weight: 700;
+  color: #1a1206; background: #ffd27a; border: 1px solid #ffe9b8; border-radius: 3px; vertical-align: middle;
+}
+#player-menu .pm-plus:hover { background: #ffe9b8; box-shadow: 0 0 8px rgba(255, 210, 122, 0.7); }

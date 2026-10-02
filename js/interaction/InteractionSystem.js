@@ -30,7 +30,7 @@ import { SHAPES } from '../construction/BuildRules.js';
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -46,7 +46,8 @@ export class InteractionSystem {
     this._tool = tool ?? (() => null); // herramienta seleccionada ({ CHOP_SPEED }) o null
     this._canWork = canWork ?? (() => true); // ¿queda energía para golpear?
     this._wearTool = wearTool ?? (() => {}); // gasta 1 de aguante de la herramienta seleccionada
-    this._swing = 0;                   // s hasta el siguiente golpe al tronco
+    this._power = power ?? (() => 1);        // multiplicador de daño del nivel (golpes y rapidez al talar/picar)
+    this._swing = 0;                   // s hasta poder dar el siguiente golpe (talar/picar/romper)
     this._chopProgress = new Map();    // id del árbol → 0..1 de tala
 
     this._cooldown = 0;
@@ -65,6 +66,8 @@ export class InteractionSystem {
 
   update(dt) {
     this._cooldown = Math.max(0, this._cooldown - dt);
+    // El ritmo de golpes es fijo: hacer clic muchas veces no golpea más deprisa que mantenerlo.
+    this._swing = Math.max(0, this._swing - dt);
     this.target = this._findTarget();
 
     const t = this.target;
@@ -77,7 +80,6 @@ export class InteractionSystem {
     // Talar / picar / romper: mientras se mantiene el clic se golpea cada CHOP_SWING s.
     const attack = this._input.wasPressed('ATTACK') || this._input.isDown('ATTACK');
     if (t?.kind === 'structure' && attack) {
-      this._swing -= dt;
       if (this._swing <= 0) {
         this._swing = this._cfg.CHOP_SWING ?? 0.6;
         if (!this._tired()) this._breakSwing(t.ref);
@@ -88,7 +90,6 @@ export class InteractionSystem {
       if (this._tired()) {
         // agotado: no golpea (aviso en _tired)
       } else if (t.hit || this._tool()?.[B.TOOL]) {
-        this._swing -= dt;
         if (this._swing <= 0) {
           this._swing = this._cfg.CHOP_SWING ?? 0.6;
           this._chopSwing(t.ref);
@@ -98,7 +99,6 @@ export class InteractionSystem {
       }
       if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
     } else {
-      this._swing = 0; // al volver a pulsar, el primer golpe es inmediato
       if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
       else if (this._input.wasPressed('ATTACK')) this._queued = 'ATTACK';
     }
@@ -162,7 +162,7 @@ export class InteractionSystem {
     // La herramienta que ayuda en este golpe se gasta (el hacha en troncos, el pico en rocas).
     const usesTool = rock || (def.HARVEST.MATERIAL !== 'web' && !!this._tool()?.CHOP_SPEED);
     const work = this._chopProgress.get(node.id) ?? { progress: 0, given: 0 };
-    work.progress = Math.min(1, work.progress + (swing * job.speed) / job.time);
+    work.progress = Math.min(1, work.progress + (swing * job.speed * this._power()) / job.time);
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
     // Trozos que ya deberían haber salido a estas alturas.
     const due = work.progress >= 1 ? job.amount : Math.floor(work.progress * job.amount);
@@ -206,7 +206,7 @@ export class InteractionSystem {
     if (speed > 1) this._wearTool();
     const key = `st-${piece.id}`;
     const work = this._chopProgress.get(key) ?? { progress: 0 };
-    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed) / (C._cfg.BREAK_TIME ?? 3));
+    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed * this._power()) / (C._cfg.BREAK_TIME ?? 3));
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
     const stone = Object.keys(piece.cost ?? C.costOf(piece.type) ?? {}).some((k) => k === 'STONE' || k === 'MINERAL');
     const done = work.progress >= 1;
@@ -258,7 +258,7 @@ export class InteractionSystem {
   _hit(animal) {
     const p = this._player.position;
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
-    const { killed, drops } = this._animals.hitAnimal(animal, this._cfg.PLAYER_HIT_DAMAGE, p.x, p.z);
+    const { killed, drops } = this._animals.hitAnimal(animal, this._cfg.PLAYER_HIT_DAMAGE * this._power(), p.x, p.z);
     if (!killed) return;
     for (const [item, amount] of Object.entries(drops)) this._inventory.addItem(item, amount);
   }

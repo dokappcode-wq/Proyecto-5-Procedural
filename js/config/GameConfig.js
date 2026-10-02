@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.11.2',
+    VERSION: '1.12.0',
   },
 
   RENDER: {
@@ -216,6 +216,30 @@ export const GameConfig = deepFreeze({
     RESPAWN_DELAY: 3,               // s antes de poder reaparecer
     RESPAWN_VALUES: { HEALTH: 100, HUNGER: 70, THIRST: 70, ENERGY: 70 },
     KEEP_INVENTORY_ON_DEATH: true,
+  },
+
+  // Niveles: la experiencia (XP) se gana recogiendo, talando, picando, fabricando y cazando.
+  // Cada nivel da POINTS_PER_LEVEL puntos para subir una estadística (menú del reloj → «Tú»).
+  PROGRESSION: {
+    MAX_LEVEL: 100,
+    POINTS_PER_LEVEL: 1,
+    XP_BASE: 50,          // XP para pasar del nivel 1 al 2
+    XP_GROWTH: 25,        // cada nivel pide esto más que el anterior
+    XP: {
+      HARVEST: 1,         // por cada unidad recogida (madera, piedra, fruta, telaraña…)
+      FELL_TREE: 12,      // árbol talado
+      BREAK_ROCK: 12,     // roca rota con el pico
+      COBWEB: 4,          // telaraña recogida entera
+      CRAFT_PER_SECOND: 0.6, // por cada segundo de fabricación de la receta
+      KILL: 20,           // animal abatido
+    },
+    // Estadísticas que se suben con los puntos (de momento estas cuatro).
+    STATS: {
+      HEALTH: { NAME: 'Vida', ICON: '❤️', PER_POINT: 10, UNIT: '' },        // +10 de vida máxima
+      STAMINA: { NAME: 'Estamina', ICON: '⚡', PER_POINT: 10, UNIT: '' },   // +10 de energía máxima
+      DAMAGE: { NAME: 'Daño', ICON: '👊', PER_POINT: 0.08, UNIT: '%' },     // +8 % de daño y de rapidez al talar/picar
+      SPEED: { NAME: 'Velocidad', ICON: '👟', PER_POINT: 0.03, UNIT: '%' }, // +3 % de velocidad al moverse
+    },
   },
 
   // Inventario por huecos: barra rápida 9 × 1 (teclas 1–9) + mochila 9 × 3 (tecla I).
