@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.11.1',
+    VERSION: '1.11.2',
   },
 
   RENDER: {
@@ -293,8 +293,8 @@ export const GameConfig = deepFreeze({
     // Herramientas: TOOL.CHOP_SPEED acelera la tala cuando se lleva seleccionada en la barra.
     //   DURABILITY: golpes que aguanta (cada golpe con ella a un tronco, roca o pieza gasta 1);
     //   al llegar a 0 se rompe. Un árbol con el hacha son ~10 golpes; una roca con el pico, ~10.
-    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 120, TOOL: { MINE_SPEED: 1 }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
-    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 120, TOOL: { CHOP_SPEED: 2.5 }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
+    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 60, TOOL: { MINE_SPEED: 1 }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
+    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 60, TOOL: { CHOP_SPEED: 2.5 }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
     LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
     LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
     LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
