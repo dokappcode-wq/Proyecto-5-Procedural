@@ -252,7 +252,16 @@ export class PlayerMenu extends ModalPanel {
     }
     this._clock = el('div', 'pm-clock');
     this._statList = el('ul', 'pm-stats');
-    you.append(gear, this._clock, this._statList);
+    // Guardar la partida (también se guarda sola cada pocos minutos).
+    const save = el('button', 'pm-save', '💾 Guardar partida');
+    save.type = 'button';
+    save.addEventListener('click', () => this._events.emit(GameEvents.GAME_SAVE_REQUEST, { reason: 'manual' }));
+    this._saveInfo = el('div', 'pm-save-info', '');
+    you.append(gear, this._clock, this._statList, save, this._saveInfo);
+    this._events.on(GameEvents.GAME_SAVED, ({ at }) => {
+      const d = new Date(at);
+      this._saveInfo.textContent = `Guardada a las ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    });
 
     const wrap = el('div', 'pm-layout');
     wrap.append(main, you);
@@ -505,9 +514,11 @@ export class PlayerMenu extends ModalPanel {
       row(D.DAMAGE?.ICON ?? '👊', 'Daño', `${Math.round(P.damageMultiplier * 100)} %`, null, 'DAMAGE');
       row(D.SPEED?.ICON ?? '👟', 'Velocidad', `${Math.round(P.speedMultiplier * 100)} %`, null, 'SPEED');
     }
+    const def = el('li', 'pm-cold');
+    def.append(el('span', 'pm-stat-name', '🛡️ Defensa'), el('span', 'pm-stat-value', `${this._eq.defense ?? 0} (−${Math.round((this._eq.damageReduction ?? 0) * 100)} % daño)`));
     const cold = el('li', 'pm-cold');
     cold.append(el('span', 'pm-stat-name', '🌡️ Protección frío'), el('span', 'pm-stat-value', `${Math.round(this._eq.coldProtection * 100)} %`));
-    this._statList.append(cold);
+    this._statList.append(def, cold);
   }
 
   /** "+10" o "+8 %" de un punto en esa estadística. */

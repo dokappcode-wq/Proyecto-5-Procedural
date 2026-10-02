@@ -83,6 +83,33 @@ export class PickupSystem {
     return this._list.get(id) ?? null;
   }
 
+  /** Para guardar la partida: lo ya cogido y las bolsas que hay en el suelo. */
+  snapshot() {
+    const taken = [];
+    const bags = [];
+    for (const p of this._list.values()) {
+      if (p.model === 'BAG') {
+        if (!p.taken && p.contents.length) bags.push({ body: p.body, x: p.x, z: p.z, contents: p.contents.map((c) => ({ ...c })) });
+      } else if (p.taken) taken.push(p.id);
+    }
+    return { taken, bags };
+  }
+
+  restore(snap, isItem) {
+    if (!snap || typeof snap !== 'object') return;
+    for (const id of Array.isArray(snap.taken) ? snap.taken : []) {
+      const p = this._list.get(id);
+      if (p) p.taken = true;
+    }
+    for (const b of Array.isArray(snap.bags) ? snap.bags : []) {
+      if (!b || typeof b.body !== 'string' || !Number.isFinite(b.x) || !Number.isFinite(b.z) || !Array.isArray(b.contents)) continue;
+      for (const c of b.contents) {
+        const count = Math.floor(c?.count);
+        if (isItem(c?.item) && count > 0) this.drop(b.body, b.x, b.z, c.item, Math.min(count, 10000), Number.isFinite(c.dur) ? c.dur : undefined);
+      }
+    }
+  }
+
   /** Marcadores para el mapa del cuerpo `body` (solo los que quedan por coger). */
   markers(body) {
     return [...this._list.values()]

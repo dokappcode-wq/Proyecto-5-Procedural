@@ -92,6 +92,18 @@ export class EquipmentSystem {
     return Math.min(this._cfg.MAX_COLD_PROTECTION ?? 0.8, p);
   }
 
+  /** Puntos de defensa de todo lo puesto (ITEMS.*.DEFENSE). */
+  get defense() {
+    let d = 0;
+    for (const id of Object.values(this.slots)) if (id) d += this._items[id]?.DEFENSE ?? 0;
+    return d;
+  }
+
+  /** Parte del daño de los ataques que quita la armadura (0..MAX_DEFENSE_REDUCTION). */
+  get damageReduction() {
+    return Math.min(this._cfg.MAX_DEFENSE_REDUCTION ?? 0.75, this.defense * (this._cfg.DEFENSE_PER_POINT ?? 0.015));
+  }
+
   /** Multiplicador de pérdida de temperatura (1 = sin protección). */
   getColdLossMultiplier() {
     return 1 - this.coldProtection;

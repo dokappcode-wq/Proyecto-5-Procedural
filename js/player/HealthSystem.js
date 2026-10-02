@@ -38,7 +38,9 @@ export class HealthSystem extends VitalStat {
     this.deathTime = 0;
     this.invulnerable = false; // herramienta Admin
 
-    events.on(GameEvents.PLAYER_DAMAGED, (d) => this.damage(d.amount, d.source, d.sourceName));
+    // Filtro opcional del daño (armadura, esquiva, escudo): (evento) → cantidad final.
+    this.modifier = null;
+    events.on(GameEvents.PLAYER_DAMAGED, (d) => this.damage(this.modifier ? this.modifier(d) : d.amount, d.source, d.sourceName));
     events.on(GameEvents.PLAYER_LANDED, ({ fallSpeed }) => {
       const excess = fallSpeed - config.FALL_DAMAGE_MIN_SPEED;
       if (excess > 0) events.emit(GameEvents.PLAYER_DAMAGED, { amount: Math.round(excess * config.FALL_DAMAGE_PER_MS), source: 'FALL' });

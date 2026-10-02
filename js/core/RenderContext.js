@@ -62,8 +62,24 @@ export class RenderContext {
     this.activeCamera = camera ?? this.camera;
   }
 
+  /**
+   * Escena que se dibuja ENCIMA de la superficie (sin profundidad compartida): las
+   * manos en 1ª persona. `visible()` decide en cada frame si se dibuja.
+   */
+  addOverlay(scene, camera, visible = () => true) {
+    (this._overlays ??= []).push({ scene, camera, visible });
+  }
+
   render() {
     this.renderer.render(this.activeScene, this.activeCamera);
+    if (!this._overlays || this.activeScene !== this.scene) return;
+    for (const o of this._overlays) {
+      if (!o.visible()) continue;
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      this.renderer.render(o.scene, o.camera);
+      this.renderer.autoClear = true;
+    }
   }
 
   _onResize() {

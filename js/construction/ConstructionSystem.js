@@ -292,6 +292,35 @@ export class ConstructionSystem {
     return this._bodyId;
   }
 
+  /** Lo construido en cada cuerpo, para guardar la partida: { bodyId: [pieza…] }. */
+  snapshot() {
+    const out = {};
+    for (const [body, st] of this._bodyStates) {
+      if (!st.pieces.length) continue;
+      out[body] = st.pieces.map((p) => ({ type: p.type, x: p.x, y: p.y, z: p.z, rotation: p.rotation, slot: p.slot, cost: p.cost, data: p.data ?? null }));
+    }
+    return out;
+  }
+
+  /** Reconstruye lo guardado (solo tipos de pieza conocidos y números válidos). */
+  restore(snap) {
+    if (!snap || typeof snap !== 'object') return;
+    const current = this._bodyId;
+    const profile = this._profile;
+    const num = (v) => typeof v === 'number' && Number.isFinite(v);
+    for (const [body, list] of Object.entries(snap)) {
+      if (!Array.isArray(list)) continue;
+      this.setBody(body, profile);
+      for (const p of list) {
+        if (!p || !this._cfg.PIECES[p.type] || ![p.x, p.y, p.z, p.rotation].every(num)) continue;
+        const piece = this.addPiece({ type: p.type, x: p.x, y: p.y, z: p.z, rotation: p.rotation, slot: p.slot ?? null, cost: p.cost ?? null });
+        if (p.data && typeof p.data === 'object') piece.data = p.data;
+        this._events.emit(GameEvents.STRUCTURE_RESTORED, { structure: piece });
+      }
+    }
+    this.setBody(current, profile);
+  }
+
   /** Todas las piezas de todos los cuerpos (las estaciones de carga cargan aunque no estés allí). */
   allPieces() {
     return [...this._bodyStates.values()].flatMap((st) => st.pieces);

@@ -525,6 +525,11 @@ export class UIManager {
     this._startSequence = fn;
   }
 
+  /** Empieza sin animación (partida cargada). */
+  startNow() {
+    this._start();
+  }
+
   _requestStart() {
     if (this._started || this._launching) return;
     if (!this._startSequence) return this._start();

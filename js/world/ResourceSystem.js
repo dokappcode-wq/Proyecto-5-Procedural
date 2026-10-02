@@ -90,9 +90,55 @@ export class ResourceSystem {
     let chunk = this._chunks.get(key);
     if (!chunk) {
       chunk = { nodes: this._generateNodes(cx, cz), grass: this._generateGrass(cx, cz) };
+      // Partida cargada: lo que ya se había recogido de este chunk.
+      if (this._saved) {
+        for (const n of chunk.nodes) {
+          const st = this._saved.get(n.id);
+          if (!st) continue;
+          n.remaining = st[0];
+          n.depleted = !!st[1];
+          if (n.depleted) {
+            n.regrowIn = this._types[n.type].HARVEST?.REGROW_SECONDS ?? 0;
+            this._regrowing.push(n);
+          }
+          chunk.dirty = true;
+        }
+      }
+      if (chunk.nodes.some((n) => n.removed)) chunk.dirty = true;
       this._chunks.set(key, chunk);
     }
     return chunk;
+  }
+
+  /**
+   * Estado guardable: nodos retirados y nodos con lo recogido a medias.
+   * @returns {{ removed: string[], nodes: Array<[string, number, number]> }}
+   */
+  snapshot() {
+    const nodes = new Map(this._saved ?? []);
+    for (const chunk of this._chunks.values()) {
+      if (!chunk.dirty) continue;
+      for (const n of chunk.nodes) {
+        if (n.removed) continue;
+        const full = n.total ?? this._types[n.type]?.HARVEST?.AMOUNT;
+        if (n.remaining !== full || n.depleted) nodes.set(n.id, [n.remaining, n.depleted ? 1 : 0]);
+        else nodes.delete(n.id);
+      }
+    }
+    return { removed: [...this._removed], nodes: [...nodes].map(([id, st]) => [id, st[0], st[1]]) };
+  }
+
+  /** Recupera un estado guardado (los chunks se regeneran con él). */
+  restore(snap) {
+    if (!snap || typeof snap !== 'object') return;
+    const ok = (id) => typeof id === 'string' && /^-?\d+:-?\d+:/.test(id);
+    this._removed = new Set((Array.isArray(snap.removed) ? snap.removed : []).filter(ok));
+    this._saved = new Map();
+    for (const e of Array.isArray(snap.nodes) ? snap.nodes : []) {
+      if (Array.isArray(e) && ok(e[0]) && Number.isFinite(e[1])) this._saved.set(e[0], [Math.max(0, Math.floor(e[1])), e[2] ? 1 : 0]);
+    }
+    this._regrowing = [];
+    this._chunks.clear();
   }
 
   get cachedChunkCount() {

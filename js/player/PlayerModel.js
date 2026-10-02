@@ -170,6 +170,11 @@ export class PlayerModel {
     this._groinLeaf.visible = !suit && o.LEGS == null;
   }
 
+  /** Color actual de las manos (piel o guantes). */
+  get handColor() {
+    return this._hands.color.getHex();
+  }
+
   /** Hora en la pantalla del reloj (solo se redibuja si cambia). */
   /** El reloj solo se ve en la muñeca cuando se lleva (se coge en la cápsula). */
   setWatchVisible(visible) {
@@ -289,6 +294,19 @@ export class PlayerModel {
 
     // Leve rebote del torso al caminar.
     this.torso.position.y = 1.1 + Math.abs(Math.cos(this._walkPhase)) * 0.03 * moveFactor;
+
+    // Agachado (o esquivando): el cuerpo baja y las piernas se doblan hacia delante.
+    const c = Math.max(s.crouch ?? 0, s.dodging ? 0.55 : 0);
+    const drop = -0.4 * c;
+    this.torso.position.y += drop;
+    this.torso.rotation.x = -0.25 * c;
+    this.leftArm.position.y = this.rightArm.position.y = 1.36 + drop;
+    this.head.position.y = 1.4 + drop;
+    this.leftLeg.position.y = this.rightLeg.position.y = 0.8 + drop;
+    if (c > 0.01) {
+      this.leftLeg.rotation.x += (1.05 - this.leftLeg.rotation.x) * c;
+      this.rightLeg.rotation.x += (0.75 - this.rightLeg.rotation.x) * c;
+    }
 
     this.head.rotation.order = 'YXZ';
     this.head.rotation.y = s.headYaw;

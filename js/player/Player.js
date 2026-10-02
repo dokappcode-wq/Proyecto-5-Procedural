@@ -34,19 +34,29 @@ export class Player {
       isSwimming: false,     // en el agua (mar o charca honda)
       headUnderwater: false, // buceando: sin aire salvo con el traje
       isClimbing: false,     // trepando una pendiente empinada (gasta energía)
+      isCrouching: false,    // agachado (C)
+      dodging: 0,            // s que quedan de esquiva (invulnerable mientras > 0)
     };
+    this.crouch = 0;         // 0..1: transición suave al agacharse (baja los ojos)
 
     this.model = new PlayerModel({ colors: config.COLORS });
     scene.add(this.model.root);
   }
 
   get eyeHeight() {
-    return this._cfg.EYE_HEIGHT;
+    const C = this._cfg.CROUCH;
+    return C ? this._cfg.EYE_HEIGHT + (C.EYE_HEIGHT - this._cfg.EYE_HEIGHT) * this.crouch : this._cfg.EYE_HEIGHT;
+  }
+
+  /** Altura del cuerpo (más baja agachado: pasa por sitios bajos). */
+  get height() {
+    const C = this._cfg.CROUCH;
+    return C && this.state.isCrouching ? C.HEIGHT : this._cfg.HEIGHT;
   }
 
   /** Posición de los ojos (escribe en `out` para no crear objetos por frame). */
   getEyePosition(out = new THREE.Vector3()) {
-    return out.set(this.position.x, this.position.y + this._cfg.EYE_HEIGHT, this.position.z);
+    return out.set(this.position.x, this.position.y + this.eyeHeight, this.position.z);
   }
 
   /** Vector unitario de la dirección de la mirada. */
@@ -81,6 +91,8 @@ export class Player {
       maxSpeed: this._cfg.RUN_SPEED,
       onGround: this.state.onGround || this.state.isFlying,
       climbing: this.state.isClimbing,
+      crouch: this.crouch,
+      dodging: this.state.dodging > 0,
       climbMoving: this.state.isClimbing && this.state.isMoving,
       headPitch: THREE.MathUtils.clamp(this.pitch, -0.7, 0.7),
       headYaw: THREE.MathUtils.clamp(wrapAngle(this.yaw - this.bodyYaw), -1.1, 1.1),

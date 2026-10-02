@@ -261,6 +261,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Guardar partida**: en el reloj (`Tab` o `I`), columna «Tú», botón **💾 Guardar partida**. También se guarda sola
+  cada 5 minutos (solo en tierra, en el planeta de inicio). En el menú de inicio aparece **▶ Continuar partida**.
+  Se guarda: inventario, ropa, vida/hambre/sed/estamina, niveles, la hora, dónde estás, la nave, lo talado y recogido,
+  lo construido y las bolsas del suelo.
+- **Mano en 1ª persona** (`V`): se ve la mano y lo que llevas (hacha, pico…), que se balancea al andar y golpea.
+  En 3ª persona la herramienta va en la mano del personaje.
+- **Agacharse** con `C` (otra vez para levantarse): más bajo y más lento. **Esquivar**: un toque rápido de `Shift`
+  te lanza hacia donde pulsas (atrás si no pulsas nada); gasta 10 de estamina y durante el salto no te alcanzan los ataques.
+- **Puño**: 2 de daño. Vida de los animales: ciervo 10, cabra 14, vaca 16.
+- **Defensa**: cada prenda tiene defensa (cuero: gorro 1, camiseta 3, pantalones 2, zapatillas 1, guantes 1). Cada punto
+  quita un 1,5 % del daño de los ataques (no de caídas, hambre o frío). Se ve en «Tú» → 🛡️ Defensa.
+- **Hacha y pico**: aguantan 400 golpes; con el hacha un árbol cae en 3 s y con el pico una roca se rompe en 3 s.
 - **Menú de inicio**: la cápsula de salvamento flota en órbita sobre el planeta. «Entrar al mundo» la hace caer
   (gira el escudo, reentrada con plasma y chispas, fogonazo) y el juego empieza junto a la **cápsula estrellada**
   (volcada, humeando, con la compuerta arrancada). Al llegar por el hiperespacio no hay caída.

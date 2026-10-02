@@ -326,6 +326,12 @@ export class WorldGenerator {
     return null;
   }
 
+  /** Partida cargada: aplica lo talado/recogido y rehace las mallas de los recursos. */
+  reloadResources(snap) {
+    this.resources?.restore(snap);
+    this._chunks.clear();
+  }
+
   /** ¿Hay agua dulce (un río) en (x, z)? El mar no se bebe; los ríos y las charcas sí. */
   isFreshWaterAt(x, z) {
     if (this.water.isWater(x, z)) return true;

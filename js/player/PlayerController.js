@@ -50,6 +50,22 @@ export class PlayerController {
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
+    this._runHeld = 0;        // s con Shift pulsado (un toque corto = esquivar)
+    this._dodgeCooldown = 0;
+    this._dodgeDir = new THREE.Vector3();
+  }
+
+  /** Agacharse / levantarse (también lo usa la entrada: C). */
+  setCrouching(on) {
+    const p = this._player;
+    if (p.state.isCrouching === on) return;
+    // No se levanta si hay un techo bajo encima.
+    if (!on && this._structures) {
+      const ceil = this._structures.ceilingAt(p.position.x, p.position.z, p.position.y + 0.5);
+      if (p.position.y + this._cfg.HEIGHT > ceil) return;
+    }
+    p.state.isCrouching = on;
+    this._events.emit(GameEvents.PLAYER_CROUCH_CHANGED, { crouching: on });
   }
 
   /** Cambia el terreno activo (p. ej. otro planeta en el futuro). */
@@ -140,6 +156,22 @@ export class PlayerController {
     p.state.isMoving = moving;
     p.state.isRunning = moving && input.isDown('RUN') && !p.state.isFlying && !p.state.isClimbing && this._mods.canRun;
 
+    // Agacharse (se alterna con C; correr o nadar levanta).
+    if (input.wasPressed('CROUCH') && !p.state.isFlying && !p.state.isSwimming && !p.state.isClimbing) this.setCrouching(!p.state.isCrouching);
+    if (p.state.isCrouching && (p.state.isRunning || p.state.isSwimming || p.state.isFlying)) this.setCrouching(false);
+    if (p.state.isCrouching) p.state.isRunning = false;
+    p.crouch += ((p.state.isCrouching ? 1 : 0) - p.crouch) * Math.min(1, dt * 12);
+
+    // Esquivar: toque corto de Shift (pulsar y soltar enseguida).
+    this._dodgeCooldown = Math.max(0, this._dodgeCooldown - dt);
+    p.state.dodging = Math.max(0, p.state.dodging - dt);
+    if (input.isDown('RUN')) this._runHeld += dt;
+    else {
+      const D = cfg.DODGE;
+      if (D && this._runHeld > 0 && this._runHeld <= D.TAP_TIME) this._tryDodge();
+      this._runHeld = 0;
+    }
+
     if (p.state.isFlying) {
       this._setSwimming(false, false, null); // volando (Admin) no se nada
       this._updateFlying(dt);
@@ -182,9 +214,17 @@ export class PlayerController {
     this._setSwimming(false, false, surface);
     if (this._updateClimbing(dt)) return;
 
-    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus;
+    const crouchK = p.state.isCrouching ? cfg.CROUCH?.SPEED_MULTIPLIER ?? 0.5 : 1;
+    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus * crouchK;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
-    this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, accel * dt);
+    if (this._dodgeTime > 0) {
+      // Esquivando: impulso fijo en la dirección elegida (sin control hasta que acaba).
+      this._dodgeTime -= dt;
+      v.x = this._dodgeDir.x * cfg.DODGE.SPEED;
+      v.z = this._dodgeDir.z * cfg.DODGE.SPEED;
+    } else {
+      this._accelerateHorizontal(this._wish.x * speed, this._wish.z * speed, accel * dt);
+    }
 
     // Salto (con buffer de entrada y coyote time)
     if (this._input.wasPressed('JUMP')) this._jumpBuffer = JUMP_BUFFER_TIME;
@@ -213,7 +253,7 @@ export class PlayerController {
     if (this._obstacles) {
       const px = p.position.x;
       const pz = p.position.z;
-      const hit = this._obstacles.resolveCollisions(p.position, cfg.RADIUS, p.position.y + 0.05, p.position.y + cfg.HEIGHT);
+      const hit = this._obstacles.resolveCollisions(p.position, cfg.RADIUS, p.position.y + 0.05, p.position.y + p.height);
       if (hit && this._isBlocked(p.position.x, p.position.z)) {
         p.position.x = px;
         p.position.z = pz;
@@ -227,10 +267,11 @@ export class PlayerController {
     p.position.y += v.y * dt;
 
     // Techo de una construcción: la cabeza no lo atraviesa al saltar.
+    const height = p.height;
     if (v.y > 0 && this._structures) {
-      const ceiling = this._structures.ceilingAt(p.position.x, p.position.z, feetBefore + cfg.HEIGHT - 0.3);
-      if (p.position.y + cfg.HEIGHT > ceiling) {
-        p.position.y = Math.max(feetBefore, ceiling - cfg.HEIGHT);
+      const ceiling = this._structures.ceilingAt(p.position.x, p.position.z, feetBefore + height - 0.3);
+      if (p.position.y + height > ceiling) {
+        p.position.y = Math.max(feetBefore, ceiling - height);
         v.y = 0;
       }
     }
@@ -303,6 +344,24 @@ export class PlayerController {
     }
     p.state.onGround = p.position.y - ground < 0.02;
     this._setSwimming(true, p.position.y + cfg.HEIGHT * 0.9 < surface, surface);
+  }
+
+  /** Esquiva hacia donde se pulsa (atrás si no se pulsa nada). Gasta estamina (PLAYER_DODGED). */
+  _tryDodge() {
+    const p = this._player;
+    const s = p.state;
+    if (this._dodgeCooldown > 0 || !s.onGround || s.isSwimming || s.isClimbing || s.isFlying || !this._mods.canRun) return false;
+    if (this._wish.lengthSq() > 0) this._dodgeDir.copy(this._wish);
+    else this._dodgeDir.set(Math.sin(p.yaw), 0, Math.cos(p.yaw)); // hacia atrás
+    const D = this._cfg.DODGE;
+    this._dodgeTime = D.TIME;
+    this._dodgeCooldown = D.COOLDOWN;
+    s.dodging = D.INVULNERABLE;
+    p.velocity.y = 1.6; // saltito
+    s.onGround = false;
+    this.setCrouching(false);
+    this._events.emit(GameEvents.PLAYER_DODGED, { x: this._dodgeDir.x, z: this._dodgeDir.z });
+    return true;
   }
 
   /** Altura de un borde trepable justo delante (entre 0,3 y 2 m sobre los pies), o null. */
@@ -453,7 +512,7 @@ export class PlayerController {
     if (rise > cfg.MAX_STEP_HEIGHT) return true;
     // Bordes de suelos/cimientos más altos que un escalón actúan como muro.
     const st = this._structures;
-    if (st?.blocksAt(x, z, cfg.RADIUS, feet + cfg.MAX_STEP_HEIGHT, feet + cfg.HEIGHT)) return true;
+    if (st?.blocksAt(x, z, cfg.RADIUS, feet + cfg.MAX_STEP_HEIGHT, feet + p.height)) return true;
     // Sobre una construcción no cuenta la pendiente del terreno de debajo.
     const onStructure = st && st.surfaceAt(x, z, feet + cfg.MAX_STEP_HEIGHT) !== null;
     if (rise > 0.01 && p.state.onGround && !onStructure) {

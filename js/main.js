@@ -71,6 +71,8 @@ import { GiantWaveSystem } from './world/GiantWave.js';
 import { ChopEffects } from './world/ChopEffects.js';
 import { CrashSite } from './world/CrashSite.js';
 import { TitleScene } from './ui/TitleScene.js';
+import { SaveGame, saveDateText } from './core/SaveGame.js';
+import { HeldItems } from './player/HeldItems.js';
 import { BubbleSystem } from './world/BubbleSystem.js';
 import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
@@ -91,7 +93,7 @@ import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 
-function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [] } = {}) {
+function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null } = {}) {
   const cfg = GameConfig;
   const events = new EventBus();
   const HOME = system.homeId;
@@ -346,6 +348,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   // Astillas al golpear troncos y árboles que caen al talarlos.
   const chopEffects = new ChopEffects({ scene: render.scene, events, worlds });
+  // Lo que se lleva en la mano: en 3ª persona en el personaje; en 1ª, la mano en pantalla.
+  const held = new HeldItems({ player, camera: render.camera, render, items: cfg.ITEMS, lighting });
+  events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => held.setHeld(selectedId ?? null, null));
+  events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && kind !== 'place' && held.playAction(kind === 'chop' ? 0.42 : 0.3));
+  events.on(GameEvents.EQUIPMENT_CHANGED, () => held.setHandColor(player.model.handColor));
   // Tirar objetos: caen al suelo en una bolsa delante del jugador (E para recogerlos).
   // También lo que no cabe en el inventario (lleno) se queda en el suelo así.
   const dropItems = (itemId, amount, dur) => {
@@ -396,6 +403,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const PG = cfg.PROGRESSION;
   const progression = new ProgressionSystem({ config: PG, events });
   progression.applyTo({ health, energy });
+  // Daño de los ataques: esquivando no alcanza; la armadura quita una parte.
+  health.modifier = (d) => {
+    const attack = d.fromX !== undefined || d.attack;
+    if (!attack) return d.amount;
+    if (player.state.dodging > 0) return 0;
+    return d.amount * (1 - equipment.damageReduction);
+  };
   events.on(GameEvents.RESOURCE_HARVESTED, ({ amount }) => progression.addXp(PG.XP.HARVEST * (amount ?? 1)));
   events.on(GameEvents.RESOURCE_HIT, ({ felled, material, node }) => {
     if (!felled) return;
@@ -451,6 +465,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.SHIP_PILOT_CHANGED, ({ piloting }) => {
     setControlLock('pilot', piloting);
     camera.setVehicleView(piloting ? ship.view : null);
+    if (piloting) held.setFirstPerson(false);
     player.setBodyVisible(!piloting && camera.mode === 'THIRD_PERSON');
     if (!piloting) interaction.resetTarget();
   });
@@ -545,7 +560,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
 
   // Presentación: el cuerpo se oculta cuando la cámara está "dentro" de la cabeza.
-  events.on(GameEvents.CAMERA_BODY_VISIBILITY, ({ visible }) => player.setBodyVisible(visible && !ship.piloting));
+  events.on(GameEvents.CAMERA_BODY_VISIBILITY, ({ visible }) => {
+    player.setBodyVisible(visible && !ship.piloting);
+    held.setFirstPerson(!visible && !ship.piloting);
+  });
 
   // ---- Interfaz y herramientas --------------------------------------------
   const ui = new UIManager({
@@ -1049,7 +1067,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // ---- Menú de inicio: la cápsula en órbita y la caída al planeta ------------------
   let titleScene = null;
-  if (!handoff) {
+  if (!handoff && !save) {
     titleScene = new TitleScene({ render, textures: getPlanetTextures(HOME), seed: system.seed });
     titleScene.start();
     const target = document.getElementById('title-target');
@@ -1072,7 +1090,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   }
   // Al empezar se mira hacia la cápsula estrellada.
   events.on(GameEvents.GAME_STARTED, () => {
-    if (!crashSite?.group || worlds.activeId !== HOME || handoff) return;
+    if (!crashSite?.group || worlds.activeId !== HOME || handoff || save) return;
     player.yaw = player.bodyYaw = crashSite.spawnYaw;
     player.pitch = -0.12;
     if (!hasWatch) setTimeout(() => message('💥 La cápsula se ha estrellado. Tu reloj de pulsera ha quedado en la compuerta (el que brilla): cógelo con E. Sin él no puedes fabricar nada.', 'warning'), 1800);
@@ -1122,6 +1140,91 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     });
   }
 
+  // ---- Guardar y cargar partida (localStorage) ------------------------------------
+  // Cada parte guarda lo suyo; las fases nuevas (historia, cofres, cuevas…) se registran igual.
+  const saveGame = new SaveGame({ key: cfg.SAVE.KEY });
+  const finite = (v) => typeof v === 'number' && Number.isFinite(v);
+  const isItem = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(cfg.ITEMS, id);
+  saveGame.register('state', {
+    save: () => captureState({
+      systemName: system.name, target: file, campaignSeed, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression, hasWatch,
+    }),
+    load: (st) => {
+      applyState(st, { items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression });
+      hasWatch = st.watch !== false;
+      player.model.setWatchVisible(hasWatch);
+      playerMenu.refreshWatch();
+      if (crashSite && hasWatch && !crashSite.watchTaken) crashSite.interact('watch');
+    },
+  });
+  saveGame.register('player', {
+    save: () => ({ x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw }),
+    load: (d) => {
+      if (![d?.x, d?.y, d?.z].every(finite)) return;
+      const b = worlds.home.getBounds();
+      if (d.x < b.minX || d.x > b.maxX || d.z < b.minZ || d.z > b.maxZ) return;
+      player.teleport(d.x, Math.max(d.y, worlds.home.getHeightAt(d.x, d.z)), d.z);
+      if (finite(d.yaw)) player.yaw = player.bodyYaw = d.yaw;
+    },
+  });
+  saveGame.register('ship', {
+    save: () => (ship.body === HOME && ship.state === 'LANDED' ? { x: ship.ship.x, z: ship.ship.z, yaw: ship.ship.yaw } : null),
+    load: (d) => {
+      if (d && [d.x, d.z, d.yaw].every(finite)) ship.placeLanded(d.x, d.z, d.yaw);
+    },
+  });
+  saveGame.register('world', { save: () => worlds.home.resources.snapshot(), load: (d) => worlds.home.reloadResources(d) });
+  saveGame.register('construction', { save: () => construction.snapshot(), load: (d) => construction.restore(d) });
+  saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
+  saveGame.register('flags', {
+    save: () => ({ shipFound, respawnBed: respawnBed && !respawnBed.ship ? { x: respawnBed.x, z: respawnBed.z } : null }),
+    load: (d) => {
+      if (typeof d?.shipFound === 'boolean') shipFound = d.shipFound;
+    },
+  });
+  const canSave = () => gameStarted && !health.dead && worlds.activeId === HOME && !ship.piloting && !spaceTravel.inSpace;
+  const saveNow = (reason = 'manual', { silent = false } = {}) => {
+    if (!canSave()) {
+      if (!silent) message('💾 Ahora no se puede guardar: hazlo en tierra, en el planeta de inicio (no a los mandos ni en el espacio).', 'warning');
+      return false;
+    }
+    const ok = saveGame.write({ file, seed: system.seed, system: system.name, reason });
+    if (!ok) {
+      if (!silent) message('💾 No se ha podido guardar (¿el navegador no deja guardar datos?).', 'warning');
+      return false;
+    }
+    const at = Date.now();
+    events.emit(GameEvents.GAME_SAVED, { reason, at });
+    if (!silent || reason !== 'auto') message(reason === 'auto' ? '💾 Guardado automático' : '💾 Partida guardada', 'info');
+    return true;
+  };
+  events.on(GameEvents.GAME_SAVE_REQUEST, ({ reason, silent } = {}) => saveNow(reason ?? 'manual', { silent }));
+  let autosaveIn = cfg.SAVE.AUTOSAVE_SECONDS;
+  const autosave = {
+    name: 'autosave',
+    update: (dt) => {
+      if (!gameStarted) return;
+      autosaveIn -= dt;
+      if (autosaveIn > 0) return;
+      autosaveIn = canSave() ? cfg.SAVE.AUTOSAVE_SECONDS : 20;
+      if (canSave()) saveNow('auto', { silent: true });
+    },
+  };
+  // Menú de inicio: "Continuar partida" si hay una guardada (recarga con su sistema y su semilla).
+  const saved = !handoff && !save ? saveGame.peek() : null;
+  const continueBtn = document.getElementById('continue-button');
+  if (saved && continueBtn) {
+    continueBtn.classList.remove('hidden');
+    continueBtn.innerHTML = '';
+    continueBtn.append('▶ Continuar partida');
+    const small = document.createElement('small');
+    small.textContent = `${saved.system ?? ''} · ${saveDateText(saved.at)}`;
+    continueBtn.append(small);
+    continueBtn.addEventListener('click', () => {
+      window.location.assign(`${window.location.pathname}?system=${encodeURIComponent(saved.file)}&seed=${saved.seed}&load=1`);
+    });
+  }
+
   const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
@@ -1165,6 +1268,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  loop.add(held);        // objeto en la mano y mano en 1ª persona (tras la cámara)
   // Reloj de pulsera: su pantalla da la hora del juego.
   loop.add({ name: 'wristWatch', update: () => player.model.setWatchText(time.clockText) });
   loop.add(eva);         // paseo espacial: mueve al jugador y coloca la cámara (sustituye a los dos anteriores)
@@ -1214,7 +1318,17 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(hyperPanel);
   loop.add(importPanel);
   loop.add(admin);
+  loop.add(autosave);    // guardado automático
   loop.add(input);       // lateUpdate: limpia el estado por frame
+
+  // Partida cargada: se aplica sobre el mundo recién generado y se entra directamente.
+  if (save) {
+    titleScene?.stop();
+    saveGame.apply(save);
+    autosaveIn = cfg.SAVE.AUTOSAVE_SECONDS;
+    ui.startNow();
+    message(`💾 Partida cargada (${saveDateText(save.at)}).`, 'info');
+  }
 
   loop.start();
 
@@ -1225,7 +1339,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, get hasWatch() { return hasWatch; },
   };
 }
 
@@ -1268,17 +1382,23 @@ async function loadCampaign() {
   ]);
   const campaign = file === GameConfig.CAMPAIGN.SYSTEM_FILE;
   const seed = campaign || params.has('seed') ? gameSeed() : undefined;
+  // ?load=1: continuar la partida guardada (si es de este sistema y esta semilla).
+  let save = null;
+  if (params.get('load') === '1') {
+    const s = new SaveGame({ key: GameConfig.SAVE.KEY }).read();
+    if (s && s.file === file && s.seed === seed) save = s;
+  }
   // Lo guardado se vuelve a comprobar entero, como si se importara de nuevo.
   const result = loadSystem(text, { seed });
   if (!result.ok) throw Object.assign(new Error(`el sistema ${file} no es válido: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`), { dataError: true });
   for (const w of result.warnings) console.warn(`[sistema] ${w.path}: ${w.message}`);
   const catalog = catalogText ? parseSystemCatalog(catalogText) : { entries: [], errors: [] };
   for (const e of catalog.errors) console.warn(`[catálogo] ${e.path}: ${e.message}`);
-  return { system: new SolarSystem(result.system), file, catalog: catalog.entries, handoff: takeHandoff(file), store, imported };
+  return { system: new SolarSystem(result.system), file, catalog: catalog.entries, handoff: save ? null : takeHandoff(file), store, imported, save };
 }
 
 loadCampaign()
-  .then(({ system, file, catalog, handoff, store, imported }) => boot(system, { file, catalog, handoff, store, imported }))
+  .then(({ system, file, catalog, handoff, store, imported, save }) => boot(system, { file, catalog, handoff, store, imported, save }))
   .catch((err) => {
     console.error(err);
     const el = document.getElementById('fatal-error');

@@ -36,6 +36,7 @@ export class EnergySystem extends VitalStat {
       else if (kind === 'chop') this.spend(config.ENERGY_CHOP_COST);
     });
     events.on(GameEvents.PLAYER_JUMPED, () => this.spend(config.ENERGY_JUMP_COST));
+    events.on(GameEvents.PLAYER_DODGED, () => this.spend(config.ENERGY_DODGE_COST ?? 10));
   }
 
   /** Gasto puntual (un golpe, un salto): también reinicia la espera para recuperarse. */

@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.13.0',
+    VERSION: '1.14.0',
   },
 
   RENDER: {
@@ -65,7 +65,8 @@ export const GameConfig = deepFreeze({
       RIGHT: ['KeyD', 'ArrowRight'],
       JUMP: ['Space'],
       RUN: ['ShiftLeft', 'ShiftRight'],
-      DESCEND: ['KeyC', 'ControlLeft'], // solo en vuelo (debug)
+      DESCEND: ['KeyC', 'ControlLeft'], // bucear, bajar (nave, vuelo)
+      CROUCH: ['KeyC'],                 // a pie: agacharse / levantarse
       TOGGLE_CAMERA: ['KeyV'],
       TOGGLE_HELP: ['KeyH'],
       INTERACT: ['KeyE'],               // recoger / interactuar
@@ -120,6 +121,11 @@ export const GameConfig = deepFreeze({
       SLIDE_SPEED: 3.5,       // m/s resbalando agotado
     },
     PITCH_LIMIT: Math.PI / 2 - 0.05,
+    // Agacharse (C, se alterna): más bajo y más lento.
+    CROUCH: { HEIGHT: 1.25, EYE_HEIGHT: 1.1, SPEED_MULTIPLIER: 0.45 },
+    // Esquivar: un toque corto de Shift lanza al jugador hacia donde pulsa WASD (atrás si no pulsa nada).
+    // Durante INVULNERABLE s no le alcanzan los ataques.
+    DODGE: { TAP_TIME: 0.22, SPEED: 11, TIME: 0.26, COOLDOWN: 0.7, INVULNERABLE: 0.32 },
     BODY_TURN_SPEED: 10,      // rad/s con que el cuerpo gira hacia la dirección de avance
     // Se empieza desnudo: sin ropa, el cuerpo es del color de la piel y tres hojas
     // tapan pecho y entrepierna (desaparecen al ponerse camiseta o pantalones).
@@ -204,6 +210,7 @@ export const GameConfig = deepFreeze({
     ENERGY_ACTION_COST: 4,          // por golpear (animales, rocas) o recoger
     ENERGY_CHOP_COST: 2.5,          // por golpe al talar, picar o romper
     ENERGY_JUMP_COST: 4,
+    ENERGY_DODGE_COST: 10,
     ENERGY_REGEN: 10,               // /s recuperada al descansar
     ENERGY_REGEN_DELAY: 1.5,        // s sin esfuerzo antes de empezar a recuperarse
     ENERGY_REGEN_HUNGRY: 0.5,       // la recuperación se reduce con hambre o sed bajas
@@ -317,13 +324,14 @@ export const GameConfig = deepFreeze({
     // Herramientas: TOOL.CHOP_SPEED acelera la tala cuando se lleva seleccionada en la barra.
     //   DURABILITY: golpes que aguanta (cada golpe con ella a un tronco, roca o pieza gasta 1);
     //   al llegar a 0 se rompe. Un árbol con el hacha son ~10 golpes; una roca con el pico, ~10.
-    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 60, TOOL: { MINE_SPEED: 1 }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
-    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 60, TOOL: { CHOP_SPEED: 2.5 }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
-    LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
-    LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
-    LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
-    LEATHER_SHOES: { NAME: 'Zapatillas de cuero', ICON: '👟', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, COLD_PROTECTION: 0.03, COLOR: 0x4a2f18, DESC: 'Pies calientes y secos.' },
-    LEATHER_GLOVES: { NAME: 'Guantes de cuero', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, COLD_PROTECTION: 0.02, COLOR: 0x5c3a1c, DESC: 'Manos protegidas.' },
+    // Hacha: un árbol en 3 s (15 s con el puño). Pico: una roca en 3 s. Aguantan 400 golpes.
+    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 400, TOOL: { MINE_SPEED: 2 }, MODEL: { TYPE: 'pickaxe' }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
+    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 400, TOOL: { CHOP_SPEED: 5 }, MODEL: { TYPE: 'axe' }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
+    LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
+    LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
+    LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
+    LEATHER_SHOES: { NAME: 'Zapatillas de cuero', ICON: '👟', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.03, COLOR: 0x4a2f18, DESC: 'Pies calientes y secos.' },
+    LEATHER_GLOVES: { NAME: 'Guantes de cuero', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.02, COLOR: 0x5c3a1c, DESC: 'Manos protegidas.' },
     // Combustible de la nave: se colocan en el puesto de carga (ver SHIP.BATTERIES).
     PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋', USE: 'BATTERY' },
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
@@ -362,6 +370,10 @@ export const GameConfig = deepFreeze({
       HANDS: { NAME: 'Manos', ICON: '🧤' },
     },
     MAX_COLD_PROTECTION: 0.8,   // la ropa nunca quita más del 80 % de la pérdida de calor
+    // Defensa (ITEMS.*.DEFENSE, se suma): cada punto quita un 1,5 % del daño de los ataques
+    // (no de caídas, hambre, frío…). Cuero 8 puntos (12 %), cobre 15 (22 %), malla 23 (35 %).
+    DEFENSE_PER_POINT: 0.015,
+    MAX_DEFENSE_REDUCTION: 0.75,
     WATER_CAPACITY: 3,          // unidades de agua por odre
   },
 
@@ -714,7 +726,7 @@ export const GameConfig = deepFreeze({
     RANGE: 2.8,                 // m desde el jugador hasta el borde del objetivo
     CHOP_SWING: 0.6,            // s entre golpes al talar manteniendo el clic
     ACTION_COOLDOWN: 0.45,      // s entre acciones (recoger o golpear)
-    PLAYER_HIT_DAMAGE: 1,       // daño de un puñetazo
+    PLAYER_HIT_DAMAGE: 2,       // daño de un puñetazo
     HIT_KNOCKBACK: 3,           // m/s de empuje al animal golpeado
     DAMAGE_KNOCKBACK: 6,        // m/s de empuje al jugador cuando un animal le ataca
   },
@@ -759,7 +771,7 @@ export const GameConfig = deepFreeze({
         NAME: 'Ciervo',            // "animal de pradera"
         NAME_PLURAL: 'Ciervos',
         DROPS: { MEAT: 2 },
-        HEALTH: 3,
+        HEALTH: 10,                 // animal genérico
         ATTACK_DAMAGE: 5,
         ATTACK_COOLDOWN: 1.2,
         TEMPERAMENT_WEIGHTS: { FLEE: 0.6, CURIOUS: 0.2, NEUTRAL: 0.2 },
@@ -777,7 +789,7 @@ export const GameConfig = deepFreeze({
         NAME: 'Cabra',
         NAME_PLURAL: 'Cabras',
         DROPS: { MEAT: 1, WOOL: 2 },
-        HEALTH: 3,
+        HEALTH: 14,
         ATTACK_DAMAGE: 6,
         ATTACK_COOLDOWN: 1.1,
         TEMPERAMENT_WEIGHTS: { FLEE: 0.35, CURIOUS: 0.35, NEUTRAL: 0.3 },
@@ -795,7 +807,7 @@ export const GameConfig = deepFreeze({
         NAME: 'Vaca',
         NAME_PLURAL: 'Vacas',
         DROPS: { MEAT: 3, LEATHER: 2 },
-        HEALTH: 5,
+        HEALTH: 16,
         ATTACK_DAMAGE: 10,
         ATTACK_COOLDOWN: 1.6,
         TEMPERAMENT_WEIGHTS: { FLEE: 0.2, CURIOUS: 0.3, NEUTRAL: 0.5 },
@@ -815,6 +827,12 @@ export const GameConfig = deepFreeze({
   ADMIN: {
     ADMIN_SEQUENCE: ['a', 'd', 'm', 'i', 'n'],
     ADMIN_KEY_TIMEOUT: 2000, // ms máximos entre dos teclas de la secuencia
+  },
+
+  // Guardar partida (localStorage del navegador): manual desde el reloj y automática.
+  SAVE: {
+    KEY: 'mundo0.save.v1',
+    AUTOSAVE_SECONDS: 300,      // cada 5 min de juego en el planeta de inicio
   },
 
   UI: {

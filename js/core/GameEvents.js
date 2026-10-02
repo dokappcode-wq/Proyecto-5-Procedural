@@ -18,6 +18,11 @@ export const GameEvents = Object.freeze({
   CAMERA_BODY_VISIBILITY: 'camera:bodyVisibility',  // { visible }
 
   // Jugador
+  PLAYER_CROUCH_CHANGED: 'player:crouch',          // { crouching }
+  PLAYER_DODGED: 'player:dodged',                  // { x, z } dirección
+  GAME_SAVE_REQUEST: 'game:saveRequest',           // { reason, silent? }
+  STRUCTURE_RESTORED: 'construction:restored',    // { structure } (al cargar partida)
+  GAME_SAVED: 'game:saved',                        // { reason, at }
   PLAYER_CLIMB_CHANGED: 'player:climbChanged',      // { climbing } escalando una pendiente
   PLAYER_LEVEL_UP: 'player:levelUp',              // { level, points }
   PROGRESSION_CHANGED: 'player:progression',      // { level, xp, points, stats }
