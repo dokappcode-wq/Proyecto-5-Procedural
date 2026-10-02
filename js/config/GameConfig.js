@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.10.0',
+    VERSION: '1.10.1',
   },
 
   RENDER: {
@@ -116,7 +116,7 @@ export const GameConfig = deepFreeze({
     // (gasta energía: ENERGY_CLIMB_COST). Sin energía no puede y resbala pendiente abajo.
     CLIMB: {
       START_SLOPE_DEG: 40,
-      SPEED: 1.5,             // m/s a lo largo de la pendiente
+      SPEED: 3.2,             // m/s a lo largo de la pendiente
       SLIDE_SPEED: 3.5,       // m/s resbalando agotado
     },
     PITCH_LIMIT: Math.PI / 2 - 0.05,
@@ -259,7 +259,7 @@ export const GameConfig = deepFreeze({
     COBWEB: {
       NAME: 'Telaraña', COLLISION_RADIUS: 0, SCALE: [1, 1], AIM_HEIGHT: 0, AIM_RADIUS: 0.8,
       HARVEST: { ITEM: 'SPIDER_SILK', AMOUNT: 5, AMOUNT_RANGE: [5, 10], REMOVE_WHEN_EMPTY: true, VERB: 'Recoger', METHOD: 'HIT', CHOP_TIME: 1.5, MATERIAL: 'web' },
-      SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.4, MAX_GAP: 3.8, CHANCE: 0.12, HEIGHT: 1.7, MAX_SIZE: 1.45 },
+      SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.0, MAX_GAP: 5.0, CHANCE: 0.4, HEIGHT: 1.7, MAX_SIZE: 1.5 },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
     MINERAL_ROCK: {

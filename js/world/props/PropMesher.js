@@ -122,13 +122,13 @@ export class PropMesher {
       const spokes = 8;
       for (let i = 0; i < spokes; i++) {
         const a = (i / spokes) * Math.PI * 2;
-        b.add(box, { position: [Math.cos(a) * 0.5, Math.sin(a) * 0.5, 0], rotation: [0, 0, a], scale: [1, 0.022, 0.015], color: white });
+        b.add(box, { position: [Math.cos(a) * 0.5, Math.sin(a) * 0.5, 0], rotation: [0, 0, a], scale: [1, 0.05, 0.03], color: white });
       }
-      for (const r of [0.28, 0.55, 0.82]) {
+      for (const r of [0.22, 0.42, 0.62, 0.82]) {
         for (let i = 0; i < spokes; i++) {
           const a = ((i + 0.5) / spokes) * Math.PI * 2;
           const len = 2 * r * Math.sin(Math.PI / spokes);
-          b.add(box, { position: [Math.cos(a) * r, Math.sin(a) * r, 0], rotation: [0, 0, a + Math.PI / 2], scale: [len, 0.018, 0.012], color: white });
+          b.add(box, { position: [Math.cos(a) * r, Math.sin(a) * r, 0], rotation: [0, 0, a + Math.PI / 2], scale: [len, 0.04, 0.025], color: white });
         }
       }
       return b.build();

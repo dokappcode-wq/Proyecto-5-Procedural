@@ -267,7 +267,7 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   (4 piedras refinadas + 2 maderas refinadas, 15 s). Selecciona la mesa en la barra y clic derecho / `R` para
   colocarla (modo construcción); `E` sobre ella abre su pestaña: cuero refinado (1 cuero, 8 s), ropa de cuero
   y odre (con cuero refinado). En `Tab` esas recetas salen bloqueadas (🛠️).
-- **Telarañas**: algunas están tendidas entre dos árboles cercanos; mantén el clic sobre ellas (1,5 s) y dan 5–10 🕸️.
+- **Telarañas**: en los bosques, tendidas entre dos árboles cercanos (a la altura de la cabeza); mantén el clic sobre ellas (1,5 s) y dan 5–10 🕸️.
 - **Romper lo construido**: apunta a una pieza y mantén el clic (3 s; con hacha o pico, la mitad): se rompe y devuelve los materiales.
 - **Energía**: ya no baja sola. Correr, nadar deprisa, escalar, saltar y golpear la gastan; parado se recupera en
   unos segundos (más despacio con hambre o sed). Agotado no puedes correr, escalar ni golpear hasta recuperar un 25 %.
