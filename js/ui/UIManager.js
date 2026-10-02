@@ -344,7 +344,7 @@ export class UIManager {
   _showTarget(target) {
     const el = this.el.prompt;
     this.el.crosshair.classList.toggle('has-target', !!target?.action);
-    if (!target) {
+    if (!target || target.silent) {
       el.classList.add('hidden');
       return;
     }
@@ -359,15 +359,6 @@ export class UIManager {
       action.className = 'target-action';
       action.textContent = `[${target.key}] ${target.action}`;
       el.appendChild(action);
-    }
-    if (target.progress > 0) {
-      // Tala en curso: barra de progreso (sin decir cuánta madera queda).
-      const bar = document.createElement('span');
-      bar.className = 'target-progress';
-      const fill = document.createElement('span');
-      fill.style.width = `${Math.round(target.progress * 100)}%`;
-      bar.appendChild(fill);
-      el.appendChild(bar);
     }
     if (target.remaining) {
       const count = document.createElement('span');

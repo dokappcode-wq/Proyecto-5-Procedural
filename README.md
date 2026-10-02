@@ -260,8 +260,8 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
-- **Talar**: apunta al tronco y **mantén el clic** (o `F`): el personaje golpea sin parar, una barra muestra
-  cuánto falta y la madera va saliendo; con el puño un árbol tarda 15 s. Con el 🪓 hacha de piedra seleccionada
+- **Talar**: apunta al tronco y **mantén el clic** (o `F`): el personaje golpea sin parar (sin letreros en pantalla)
+  y la madera va saliendo; con el puño un árbol tarda 15 s. Con el 🪓 hacha de piedra seleccionada
   en la barra cae antes (6 s) y da la misma madera.
 - **Rocas**: con `E` coges sus piedras sueltas (vuelven con el tiempo). A puñetazos no se rompen y te haces
   daño; con el ⛏️ pico de piedra seleccionado, manteniendo el clic se rompen (6 s) y dan 5 🪨.

@@ -173,7 +173,6 @@ export class InteractionSystem {
       node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z,
       felled: done, progress: work.progress, material: rock ? 'stone' : 'wood',
     });
-    this._targetKey = null; // repintar la barra de progreso
   }
 
   /** Puñetazo a una roca: no se rompe y duele. */
@@ -308,14 +307,14 @@ export class InteractionSystem {
     if (B && def.HARVEST.METHOD !== 'HIT') {
       // Roca: con pico se pica; sin pico, E coge piedras sueltas si quedan.
       const hasTool = !!this._tool()?.[B.TOOL];
-      const progress = this.chopProgress(t.ref.id);
-      if (hasTool) return { ...t, breakable: true, label: def.NAME, action: B.VERB, key: 'Clic', progress };
-      if (t.ref.remaining > 0) return { ...t, breakable: true, label: def.NAME, action: def.HARVEST.VERB, key: 'E', progress };
-      return { ...t, breakable: true, label: def.NAME, action: 'Necesitas un pico', key: '⛏️', progress };
+      if (hasTool) return { ...t, breakable: true, label: def.NAME, action: B.VERB, key: 'Clic' };
+      if (t.ref.remaining > 0) return { ...t, breakable: true, label: def.NAME, action: def.HARVEST.VERB, key: 'E' };
+      return { ...t, breakable: true, label: def.NAME, action: 'Necesitas un pico', key: '⛏️' };
     }
     if (t.ref.remaining <= 0) return { ...t, label: `${def.NAME} (sin fruto)`, action: null };
     if (def.HARVEST.METHOD === 'HIT') {
-      return { ...t, hit: true, label: def.NAME, action: def.HARVEST.VERB, key: 'Clic', progress: this.chopProgress(t.ref.id) };
+      // Sin letrero en pantalla (silent): basta con apuntar al tronco y mantener el clic.
+      return { ...t, hit: true, silent: true, label: def.NAME, action: def.HARVEST.VERB, key: 'Clic' };
     }
     return { ...t, label: def.NAME, action: def.HARVEST.VERB, key: 'E', remaining: t.ref.remaining };
   }

@@ -273,8 +273,6 @@ kbd {
 #interaction-prompt .target-name { font-weight: 700; }
 #interaction-prompt .target-action { color: #ffe38a; margin-left: 6px; }
 #interaction-prompt .target-count { color: var(--ui-muted); margin-left: 4px; }
-#interaction-prompt .target-progress { display: inline-block; width: 70px; height: 6px; margin-left: 8px; background: rgba(255, 255, 255, 0.18); border-radius: 3px; overflow: hidden; vertical-align: middle; }
-#interaction-prompt .target-progress span { display: block; height: 100%; background: linear-gradient(90deg, #c8955a, #ffd27a); }
 
 /* ---- Inventario ------------------------------------------------------ */
 #inventory-bar {

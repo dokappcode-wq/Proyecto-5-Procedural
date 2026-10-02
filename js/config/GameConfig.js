@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.9.0',
+    VERSION: '1.9.1',
   },
 
   RENDER: {
