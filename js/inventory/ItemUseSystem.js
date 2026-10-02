@@ -85,7 +85,7 @@ export class ItemUseSystem {
         break;
       case 'BUILD':
         // Una pieza (pared, mesa, antorcha…): se coloca en el modo construcción.
-        this._events.emit(GameEvents.BUILD_PIECE_REQUEST, { pieceId: def.BUILD_PIECE });
+        this._events.emit(GameEvents.BUILD_PIECE_REQUEST, { pieceId: def.BUILD_PIECE, once: !!def.HOLD }); // la antorcha: una y vuelve a la mano
         ok = true;
         break;
       case 'MAP':

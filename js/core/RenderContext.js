@@ -14,7 +14,7 @@ export class RenderContext {
   constructor({ config, skyConfig, container }) {
     this._cfg = config;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: config.ANTIALIAS });
+    this.renderer = new THREE.WebGLRenderer({ antialias: config.ANTIALIAS, stencil: true }); // stencil: el mar no se dibuja dentro de las cuevas (CaveMesher)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.MAX_PIXEL_RATIO));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

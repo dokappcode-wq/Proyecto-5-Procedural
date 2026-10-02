@@ -125,7 +125,7 @@ export class InteractionSystem {
       // Rocas: con E, piedras sueltas (si quedan). Picar va en update().
       if (button !== 'INTERACT') return;
       if (target.ref.remaining > 0) this._harvest(target.ref);
-      else this._hint('No quedan piedras sueltas. Para romper la roca hace falta un ⛏️ pico seleccionado en la barra.');
+      else this._hint(`${this._types[target.ref.type].NAME}: para picarla hace falta un ⛏️ pico seleccionado en la barra.`);
     } else if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
     } else if (target?.kind === 'provided' && button === 'INTERACT') {
@@ -282,8 +282,9 @@ export class InteractionSystem {
     let best = null;
     let bestT = Infinity;
     const consider = (candidate, cx, cy, cz, aimRadius, reachRadius) => {
-      // Alcance medido desde el jugador (no desde la cámara).
+      // Alcance medido desde el jugador (no desde la cámara); y a su altura (cuevas: no a través del suelo).
       if (Math.hypot(cx - p.x, cz - p.z) - reachRadius > range) return;
+      if (Math.abs(cy - (p.y + 1.2)) > range + 2.5) return;
       // Distancia del centro del objetivo a la línea de la mira.
       this._v.set(cx, cy, cz).sub(this._origin);
       const t = this._v.dot(this._dir);
@@ -357,7 +358,7 @@ export class InteractionSystem {
     }
     // Ríos: donde la mira corta el nivel del agua, si ahí hay agua dulce (el mar no se bebe).
     const sea = this._world.seaLevel;
-    if (best?.kind !== 'water' && this._dir.y < -0.05 && typeof sea === 'number' && this._world.isFreshWaterAt) {
+    if (best?.kind !== 'water' && this._dir.y < -0.05 && typeof sea === 'number' && this._world.isFreshWaterAt && !this._world.inCave?.(p.x, p.y + 1, p.z)) {
       const t = (sea - this._origin.y) / this._dir.y;
       const hx = this._origin.x + this._dir.x * t;
       const hz = this._origin.z + this._dir.z * t;

@@ -267,6 +267,12 @@ export class PlayerController {
     const ground = this._groundHeight(p.position.x, p.position.z);
     p.position.y += v.y * dt;
 
+    // Techo de una cueva.
+    const caveHere = this._caveFloor(p.position.x, p.position.z, feetBefore);
+    if (caveHere && p.position.y + p.height > caveHere.ceil) {
+      p.position.y = Math.max(feetBefore, caveHere.ceil - p.height);
+      if (v.y > 0) v.y = 0;
+    }
     // Techo de una construcción: la cabeza no lo atraviesa al saltar.
     const height = p.height;
     if (v.y > 0 && this._structures) {
@@ -390,6 +396,7 @@ export class PlayerController {
     const pos = p.position;
     const t = this._terrain;
     if (!C || p.state.isFlying) return this._setClimbing(false);
+    if (this._caveFloor(pos.x, pos.z, pos.y)) return this._setClimbing(false); // en una cueva no se escala el terreno de arriba
     // Altura del terreno bajo la huella (en una pendiente, el punto más alto).
     const foot = (x, z) => {
       const r = this._cfg.RADIUS;
@@ -534,11 +541,27 @@ export class PlayerController {
   _groundHeight(x, z, feet = this._player.position.y) {
     const r = this._cfg.RADIUS;
     const maxY = feet + this._cfg.MAX_STEP_HEIGHT;
+    // Dentro de una cueva el suelo es el de la cueva (el terreno queda arriba).
+    const cave = this._caveFloor(x, z, feet);
+    if (cave) {
+      let h = cave.floor;
+      for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+        const c = this._caveFloor(x + dx, z + dz, feet);
+        if (c) h = Math.max(h, c.floor);
+      }
+      const built = this._structures?.surfaceAt(x, z, maxY) ?? null;
+      return built !== null && built > h && built < cave.ceil ? built : h;
+    }
     let h = -Infinity;
     for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) {
       h = Math.max(h, this._groundAt(x + dx, z + dz, maxY));
     }
     return h;
+  }
+
+  /** Suelo de cueva en (x, z) para unos pies a esa altura (o null). */
+  _caveFloor(x, z, feet) {
+    return this._terrain.caveFloorAt?.(x, z, feet) ?? null;
   }
 
   _groundAt(x, z, maxY) {

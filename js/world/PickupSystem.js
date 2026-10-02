@@ -52,9 +52,10 @@ export class PickupSystem {
    * Deja objetos en el suelo junto a (x, z) en una bolsa. Si ya hay una bolsa a
    * menos de 3 m en ese cuerpo, se meten en ella.
    */
-  drop(body, x, z, item, count, dur) {
+  drop(body, x, z, item, count, dur, y = null) {
     for (const p of this._list.values()) {
       if (p.model !== 'BAG' || p.taken || p.body !== body || Math.hypot(p.x - x, p.z - z) > 3) continue;
+      if (y !== null && p.y !== null && Math.abs(p.y - y) > 3) continue; // otra bolsa, pero en otra altura (cueva)
       // Las herramientas usadas van aparte: cada una conserva su aguante.
       const same = dur == null && p.contents.find((c) => c.item === item && c.dur == null);
       if (same) same.count += count;
@@ -64,9 +65,11 @@ export class PickupSystem {
     }
     this._bagSeq = (this._bagSeq ?? 0) + 1;
     const contents = [dur == null ? { item, count } : { item, count, dur }];
-    return this.add({
+    const bag = this.add({
       id: `BAG_${this._bagSeq}`, body, x, z, model: 'BAG', label: this._bagLabel(contents), action: 'Coger', beacon: false, contents,
     });
+    if (y !== null) bag.y = y; // en una cueva: a la altura del jugador, no en la superficie
+    return bag;
   }
 
   /** "🎒 Bolsa · 🪵×12 🪨×3" (como mucho 4 tipos). */
@@ -89,7 +92,7 @@ export class PickupSystem {
     const bags = [];
     for (const p of this._list.values()) {
       if (p.model === 'BAG') {
-        if (!p.taken && p.contents.length) bags.push({ body: p.body, x: p.x, z: p.z, contents: p.contents.map((c) => ({ ...c })) });
+        if (!p.taken && p.contents.length) bags.push({ body: p.body, x: p.x, z: p.z, y: p.y, contents: p.contents.map((c) => ({ ...c })) });
       } else if (p.taken) taken.push(p.id);
     }
     return { taken, bags };
@@ -105,7 +108,7 @@ export class PickupSystem {
       if (!b || typeof b.body !== 'string' || !Number.isFinite(b.x) || !Number.isFinite(b.z) || !Array.isArray(b.contents)) continue;
       for (const c of b.contents) {
         const count = Math.floor(c?.count);
-        if (isItem(c?.item) && count > 0) this.drop(b.body, b.x, b.z, c.item, Math.min(count, 10000), Number.isFinite(c.dur) ? c.dur : undefined);
+        if (isItem(c?.item) && count > 0) this.drop(b.body, b.x, b.z, c.item, Math.min(count, 10000), Number.isFinite(c.dur) ? c.dur : undefined, Number.isFinite(b.y) ? b.y : null);
       }
     }
   }

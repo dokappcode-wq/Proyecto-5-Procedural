@@ -15,6 +15,8 @@ import { smoothstep, clamp01 } from '../core/MathUtils.js';
  * (`setVisibility`, lo alimenta TemperatureSystem por evento desde main.js).
  * No sabe nada de la hora "de reloj": solo de la posición del sol.
  */
+const CAVE_FOG = new THREE.Color(0x050506);
+
 export class AtmosphereSystem {
   constructor({ time, lighting, sky, scene, palette, renderConfig, celestial = null }) {
     this.name = 'atmosphere';
@@ -78,6 +80,17 @@ export class AtmosphereSystem {
     this.apply();
   }
 
+  /**
+   * Dentro de una cueva (0 = fuera, 1 = en lo hondo): la luz del sol y del cielo no llega,
+   * la niebla se vuelve negra y cercana. Solo alumbran antorchas y flores luminosas.
+   */
+  setCave(k) {
+    const v = Math.max(0, Math.min(1, k));
+    if (Math.abs(v - (this._cave ?? 0)) < 0.002) return;
+    this._cave = v;
+    this.apply();
+  }
+
   /** Bajo el agua: niebla cercana del color del agua ({ color, visibility } o null). */
   setUnderwater(state) {
     this._underwater = state;
@@ -87,7 +100,23 @@ export class AtmosphereSystem {
   apply() {
     if (this.airless) this._applyAirless();
     else this._applyAir();
+    this._applyCave();
     this._applyUnderwater();
+  }
+
+  _applyCave() {
+    const k = this._cave ?? 0;
+    if (k <= 0) return;
+    const L = this._lighting;
+    L.sun.intensity *= 1 - k;
+    L.hemi.intensity *= 1 - k * 0.94;
+    const fog = this._scene.fog;
+    if (fog) {
+      fog.color.lerp(CAVE_FOG, k);
+      fog.near *= 1 - k * 0.95;
+      fog.far = fog.far * (1 - k) + 38 * k;
+    }
+    if (this._scene.background?.isColor) this._scene.background.lerp(CAVE_FOG, k);
   }
 
   _applyUnderwater() {

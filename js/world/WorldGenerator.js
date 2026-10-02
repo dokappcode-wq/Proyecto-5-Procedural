@@ -11,6 +11,8 @@ import { BiomeSystem } from './BiomeSystem.js';
 import { WaterSystem } from './WaterSystem.js';
 import { ResourceSystem } from './ResourceSystem.js';
 import { PropMesher } from './props/PropMesher.js';
+import { CaveSystem } from './CaveSystem.js';
+import { buildCaveMeshes, markStencil, hideOverCaves } from './CaveMesher.js';
 
 /**
  * WorldGenerator — mundo procedural finito generado a partir de una seed.
@@ -75,7 +77,7 @@ export class WorldGenerator {
     this.resources = null;
 
     // ---- Capas de chunk -------------------------------------------------------
-    this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading });
+    this._material = markStencil(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading }), 0);
     this._propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this._grassMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     this._mesher = new TerrainMesher({ colorizer: () => {} });
@@ -89,12 +91,17 @@ export class WorldGenerator {
           name: 'terrain',
           viewDistance: config.VIEW_DISTANCE_CHUNKS,
           build: (cx, cz) => {
-            const mesh = new THREE.Mesh(this._mesher.build(this.getChunkData(cx, cz)), this._material);
+            // Chunks con la boca de una cueva: el terreno de la boca no se dibuja.
+            const cs = config.CHUNK_SIZE;
+            const x0 = -this._half + cx * cs;
+            const z0 = -this._half + cz * cs;
+            const holes = this.caves?.mouthNear(x0, z0, x0 + cs, z0 + cs) ? (x, y, z) => this.caves.openAt(x, y, z) : null;
+            const mesh = new THREE.Mesh(this._mesher.build(this.getChunkData(cx, cz), holes), this._material);
             mesh.receiveShadow = mesh.castShadow = true;
             return mesh;
           },
           dispose: (mesh) => {
-            mesh.geometry.index = null; // el índice es compartido entre chunks
+            if (mesh.geometry.index && mesh.geometry.index === this._mesher._indexCache.get(this._res)) mesh.geometry.index = null; // el índice es compartido entre chunks
             mesh.geometry.dispose();
           },
         },
@@ -164,6 +171,25 @@ export class WorldGenerator {
     // Zonas sin árboles ni rocas: alrededor del inicio (SPAWN_CLEAR_RADIUS) y de la nave.
     const clearZones = this._landing ? [{ x: this._landing.x, z: this._landing.z, r: this._landingCfg.CLEAR_RADIUS }] : [];
 
+    // Cuevas (campaña): túneles bajo el terreno, con su malla y sus minerales.
+    this._caveGroup?.parent?.remove(this._caveGroup);
+    this._caveGroup?.traverse((o) => o.geometry?.dispose?.());
+    this._caveGroup = null;
+    this.caves = null;
+    if (this._rules?.CAVES) {
+      this.caves = new CaveSystem({ config: this._rules.CAVES });
+      this.caves.generate({
+        seed: this.seed.sub.terrain,
+        terrain: { sample: (x, z) => this.terrain.sample(x, z), heightAt: (x, z) => this.terrain.heightAt(x, z) },
+        bounds: this.getBounds(),
+        spawn: this._spawn,
+        avoid: this._landing ? [{ x: this._landing.x, z: this._landing.z, r: 80 }] : [],
+        isWater: (x, z) => this.water.isWater(x, z, 8),
+      });
+      this._caveGroup = buildCaveMeshes(this.caves.caves, (x, z) => this.terrain.heightAt(x, z), this._propMesher._colors);
+      this._scene.add(this._caveGroup);
+    }
+
     this.resources = new ResourceSystem({
       config: this._planet.RESOURCES,
       types: this._resourceTypes,
@@ -178,6 +204,9 @@ export class WorldGenerator {
         heightAt: (x, z) => this.getHeightAt(x, z),
         sample: (x, z) => this.terrain.sample(x, z),
         isWater: (x, z, m) => this.water.isWater(x, z, m),
+        // Bocas de cueva: ahí no crece nada; dentro de las cuevas, sus minerales.
+        isHole: this.caves ? (x, z) => this.isCaveHole(x, z) : null,
+        extraNodes: this.caves ? (cx, cz) => this.caves.nodesInChunk(cx, cz, this._cfg.CHUNK_SIZE, this._half) : null,
       },
     });
     this.resources.onChunkChanged = (cx, cz) => this._chunks.rebuild(cx, cz);
@@ -330,6 +359,23 @@ export class WorldGenerator {
   reloadResources(snap) {
     this.resources?.restore(snap);
     this._chunks.clear();
+  }
+
+  // ---- Cuevas ---------------------------------------------------------------------
+
+  /** Suelo de cueva bajo unos pies en (x, z): { floor, ceil } o null (fuera de las cuevas). */
+  caveFloorAt(x, z, feet) {
+    return this.caves?.floorAt(x, z, feet) ?? null;
+  }
+
+  /** ¿(x, y, z) está dentro de una cueva? */
+  inCave(x, y, z, margin = 0) {
+    return !!this.caves?.contains(x, y, z, margin);
+  }
+
+  /** ¿El terreno en (x, z) está abierto por la boca de una cueva? */
+  isCaveHole(x, z) {
+    return !!this.caves?.holeAt(x, this.getHeightAt(x, z), z);
   }
 
   /** ¿Hay agua dulce (un río) en (x, z)? El mar no se bebe; los ríos y las charcas sí. */
@@ -599,13 +645,13 @@ export class WorldGenerator {
     const size = this._cfg.WORLD_SIZE * 4;
     const sea = new THREE.Mesh(
       new THREE.PlaneGeometry(size, size),
-      new THREE.MeshPhongMaterial({
+      hideOverCaves(new THREE.MeshPhongMaterial({
         color: this._planet.COLORS.SEA,
         specular: 0x9fc4dd,
         shininess: 60,
         transparent: true,
         opacity: this._planet.COLORS.SEA_OPACITY,
-      }),
+      })),
     );
     sea.rotation.x = -Math.PI / 2;
     sea.position.y = this._cfg.SEA_LEVEL;

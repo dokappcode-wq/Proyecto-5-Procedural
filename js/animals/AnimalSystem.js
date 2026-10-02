@@ -73,6 +73,7 @@ export class AnimalSystem {
         if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return false;
         const world = this._world;
         if (world.water.isWater(x, z, 0.6)) return false;
+        if (world.isCaveHole?.(x, z)) return false;
         const h = world.getHeightAt(x, z);
         if (h < world.seaLevel + 0.3) return false;
         const slope = Math.abs(world.getHeightAt(x + 0.7, z) - world.getHeightAt(x - 0.7, z)) +

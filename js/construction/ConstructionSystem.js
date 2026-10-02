@@ -140,8 +140,9 @@ export class ConstructionSystem {
   /**
    * Colocar una pieza que se lleva como objeto (seleccionada en la barra o "Colocar"
    * desde la mochila): modo construcción solo con esa pieza; al acabarse, se sale.
+   * `once`: se sale tras colocar una (la antorcha, que si no se lleva en la mano).
    */
-  startPlacing(pieceId) {
+  startPlacing(pieceId, { once = false } = {}) {
     if (!this._cfg.PIECES[pieceId]) return false;
     if (!this.pieceIds.includes(pieceId)) {
       this._events.emit(GameEvents.UI_MESSAGE, { text: `Aquí no se puede colocar: ${this._cfg.PIECES[pieceId].NAME}.`, type: 'danger' });
@@ -151,6 +152,7 @@ export class ConstructionSystem {
     this.select(pieceId);
     this.setActive(true);
     this.itemMode = true;
+    this._placeOnce = once;
     return true;
   }
 
@@ -229,7 +231,7 @@ export class ConstructionSystem {
     this._events.emit(GameEvents.STRUCTURE_PLACED, { structure });
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
     // Colocando objetos: cuando no quedan más de esa pieza se sale del modo construcción.
-    if (itemMode && this.active && !this.canAfford(candidate.type)) this.setActive(false);
+    if (itemMode && this.active && (this._placeOnce || !this.canAfford(candidate.type))) this.setActive(false);
     return true;
   }
 
@@ -418,7 +420,11 @@ export class ConstructionSystem {
         return { ok: false, reason: 'Estás en medio' };
       }
     }
-    if (!isSupported(candidate, this.pieces, (x, z) => w.getHeightAt(x, z), this._cfg.GRID)) {
+    // Dentro de una cueva: solo piezas sueltas (antorchas, cofres, mesas, horno, cama).
+    if (this._world.inCave?.(p.x, p.y + 1, p.z) && SHAPES[candidate.type].slot !== 'FREE') {
+      return { ok: false, reason: 'Dentro de una cueva solo se ponen antorchas, cofres, mesas, el horno o la cama' };
+    }
+    if (!isSupported(candidate, this.pieces, (x, z) => this._groundY(x, z, candidate.y + 0.5), this._cfg.GRID)) {
       return { ok: false, reason: 'Necesita apoyo (suelo u otra pieza)' };
     }
     return { ok: true };
@@ -456,20 +462,26 @@ export class ConstructionSystem {
     return null;
   }
 
+  /** Suelo en (x, z) para algo a la altura y: el de la cueva si está dentro de una; si no, el terreno. */
+  _groundY(x, z, y) {
+    const cave = this._world.caveFloorAt?.(x, z, y);
+    return cave ? cave.floor : this._world.getHeightAt(x, z);
+  }
+
   /** Marcha a lo largo del rayo hasta cruzar el terreno. @returns distancia o null */
   _raycastTerrain(origin, dir, maxDist) {
-    const w = this._world;
     const step = 0.25;
     let prev = 0;
+    const g = (x, z, y) => this._groundY(x, z, y);
     for (let t = step; t <= maxDist; t += step) {
       const y = origin.y + dir.y * t;
-      if (y <= w.getHeightAt(origin.x + dir.x * t, origin.z + dir.z * t)) {
+      if (y <= g(origin.x + dir.x * t, origin.z + dir.z * t, y)) {
         let lo = prev;
         let hi = t;
         for (let i = 0; i < 8; i++) {
           const mid = (lo + hi) / 2;
           const my = origin.y + dir.y * mid;
-          if (my <= w.getHeightAt(origin.x + dir.x * mid, origin.z + dir.z * mid)) hi = mid;
+          if (my <= g(origin.x + dir.x * mid, origin.z + dir.z * mid, my)) hi = mid;
           else lo = mid;
         }
         return hi;
@@ -499,7 +511,8 @@ export class ConstructionSystem {
     }
     const snapped = snapXZ(type, point.x, point.z, { grid: this._cfg.GRID, yaw: this._player.yaw, rotSteps: this._rotSteps });
     const piece = { type, ...snapped, y: 0 };
-    piece.y = baseY !== null ? Math.round(baseY * 20) / 20 : terrainBaseY(piece, (x, z) => this._world.getHeightAt(x, z));
+    const py = this._player.position.y;
+    piece.y = baseY !== null ? Math.round(baseY * 20) / 20 : terrainBaseY(piece, (x, z) => this._groundY(x, z, Math.max(py, hit.point.y) + 0.5));
     return piece;
   }
 

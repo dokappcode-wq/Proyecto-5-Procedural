@@ -261,6 +261,13 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Cuevas (v1.16)**: 12 subterráneas (un agujero en el suelo de llanuras y bosques, rodeado de rocas, con una rampa que
+  baja) y 8 de montaña (en las laderas, entran hacia dentro de la montaña). Ninguna a menos de 180 m del inicio. Son
+  túneles de 85–245 m que bajan 25–40 m, con cámaras anchas cada cierto tramo; se recorren andando (sin escalones).
+  Dentro, cuanto más hondo más oscuro: solo alumbran las **antorchas** (en la mano o clavadas) y las **flores luminosas**.
+- **Menas** (con el ⛏️ pico seleccionado, clic mantenido): **carbón** en la entrada (3), **cobre** por todo el túnel (3),
+  **hierro** más adentro y más escaso (2), **diamante** muy raro al fondo (1). **Flor luminosa**: se coge con `E`.
+  El horno funde el mineral con carbón (cobre/hierro/diamante refinados) y la arena en cristal.
 - **Construcción por objetos**: cada pieza (suelo, pared, puerta, cofre, horno…) se fabrica en el reloj (`Tab`,
   categoría Construcción o Estaciones). Seleccionada en la barra se coloca con clic (`Q` gira); en la mochila, clic sobre
   ella → **🔨 Colocar**. Al romperla vuelve al inventario. `B` sigue abriendo el modo construcción con las piezas que lleves.
@@ -269,14 +276,14 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 - **Horno** (10 piedras refinadas + 2 maderas refinadas): con carbón funde cobre, hierro, diamante y arena (→ cristal).
   **Mesa de elaboración** (5 hierro refinado + 5 cobre refinado): placa de navegación, espadas de cobre/hierro,
   escudos, flechas de cobre/hierro y armaduras de cobre y de malla.
-- **Arena**: montones en la playa (`E`). Los minerales (cobre, hierro, carbón, diamante, flor luminosa) estarán en las cuevas
-  (siguiente fase); para probar el horno ya, usa Admin → Inventario.
+- **Arena**: montones en la playa (`E`).
 - **Armas**: espada básica (10), de cobre (12) y de hierro (15). **Tirachinas** (dispara piedras, 5 de daño) y **arco**
   (daño de la flecha: 10 normal, 15 cobre, 20 hierro; `X` cambia de flecha). Clic derecho mantenido apunta (zoom en
   1ª persona, cámara al hombro en 3ª), clic izquierdo mantenido tensa y al soltar dispara.
 - **Escudos** (ranura «Escudo» del reloj): con el escudo puesto, clic derecho mantenido bloquea los golpes de frente
   (gasta aguante: cobre 50, hierro 100). Bloqueando no se ataca.
-- **Antorcha** (1 madera + 1 carbón): en la mano ilumina; `R` / clic derecho la clava en el suelo y sigue iluminando.
+- **Antorcha** (1 madera + 1 carbón): en la mano ilumina; `R` / clic derecho y luego clic la clava en el suelo (también
+  dentro de las cuevas) y sigue iluminando; después vuelves a llevar la siguiente en la mano.
 - **Guardar partida**: en el reloj (`Tab` o `I`), columna «Tú», botón **💾 Guardar partida**. También se guarda sola
   cada 5 minutos (solo en tierra, en el planeta de inicio). En el menú de inicio aparece **▶ Continuar partida**.
   Se guarda: inventario, ropa, vida/hambre/sed/estamina, niveles, la hora, dónde estás, la nave, lo talado y recogido,

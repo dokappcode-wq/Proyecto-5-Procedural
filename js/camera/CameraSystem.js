@@ -179,8 +179,10 @@ export class CameraSystem {
     const a = a0 + da * k;
     const r = Math.hypot(ox, oz) * (1 - k) + dist * k;
     cam.position.set(this._chest.x + Math.sin(a) * r, cam.position.y + (goalY - cam.position.y) * k, this._chest.z + Math.cos(a) * r);
-    const minY = this._terrain.getHeightAt(cam.position.x, cam.position.z) + this._cfg.MIN_HEIGHT_ABOVE_GROUND;
-    if (cam.position.y < minY) cam.position.y = minY;
+    if (!this._inCave) {
+      const minY = this._terrain.getHeightAt(cam.position.x, cam.position.z) + this._cfg.MIN_HEIGHT_ABOVE_GROUND;
+      if (cam.position.y < minY) cam.position.y = minY;
+    }
 
     // Mirar al jugador, con el punto de mira algo a su izquierda (él queda a la izquierda).
     const rx = -Math.cos(by);
@@ -209,6 +211,9 @@ export class CameraSystem {
     // Posición ideal en 3ª persona: detrás, un poco por encima y al hombro.
     this._pivot.copy(this._eye).addScaledVector(this._right, shoulder * this._blend);
     this._pivot.y += heightOffset;
+    // En una cueva: la cámara no sale del túnel.
+    this._inCave = !v && !!this._terrain.inCave?.(this._eye.x, this._eye.y - 0.5, this._eye.z);
+    if (this._inCave && !this._terrain.inCave(this._pivot.x, this._pivot.y, this._pivot.z, 0.25)) this._pivot.copy(this._eye);
     let dist = this._occlusionDistance(this._pivot, v ? v.distance : this._distance + (Math.min(this._distance, 2.2) - this._distance) * aim);
     // Paredes y techos construidos: la cámara se acerca para no quedar detrás.
     if (this._occluders && this._blend > 0.01) {
@@ -222,9 +227,11 @@ export class CameraSystem {
     const k = this._blend * this._blend * (3 - 2 * this._blend);
     const pos = this._camera.position.copy(this._eye).lerp(this._third, k);
 
-    // Nunca por debajo del terreno.
-    const minY = this._terrain.getHeightAt(pos.x, pos.z) + cfg.MIN_HEIGHT_ABOVE_GROUND;
-    if (pos.y < minY) pos.y = minY;
+    // Nunca por debajo del terreno (en una cueva, el terreno queda arriba: no cuenta).
+    if (!this._inCave) {
+      const minY = this._terrain.getHeightAt(pos.x, pos.z) + cfg.MIN_HEIGHT_ABOVE_GROUND;
+      if (pos.y < minY) pos.y = minY;
+    }
 
     this._camera.rotation.set(pitch, yaw, 0);
   }
@@ -235,6 +242,15 @@ export class CameraSystem {
    */
   _occlusionDistance(pivot, maxDist) {
     const margin = this._cfg.MIN_HEIGHT_ABOVE_GROUND;
+    if (this._inCave) {
+      // Dentro de una cueva la "pared" es la del túnel.
+      for (let i = 1; i <= OCCLUSION_STEPS * 2; i++) {
+        const d = (maxDist * i) / (OCCLUSION_STEPS * 2);
+        this._tmp.copy(pivot).addScaledVector(this._fwd, -d);
+        if (!this._terrain.inCave(this._tmp.x, this._tmp.y, this._tmp.z, 0.35)) return Math.max(0, (maxDist * (i - 1)) / (OCCLUSION_STEPS * 2));
+      }
+      return maxDist;
+    }
     for (let i = 1; i <= OCCLUSION_STEPS; i++) {
       const d = (maxDist * i) / OCCLUSION_STEPS;
       this._tmp.copy(pivot).addScaledVector(this._fwd, -d);

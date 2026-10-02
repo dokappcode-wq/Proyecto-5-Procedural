@@ -28,7 +28,12 @@ export class TerrainMesher {
     this._colorizer = colorizer;
   }
 
-  build(chunk) {
+  /**
+   * @param {object} chunk datos del chunk
+   * @param {Function} [holeTest] (x, y, z) → true si ese trozo de terreno está abierto (boca de una cueva):
+   *   los triángulos cuyo centro cae dentro no se dibujan.
+   */
+  build(chunk, holeTest = null) {
     const { res, spacing, originX, originZ, heights, biomeWeights, shore } = chunk;
     const stride = res + 3;
     const n = res + 1;
@@ -78,10 +83,36 @@ export class TerrainMesher {
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(this._getIndex(res));
+    geo.setIndex(holeTest ? this._holeIndex(res, positions, holeTest) : this._getIndex(res));
     geo.computeBoundingSphere();
     geo.computeBoundingBox();
     return geo;
+  }
+
+  /** Índice propio sin los triángulos de la boca de una cueva. */
+  _holeIndex(res, p, holeTest) {
+    const n = res + 1;
+    const out = [];
+    // Solo se quita un triángulo si está entero dentro de la boca (sus tres vértices y
+    // su centro): así el borde del agujero nunca deja ver el vacío.
+    const open = new Uint8Array(n * n);
+    for (let v = 0; v < n * n; v++) open[v] = holeTest(p[v * 3], p[v * 3 + 1], p[v * 3 + 2]) ? 1 : 0;
+    const hole = (i, j, k) => open[i] && open[j] && open[k] && holeTest(
+      (p[i * 3] + p[j * 3] + p[k * 3]) / 3,
+      (p[i * 3 + 1] + p[j * 3 + 1] + p[k * 3 + 1]) / 3,
+      (p[i * 3 + 2] + p[j * 3 + 2] + p[k * 3 + 2]) / 3,
+    );
+    for (let l = 0; l < res; l++) {
+      for (let k = 0; k < res; k++) {
+        const a = l * n + k;
+        const b = a + n;
+        const d = a + 1;
+        const cc = b + 1;
+        if (!hole(a, b, d)) out.push(a, b, d);
+        if (!hole(b, cc, d)) out.push(b, cc, d);
+      }
+    }
+    return new THREE.BufferAttribute(new (n * n > 65535 ? Uint32Array : Uint16Array)(out), 1);
   }
 
   /** El índice es idéntico para todos los chunks de igual resolución: se comparte. */

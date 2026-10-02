@@ -24,7 +24,7 @@ export class PropMesher {
       nodes.map((n) => ({
         template: this._pick(n.type === 'APPLE_TREE' && n.depleted ? 'APPLE_TREE_EMPTY' : n.type, n.variant),
         x: n.x,
-        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' ? 0 : 0.12),
+        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave ? 0 : 0.12),
         z: n.z,
         scale: n.scale,
         rotation: n.rotation,
@@ -199,6 +199,45 @@ export class PropMesher {
       return b.build();
     };
 
+    // Vetas de las cuevas: roca oscura con trozos o cristales del mineral.
+    const ore = (variant, color, kind) => {
+      const b = new PartsBuilder();
+      b.add(ico, { position: [0, 0.32, 0], scale: [0.8, 0.58, 0.75], color: C.CAVE_ROCK ?? shade(C.ROCK, 0.75), jitter: lumpy(160 + variant, 0.4) });
+      const n = kind === 'crystal' ? 6 : 7;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + variant * 0.7;
+        if (kind === 'crystal') {
+          b.add(octa, {
+            position: [Math.cos(a) * 0.35, 0.55 + (i % 2) * 0.12, Math.sin(a) * 0.3],
+            rotation: [Math.cos(a) * 0.45, a, Math.sin(a) * 0.45],
+            scale: [0.1, 0.32 + (i % 3) * 0.1, 0.1],
+            color: i % 2 ? color : shade(color, 1.2),
+          });
+        } else {
+          b.add(ico, {
+            position: [Math.cos(a) * 0.42, 0.3 + (i % 3) * 0.14, Math.sin(a) * 0.38],
+            scale: 0.13 + (i % 2) * 0.05,
+            color: i % 2 ? color : shade(color, 0.85),
+            jitter: lumpy(170 + i, 0.3),
+          });
+        }
+      }
+      return b.build();
+    };
+
+    // Flor luminosa de las cuevas: tallo, hojas y un bulbo que brilla (la luz la pone el juego).
+    const stemBox = new THREE.BoxGeometry(1, 1, 1);
+    const glowFlower = (variant) => {
+      const b = new PartsBuilder();
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + variant;
+        b.add(stemBox, { position: [Math.cos(a) * 0.08, 0.25, Math.sin(a) * 0.08], rotation: [Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25], scale: [0.03, 0.5, 0.03], color: C.GLOW_STEM ?? 0x3f8f6a });
+        b.add(octa, { position: [Math.cos(a) * 0.14, 0.52, Math.sin(a) * 0.14], scale: [0.12, 0.16, 0.12], color: i % 2 ? C.GLOW ?? 0x8dffd8 : shade(C.GLOW ?? 0x8dffd8, 1.15) });
+      }
+      b.add(octa, { position: [0, 0.12, 0], rotation: [0, 0.4, 0], scale: [0.28, 0.06, 0.28], color: C.GLOW_STEM ?? 0x3f8f6a });
+      return b.build();
+    };
+
     // Montón de arena de la playa (E: recoger arena).
     const sandPile = (variant) => {
       const b = new PartsBuilder();
@@ -233,6 +272,11 @@ export class PropMesher {
       MINERAL_ROCK: [mineralRock(0), mineralRock(1)],
       BUSH: [bush(0), bush(1)],
       SAND_PILE: [sandPile(0), sandPile(1)],
+      COAL_ORE: [ore(0, C.COAL ?? 0x26282b, 'chunks'), ore(1, C.COAL ?? 0x26282b, 'chunks')],
+      COPPER_ORE: [ore(0, C.COPPER ?? 0xd0803e, 'chunks'), ore(1, C.COPPER ?? 0xd0803e, 'chunks')],
+      IRON_ORE: [ore(0, C.IRON ?? 0xc9b8a4, 'chunks'), ore(1, C.IRON ?? 0xc9b8a4, 'chunks')],
+      DIAMOND_ORE: [ore(0, C.DIAMOND ?? 0xbff6ff, 'crystal'), ore(1, C.DIAMOND ?? 0xbff6ff, 'crystal')],
+      GLOW_FLOWER: [glowFlower(0), glowFlower(1)],
       GRASS: [grassTuft()],
     };
   }

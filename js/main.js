@@ -124,7 +124,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
       landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
       // Campaña: el inicio en cualquier punto del planeta y la nave en lo alto de las Montañas Heladas.
-      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE } : null,
+      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE, CAVES: cfg.CAVES } : null,
     },
   });
   // Todos los sistemas consultan el cuerpo ACTIVO a través de este proxy.
@@ -364,7 +364,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     if (!itemId || !(amount > 0)) return;
     const p = player.position;
     const ahead = 1.2;
-    pickups.drop(worlds.activeId, p.x - Math.sin(player.yaw) * ahead, p.z - Math.cos(player.yaw) * ahead, itemId, amount, dur);
+    const inCave = world.inCave?.(p.x, p.y + 1, p.z);
+    pickups.drop(worlds.activeId, p.x - Math.sin(player.yaw) * ahead, p.z - Math.cos(player.yaw) * ahead, itemId, amount, dur, inCave ? p.y : null);
   };
   events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount, dur }) => dropItems(itemId, amount, dur));
   // Una herramienta gastada se rompe.
@@ -622,7 +623,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Estaciones (mesa de refinería): E sobre ella abre su pestaña del menú.
   events.on(GameEvents.CRAFT_STATION_OPEN, ({ station }) => playerMenu.open('STATION', { station }));
   // Colocar una estación fabricada: modo construcción con esa pieza seleccionada.
-  events.on(GameEvents.BUILD_PIECE_REQUEST, ({ pieceId }) => construction.startPlacing(pieceId));
+  events.on(GameEvents.BUILD_PIECE_REQUEST, ({ pieceId, once }) => construction.startPlacing(pieceId, { once }));
   // Seleccionar una pieza en la barra = colocarla (la antorcha no: en la mano ilumina; R la clava).
   events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => {
     const def = cfg.ITEMS[selectedId];
@@ -633,7 +634,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.CHEST_OPEN, ({ piece }) => playerMenu.openChest(piece.data));
   events.on(GameEvents.STRUCTURE_REMOVED, ({ structure }) => {
     for (const st of structure.data?.slots ?? []) {
-      if (st) pickups.drop(worlds.activeId, structure.x, structure.z, st.id, st.count, st.dur);
+      if (st) pickups.drop(worlds.activeId, structure.x, structure.z, st.id, st.count, st.dur, structure.y);
     }
   });
   // Partida cargada: el contenido de los cofres se comprueba (solo objetos que existen).
@@ -650,8 +651,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       }),
     };
   });
-  // Antorchas clavadas: las más cercanas al jugador iluminan (un número fijo de luces).
-  const torchLights = Array.from({ length: cfg.BUILD.TORCH_LIGHTS }, () => {
+  // Luces del mundo: antorchas clavadas y flores luminosas de las cuevas. Solo las más
+  // cercanas al jugador tienen luz de verdad (un número fijo de luces).
+  const torchLights = Array.from({ length: cfg.BUILD.TORCH_LIGHTS + 2 }, () => {
     const l = new THREE.PointLight(0xffa24a, 0, 13, 1.6);
     render.scene.add(l);
     return l;
@@ -660,16 +662,49 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     name: 'torchLights',
     update: (dt, t) => {
       const p = player.position;
-      const list = construction.pieces.filter((pc) => pc.type === 'TORCH')
-        .map((pc) => ({ pc, d: Math.hypot(pc.x - p.x, pc.z - p.z) }))
-        .filter((e) => e.d < 60).sort((a, b) => a.d - b.d);
+      const list = [];
+      for (const pc of construction.pieces) {
+        if (pc.type !== 'TORCH') continue;
+        const d = Math.hypot(pc.x - p.x, pc.z - p.z, (pc.y - p.y) * 2);
+        if (d < 60) list.push({ x: pc.x, y: pc.y + 1.15, z: pc.z, d, torch: true });
+      }
+      for (const n of world.resources?.getNodesNear(p.x, p.z, 36) ?? []) {
+        if (n.type !== 'GLOW_FLOWER' || n.removed) continue;
+        const d = Math.hypot(n.x - p.x, n.z - p.z, (n.y - p.y) * 2);
+        if (d < 40) list.push({ x: n.x, y: n.y + 0.7, z: n.z, d, torch: false });
+      }
+      list.sort((a, b) => a.d - b.d);
       torchLights.forEach((l, i) => {
         const e = list[i];
         l.visible = !!e;
         if (!e) return;
-        l.position.set(e.pc.x, e.pc.y + 1.15, e.pc.z);
-        l.intensity = 2.2 * (0.88 + Math.sin(t * 13 + i) * 0.06 + Math.sin(t * 5.1 + i * 2) * 0.06);
+        l.position.set(e.x, e.y, e.z);
+        if (e.torch) {
+          l.color.setHex(0xffa24a);
+          l.distance = 13;
+          l.intensity = 2.2 * (0.88 + Math.sin(t * 13 + i) * 0.06 + Math.sin(t * 5.1 + i * 2) * 0.06);
+        } else {
+          l.color.setHex(cfg.RESOURCE_TYPES.GLOW_FLOWER.LIGHT);
+          l.distance = 9;
+          l.intensity = 1.5 + Math.sin(t * 1.7 + i) * 0.25;
+        }
       });
+    },
+  };
+  // Cuevas: cuanto más hondo, más oscuro (solo alumbran antorchas y flores luminosas).
+  let caveMsg = false;
+  const caveDark = {
+    name: 'caveDarkness',
+    update: () => {
+      const p = player.position;
+      const inside = worlds.activeId === HOME && !!world.inCave?.(p.x, p.y + 1, p.z);
+      const depth = inside ? world.getHeightAt(p.x, p.z) - (p.y + player.eyeHeight) : 0;
+      const k = inside ? Math.max(0, Math.min(1, (depth - 1) / cfg.CAVES.DARKNESS_DEPTH)) : 0;
+      atmosphere.setCave(k);
+      if (k > 0.6 && !caveMsg) {
+        caveMsg = true;
+        message('🕳️ Una cueva: aquí abajo no llega la luz. Lleva una 🔥 antorcha (1 madera + 1 carbón) y un ⛏️ pico para las menas.', 'info');
+      }
     },
   };
   // Al abrirlo, el jugador se gira hacia donde miraba, levanta la muñeca para mirar
@@ -1342,7 +1377,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
-  loop.add(torches);     // luz de las antorchas clavadas
+  loop.add(torches);     // luz de las antorchas clavadas y de las flores luminosas
+  loop.add(caveDark);    // oscuridad dentro de las cuevas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante
   loop.add(shipBeacon);  // haz de luz sobre la nave hasta encontrarla
   if (titleScene) loop.add(titleScene); // menú de inicio: la cápsula en órbita

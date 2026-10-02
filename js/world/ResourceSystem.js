@@ -191,6 +191,8 @@ export class ResourceSystem {
     this._forChunksAround(pos.x, pos.z, radius + 2, (chunk) => {
       for (const n of chunk.nodes) {
         if (n.removed || n.radius <= 0) continue;
+        // Solo a su altura: los árboles de arriba no estorban dentro de una cueva, ni al revés.
+        if (pos.y !== undefined && Math.abs(pos.y - n.y) > 4) continue;
         const dx = pos.x - n.x;
         const dz = pos.z - n.z;
         const min = n.radius + radius;
@@ -259,7 +261,28 @@ export class ResourceSystem {
       }
     }
     this._addCobwebs(cx, cz, nodes);
+    this._addCaveNodes(cx, cz, nodes);
     return nodes;
+  }
+
+  /** Minerales y flores de las cuevas que caen en este chunk (con su propia altura). */
+  _addCaveNodes(cx, cz, nodes) {
+    const extra = this._world.extraNodes?.(cx, cz);
+    if (!extra?.length) return;
+    for (const e of extra) {
+      const def = this._types[e.type];
+      if (!def) continue;
+      const id = `${cx}:${cz}:c${e.key}`;
+      const rng = new SeededRandom(deriveSeed(this._seed, `cave:${id}`));
+      const scale = def.SCALE[0] + (def.SCALE[1] - def.SCALE[0]) * rng.next();
+      nodes.push({
+        id, type: e.type, x: e.x, y: e.y, z: e.z, scale,
+        rotation: rng.next() * Math.PI * 2, variant: Math.floor(rng.next() * 3), tint: rng.next(),
+        radius: def.COLLISION_RADIUS * scale,
+        remaining: def.HARVEST ? def.HARVEST.AMOUNT : 0,
+        depleted: false, removed: this._removed.has(id), cave: true,
+      });
+    }
   }
 
   /**
@@ -326,6 +349,7 @@ export class ResourceSystem {
     const w = this._world;
     if (y < w.seaLevel + 0.6) return false;
     if (w.isWater(x, z, 1.5)) return false;
+    if (w.isHole?.(x, z)) return false;
     if (Math.hypot(x - w.spawn.x, z - w.spawn.z) < c.SPAWN_CLEAR_RADIUS) return false;
     for (const zone of w.clearZones ?? []) if (Math.hypot(x - zone.x, z - zone.z) < zone.r) return false;
     const isTree = type === 'TREE' || type === 'PINE' || type === 'APPLE_TREE';
@@ -356,7 +380,7 @@ export class ResourceSystem {
       for (const b in bw) density += (perChunk[b] ?? 0) * bw[b];
       if (keep >= density / maxDensity) continue;
       const y = w.heightAt(x, z);
-      if (y < w.seaLevel + 0.8 || w.isWater(x, z, 0.5)) continue;
+      if (y < w.seaLevel + 0.8 || w.isWater(x, z, 0.5) || w.isHole?.(x, z)) continue;
       tufts.push({ x, y, z, scale, rotation, tint });
     }
     return tufts;

@@ -47,7 +47,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.15.0',
+    VERSION: '1.16.0',
   },
 
   RENDER: {
@@ -328,6 +328,31 @@ export const GameConfig = deepFreeze({
       SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.0, MAX_GAP: 5.0, CHANCE: 0.06, HEIGHT: 1.7, MAX_SIZE: 1.5 },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
+    // Cuevas: vetas que solo se rompen con pico (como las rocas) y flores luminosas (E).
+    COAL_ORE: {
+      NAME: 'Veta de carbón', COLLISION_RADIUS: 0.5, SCALE: [0.8, 1.1], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.8, CAVE: true,
+      HARVEST: { ITEM: 'COAL', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
+      BREAK: { ITEM: 'COAL', AMOUNT: 3, TIME: 5, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar carbón' },
+    },
+    COPPER_ORE: {
+      NAME: 'Mena de cobre', COLLISION_RADIUS: 0.55, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.85, CAVE: true,
+      HARVEST: { ITEM: 'COPPER_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
+      BREAK: { ITEM: 'COPPER_ORE', AMOUNT: 3, TIME: 6, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar cobre' },
+    },
+    IRON_ORE: {
+      NAME: 'Mena de hierro', COLLISION_RADIUS: 0.55, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.85, CAVE: true,
+      HARVEST: { ITEM: 'IRON_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
+      BREAK: { ITEM: 'IRON_ORE', AMOUNT: 2, TIME: 8, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar hierro' },
+    },
+    DIAMOND_ORE: {
+      NAME: 'Veta de diamante', COLLISION_RADIUS: 0.45, SCALE: [0.7, 1.0], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.8, CAVE: true,
+      HARVEST: { ITEM: 'DIAMOND_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
+      BREAK: { ITEM: 'DIAMOND_ORE', AMOUNT: 1, TIME: 12, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar diamante' },
+    },
+    GLOW_FLOWER: {
+      NAME: 'Flor luminosa', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.6, CAVE: true, LIGHT: 0x7fffd0,
+      HARVEST: { ITEM: 'GLOW_FLOWER', AMOUNT: 1, REMOVE_WHEN_EMPTY: true, VERB: 'Coger' },
+    },
     // Playa: montones de arena (E) para fundir cristal en el horno.
     SAND_PILE: {
       NAME: 'Montón de arena', COLLISION_RADIUS: 0, SCALE: [0.8, 1.3], AIM_HEIGHT: 0.1, AIM_RADIUS: 0.8,
@@ -847,6 +872,13 @@ export const GameConfig = deepFreeze({
     BUSH: 0x4d8a3c,
     MINERAL: 0x5fd8ff,
     SAND: 0xe2cf96,
+    COAL: 0x26282b,
+    COPPER: 0xd0803e,
+    IRON: 0xc9b8a4,
+    DIAMOND: 0xbff6ff,
+    GLOW: 0x8dffd8,
+    GLOW_STEM: 0x3f8f6a,
+    CAVE_ROCK: 0x6b665f,
     GRASS: 0x7fb050,
     GRASS_TIP: 0xb9cf6a,
     COLOR_JITTER: 0.12,
@@ -932,6 +964,34 @@ export const GameConfig = deepFreeze({
   ADMIN: {
     ADMIN_SEQUENCE: ['a', 'd', 'm', 'i', 'n'],
     ADMIN_KEY_TIMEOUT: 2000, // ms máximos entre dos teclas de la secuencia
+  },
+
+  // Cuevas (planeta de inicio de la campaña): subterráneas (agujero en el suelo con rampa) y
+  // de montaña (boca en la ladera). Túneles que bajan, con cámaras; minerales dentro.
+  CAVES: {
+    UNDERGROUND: 12,
+    MOUNTAIN: 8,
+    MIN_SPAWN_DISTANCE: 180,     // m: alrededor del inicio no hay cuevas
+    MIN_SPACING: 260,            // m entre bocas
+    STEP: 5,                     // m entre nodos del túnel
+    LENGTH: [34, 48],            // nodos (≈ 170–240 m de túnel)
+    MIN_STEPS: 16,
+    DEPTH: [22, 34],             // m que baja el suelo respecto a la boca
+    RADIUS: [2.5, 3.2],          // m de los pasillos
+    CHAMBER_RADIUS: [6, 8.5],    // m de las cámaras
+    CHAMBER_EVERY: 8,            // nodos entre cámaras
+    TURN: 0.32,                  // rad de giro máximo por nodo
+    ENTRANCE_STEPS: 4,           // nodos de rampa en la entrada
+    ENTRANCE_DROP: 0.6,          // pendiente de la rampa (m por m)
+    ROCK_ABOVE: 3,               // m de roca mínima sobre el techo
+    CONTENT: {
+      COAL: [3, 5],              // vetas de carbón en la boca
+      COPPER_PER_NODE: 0.45,
+      IRON_PER_NODE: 0.22,       // menos que cobre, y más adentro
+      DIAMOND_PER_NODE: 0.035,   // muy raro, al fondo
+      GLOW_FLOWERS: [2, 4],      // por cámara
+    },
+    DARKNESS_DEPTH: 6,           // m bajo la superficie a partir de los que la cueva es negra
   },
 
   // Guardar partida (localStorage del navegador): manual desde el reloj y automática.
