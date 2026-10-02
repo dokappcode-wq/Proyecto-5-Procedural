@@ -157,6 +157,55 @@ export const BUILD_MODELS = {
     b.add(box, { position: [0, 0.38, 0.2], scale: [0.5, 0.12, 0.3], color: 0xc9b089 });
     return b.build();
   },
+  FURNACE() {
+    const b = new PartsBuilder();
+    const stone = 0x7d7a75;
+    const dark = 0x55524e;
+    b.add(box, { position: [0, 0.5, 0], scale: [1.4, 1.0, 1.4], color: stone });
+    b.add(box, { position: [0, 1.15, 0], scale: [1.1, 0.3, 1.1], color: dark });
+    b.add(box, { position: [0, 1.45, 0.15], scale: [0.4, 0.5, 0.4], color: stone }); // chimenea
+    // Boca del horno (+Z) con brasas.
+    b.add(box, { position: [0, 0.45, 0.66], scale: [0.6, 0.5, 0.12], color: 0x1c1410 });
+    b.add(box, { position: [0, 0.3, 0.6], scale: [0.48, 0.12, 0.08], color: 0xff7a2a });
+    b.add(box, { position: [0, 0.8, 0.71], scale: [0.8, 0.08, 0.05], color: dark });
+    return b.build();
+  },
+  WORKBENCH() {
+    const b = new PartsBuilder();
+    const wood = 0x8a5a32;
+    const dark = 0x5e3b20;
+    const metal = 0x8f959c;
+    for (const [x, z] of [[-0.85, -0.45], [0.85, -0.45], [-0.85, 0.45], [0.85, 0.45]]) {
+      b.add(box, { position: [x, 0.42, z], scale: [0.12, 0.84, 0.12], color: metal });
+    }
+    b.add(box, { position: [0, 0.88, 0], scale: [1.9, 0.12, 1.1], color: wood });
+    b.add(box, { position: [0, 0.3, 0], scale: [1.7, 0.06, 0.95], color: dark });
+    // Yunque, tornillo de banco y herramientas.
+    b.add(box, { position: [-0.5, 1.02, 0], scale: [0.5, 0.16, 0.28], color: 0x4a4f55 });
+    b.add(box, { position: [-0.5, 1.12, 0], scale: [0.62, 0.06, 0.2], color: 0x5c6168 });
+    b.add(box, { position: [0.55, 1.0, -0.2], scale: [0.18, 0.14, 0.3], color: metal });
+    b.add(box, { position: [0.3, 0.96, 0.25], scale: [0.5, 0.04, 0.06], color: 0x6a6f76 });
+    b.add(box, { position: [0, 0.4, 0.2], scale: [0.6, 0.14, 0.3], color: 0xb87333 });
+    return b.build();
+  },
+  CHEST() {
+    const b = new PartsBuilder();
+    const wood = 0x9a6a3f;
+    const dark = 0x6b4a2f;
+    const metal = 0x6f747a;
+    b.add(box, { position: [0, 0.3, 0], scale: [1.0, 0.6, 0.7], color: wood });
+    b.add(box, { position: [0, 0.64, 0], scale: [1.02, 0.12, 0.72], color: dark }); // tapa
+    for (const x of [-0.42, 0.42]) b.add(box, { position: [x, 0.35, 0], scale: [0.06, 0.72, 0.74], color: metal });
+    b.add(box, { position: [0, 0.52, 0.36], scale: [0.14, 0.16, 0.04], color: 0xd9b75a }); // cerradura
+    return b.build();
+  },
+  TORCH() {
+    const b = new PartsBuilder();
+    b.add(box, { position: [0, 0.45, 0], scale: [0.07, 0.9, 0.07], color: 0x5e3b1f });
+    b.add(box, { position: [0, 0.94, 0], scale: [0.12, 0.1, 0.12], color: 0x2a2420 });
+    b.add(box, { position: [0, 1.04, 0], scale: [0.09, 0.12, 0.09], color: 0xffb347 });
+    return b.build();
+  },
   CHARGING_STATION() {
     const b = new PartsBuilder();
     b.add(box, { position: [0, 0.08, 0], scale: [1.0, 0.16, 0.8], color: STONE_DARK });

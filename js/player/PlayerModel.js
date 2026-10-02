@@ -215,6 +215,11 @@ export class PlayerModel {
     this._wristTarget = on ? 1 : 0;
   }
 
+  /** Pose de combate: 'aim' (arco/tirachinas: brazos al frente), 'block' (escudo delante) o null. */
+  setCombatPose(pose) {
+    this._combatPose = pose;
+  }
+
   /** La cabeza se oculta cuando la cámara está pegada a ella (vista del reloj). */
   setHeadVisible(visible) {
     this.head.visible = visible;
@@ -290,6 +295,14 @@ export class PlayerModel {
       a.z += (0.62 - a.z) * w;
     } else {
       this.leftArm.rotation.y = 0;
+    }
+
+    // Combate: apuntar (los dos brazos al frente) o bloquear (escudo delante del pecho).
+    if (this._combatPose === 'aim') {
+      this.leftArm.rotation.set(1.5 + s.headPitch, -0.15, 0);
+      this.rightArm.rotation.set(1.4 + s.headPitch, 0.4, 0);
+    } else if (this._combatPose === 'block') {
+      this.leftArm.rotation.set(1.2, 0.55, 0);
     }
 
     // Leve rebote del torso al caminar.

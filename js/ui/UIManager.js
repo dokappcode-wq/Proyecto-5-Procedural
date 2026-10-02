@@ -206,14 +206,18 @@ export class UIManager {
       this._placement = pl;
       this._drawUseHint();
     });
-    events.on(GameEvents.BUILD_MODE_CHANGED, ({ active, pieceId, pieces }) => {
-      this._buildMode = active;
+    events.on(GameEvents.BUILD_MODE_CHANGED, ({ active, pieceId, pieces, itemMode }) => {
+      // Colocando una pieza de la barra: la barra normal sigue a la vista (cambiar de objeto sale).
+      this._buildMode = active && !itemMode;
       this._buildPiece = pieceId;
       if (pieces) this._buildPieces = pieces;
       document.body.classList.toggle('build-mode', active);
       if (active) {
         this._showTarget(null);
-        this.showMessage('Modo construcción: [1–0] pieza · [Clic] colocar · [Clic dcho] quitar · [Q] girar · [B] salir', 'biome');
+        const name = pieces?.find((p) => p.id === pieceId)?.NAME ?? '';
+        this.showMessage(itemMode
+          ? `🔨 Colocar ${name.toLowerCase()}: [Clic] colocar · [Q] girar · [Clic dcho] quitar una pieza · otro objeto o [B] para salir`
+          : 'Modo construcción: [1–0] pieza · [Clic] colocar · [Clic dcho] quitar · [Q] girar · [B] salir', 'biome');
       }
       this._drawHotbar();
     });
@@ -483,7 +487,20 @@ export class UIManager {
       }
       case 'EQUIP': text = `${key} Ponerse (se cambia por lo que lleves) · [I] Inventario`; break;
       case 'WATCH': text = `${key} Ver dónde está la nave`; break;
+      case 'BUILD': text = def.HOLD ? `Ilumina en la mano · ${key} Clavarla en el suelo` : '[Clic] Colocar · [Q] Girar'; break;
       default:
+        if (def.RANGED) {
+          text = `[Mantén clic dcho] Apuntar · [Mantén clic] Tensar y suelta para disparar${def.RANGED.AMMO.length > 1 ? ' · [X] Flecha' : ''}`;
+          break;
+        }
+        if (def.WEAPON) {
+          text = `[Clic] Golpear (${def.WEAPON.DAMAGE} de daño)${this._hasShield?.() ? ' · [Clic dcho] Bloquear' : ''}`;
+          break;
+        }
+        if (def.AMMO) {
+          text = 'Munición para el arco';
+          break;
+        }
         if (def.TOOL) {
           text = def.TOOL.CHOP_SPEED ? '[Mantén clic] en un tronco: tala más deprisa' : '[Mantén clic] en una roca: picar';
           break;

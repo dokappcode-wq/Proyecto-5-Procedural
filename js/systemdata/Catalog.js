@@ -84,6 +84,7 @@ export const FLORA_TEMPLATES = Object.freeze({
   bush: { resource: 'BUSH', label: 'Arbusto (decorativo)', colorKeys: ['BUSH'] },
   rock: { resource: 'ROCK', label: 'Roca (da piedra)', colorKeys: ['ROCK'] },
   mineral_rock: { resource: 'MINERAL_ROCK', label: 'Veta de mineral (da mineral)', colorKeys: ['MINERAL'] },
+  sand_pile: { resource: 'SAND_PILE', label: 'Montón de arena (da arena; mejor en la playa)', colorKeys: ['SAND'] },
 });
 
 /** Fauna: plantilla → especie del motor. */

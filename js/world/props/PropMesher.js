@@ -199,6 +199,14 @@ export class PropMesher {
       return b.build();
     };
 
+    // Montón de arena de la playa (E: recoger arena).
+    const sandPile = (variant) => {
+      const b = new PartsBuilder();
+      b.add(ico, { position: [0, 0.05, 0], scale: [0.85, 0.28, 0.75], color: C.SAND, jitter: lumpy(140 + variant, 0.35) });
+      b.add(ico, { position: [0.35, 0.03, 0.2], scale: [0.4, 0.16, 0.35], color: shade(C.SAND, 0.92), jitter: lumpy(150 + variant, 0.3) });
+      return b.build();
+    };
+
     const grassTuft = () => {
       const b = new PartsBuilder();
       const blade = new THREE.BufferGeometry();
@@ -224,6 +232,7 @@ export class PropMesher {
       ROCK: [rock(0), rock(1), rock(2)],
       MINERAL_ROCK: [mineralRock(0), mineralRock(1)],
       BUSH: [bush(0), bush(1)],
+      SAND_PILE: [sandPile(0), sandPile(1)],
       GRASS: [grassTuft()],
     };
   }

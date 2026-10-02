@@ -24,6 +24,7 @@ export function captureState({ systemName, target, campaignSeed, inventory, equi
     totalHours: time.totalHours,
     slots: inventory.snapshot(),
     worn: { ...equipment.slots },
+    wornDur: { ...(equipment.dur ?? {}) },
     progression: progression?.snapshot() ?? null,
     watch: !!hasWatch,
     vitals: { health: health.value, hunger: hunger.value, thirst: thirst.value, energy: energy.value },
@@ -66,7 +67,7 @@ export function applyState(s, { items, techs, inventory, equipment, health, hung
   inventory.restore(Array.isArray(s.slots) ? s.slots : []);
   for (const slot of Object.keys(equipment.slots)) equipment.equipDirect?.(slot, null);
   for (const [slot, id] of Object.entries(s.worn && typeof s.worn === 'object' ? s.worn : {})) {
-    if (known(id) && Object.prototype.hasOwnProperty.call(equipment.slots, slot)) equipment.equipDirect(slot, id);
+    if (known(id) && Object.prototype.hasOwnProperty.call(equipment.slots, slot)) equipment.equipDirect(slot, id, num(s.wornDur?.[slot], 1, 1e6, undefined));
   }
   // Niveles antes que las vitales: la vida y la energía máximas dependen de ellos.
   if (progression && s.progression) progression.restore(s.progression);

@@ -14,7 +14,7 @@ import { GameEvents } from '../core/GameEvents.js';
 const USE_COOLDOWN = 0.35;
 
 export class ItemUseSystem {
-  constructor({ items, equipmentConfig, input, hotbar, inventory, nutrition, equipment, interaction, thirst, events }) {
+  constructor({ items, equipmentConfig, input, hotbar, inventory, nutrition, equipment, interaction, thirst, events, capturesUse = () => false }) {
     this.name = 'itemUse';
     this._items = items;
     this._eqCfg = equipmentConfig;
@@ -28,6 +28,7 @@ export class ItemUseSystem {
     this._events = events;
     this._cooldown = 0;
     this._queued = false;
+    this._capturesUse = capturesUse; // el clic derecho es del combate (bloquear, apuntar)
     // El agua solo se lleva en el odre: sin odres (o con menos), la que no cabe se pierde.
     events.on(GameEvents.INVENTORY_CHANGED, () => {
       const extra = this._inventory.getItemCount('WATER') - this.waterCapacity;
@@ -38,7 +39,7 @@ export class ItemUseSystem {
   update(dt) {
     this._cooldown = Math.max(0, this._cooldown - dt);
     // Una pulsación durante el enfriamiento queda en cola (no se pierde).
-    if (this._input.wasPressed('USE')) this._queued = true;
+    if (this._input.wasPressed('USE') && !this._capturesUse()) this._queued = true;
     if (this._cooldown > 0 || !this._queued) return;
     this._queued = false;
     const itemId = this._hotbar.selectedId;
@@ -83,7 +84,7 @@ export class ItemUseSystem {
         ok = true;
         break;
       case 'BUILD':
-        // Una estación fabricada (mesa de refinería): se coloca en el modo construcción.
+        // Una pieza (pared, mesa, antorcha…): se coloca en el modo construcción.
         this._events.emit(GameEvents.BUILD_PIECE_REQUEST, { pieceId: def.BUILD_PIECE });
         ok = true;
         break;
@@ -93,6 +94,7 @@ export class ItemUseSystem {
         break;
       default:
         if (def.TOOL) this._message(`${def.NAME}: herramienta. Mantén el clic sobre ${def.TOOL.CHOP_SPEED ? 'un tronco para talar más deprisa' : 'una roca para picarla'}.`);
+        else if (def.WEAPON) this._message(`${def.NAME}: ${def.WEAPON.DAMAGE} de daño. Clic para golpear${this._equipment.slots.OFFHAND ? '' : ' (con un escudo puesto, clic dcho bloquea)'}.`);
         else this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
     }
     if (ok) this._events.emit(GameEvents.ITEM_USED, { itemId, use: def.USE });

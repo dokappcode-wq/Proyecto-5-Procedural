@@ -100,9 +100,21 @@ export class CameraSystem {
     this.setMode(this.mode === CameraMode.FIRST_PERSON ? CameraMode.THIRD_PERSON : CameraMode.FIRST_PERSON);
   }
 
+  /** Apuntar (arco, tirachinas): en 1ª persona acerca la vista; en 3ª, cámara al hombro y más cerca. */
+  setAim(on) {
+    this._aimOn = !!on;
+  }
+
   update(dt) {
     const cfg = this._cfg;
     const input = this._input;
+    this._baseFov ??= this._camera.fov;
+    this._aim = (this._aim ?? 0) + ((this._aimOn && !this._vehicle ? 1 : 0) - (this._aim ?? 0)) * Math.min(1, dt * 10);
+    const fov = this._baseFov - this._aim * (this.mode === CameraMode.FIRST_PERSON ? 22 : 12);
+    if (Math.abs(fov - this._camera.fov) > 0.01) {
+      this._camera.fov = fov;
+      this._camera.updateProjectionMatrix();
+    }
 
     if (input.wasPressed('TOGGLE_CAMERA') && !this._vehicle) this.toggleMode();
 
@@ -185,7 +197,8 @@ export class CameraSystem {
     const t = v ?? this._target;
     const yaw = t.yaw;
     const pitch = t.pitch;
-    const shoulder = v ? 0 : cfg.THIRD_PERSON_SHOULDER_OFFSET;
+    const aim = v ? 0 : this._aim ?? 0;
+    const shoulder = v ? 0 : cfg.THIRD_PERSON_SHOULDER_OFFSET + aim * 0.35;
     const heightOffset = v ? 0 : cfg.THIRD_PERSON_HEIGHT_OFFSET;
 
     t.getEyePosition(this._eye);
@@ -196,7 +209,7 @@ export class CameraSystem {
     // Posición ideal en 3ª persona: detrás, un poco por encima y al hombro.
     this._pivot.copy(this._eye).addScaledVector(this._right, shoulder * this._blend);
     this._pivot.y += heightOffset;
-    let dist = this._occlusionDistance(this._pivot, v ? v.distance : this._distance);
+    let dist = this._occlusionDistance(this._pivot, v ? v.distance : this._distance + (Math.min(this._distance, 2.2) - this._distance) * aim);
     // Paredes y techos construidos: la cámara se acerca para no quedar detrás.
     if (this._occluders && this._blend > 0.01) {
       this._back.copy(this._fwd).negate();

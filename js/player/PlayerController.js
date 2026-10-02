@@ -47,6 +47,7 @@ export class PlayerController {
     this._mods = { canRun: true, canClimb: true, speedMultiplier: 1 };
     this.gravityScale = 1; // lunas: menos gravedad (se salta más y se cae más despacio)
     this.speedBonus = 1;   // niveles: velocidad (ProgressionSystem)
+    this.combatSpeed = 1;  // bloqueando o apuntando se camina más despacio (CombatSystem)
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
@@ -215,7 +216,7 @@ export class PlayerController {
     if (this._updateClimbing(dt)) return;
 
     const crouchK = p.state.isCrouching ? cfg.CROUCH?.SPEED_MULTIPLIER ?? 0.5 : 1;
-    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus * crouchK;
+    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus * crouchK * this.combatSpeed;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
     if (this._dodgeTime > 0) {
       // Esquivando: impulso fijo en la dirección elegida (sin control hasta que acaba).

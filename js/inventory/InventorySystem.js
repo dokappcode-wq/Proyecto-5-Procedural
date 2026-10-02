@@ -36,6 +36,13 @@ export class InventorySystem {
     this.slots = new Array(this.hotbarSize + this.mainSize).fill(null);
     this.cursor = null; // pila que se lleva con el ratón en el panel
     this._equipment = null;
+    this.container = null; // cofre abierto: { slots } (huecos 'c:0', 'c:1'…)
+  }
+
+  /** Cofre abierto en el panel (o null al cerrarlo). Sus huecos entran en los clics como 'c:N'. */
+  attachContainer(container) {
+    this.container = container;
+    this._emit(null, 0);
   }
 
   /** Las ranuras de ropa (EquipmentSystem) entran en los clics del panel. */
@@ -177,12 +184,15 @@ export class InventorySystem {
 
   // ---- Por huecos (panel del inventario) -----------------------------------------
 
-  /** Contenido de un hueco: número (inventario) o 'eq:SLOT' (ropa). */
+  /** Contenido de un hueco: número (inventario), 'c:N' (cofre abierto) o 'eq:SLOT' (ropa). */
   getRef(ref) {
     if (typeof ref === 'number') return this.slots[ref] ?? null;
+    const c = this._loc(ref);
+    if (c) return c[0][c[1]] ?? null;
     const slot = eqSlot(ref);
     const id = slot && this._equipment?.slots[slot];
-    return id ? { id, count: 1 } : null;
+    const dur = slot ? this._equipment?.dur?.[slot] : undefined;
+    return id ? (dur != null ? { id, count: 1, dur } : { id, count: 1 }) : null;
   }
 
   /**
@@ -195,9 +205,11 @@ export class InventorySystem {
   click(ref, { button = 0, shift = false } = {}) {
     const slot = eqSlot(ref);
     if (slot) return this._clickEquipment(slot, shift);
-    if (typeof ref !== 'number' || ref < 0 || ref >= this.slots.length) return false;
+    const loc = this._loc(ref);
+    if (!loc) return false;
     if (shift && !this.cursor) return this._quickMove(ref);
-    const here = this.slots[ref];
+    const [arr, idx] = loc;
+    const here = arr[idx];
     const c = this.cursor;
     if (button === 2) {
       if (!c && here) {
@@ -205,7 +217,7 @@ export class InventorySystem {
         const take = Math.ceil(here.count / 2);
         if (take === here.count) {
           this.cursor = here; // todo el hueco (conserva el aguante de las herramientas)
-          this.slots[ref] = null;
+          arr[idx] = null;
         } else {
           this.cursor = { id: here.id, count: take };
           here.count -= take;
@@ -217,30 +229,30 @@ export class InventorySystem {
           c.count -= 1;
           if (c.count === 0) this.cursor = null;
         } else if (c.count === 1) {
-          this.slots[ref] = c;
+          arr[idx] = c;
           this.cursor = null;
         } else {
-          this.slots[ref] = { id: c.id, count: 1 };
+          arr[idx] = { id: c.id, count: 1 };
           c.count -= 1;
         }
       } else return false;
     } else if (!c) {
       if (!here) return false;
       this.cursor = here;
-      this.slots[ref] = null;
+      arr[idx] = null;
     } else if (!here) {
-      this.slots[ref] = c;
+      arr[idx] = c;
       this.cursor = null;
     } else if (here.id === c.id) {
       const move = Math.min(c.count, this.stackLimit(c.id) - here.count);
-      if (move <= 0) [this.slots[ref], this.cursor] = [c, here];
+      if (move <= 0) [arr[idx], this.cursor] = [c, here];
       else {
         here.count += move;
         c.count -= move;
         if (c.count === 0) this.cursor = null;
       }
     } else {
-      [this.slots[ref], this.cursor] = [c, here];
+      [arr[idx], this.cursor] = [c, here];
     }
     this._emit(null, 0);
     return true;
@@ -289,12 +301,14 @@ export class InventorySystem {
       if (shift) {
         // Quitársela directamente a la mochila.
         if (this.roomFor(worn) < 1) return false;
+        const dur = eq.dur?.[slot];
         eq._set(slot, null);
-        this.addItem(worn, 1);
+        this.addItem(worn, 1, { dur });
         return true;
       }
+      const dur = eq.dur?.[slot];
       eq._set(slot, null);
-      this.cursor = { id: worn, count: 1 };
+      this.cursor = dur != null ? { id: worn, count: 1, dur } : { id: worn, count: 1 };
       this._emit(null, 0);
       return true;
     }
@@ -302,13 +316,16 @@ export class InventorySystem {
       this._events?.emit(GameEvents.UI_MESSAGE, { text: `${this._defs[c.id]?.NAME ?? c.id} no va en ${eq.slotName(slot)}.`, type: 'info' });
       return false;
     }
-    eq._set(slot, c.id);
-    this.cursor = worn ? { id: worn, count: 1 } : null;
+    const wornDur = eq.dur?.[slot];
+    eq._set(slot, c.id, c.dur);
+    this.cursor = worn ? (wornDur != null ? { id: worn, count: 1, dur: wornDur } : { id: worn, count: 1 }) : null;
     this._emit(null, 0);
     return true;
   }
 
   _quickMove(ref) {
+    // Con un cofre abierto: inventario ↔ cofre.
+    if (this.container) return this._quickMoveContainer(ref);
     const here = this.slots[ref];
     if (!here) return false;
     // Ropa: a su ranura si está libre.
@@ -316,7 +333,7 @@ export class InventorySystem {
     const wearSlot = this._defs[here.id]?.SLOT;
     if (eq && wearSlot && here.count === 1 && !eq.slots[wearSlot] && eq.canWear(wearSlot, here.id)) {
       this.slots[ref] = null;
-      eq._set(wearSlot, here.id);
+      eq._set(wearSlot, here.id, here.dur);
       this._emit(null, 0);
       return true;
     }
@@ -340,6 +357,43 @@ export class InventorySystem {
     if (here.count === 0) this.slots[ref] = null;
     this._emit(null, 0);
     return true;
+  }
+
+  /** Mover rápido entre el inventario y el cofre abierto (completa pilas, luego huecos vacíos). */
+  _quickMoveContainer(ref) {
+    const loc = this._loc(ref);
+    if (!loc) return false;
+    const [from, i] = loc;
+    const here = from[i];
+    if (!here) return false;
+    const to = from === this.slots ? this.container.slots : this.slots;
+    const lim = this.stackLimit(here.id);
+    for (const pass of ['merge', 'empty']) {
+      for (let k = 0; k < to.length && here.count > 0; k++) {
+        const t = to[k];
+        if (pass === 'merge' && t?.id === here.id && t.count < lim && here.dur == null && t.dur == null) {
+          const move = Math.min(here.count, lim - t.count);
+          t.count += move;
+          here.count -= move;
+        } else if (pass === 'empty' && !t) {
+          to[k] = { ...here };
+          here.count = 0;
+        }
+      }
+    }
+    if (here.count === 0) from[i] = null;
+    this._emit(null, 0);
+    return true;
+  }
+
+  /** [array, índice] de un hueco: número = inventario; 'c:N' = cofre abierto. */
+  _loc(ref) {
+    if (typeof ref === 'number') return ref >= 0 && ref < this.slots.length ? [this.slots, ref] : null;
+    if (typeof ref === 'string' && ref.startsWith('c:') && this.container) {
+      const i = Number(ref.slice(2));
+      return Number.isInteger(i) && i >= 0 && i < this.container.slots.length ? [this.container.slots, i] : null;
+    }
+    return null;
   }
 
   // Alias con los nombres de la especificación.

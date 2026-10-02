@@ -21,9 +21,24 @@ export class CraftingSystem {
     this._items = items;
     this._inventory = inventory;
     this._events = events;
-    this.queue = [];   // [{ uid, recipeId, time, left }]
+    this.queue = [];   // [{ uid, recipeId, time, left, ingredients }]
     this._uid = 0;
+    this._subs = {};   // cuerpo sin madera/lana: las piezas de construcción usan piedra/mineral
+    events.on(GameEvents.BODY_CHANGED, ({ planet }) => (this._subs = planet?.BUILD_SUBSTITUTE ?? {}));
     events.on(GameEvents.CRAFT_REQUEST, ({ recipeId, station }) => this.craft(recipeId, { station }));
+  }
+
+  /** Ingredientes de una receta en el cuerpo actual (las piezas de construcción sustituyen materiales). */
+  ingredients(recipeId) {
+    const r = this._recipes[recipeId];
+    if (!r) return {};
+    if (r.CATEGORY !== 'CONSTRUCTION' || !Object.keys(this._subs).length) return r.INGREDIENTS;
+    const out = {};
+    for (const [item, n] of Object.entries(r.INGREDIENTS)) {
+      const it = this._subs[item] ?? item;
+      out[it] = (out[it] ?? 0) + n;
+    }
+    return out;
   }
 
   /** Lista de recetas con su disponibilidad actual (para la UI). */
@@ -34,7 +49,7 @@ export class CraftingSystem {
       amount: r.AMOUNT,
       name: this._items[r.RESULT].NAME,
       icon: this._items[r.RESULT].ICON,
-      ingredients: Object.entries(r.INGREDIENTS).map(([item, n]) => ({
+      ingredients: Object.entries(this.ingredients(id)).map(([item, n]) => ({
         item,
         amount: n,
         have: this._inventory.getItemCount(item),
@@ -52,14 +67,14 @@ export class CraftingSystem {
   canCraft(recipeId) {
     const r = this._recipes[recipeId];
     if (!r) return false;
-    return Object.entries(r.INGREDIENTS).every(([item, n]) => this._inventory.hasItem(item, n));
+    return Object.entries(this.ingredients(recipeId)).every(([item, n]) => this._inventory.hasItem(item, n));
   }
 
   /** Cuántas veces se puede fabricar ahora con lo que se lleva. */
   maxCraftable(recipeId) {
     const r = this._recipes[recipeId];
     if (!r) return 0;
-    return Math.min(...Object.entries(r.INGREDIENTS).map(([item, n]) => Math.floor(this._inventory.getItemCount(item) / n)));
+    return Math.min(...Object.entries(this.ingredients(recipeId)).map(([item, n]) => Math.floor(this._inventory.getItemCount(item) / n)));
   }
 
   /**
@@ -83,9 +98,10 @@ export class CraftingSystem {
       this._message('La cola de fabricación está llena.', 'danger');
       return false;
     }
-    for (const [item, n] of Object.entries(r.INGREDIENTS)) this._inventory.removeItem(item, n);
+    const ingredients = { ...this.ingredients(recipeId) };
+    for (const [item, n] of Object.entries(ingredients)) this._inventory.removeItem(item, n);
     const time = Math.max(0, r.TIME ?? 0);
-    this.queue.push({ uid: ++this._uid, recipeId, time, left: time });
+    this.queue.push({ uid: ++this._uid, recipeId, time, left: time, ingredients });
     this._changed();
     if (time === 0) this.update(0);
     return true;
@@ -96,7 +112,7 @@ export class CraftingSystem {
     const i = this.queue.findIndex((q) => q.uid === uid);
     if (i < 0) return false;
     const [q] = this.queue.splice(i, 1);
-    for (const [item, n] of Object.entries(this._recipes[q.recipeId].INGREDIENTS)) this._inventory.addItem(item, n);
+    for (const [item, n] of Object.entries(q.ingredients ?? this._recipes[q.recipeId].INGREDIENTS)) this._inventory.addItem(item, n);
     this._changed();
     return true;
   }

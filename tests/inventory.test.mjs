@@ -119,7 +119,7 @@ test('barra rápida: los huecos 1–9; el seleccionado sigue al contenido del hu
 
 test('cinco prendas de cuero: fabricables y cada una en su ranura', () => {
   const pieces = { HEAD: 'LEATHER_CAP', CHEST: 'LEATHER_SHIRT', LEGS: 'LEATHER_PANTS', FEET: 'LEATHER_SHOES', HANDS: 'LEATHER_GLOVES' };
-  assert.deepEqual(Object.keys(C.EQUIPMENT.SLOTS), Object.keys(pieces));
+  assert.deepEqual(Object.keys(C.EQUIPMENT.SLOTS).filter((k) => k !== 'OFFHAND'), Object.keys(pieces));
   for (const [slot, id] of Object.entries(pieces)) {
     assert.equal(C.ITEMS[id].SLOT, slot);
     assert.equal(C.ITEMS[id].STACK, 1);
@@ -161,7 +161,7 @@ test('fabricación: categorías y cuántas veces se puede fabricar', async () =>
   for (const x of Object.values(r)) assert.ok(x.time > 0, `${x.id} tarda algo`);
   assert.deepEqual(C.RECIPES.REFINED_STONE.INGREDIENTS, { STONE: 4 });
   assert.deepEqual(C.RECIPES.REFINED_WOOD.INGREDIENTS, { WOOD: 2 });
-  assert.deepEqual(C.RECIPES.REFINERY_KIT.INGREDIENTS, { REFINED_STONE: 4, REFINED_WOOD: 2 });
+  assert.deepEqual(C.RECIPES.PIECE_REFINERY.INGREDIENTS, { REFINED_STONE: 4, REFINED_WOOD: 2 });
   assert.deepEqual(C.RECIPES.REFINED_LEATHER.INGREDIENTS, { LEATHER: 1 });
   assert.deepEqual(C.RECIPES.ROPE.INGREDIENTS, { SPIDER_SILK: 5 });
   for (const t of ['STONE_AXE', 'STONE_PICKAXE']) assert.deepEqual(C.RECIPES[t].INGREDIENTS, { REFINED_WOOD: 3, REFINED_STONE: 2, ROPE: 2 }, `${t}: 3 maderas y 2 piedras refinadas + 2 cuerdas`);

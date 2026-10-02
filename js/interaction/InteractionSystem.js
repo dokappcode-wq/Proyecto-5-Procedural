@@ -30,7 +30,7 @@ import { SHAPES } from '../construction/BuildRules.js';
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null, weapon = null, suppressAttack = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -47,6 +47,10 @@ export class InteractionSystem {
     this._canWork = canWork ?? (() => true); // ¿queda energía para golpear?
     this._wearTool = wearTool ?? (() => {}); // gasta 1 de aguante de la herramienta seleccionada
     this._power = power ?? (() => 1);        // multiplicador de daño del nivel (golpes y rapidez al talar/picar)
+    this._weapon = weapon ?? (() => null);   // arma seleccionada ({ DAMAGE }) o null (puño)
+    this._suppressAttack = suppressAttack ?? (() => false); // bloqueando o con arco/tirachinas: el clic no golpea
+    // Criaturas a las que se puede golpear: animales y, más adelante, enemigos (misma interfaz).
+    this.creatures = [animals];
     this._swing = 0;                   // s hasta poder dar el siguiente golpe (talar/picar/romper)
     this._chopProgress = new Map();    // id del árbol → 0..1 de tala
 
@@ -78,7 +82,8 @@ export class InteractionSystem {
     }
 
     // Talar / picar / romper: mientras se mantiene el clic se golpea cada CHOP_SWING s.
-    const attack = this._input.wasPressed('ATTACK') || this._input.isDown('ATTACK');
+    const suppress = this._suppressAttack();
+    const attack = !suppress && (this._input.wasPressed('ATTACK') || this._input.isDown('ATTACK'));
     if (t?.kind === 'structure' && attack) {
       if (this._swing <= 0) {
         this._swing = this._cfg.CHOP_SWING ?? 0.6;
@@ -100,7 +105,7 @@ export class InteractionSystem {
       if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
     } else {
       if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
-      else if (this._input.wasPressed('ATTACK')) this._queued = 'ATTACK';
+      else if (this._input.wasPressed('ATTACK') && !suppress) this._queued = 'ATTACK';
     }
     if (this._cooldown > 0 || !this._queued) return;
     const action = this._queued;
@@ -131,7 +136,7 @@ export class InteractionSystem {
       this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'drink' });
       this._events.emit(GameEvents.PLAYER_DRANK, { source: target.ref?.river ? 'RIVER' : 'POND' });
     } else if (target?.kind === 'animal' && button === 'ATTACK') {
-      this._hit(target.ref);
+      this._hit(target.ref, target.source);
     } else if (button === 'ATTACK') {
       this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'miss' });
     } else {
@@ -255,10 +260,13 @@ export class InteractionSystem {
     this._events.emit(GameEvents.UI_MESSAGE, { text: '🪓 Golpea el tronco (clic o F) para sacar trozos de madera.', type: 'info' });
   }
 
-  _hit(animal) {
+  _hit(animal, source = this._animals) {
     const p = this._player.position;
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
-    const { killed, drops } = this._animals.hitAnimal(animal, this._cfg.PLAYER_HIT_DAMAGE * this._power(), p.x, p.z);
+    const weapon = this._weapon();
+    if (weapon) this._wearTool();
+    const damage = (weapon?.DAMAGE ?? this._cfg.PLAYER_HIT_DAMAGE) * this._power();
+    const { killed, drops } = source.hitAnimal(animal, damage, p.x, p.z);
     if (!killed) return;
     for (const [item, amount] of Object.entries(drops)) this._inventory.addItem(item, amount);
   }
@@ -299,8 +307,10 @@ export class InteractionSystem {
         );
       }
     }
-    for (const a of this._animals.getAnimalsNear(p.x, p.z, range + 2)) {
-      consider({ kind: 'animal', id: a.id, ref: a }, a.x, a.y + 0.8 * a.scale, a.z, 0.75 * a.scale, 0.5 * a.scale);
+    for (const source of this.creatures) {
+      for (const a of source.getAnimalsNear(p.x, p.z, range + 2)) {
+        consider({ kind: 'animal', id: a.id, ref: a, source }, a.x, a.y + 0.8 * a.scale, a.z, 0.75 * a.scale, 0.5 * a.scale);
+      }
     }
 
     // Piezas construidas con las que se interactúa (puertas, camas).
@@ -367,7 +377,7 @@ export class InteractionSystem {
       // Las piezas sin uso (paredes, suelos…) no muestran letrero: se rompen manteniendo el clic.
       if (!SHAPES[t.ref.type]?.interact) return { ...t, silent: true, label: t.ref.def.NAME, action: null };
       const kind = SHAPES[t.ref.type].interact;
-      const action = t.ref.actionText ?? (kind === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : kind === 'REFINERY' ? 'Usar' : 'Dormir');
+      const action = t.ref.actionText ?? (kind === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : kind === 'CRAFT' ? 'Usar' : kind === 'STORAGE' ? 'Abrir' : 'Dormir');
       return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };
     }
     if (t.kind === 'animal') {

@@ -102,6 +102,7 @@ export class ConstructionSystem {
   // ---- Modo construcción ---------------------------------------------------------
 
   setActive(active) {
+    if (!active) this.itemMode = false;
     if (this.active === active) return;
     this.active = active;
     if (!active) {
@@ -109,7 +110,7 @@ export class ConstructionSystem {
       this._removeHighlight.visible = false;
       this._setPlacement(false, false, null, null);
     }
-    this._events.emit(GameEvents.BUILD_MODE_CHANGED, { active, pieceId: this.selected, pieces: this.pieceDefs() });
+    this._events.emit(GameEvents.BUILD_MODE_CHANGED, { active, pieceId: this.selected, pieces: this.pieceDefs(), itemMode: !!this.itemMode });
   }
 
   /** Piezas disponibles en un cuerpo: sin aire, estaciones en vez de vallas y camas; en el espacio, ninguna. */
@@ -134,6 +135,23 @@ export class ConstructionSystem {
   /** Piezas del cuerpo actual para la UI: [{ id, NAME, ICON, COST }]. */
   pieceDefs() {
     return this.pieceIds.map((id) => ({ id, ...this._cfg.PIECES[id], COST: this.costOf(id) }));
+  }
+
+  /**
+   * Colocar una pieza que se lleva como objeto (seleccionada en la barra o "Colocar"
+   * desde la mochila): modo construcción solo con esa pieza; al acabarse, se sale.
+   */
+  startPlacing(pieceId) {
+    if (!this._cfg.PIECES[pieceId]) return false;
+    if (!this.pieceIds.includes(pieceId)) {
+      this._events.emit(GameEvents.UI_MESSAGE, { text: `Aquí no se puede colocar: ${this._cfg.PIECES[pieceId].NAME}.`, type: 'danger' });
+      return false;
+    }
+    this.itemMode = true;
+    this.select(pieceId);
+    this.setActive(true);
+    this.itemMode = true;
+    return true;
   }
 
   select(pieceId) {
@@ -164,8 +182,11 @@ export class ConstructionSystem {
       return;
     }
 
-    for (let i = 1; i <= 10; i++) {
-      if (input.wasPressed(`HOTBAR_${i}`) && this.pieceIds[i - 1]) this.select(this.pieceIds[i - 1]);
+    // Con B se elige la pieza con los números; colocando un objeto de la barra, los números son la barra.
+    if (!this.itemMode) {
+      for (let i = 1; i <= 10; i++) {
+        if (input.wasPressed(`HOTBAR_${i}`) && this.pieceIds[i - 1]) this.select(this.pieceIds[i - 1]);
+      }
     }
     if (input.wasPressed('ROTATE')) this._rotSteps++;
 
@@ -199,13 +220,16 @@ export class ConstructionSystem {
       this._events.emit(GameEvents.UI_MESSAGE, { text: pl.reason ?? 'No se puede colocar aquí', type: 'danger' });
       return false;
     }
-    const cost = this.costOf(pl.piece.type);
+    // Se copia antes de gastar el objeto: gastar la última pieza vacía la barra y eso sale del modo construcción.
+    const candidate = { ...pl.piece };
+    const itemMode = this.itemMode;
+    const cost = this.costOf(candidate.type);
     if (!this.freeBuild) for (const [item, n] of Object.entries(cost)) this._inventory.removeItem(item, n);
-    const structure = this.addPiece({ ...pl.piece, cost });
+    const structure = this.addPiece({ ...candidate, cost });
     this._events.emit(GameEvents.STRUCTURE_PLACED, { structure });
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'place' });
-    // Una estación fabricada (mesa de refinería): colocada, se sale del modo construcción.
-    if (Object.keys(cost).some((k) => this._items[k]?.USE === 'BUILD')) this.setActive(false);
+    // Colocando objetos: cuando no quedan más de esa pieza se sale del modo construcción.
+    if (itemMode && this.active && !this.canAfford(candidate.type)) this.setActive(false);
     return true;
   }
 
@@ -232,6 +256,7 @@ export class ConstructionSystem {
   /** Añade una pieza ya validada (también la usan las herramientas Admin). */
   addPiece({ type, x, y, z, rotation, slot, cost = null }) {
     const piece = { id: this._nextId++, type, x, y, z, rotation, slot, open: false, def: this._cfg.PIECES[type], cost, body: this._bodyId };
+    if (type === 'CHEST') piece.data = { slots: new Array(this._cfg.CHEST_SLOTS ?? 27).fill(null) };
     piece.key = slotKey(slot, y);
     const root = new THREE.Group();
     root.position.set(x, y, z);
@@ -352,8 +377,10 @@ export class ConstructionSystem {
       piece.object.updateMatrixWorld(true);
     } else if (kind === 'SLEEP') {
       this._events.emit(GameEvents.SLEEP_REQUEST, { bed: piece });
-    } else if (kind === 'REFINERY') {
-      this._events.emit(GameEvents.CRAFT_STATION_OPEN, { station: 'REFINERY', piece });
+    } else if (kind === 'CRAFT') {
+      this._events.emit(GameEvents.CRAFT_STATION_OPEN, { station: SHAPES[piece.type].station, piece });
+    } else if (kind === 'STORAGE') {
+      this._events.emit(GameEvents.CHEST_OPEN, { piece });
     }
   }
 

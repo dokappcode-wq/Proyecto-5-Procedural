@@ -10,10 +10,44 @@
  * Cada fase añade aquí su sección (WORLD, SURVIVAL, NUTRITION, TEMPERATURE,
  * TIME, CELESTIAL, SHIP...).
  */
+// Piezas de construcción (Fase 9 + 2). Cada pieza es un OBJETO que se fabrica en el reloj
+// (o en su estación) con RECIPE y se coloca seleccionándolo en la barra (o "Colocar" desde la
+// mochila). Al romperla vuelve al inventario. ITEM: objeto propio si ya existía (mesa de refinería).
+const BUILD_PIECES = {
+  FOUNDATION: { NAME: 'Cimiento', ICON: '🪨', RECIPE: { STONE: 4 }, TIME: 3 },
+  FLOOR: { NAME: 'Suelo', ICON: '🟫', RECIPE: { WOOD: 2 }, TIME: 2 },
+  WALL: { NAME: 'Pared', ICON: '🧱', RECIPE: { WOOD: 3 }, TIME: 3 },
+  DOOR: { NAME: 'Puerta', ICON: '🚪', RECIPE: { WOOD: 4 }, TIME: 4 },
+  WINDOW: { NAME: 'Ventana', ICON: '🪟', RECIPE: { WOOD: 3 }, TIME: 3 },
+  FENCE: { NAME: 'Valla', ICON: '🚧', RECIPE: { WOOD: 1 }, TIME: 1 },
+  PILLAR: { NAME: 'Pilar', ICON: '🏛️', RECIPE: { WOOD: 1 }, TIME: 1 },
+  STAIRS: { NAME: 'Escalera', ICON: '🪜', RECIPE: { WOOD: 4 }, TIME: 4 },
+  ROOF: { NAME: 'Tejado', ICON: '🔺', RECIPE: { WOOD: 3 }, TIME: 3 },
+  BED: { NAME: 'Cama', ICON: '🛏️', RECIPE: { WOOL: 3, WOOD: 3 }, TIME: 8 },
+  REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️', ITEM: 'REFINERY_KIT', STATION_PIECE: true },
+  CHEST: { NAME: 'Cofre', ICON: '📦', RECIPE: { REFINED_WOOD: 6 }, TIME: 10, DESC: 'Guarda objetos: colócalo y E para abrirlo (27 huecos).' },
+  FURNACE: { NAME: 'Horno', ICON: '🔥', RECIPE: { REFINED_STONE: 10, REFINED_WOOD: 2 }, TIME: 15, STATION_PIECE: true, DESC: 'Funde menas, diamante y arena con carbón (E para usarlo).' },
+  WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰', RECIPE: { REFINED_IRON: 5, REFINED_COPPER: 5 }, TIME: 20, STATION_PIECE: true, DESC: 'Recetas avanzadas: placa de navegación, armas y armaduras de metal (E para usarla).' },
+  TORCH: { NAME: 'Antorcha', ICON: '🔥', ITEM: 'TORCH' },
+  // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
+  CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', RECIPE: { STONE: 4, MINERAL: 3 }, TIME: 8, BODIES: 'MOON' },
+  OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', RECIPE: { STONE: 4, MINERAL: 4 }, TIME: 8, BODIES: 'MOON' },
+};
+const pieceItemId = (type) => BUILD_PIECES[type].ITEM ?? `PIECE_${type}`;
+// Objetos de las piezas (los que no tienen objeto propio).
+const PIECE_ITEMS = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([, d]) => !d.ITEM).map(([type, d]) => [
+  `PIECE_${type}`,
+  { NAME: d.NAME, ICON: d.ICON, USE: 'BUILD', BUILD_PIECE: type, DESC: d.DESC ?? 'Pieza de construcción: selecciónala en la barra para colocarla (clic). Rompiéndola vuelve al inventario.' },
+]));
+const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([, d]) => d.RECIPE).map(([type, d]) => [
+  `PIECE_${type}`,
+  { RESULT: pieceItemId(type), AMOUNT: 1, CATEGORY: d.STATION_PIECE ? 'STATIONS' : 'CONSTRUCTION', TIME: d.TIME ?? 3, INGREDIENTS: d.RECIPE },
+]));
+
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.14.0',
+    VERSION: '1.15.0',
   },
 
   RENDER: {
@@ -72,6 +106,7 @@ export const GameConfig = deepFreeze({
       INTERACT: ['KeyE'],               // recoger / interactuar
       ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
       USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado · en modo construcción: quitar pieza
+      AMMO_NEXT: ['KeyX'],              // arco: cambiar de tipo de flecha
       ROTATE: ['KeyQ'],                 // girar la pieza antes de colocarla
       CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
       INVENTORY: ['KeyI'],              // abrir/cerrar el inventario (mochila 9×3 + barra + ropa)
@@ -293,6 +328,11 @@ export const GameConfig = deepFreeze({
       SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.0, MAX_GAP: 5.0, CHANCE: 0.06, HEIGHT: 1.7, MAX_SIZE: 1.5 },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
+    // Playa: montones de arena (E) para fundir cristal en el horno.
+    SAND_PILE: {
+      NAME: 'Montón de arena', COLLISION_RADIUS: 0, SCALE: [0.8, 1.3], AIM_HEIGHT: 0.1, AIM_RADIUS: 0.8,
+      HARVEST: { ITEM: 'SAND', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Recoger arena' },
+    },
     MINERAL_ROCK: {
       NAME: 'Veta de mineral', COLLISION_RADIUS: 0.7, SCALE: [0.7, 1.2], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.9,
       HARVEST: { ITEM: 'MINERAL', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Minar' },
@@ -315,7 +355,34 @@ export const GameConfig = deepFreeze({
     REFINED_LEATHER: { NAME: 'Cuero refinado', ICON: '🟤', DESC: 'Cuero curtido en la mesa de refinería: para la ropa y el odre.' },
     REFINED_STONE: { NAME: 'Piedra refinada', ICON: '⬜', DESC: 'Bloque de piedra tallada (4 piedras).' },
     REFINED_WOOD: { NAME: 'Madera refinada', ICON: '🟧', DESC: 'Tabla de madera trabajada (2 de madera).' },
-    REFINERY_KIT: { NAME: 'Mesa de refinería', ICON: '🛠️', STACK: 1, USE: 'BUILD', BUILD_PIECE: 'REFINERY', DESC: 'Selecciónala y clic derecho / R para colocarla. Con E en ella: cuero refinado, ropa de cuero y odre.' },
+    REFINERY_KIT: { NAME: 'Mesa de refinería', ICON: '🛠️', STACK: 1, USE: 'BUILD', BUILD_PIECE: 'REFINERY', DESC: 'Selecciónala en la barra para colocarla. Con E en ella: cuero refinado, ropa de cuero y odre.' },
+    // Fase 2: minerales (en las cuevas), arena (playa) y lo que sale del horno.
+    COPPER_ORE: { NAME: 'Mena de cobre', ICON: '🔶', DESC: 'Se pica en las menas de cobre de las cuevas. Se funde en el horno.' },
+    IRON_ORE: { NAME: 'Mena de hierro', ICON: '🔘', DESC: 'Dentro de las cuevas (menos que el cobre). Se funde en el horno.' },
+    COAL: { NAME: 'Carbón', ICON: '⚫', DESC: 'En las entradas de las cuevas. Combustible del horno y de las antorchas.' },
+    DIAMOND_ORE: { NAME: 'Diamante en bruto', ICON: '🔹', DESC: 'Muy raro, en lo hondo de las cuevas. Se talla en el horno.' },
+    GLOW_FLOWER: { NAME: 'Flor luminosa', ICON: '🌼', DESC: 'La sueltan las flores luminosas de las cuevas.' },
+    SAND: { NAME: 'Arena', ICON: '🟨', DESC: 'Se recoge en los montones de arena de la playa (E). En el horno se convierte en cristal.' },
+    REFINED_COPPER: { NAME: 'Cobre refinado', ICON: '🥉', DESC: 'Lingote de cobre (horno).' },
+    REFINED_IRON: { NAME: 'Hierro refinado', ICON: '🔩', DESC: 'Lingote de hierro (horno).' },
+    REFINED_DIAMOND: { NAME: 'Diamante tallado', ICON: '💠', DESC: 'Diamante pulido (horno).' },
+    GLASS: { NAME: 'Cristal', ICON: '🧊', DESC: 'Arena fundida en el horno.' },
+    NAV_PLATE: { NAME: 'Placa de navegación', ICON: '📟', STACK: 1, DESC: 'Placa base de navegación de la nave. Se fabrica en la mesa de elaboración.' },
+    // Armas. WEAPON.DAMAGE: daño por golpe (con el nivel de daño). DURABILITY: golpes o disparos.
+    STONE_SWORD: { NAME: 'Espada básica', ICON: '🗡️', STACK: 1, DURABILITY: 400, WEAPON: { DAMAGE: 10 }, MODEL: { TYPE: 'sword', BLADE: 0x9b9fa5, GUARD: 0x6b4a2f, LENGTH: 0.62 }, DESC: '10 de daño. Aguanta 400 golpes.' },
+    COPPER_SWORD: { NAME: 'Espada de cobre', ICON: '⚔️', STACK: 1, DURABILITY: 600, WEAPON: { DAMAGE: 12 }, MODEL: { TYPE: 'sword', BLADE: 0xd08a4e, GUARD: 0x8a5a32, LENGTH: 0.7 }, DESC: '12 de daño. Aguanta 600 golpes.' },
+    IRON_SWORD: { NAME: 'Espada de hierro', ICON: '🔪', STACK: 1, DURABILITY: 400, WEAPON: { DAMAGE: 15 }, MODEL: { TYPE: 'sword', BLADE: 0xc8ccd2, GUARD: 0x3b3f45, LENGTH: 0.78 }, DESC: '15 de daño. Aguanta 400 golpes.' },
+    // A distancia: clic derecho mantenido apunta, clic izquierdo mantenido tensa y al soltar dispara.
+    SLINGSHOT: { NAME: 'Tirachinas', ICON: '🪃', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['STONE'], DAMAGE: 5, SPEED: 32, DRAW_TIME: 0.45 }, MODEL: { TYPE: 'slingshot' }, DESC: 'Dispara piedras (5 de daño). Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
+    BOW: { NAME: 'Arco', ICON: '🏹', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['ARROW', 'COPPER_ARROW', 'IRON_ARROW'], SPEED: 48, DRAW_TIME: 0.8 }, MODEL: { TYPE: 'bow' }, DESC: 'El daño depende de la flecha. X cambia de flecha. Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
+    ARROW: { NAME: 'Flecha', ICON: '➹', AMMO: { DAMAGE: 10 }, MODEL: { TYPE: 'arrow', TIP: 0x8d8f93 }, DESC: '10 de daño. Se gasta al dispararla.' },
+    COPPER_ARROW: { NAME: 'Flecha de cobre', ICON: '➶', AMMO: { DAMAGE: 15 }, MODEL: { TYPE: 'arrow', TIP: 0xd08a4e }, DESC: '15 de daño (mesa de elaboración).' },
+    IRON_ARROW: { NAME: 'Flecha de hierro', ICON: '➵', AMMO: { DAMAGE: 20 }, MODEL: { TYPE: 'arrow', TIP: 0xc8ccd2 }, DESC: '20 de daño (mesa de elaboración).' },
+    // Escudos (mano izquierda, ranura ESCUDO): clic derecho mantenido para bloquear. Aguante = golpes parados.
+    COPPER_SHIELD: { NAME: 'Escudo de cobre', ICON: '🛡️', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 50, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xb87333, RIM: 0x6e4a2a }, DESC: 'Clic dcho mantenido: bloquear (no se puede atacar a la vez). Aguanta 50 golpes.' },
+    IRON_SHIELD: { NAME: 'Escudo de hierro', ICON: '🔰', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 100, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xa9aeb5, RIM: 0x4a4f55 }, DESC: 'Clic dcho mantenido: bloquear. Aguanta 100 golpes.' },
+    TORCH: { NAME: 'Antorcha', ICON: '🔥', USE: 'BUILD', BUILD_PIECE: 'TORCH', HOLD: true, MODEL: { TYPE: 'torch' }, DESC: 'En la mano ilumina. Clic dcho / R para clavarla en el suelo.' },
+    ...PIECE_ITEMS,
     MEAT: { NAME: 'Carne', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION' },
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
@@ -332,6 +399,17 @@ export const GameConfig = deepFreeze({
     LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
     LEATHER_SHOES: { NAME: 'Zapatillas de cuero', ICON: '👟', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.03, COLOR: 0x4a2f18, DESC: 'Pies calientes y secos.' },
     LEATHER_GLOVES: { NAME: 'Guantes de cuero', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.02, COLOR: 0x5c3a1c, DESC: 'Manos protegidas.' },
+    // Armaduras de metal (mesa de elaboración). DEFENSE: puntos de defensa.
+    COPPER_HELMET: { NAME: 'Casco de cobre', ICON: '⛑️', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.03, COLOR: 0xb87333, DESC: 'Defensa 2.' },
+    COPPER_CHEST: { NAME: 'Pechera de cobre', ICON: '🦺', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 6, COLD_PROTECTION: 0.05, COLOR: 0xc07a3c, DESC: 'Defensa 6.' },
+    COPPER_LEGS: { NAME: 'Grebas de cobre', ICON: '🦿', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 4, COLD_PROTECTION: 0.04, COLOR: 0xa86a32, DESC: 'Defensa 4.' },
+    COPPER_BOOTS: { NAME: 'Botas de cobre', ICON: '🥾', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.02, COLOR: 0x8f5a2a, DESC: 'Defensa 2.' },
+    COPPER_GLOVES: { NAME: 'Guanteletes de cobre', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.01, COLOR: 0xb87333, DESC: 'Defensa 1.' },
+    CHAIN_HELMET: { NAME: 'Cofia de malla', ICON: '⛑️', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.03, COLOR: 0x9ea4aa, DESC: 'Defensa 3.' },
+    CHAIN_CHEST: { NAME: 'Cota de malla', ICON: '🦺', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 9, COLD_PROTECTION: 0.05, COLOR: 0x8e959c, DESC: 'Defensa 9.' },
+    CHAIN_LEGS: { NAME: 'Calzas de malla', ICON: '🦿', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 6, COLD_PROTECTION: 0.04, COLOR: 0x7f868d, DESC: 'Defensa 6.' },
+    CHAIN_BOOTS: { NAME: 'Botas de malla', ICON: '🥾', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.02, COLOR: 0x6f767d, DESC: 'Defensa 3.' },
+    CHAIN_GLOVES: { NAME: 'Guantes de malla', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.01, COLOR: 0x9ea4aa, DESC: 'Defensa 2.' },
     // Combustible de la nave: se colocan en el puesto de carga (ver SHIP.BATTERIES).
     PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋', USE: 'BATTERY' },
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
@@ -368,6 +446,7 @@ export const GameConfig = deepFreeze({
       LEGS: { NAME: 'Piernas', ICON: '👖' },
       FEET: { NAME: 'Pies', ICON: '🥾' },
       HANDS: { NAME: 'Manos', ICON: '🧤' },
+      OFFHAND: { NAME: 'Escudo', ICON: '🛡️' },
     },
     MAX_COLD_PROTECTION: 0.8,   // la ropa nunca quita más del 80 % de la pérdida de calor
     // Defensa (ITEMS.*.DEFENSE, se suma): cada punto quita un 1,5 % del daño de los ataques
@@ -388,7 +467,7 @@ export const GameConfig = deepFreeze({
     ROPE: { RESULT: 'ROPE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { SPIDER_SILK: 5 } },
     STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 3, REFINED_STONE: 2, ROPE: 2 } },
     STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 3, REFINED_STONE: 2, ROPE: 2 } },
-    REFINERY_KIT: { RESULT: 'REFINERY_KIT', AMOUNT: 1, CATEGORY: 'STATIONS', TIME: 15, INGREDIENTS: { REFINED_STONE: 4, REFINED_WOOD: 2 } },
+    PIECE_REFINERY: { RESULT: 'REFINERY_KIT', AMOUNT: 1, CATEGORY: 'STATIONS', TIME: 15, INGREDIENTS: { REFINED_STONE: 4, REFINED_WOOD: 2 } },
     // Mesa de refinería.
     REFINED_LEATHER: { RESULT: 'REFINED_LEATHER', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { LEATHER: 1 } },
     WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 2, WOOD: 1 } },
@@ -397,16 +476,52 @@ export const GameConfig = deepFreeze({
     LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 10, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 2 } },
     LEATHER_SHOES: { RESULT: 'LEATHER_SHOES', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 2 } },
     LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 5, STATION: 'REFINERY', INGREDIENTS: { REFINED_LEATHER: 1 } },
+    // Armas y antorchas (en el reloj).
+    STONE_SWORD: { RESULT: 'STONE_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 12, INGREDIENTS: { REFINED_WOOD: 2, REFINED_STONE: 4, ROPE: 1 } },
+    SLINGSHOT: { RESULT: 'SLINGSHOT', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 10, INGREDIENTS: { REFINED_WOOD: 4, ROPE: 2 } },
+    BOW: { RESULT: 'BOW', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 6, ROPE: 4 } },
+    ARROW: { RESULT: 'ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, INGREDIENTS: { WOOD: 3, STONE: 1, SPIDER_SILK: 3 } },
+    TORCH: { RESULT: 'TORCH', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 2, INGREDIENTS: { WOOD: 1, COAL: 1 } },
+    // Horno: el carbón es el combustible.
+    REFINED_COPPER: { RESULT: 'REFINED_COPPER', AMOUNT: 2, CATEGORY: 'MATERIALS', TIME: 10, STATION: 'FURNACE', INGREDIENTS: { COPPER_ORE: 2, COAL: 1 } },
+    REFINED_IRON: { RESULT: 'REFINED_IRON', AMOUNT: 2, CATEGORY: 'MATERIALS', TIME: 12, STATION: 'FURNACE', INGREDIENTS: { IRON_ORE: 2, COAL: 1 } },
+    REFINED_DIAMOND: { RESULT: 'REFINED_DIAMOND', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 15, STATION: 'FURNACE', INGREDIENTS: { DIAMOND_ORE: 1, COAL: 1 } },
+    GLASS: { RESULT: 'GLASS', AMOUNT: 4, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'FURNACE', INGREDIENTS: { SAND: 4, COAL: 1 } },
+    // Mesa de elaboración.
+    NAV_PLATE: { RESULT: 'NAV_PLATE', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 30, STATION: 'WORKBENCH', INGREDIENTS: { GLASS: 20, REFINED_IRON: 5, REFINED_COPPER: 5 } },
+    COPPER_SWORD: { RESULT: 'COPPER_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 15, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_COPPER: 2 } },
+    IRON_SWORD: { RESULT: 'IRON_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 18, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 2 } },
+    COPPER_SHIELD: { RESULT: 'COPPER_SHIELD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 4, REFINED_COPPER: 1 } },
+    IRON_SHIELD: { RESULT: 'IRON_SHIELD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 15, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 4, REFINED_IRON: 1 } },
+    COPPER_ARROW: { RESULT: 'COPPER_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, REFINED_COPPER: 1, SPIDER_SILK: 3 } },
+    IRON_ARROW: { RESULT: 'IRON_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, REFINED_IRON: 1, SPIDER_SILK: 3 } },
+    COPPER_HELMET: { RESULT: 'COPPER_HELMET', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 10, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_COPPER: 2 } },
+    COPPER_GLOVES: { RESULT: 'COPPER_GLOVES', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 6, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_COPPER: 1 } },
+    COPPER_BOOTS: { RESULT: 'COPPER_BOOTS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 10, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_COPPER: 2 } },
+    COPPER_LEGS: { RESULT: 'COPPER_LEGS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 14, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_COPPER: 4 } },
+    COPPER_CHEST: { RESULT: 'COPPER_CHEST', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 18, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_COPPER: 5 } },
+    CHAIN_HELMET: { RESULT: 'CHAIN_HELMET', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 2 } },
+    CHAIN_GLOVES: { RESULT: 'CHAIN_GLOVES', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 8, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 1 } },
+    CHAIN_BOOTS: { RESULT: 'CHAIN_BOOTS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 2 } },
+    CHAIN_LEGS: { RESULT: 'CHAIN_LEGS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 16, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 4 } },
+    CHAIN_CHEST: { RESULT: 'CHAIN_CHEST', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 20, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 5 } },
+    // Piezas de construcción (estaciones incluidas).
+    ...PIECE_RECIPES,
   },
   // Estaciones de fabricación (piezas construidas que se usan con E).
   STATIONS: {
     REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️' },
+    FURNACE: { NAME: 'Horno', ICON: '🔥' },
+    WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰' },
   },
   RECIPE_CATEGORIES: {
     MATERIALS: 'Materiales',
     STATIONS: 'Estaciones',
+    CONSTRUCTION: 'Construcción',
     TOOLS: 'Herramientas',
+    WEAPONS: 'Armas',
     CLOTHING: 'Ropa',
+    ARMOR: 'Armaduras',
     SURVIVAL: 'Supervivencia',
   },
 
@@ -421,25 +536,14 @@ export const GameConfig = deepFreeze({
     RANGE: 7,               // m máximos desde el jugador
     REFUND: 1,              // fracción de materiales devuelta al quitar una pieza
     BREAK_TIME: 3,          // s de golpes (manteniendo el clic) para romper una pieza fuera del modo construcción; un hacha o un pico lo reducen a la mitad
-    PIECES: {
-      FOUNDATION: { NAME: 'Cimiento', ICON: '🪨', COST: { STONE: 4 } },
-      FLOOR: { NAME: 'Suelo', ICON: '🟫', COST: { WOOD: 2 } },
-      WALL: { NAME: 'Pared', ICON: '🧱', COST: { WOOD: 3 } },
-      DOOR: { NAME: 'Puerta', ICON: '🚪', COST: { WOOD: 4 } },
-      WINDOW: { NAME: 'Ventana', ICON: '🪟', COST: { WOOD: 3 } },
-      FENCE: { NAME: 'Valla', ICON: '🚧', COST: { WOOD: 1 } },
-      PILLAR: { NAME: 'Pilar', ICON: '🏛️', COST: { WOOD: 1 } },
-      STAIRS: { NAME: 'Escalera', ICON: '🪜', COST: { WOOD: 4 } },
-      ROOF: { NAME: 'Tejado', ICON: '🔺', COST: { WOOD: 3 } },
-      BED: { NAME: 'Cama', ICON: '🛏️', COST: { WOOL: 3, WOOD: 3 } },
-      // Se fabrica en el menú (Tab) y se coloca usándola; al quitarla vuelve al inventario.
-      REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️', COST: { REFINERY_KIT: 1 } },
-      // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
-      CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', COST: { STONE: 4, MINERAL: 3 }, BODIES: 'MOON' },
-      OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', COST: { STONE: 4, MINERAL: 4 }, BODIES: 'MOON' },
-    },
+    // Coste de cada pieza = su objeto (ver BUILD_PIECES arriba).
+    PIECES: Object.fromEntries(Object.entries(BUILD_PIECES).map(([type, d]) => [
+      type, { NAME: d.NAME, ICON: d.ICON, COST: { [pieceItemId(type)]: 1 }, ...(d.BODIES ? { BODIES: d.BODIES } : {}) },
+    ])),
     // Piezas que no se pueden hacer en las lunas (BODIES: 'HOME').
-    HOME_ONLY: ['FENCE', 'BED'],
+    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY'],
+    CHEST_SLOTS: 27,
+    TORCH_LIGHTS: 6,        // antorchas clavadas que iluminan a la vez (las más cercanas)
   },
 
   // Soporte vital (Etapa 4): aire, traje espacial y burbujas de oxígeno.
@@ -742,6 +846,7 @@ export const GameConfig = deepFreeze({
     ROCK: 0x8d8b88,
     BUSH: 0x4d8a3c,
     MINERAL: 0x5fd8ff,
+    SAND: 0xe2cf96,
     GRASS: 0x7fb050,
     GRASS_TIP: 0xb9cf6a,
     COLOR_JITTER: 0.12,

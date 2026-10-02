@@ -74,8 +74,27 @@ export const SHAPES = {
   },
   // Mesa de refinería: estación de fabricación (E abre sus recetas).
   REFINERY: {
-    slot: 'FREE', half: [0.9, 0.5], top: 1.0, interact: 'REFINERY',
+    slot: 'FREE', half: [0.9, 0.5], top: 1.0, interact: 'CRAFT', station: 'REFINERY',
     colliders: [{ x0: -0.9, x1: 0.9, z0: -0.5, z1: 0.5, y0: 0, y1: 1.0 }], surfaces: [],
+  },
+  // Horno y mesa de elaboración: más estaciones de fabricación.
+  FURNACE: {
+    slot: 'FREE', half: [0.7, 0.7], top: 1.7, interact: 'CRAFT', station: 'FURNACE',
+    colliders: [{ x0: -0.7, x1: 0.7, z0: -0.7, z1: 0.7, y0: 0, y1: 1.7 }], surfaces: [],
+  },
+  WORKBENCH: {
+    slot: 'FREE', half: [0.95, 0.55], top: 1.0, interact: 'CRAFT', station: 'WORKBENCH',
+    colliders: [{ x0: -0.95, x1: 0.95, z0: -0.55, z1: 0.55, y0: 0, y1: 1.0 }], surfaces: [],
+  },
+  // Cofre: guarda objetos (E para abrirlo).
+  CHEST: {
+    slot: 'FREE', half: [0.5, 0.35], top: 0.7, interact: 'STORAGE',
+    colliders: [{ x0: -0.5, x1: 0.5, z0: -0.35, z1: 0.35, y0: 0, y1: 0.7 }], surfaces: [{ kind: 'flat', y: 0.7, bottom: 0 }],
+  },
+  // Antorcha clavada en el suelo: ilumina (no estorba el paso).
+  TORCH: {
+    slot: 'FREE', half: [0.12, 0.12], top: 1.1,
+    colliders: [], surfaces: [],
   },
   // Lunas: estación de carga (baterías plank) y de oxígeno (traje). StationSystem las hace funcionar.
   CHARGING_STATION: {

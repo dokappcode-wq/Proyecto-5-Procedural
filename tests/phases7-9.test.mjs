@@ -135,7 +135,7 @@ test('todas las recetas producen objetos definidos con ingredientes definidos', 
 
 test('ropa: cinco ranuras, sale del inventario al ponérsela y abriga sumando', () => {
   const w = world();
-  assert.deepEqual(Object.keys(w.equipment.slots), ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HANDS']);
+  assert.deepEqual(Object.keys(w.equipment.slots), ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HANDS', 'OFFHAND']);
   assert.equal(w.equipment.getColdLossMultiplier(), 1);
   assert.ok(!w.equipment.wear('LEATHER_SHIRT'), 'no se pone sin tenerla');
   for (const id of ['LEATHER_CAP', 'LEATHER_SHIRT', 'LEATHER_PANTS', 'LEATHER_SHOES', 'LEATHER_GLOVES']) {
@@ -143,7 +143,7 @@ test('ropa: cinco ranuras, sale del inventario al ponérsela y abriga sumando', 
     assert.ok(w.itemUse.use(id));
     assert.equal(w.inventory.getItemCount(id), 0, `${id}: puesto, ya no ocupa hueco`);
   }
-  assert.deepEqual(w.equipment.slots, { HEAD: 'LEATHER_CAP', CHEST: 'LEATHER_SHIRT', LEGS: 'LEATHER_PANTS', FEET: 'LEATHER_SHOES', HANDS: 'LEATHER_GLOVES' });
+  assert.deepEqual(w.equipment.slots, { HEAD: 'LEATHER_CAP', CHEST: 'LEATHER_SHIRT', LEGS: 'LEATHER_PANTS', FEET: 'LEATHER_SHOES', HANDS: 'LEATHER_GLOVES', OFFHAND: null });
   assert.ok(Math.abs(w.equipment.getColdLossMultiplier() - 0.7) < 1e-9, 'el conjunto entero abriga un 30 %');
   // Usarla otra vez la quita (vuelve al inventario).
   w.itemUse.use('LEATHER_CAP');

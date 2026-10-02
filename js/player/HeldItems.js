@@ -166,7 +166,7 @@ export class HeldItems {
     a.rotation.set(sx * 1.0 + aim * 0.1, -aim * 0.25, 0);
 
     const l = this._leftPivot;
-    l.position.set(-0.32 + bx + block * 0.2 + aim * 0.26, -0.3 + by + block * 0.14 + aim * 0.22, -0.5 + block * 0.06);
+    l.position.set(-0.36 + bx + block * 0.2 + aim * 0.26, -0.34 + by + block * 0.16 + aim * 0.22, -0.55 + block * 0.08);
     l.rotation.set(block * 0.1, block * 0.3, 0);
 
     // Arco: la cuerda se tensa al apuntar.
@@ -207,7 +207,10 @@ function placeModel(m, where) {
     // Vista en 1ª persona: el mango sale de la mano hacia arriba, inclinado hacia dentro y adelante.
     g.scale.setScalar(0.62);
     if (m.kind === 'bow') {
-      g.rotation.set(0, Math.PI / 2, 0.15);
+      // Arco vertical, casi de canto (se ve la curva), a la izquierda de la mano.
+      g.scale.setScalar(0.5);
+      g.rotation.set(0, 0.45, 0.12);
+      g.position.set(-0.12, 0.08, -0.05);
     } else if (m.kind === 'slingshot') {
       g.rotation.set(-0.25, 0, 0.1);
     } else if (m.kind === 'torch') {
@@ -216,7 +219,8 @@ function placeModel(m, where) {
       g.rotation.set(-0.42, 0.3, 0.32);
     }
   } else if (where === 'left1') {
-    g.scale.setScalar(0.7);
-    g.rotation.set(0, 0.25, 0);
+    g.scale.setScalar(0.45);
+    g.rotation.set(0, 0.35, 0);
+    g.position.set(-0.05, -0.04, 0);
   }
 }

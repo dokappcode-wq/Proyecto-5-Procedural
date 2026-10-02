@@ -121,7 +121,7 @@ test('un traspaso manipulado no mete objetos ni tecnologías que no existen', ()
   const b = fakeGame();
   applyState(takeHandoff('kappa', store), { items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, ...b });
   assert.deepEqual(b.inventory.getAll().map((i) => [i.id, i.count]), [['MINERAL', 100], ['LEATHER_CAP', 1]], 'como mucho una pila por hueco');
-  assert.deepEqual(b.equipment.slots, { HEAD: null, CHEST: null, LEGS: null, FEET: 'LEATHER_SHOES', HANDS: null }, 'solo prendas en su ranura');
+  assert.deepEqual(b.equipment.slots, { HEAD: null, CHEST: null, LEGS: null, FEET: 'LEATHER_SHOES', HANDS: null, OFFHAND: null }, 'solo prendas en su ranura');
   assert.notEqual(b.ship.installed.CONTROL_2, 'ARMA_SECRETA');
   assert.equal(b.ship.installed.NO_SLOT, undefined);
   assert.deepEqual(b.ship.batteries.slots.map((x) => x && x.charge), [100, 0, 100, null]);

@@ -21,6 +21,7 @@ export class EquipmentSystem {
     this._events = events;
     this.slotDefs = config.SLOTS;
     this.slots = Object.fromEntries(Object.keys(config.SLOTS).map((k) => [k, null]));
+    this.dur = {}; // aguante de lo que se lleva puesto (escudos: golpes que paran)
     inventory.attachEquipment?.(this);
   }
 
@@ -44,9 +45,12 @@ export class EquipmentSystem {
     const slot = this._items[itemId]?.SLOT;
     if (!slot || !this.canWear(slot, itemId) || !this._inventory.hasItem(itemId)) return false;
     const old = this.slots[slot];
-    this._inventory.removeItem(itemId, 1);
-    this._set(slot, itemId);
-    if (old) this._inventory.addItem(old, 1);
+    const oldDur = this.dur[slot];
+    // Del hueco concreto (conserva el aguante); si no, por tipo.
+    const i = this._inventory.slots.findIndex((st) => st?.id === itemId);
+    const got = i >= 0 ? this._inventory.takeFromSlot(i, 1) : (this._inventory.removeItem(itemId, 1), null);
+    this._set(slot, itemId, got?.dur);
+    if (old) this._inventory.addItem(old, 1, { dur: oldDur });
     return true;
   }
 
@@ -58,8 +62,9 @@ export class EquipmentSystem {
       this._events.emit(GameEvents.UI_MESSAGE, { text: 'No te cabe en el inventario: haz hueco primero.', type: 'info' });
       return false;
     }
+    const dur = this.dur[slot];
     this._set(slot, null);
-    this._inventory.addItem(id, 1);
+    this._inventory.addItem(id, 1, { dur });
     return true;
   }
 
@@ -75,14 +80,31 @@ export class EquipmentSystem {
   }
 
   /** Ponerse algo directamente (al llegar por el hiperespacio). */
-  equipDirect(slot, itemId) {
+  equipDirect(slot, itemId, dur) {
     if (itemId === null && Object.prototype.hasOwnProperty.call(this.slots, slot)) {
       this._set(slot, null);
       return true;
     }
     if (!this.canWear(slot, itemId)) return false;
-    this._set(slot, itemId);
+    this._set(slot, itemId, dur);
     return true;
+  }
+
+  /**
+   * Gasta aguante de lo puesto en una ranura (el escudo al parar un golpe). Al llegar a 0
+   * se rompe: TOOL_BROKEN. @returns {boolean} si sigue entero
+   */
+  wearSlot(slot, amount = 1) {
+    const id = this.slots[slot];
+    if (!id || this.dur[slot] == null) return !!id;
+    this.dur[slot] -= amount;
+    if (this.dur[slot] > 0) {
+      this._events.emit(GameEvents.EQUIPMENT_CHANGED, { slot, itemId: id, slots: { ...this.slots } });
+      return true;
+    }
+    this._set(slot, null);
+    this._events.emit(GameEvents.TOOL_BROKEN, { itemId: id });
+    return false;
   }
 
   /** Protección total contra el frío (0..1). */
@@ -109,7 +131,10 @@ export class EquipmentSystem {
     return 1 - this.coldProtection;
   }
 
-  _set(slot, itemId) {
+  _set(slot, itemId, dur) {
+    const max = itemId ? this._items[itemId]?.DURABILITY : null;
+    if (itemId && max) this.dur[slot] = Number.isFinite(dur) ? Math.max(1, Math.min(max, dur)) : max;
+    else delete this.dur[slot];
     if (this.slots[slot] === itemId) return;
     this.slots[slot] = itemId;
     this._events.emit(GameEvents.EQUIPMENT_CHANGED, { slot, itemId, slots: { ...this.slots } });

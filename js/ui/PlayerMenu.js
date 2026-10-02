@@ -22,7 +22,7 @@ import { durabilityBar } from './UIManager.js';
  * Solo vista: inventario, ropa y fabricación viven en sus sistemas. Todo el
  * texto se pinta con textContent.
  */
-export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTING', STATION: 'STATION' });
+export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTING', STATION: 'STATION', CHEST: 'CHEST' });
 const KEY_TAB = { Tab: MenuTab.CRAFTING, KeyI: MenuTab.INVENTORY };
 
 export class PlayerMenu extends ModalPanel {
@@ -119,6 +119,9 @@ export class PlayerMenu extends ModalPanel {
 
   setOpen(open) {
     if (!open) {
+      this._closePlaceMenu();
+      this._closeChest();
+      if (this.tab === MenuTab.CHEST) this.tab = MenuTab.INVENTORY;
       this._inv.returnCursor();
       this.station = null;
       this._tabButtons.STATION.classList.add('hidden');
@@ -136,9 +139,12 @@ export class PlayerMenu extends ModalPanel {
       if (this.isOpen) this._noWatch();
       return;
     }
+    if (tab === MenuTab.CHEST && !this._inv.container) return;
     if (tab !== this.tab) this._inv.returnCursor();
+    if (tab !== MenuTab.CHEST && this.tab === MenuTab.CHEST) this._closeChest();
     this.tab = tab;
-    const crafting = tab !== MenuTab.INVENTORY;
+    const crafting = tab !== MenuTab.INVENTORY && tab !== MenuTab.CHEST;
+    this._chestSection.classList.toggle('hidden', tab !== MenuTab.CHEST);
     for (const [t, b] of Object.entries(this._tabButtons)) b.classList.toggle('active', t === tab);
     this._invSection.classList.toggle('hidden', crafting);
     this._craftSection.classList.toggle('hidden', !crafting);
@@ -154,13 +160,14 @@ export class PlayerMenu extends ModalPanel {
     // Pestañas.
     const tabs = el('nav', 'pm-tabs');
     this._tabButtons = {};
-    for (const [tab, label] of [[MenuTab.INVENTORY, 'Inventario'], [MenuTab.CRAFTING, 'Fabricación'], [MenuTab.STATION, 'Estación']]) {
+    for (const [tab, label] of [[MenuTab.INVENTORY, 'Inventario'], [MenuTab.CRAFTING, 'Fabricación'], [MenuTab.STATION, 'Estación'], [MenuTab.CHEST, 'Cofre']]) {
       const b = button(label, 'pm-tab');
       b.addEventListener('click', () => this.setTab(tab));
       this._tabButtons[tab] = b;
       tabs.append(b);
     }
     this._tabButtons.STATION.classList.add('hidden');
+    this._tabButtons.CHEST.classList.add('hidden');
     const close = button('✕', 'pm-close');
     close.setAttribute('aria-label', 'Cerrar');
     close.addEventListener('click', () => this.setOpen(false));
@@ -225,6 +232,17 @@ export class PlayerMenu extends ModalPanel {
     drop.addEventListener('contextmenu', (e) => e.preventDefault());
     this._invSection.append(el('h3', 'pm-sub', 'Mochila'), grid, el('h3', 'pm-sub', 'Barra rápida · 1–9'), bar, drop);
 
+    // Cofre abierto: sus huecos ('c:N') encima de la mochila.
+    this._chestSection = el('section', 'pm-chest hidden');
+    const cgrid = el('div', 'pm-grid pm-bag');
+    this._chestSlots = [];
+    for (let i = 0; i < 27; i++) {
+      const s = this._slotEl(`c:${i}`);
+      this._chestSlots.push(s);
+      cgrid.append(s);
+    }
+    this._chestSection.append(el('h3', 'pm-sub', 'Cofre · Shift+clic mueve entre el cofre y tu inventario'), cgrid);
+
     // Fabricación: rejilla de recetas.
     this._craftSection = el('section', 'pm-crafting');
     this._recipeGrid = el('div', 'pm-grid pm-recipes');
@@ -235,7 +253,7 @@ export class PlayerMenu extends ModalPanel {
     // Detalle (objeto señalado o receta seleccionada).
     this._detail = el('div', 'pm-detail');
 
-    main.append(tabs, this._toolbar, this._invSection, this._craftSection, this._detail);
+    main.append(tabs, this._toolbar, this._chestSection, this._invSection, this._craftSection, this._detail);
 
     // Columna "TÚ".
     const you = el('aside', 'pm-you');
@@ -290,6 +308,12 @@ export class PlayerMenu extends ModalPanel {
     s.append(el('span', 'icon'), el('span', 'count'));
     s.addEventListener('mousedown', (e) => {
       e.preventDefault();
+      // Una pieza de construcción en la mochila: ¿colocarla o moverla?
+      const st = typeof ref === 'number' && ref >= this._inv.hotbarSize ? this._inv.slots[ref] : null;
+      if (st && e.button === 0 && !e.shiftKey && !this._inv.cursor && this._items[st.id]?.USE === 'BUILD') {
+        this._placeMenu(e, ref, st);
+        return;
+      }
       this._inv.click(ref, { button: e.button, shift: e.shiftKey });
     });
     s.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -304,6 +328,59 @@ export class PlayerMenu extends ModalPanel {
     return s;
   }
 
+  /** Menú pequeño junto al ratón: colocar la pieza o moverla. */
+  _placeMenu(e, ref, st) {
+    this._closePlaceMenu();
+    const m = el('div', 'pm-popup');
+    const def = this._items[st.id];
+    const place = button(`🔨 Colocar ${def.NAME.toLowerCase()}`, 'pm-popup-btn');
+    place.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this._closePlaceMenu();
+      this.setOpen(false);
+      this._events.emit(GameEvents.BUILD_PIECE_REQUEST, { pieceId: def.BUILD_PIECE });
+    });
+    const move = button('✋ Moverla', 'pm-popup-btn');
+    move.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this._closePlaceMenu();
+      this._inv.click(ref, { button: 0 });
+    });
+    m.append(place, move);
+    m.style.left = `${e.clientX + 6}px`;
+    m.style.top = `${e.clientY + 6}px`;
+    document.body.appendChild(m);
+    this._popup = m;
+    this._popupClose = (ev) => {
+      if (!m.contains(ev.target)) this._closePlaceMenu();
+    };
+    setTimeout(() => window.addEventListener('mousedown', this._popupClose, true), 0);
+  }
+
+  _closePlaceMenu() {
+    if (!this._popup) return;
+    this._popup.remove();
+    this._popup = null;
+    window.removeEventListener('mousedown', this._popupClose, true);
+  }
+
+  /** Abre el menú con un cofre: sus huecos y tu inventario. */
+  openChest(container) {
+    this._inv.attachContainer(container);
+    this._tabButtons.CHEST.classList.remove('hidden');
+    this.setTab(MenuTab.CHEST);
+    this.setOpen(true);
+  }
+
+  _closeChest() {
+    if (!this._inv.container) return;
+    this._inv.returnCursor();
+    this._inv.attachContainer(null);
+    this._tabButtons.CHEST.classList.add('hidden');
+  }
+
   // ---- Pintado ---------------------------------------------------------------------
 
   render() {
@@ -316,7 +393,8 @@ export class PlayerMenu extends ModalPanel {
       s.querySelector('.dur')?.remove();
       if (stack?.dur != null && def?.DURABILITY) s.append(durabilityBar(stack.dur / def.DURABILITY));
     };
-    if (this.tab === MenuTab.INVENTORY) {
+    if (this.tab === MenuTab.CHEST && inv.container) this._chestSlots.forEach((s, k) => paint(s, inv.container.slots[k]));
+    if (this.tab === MenuTab.INVENTORY || this.tab === MenuTab.CHEST) {
       this._mainSlots.forEach((s, k) => paint(s, inv.slots[inv.hotbarSize + k]));
       this._barSlots.forEach((s, i) => {
         paint(s, inv.slots[i]);
@@ -327,7 +405,7 @@ export class PlayerMenu extends ModalPanel {
     }
     for (const [slot, s] of Object.entries(this._gearSlots)) {
       const id = this._eq.slots[slot];
-      paint(s, id ? { id, count: 1 } : null);
+      paint(s, id ? { id, count: 1, dur: this._eq.dur?.[slot] } : null);
     }
     const c = inv.cursor;
     this._cursorEl.classList.toggle('hidden', !c);
@@ -420,7 +498,7 @@ export class PlayerMenu extends ModalPanel {
     d.replaceChildren();
     const stack = this._hover === null ? null : this._inv.getRef(this._hover);
     if (stack) return this._itemDetail(d, stack.id, stack.count, stack.dur);
-    if (typeof this._hover === 'string') {
+    if (typeof this._hover === 'string' && this._hover.startsWith('eq:')) {
       const slot = this._eq.slotDefs[this._hover.slice(3)];
       d.append(el('p', 'pm-hint', `Ranura de ropa: ${slot?.NAME.toLowerCase() ?? ''}. Coge una prenda con clic y déjala aquí (o Shift+clic sobre ella).`));
       return;
@@ -436,7 +514,10 @@ export class PlayerMenu extends ModalPanel {
     info.append(el('b', null, `${def.NAME}${count > 1 ? ` ×${count}` : ''}`));
     const parts = [];
     if (dur != null && def.DURABILITY) parts.push(`Aguante: ${dur}/${def.DURABILITY} golpes`);
-    if (def.SLOT) parts.push(`Se pone en: ${this._eq.slotDefs[def.SLOT]?.NAME.toLowerCase()} · abriga ${Math.round((def.COLD_PROTECTION ?? 0) * 100)} %`);
+    if (def.SLOT) parts.push(`Se pone en: ${this._eq.slotDefs[def.SLOT]?.NAME.toLowerCase()}${def.DEFENSE ? ` · defensa ${def.DEFENSE}` : ''}${def.COLD_PROTECTION ? ` · abriga ${Math.round(def.COLD_PROTECTION * 100)} %` : ''}`);
+    if (def.WEAPON) parts.push(`Daño ${def.WEAPON.DAMAGE}`);
+    if (def.AMMO) parts.push(`Munición · daño ${def.AMMO.DAMAGE}`);
+    if (def.USE === 'BUILD' && !def.HOLD) parts.push('Selecciónala en la barra para colocarla · en la mochila, clic → Colocar');
     if (def.DESC) parts.push(def.DESC);
     if (parts.length) info.append(el('span', null, parts.join(' · ')));
     d.append(info);

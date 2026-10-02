@@ -73,6 +73,7 @@ import { CrashSite } from './world/CrashSite.js';
 import { TitleScene } from './ui/TitleScene.js';
 import { SaveGame, saveDateText } from './core/SaveGame.js';
 import { HeldItems } from './player/HeldItems.js';
+import { CombatSystem } from './combat/CombatSystem.js';
 import { BubbleSystem } from './world/BubbleSystem.js';
 import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
@@ -350,9 +351,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const chopEffects = new ChopEffects({ scene: render.scene, events, worlds });
   // Lo que se lleva en la mano: en 3ª persona en el personaje; en 1ª, la mano en pantalla.
   const held = new HeldItems({ player, camera: render.camera, render, items: cfg.ITEMS, lighting });
-  events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => held.setHeld(selectedId ?? null, null));
+  events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => held.setHeld(selectedId ?? null, equipment.slots.OFFHAND ?? null));
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && kind !== 'place' && held.playAction(kind === 'chop' ? 0.42 : 0.3));
-  events.on(GameEvents.EQUIPMENT_CHANGED, () => held.setHandColor(player.model.handColor));
+  events.on(GameEvents.EQUIPMENT_CHANGED, () => {
+    held.setHandColor(player.model.handColor);
+    held.setHeld(hotbar.selectedId ?? null, equipment.slots.OFFHAND ?? null);
+  });
+  events.on(GameEvents.PLAYER_BLOCKED, () => message('🛡️ ¡Bloqueado!', 'info'));
   // Tirar objetos: caen al suelo en una bolsa delante del jugador (E para recogerlos).
   // También lo que no cabe en el inventario (lleno) se queda en el suelo así.
   const dropItems = (itemId, amount, dur) => {
@@ -381,6 +386,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     canWork: () => energy.canWork, // sin energía no se golpea
     wearTool: () => hotbar.selectedIndex !== null && inventory.wearSlot(hotbar.selectedIndex, 1), // aguante de la herramienta
     power: () => progression.damageMultiplier, // nivel: más daño y más rapidez al talar/picar/romper
+    weapon: () => cfg.ITEMS[hotbar.selectedId]?.WEAPON ?? null, // espada seleccionada: su daño
+    suppressAttack: () => combat.suppressAttack, // bloqueando o con arco/tirachinas el clic no golpea
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -408,6 +415,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     const attack = d.fromX !== undefined || d.attack;
     if (!attack) return d.amount;
     if (player.state.dodging > 0) return 0;
+    if (combat.blockHit(d)) return 0; // el escudo lo para (de frente)
     return d.amount * (1 - equipment.damageReduction);
   };
   events.on(GameEvents.RESOURCE_HARVESTED, ({ amount }) => progression.addXp(PG.XP.HARVEST * (amount ?? 1)));
@@ -440,11 +448,18 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     interaction,
     thirst,
     events,
+    capturesUse: () => combat.capturesUse, // con escudo o arma a distancia, el clic dcho es del combate
+  });
+  // Combate: escudo (bloquear) y armas a distancia (apuntar, tensar, disparar).
+  const combat = new CombatSystem({
+    input, items: cfg.ITEMS, inventory, hotbar, equipment, player, controller, camera: render.camera, cameraSystem: camera, held,
+    scene: render.scene, world, events, power: () => progression.damageMultiplier, creatures: interaction.creatures,
   });
   // En modo construcción el clic coloca/quita piezas: se pausan la barra de
   // objetos, "usar" y la interacción normal (recoger, golpear).
   events.on(GameEvents.BUILD_MODE_CHANGED, ({ active }) => {
-    hotbar.enabled = !active;
+    // Colocando una pieza de la barra, la barra sigue funcionando (cambiar de objeto sale).
+    hotbar.enabled = !active || construction.itemMode;
     itemUse.enabled = !active;
     interaction.enabled = !active;
     if (!active) interaction.resetTarget();
@@ -577,6 +592,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     input,
     canvas: render.domElement,
   });
+  ui._hasShield = () => !!equipment.slots.OFFHAND;
   const hudRoot = document.getElementById('hud');
   // Menú del reloj de pulsera: Tab = fabricación, I = inventario (mochila 9×3, barra, ropa) + "Tú".
   const playerMenu = new PlayerMenu({
@@ -606,10 +622,56 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Estaciones (mesa de refinería): E sobre ella abre su pestaña del menú.
   events.on(GameEvents.CRAFT_STATION_OPEN, ({ station }) => playerMenu.open('STATION', { station }));
   // Colocar una estación fabricada: modo construcción con esa pieza seleccionada.
-  events.on(GameEvents.BUILD_PIECE_REQUEST, ({ pieceId }) => {
-    if (!construction.active) construction.setActive(true);
-    construction.select(pieceId);
+  events.on(GameEvents.BUILD_PIECE_REQUEST, ({ pieceId }) => construction.startPlacing(pieceId));
+  // Seleccionar una pieza en la barra = colocarla (la antorcha no: en la mano ilumina; R la clava).
+  events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => {
+    const def = cfg.ITEMS[selectedId];
+    if (def?.USE === 'BUILD' && !def.HOLD) construction.startPlacing(def.BUILD_PIECE);
+    else if (construction.itemMode) construction.setActive(false);
   });
+  // Cofres: E abre su contenido junto al inventario. Al romperlos, lo que tenían cae en una bolsa.
+  events.on(GameEvents.CHEST_OPEN, ({ piece }) => playerMenu.openChest(piece.data));
+  events.on(GameEvents.STRUCTURE_REMOVED, ({ structure }) => {
+    for (const st of structure.data?.slots ?? []) {
+      if (st) pickups.drop(worlds.activeId, structure.x, structure.z, st.id, st.count, st.dur);
+    }
+  });
+  // Partida cargada: el contenido de los cofres se comprueba (solo objetos que existen).
+  events.on(GameEvents.STRUCTURE_RESTORED, ({ structure }) => {
+    if (structure.type !== 'CHEST') return;
+    const slots = Array.isArray(structure.data?.slots) ? structure.data.slots : [];
+    const n = cfg.BUILD.CHEST_SLOTS;
+    structure.data = {
+      slots: Array.from({ length: n }, (_, i) => {
+        const st = slots[i];
+        const count = Math.floor(st?.count);
+        if (!st || !Object.prototype.hasOwnProperty.call(cfg.ITEMS, st.id) || !(count > 0)) return null;
+        return { id: st.id, count: Math.min(count, inventory.stackLimit(st.id)), ...(Number.isFinite(st.dur) ? { dur: st.dur } : {}) };
+      }),
+    };
+  });
+  // Antorchas clavadas: las más cercanas al jugador iluminan (un número fijo de luces).
+  const torchLights = Array.from({ length: cfg.BUILD.TORCH_LIGHTS }, () => {
+    const l = new THREE.PointLight(0xffa24a, 0, 13, 1.6);
+    render.scene.add(l);
+    return l;
+  });
+  const torches = {
+    name: 'torchLights',
+    update: (dt, t) => {
+      const p = player.position;
+      const list = construction.pieces.filter((pc) => pc.type === 'TORCH')
+        .map((pc) => ({ pc, d: Math.hypot(pc.x - p.x, pc.z - p.z) }))
+        .filter((e) => e.d < 60).sort((a, b) => a.d - b.d);
+      torchLights.forEach((l, i) => {
+        const e = list[i];
+        l.visible = !!e;
+        if (!e) return;
+        l.position.set(e.pc.x, e.pc.y + 1.15, e.pc.z);
+        l.intensity = 2.2 * (0.88 + Math.sin(t * 13 + i) * 0.06 + Math.sin(t * 5.1 + i * 2) * 0.06);
+      });
+    },
+  };
   // Al abrirlo, el jugador se gira hacia donde miraba, levanta la muñeca para mirar
   // el reloj y la cámara se coloca delante de él (retrato, con el menú a la derecha).
   events.on(GameEvents.UI_PANEL_TOGGLED, ({ id, open }) => {
@@ -1274,11 +1336,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(eva);         // paseo espacial: mueve al jugador y coloca la cámara (sustituye a los dos anteriores)
   loop.add(hotbar);      // teclas 1–9
   loop.add(construction); // modo construcción: apuntar, vista previa, colocar/quitar
+  loop.add(combat);      // escudo y armas a distancia (antes que la interacción: decide si el clic golpea)
   loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
+  loop.add(torches);     // luz de las antorchas clavadas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante
   loop.add(shipBeacon);  // haz de luz sobre la nave hasta encontrarla
   if (titleScene) loop.add(titleScene); // menú de inicio: la cápsula en órbita
@@ -1339,7 +1403,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, get hasWatch() { return hasWatch; },
   };
 }
 

@@ -147,7 +147,7 @@ Claves (ruta: tipo — qué es):
 - planets[].biomes.mountain.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
 - planets[].flora: lista de hasta 24 — Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.
 - planets[].flora[]: objeto — Una planta o roca en una zona.
-- planets[].flora[].template: uno de: broadleaf_tree (Árbol de hoja ancha (da madera)), pine (Pino / conífera (da madera)), fruit_tree (Árbol frutal (da fruta comestible)), bush (Arbusto (decorativo)), rock (Roca (da piedra)), mineral_rock (Veta de mineral (da mineral)) (obligatorio) — Tipo de planta o roca.
+- planets[].flora[].template: uno de: broadleaf_tree (Árbol de hoja ancha (da madera)), pine (Pino / conífera (da madera)), fruit_tree (Árbol frutal (da fruta comestible)), bush (Arbusto (decorativo)), rock (Roca (da piedra)), mineral_rock (Veta de mineral (da mineral)), sand_pile (Montón de arena (da arena; mejor en la playa)) (obligatorio) — Tipo de planta o roca.
 - planets[].flora[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)), beach (playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)), river (riberas de los ríos (necesita terrain.params.rivers > 0)), mountain (montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)) (obligatorio) — Zona en la que crece.
 - planets[].flora[].density: número 0–0.4 (obligatorio) — Probabilidad por celda de 4×4 m (0.01 = disperso, 0.25 = bosque denso).
 - planets[].flora[].color: color "#rrggbb" — Color de las hojas (o de la roca / del mineral). Uno por tipo en todo el cuerpo.
@@ -273,7 +273,7 @@ Claves (ruta: tipo — qué es):
 - planets[].moons[].biomes.mountain.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
 - planets[].moons[].flora: lista de hasta 24 — Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.
 - planets[].moons[].flora[]: objeto — Una planta o roca en una zona.
-- planets[].moons[].flora[].template: uno de: broadleaf_tree (Árbol de hoja ancha (da madera)), pine (Pino / conífera (da madera)), fruit_tree (Árbol frutal (da fruta comestible)), bush (Arbusto (decorativo)), rock (Roca (da piedra)), mineral_rock (Veta de mineral (da mineral)) (obligatorio) — Tipo de planta o roca.
+- planets[].moons[].flora[].template: uno de: broadleaf_tree (Árbol de hoja ancha (da madera)), pine (Pino / conífera (da madera)), fruit_tree (Árbol frutal (da fruta comestible)), bush (Arbusto (decorativo)), rock (Roca (da piedra)), mineral_rock (Veta de mineral (da mineral)), sand_pile (Montón de arena (da arena; mejor en la playa)) (obligatorio) — Tipo de planta o roca.
 - planets[].moons[].flora[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)), beach (playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)), river (riberas de los ríos (necesita terrain.params.rivers > 0)), mountain (montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)) (obligatorio) — Zona en la que crece.
 - planets[].moons[].flora[].density: número 0–0.4 (obligatorio) — Probabilidad por celda de 4×4 m (0.01 = disperso, 0.25 = bosque denso).
 - planets[].moons[].flora[].color: color "#rrggbb" — Color de las hojas (o de la roca / del mineral). Uno por tipo en todo el cuerpo.

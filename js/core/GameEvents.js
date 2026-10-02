@@ -22,6 +22,9 @@ export const GameEvents = Object.freeze({
   PLAYER_DODGED: 'player:dodged',                  // { x, z } dirección
   GAME_SAVE_REQUEST: 'game:saveRequest',           // { reason, silent? }
   STRUCTURE_RESTORED: 'construction:restored',    // { structure } (al cargar partida)
+  CHEST_OPEN: 'construction:chestOpen',           // { piece }
+  PROJECTILE_HIT: 'combat:projectileHit',         // { x, y, z, target? }
+  PLAYER_BLOCKED: 'combat:blocked',               // { amount } golpe parado con el escudo
   GAME_SAVED: 'game:saved',                        // { reason, at }
   PLAYER_CLIMB_CHANGED: 'player:climbChanged',      // { climbing } escalando una pendiente
   PLAYER_LEVEL_UP: 'player:levelUp',              // { level, points }

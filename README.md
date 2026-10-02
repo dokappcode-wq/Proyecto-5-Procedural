@@ -261,6 +261,22 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Construcción por objetos**: cada pieza (suelo, pared, puerta, cofre, horno…) se fabrica en el reloj (`Tab`,
+  categoría Construcción o Estaciones). Seleccionada en la barra se coloca con clic (`Q` gira); en la mochila, clic sobre
+  ella → **🔨 Colocar**. Al romperla vuelve al inventario. `B` sigue abriendo el modo construcción con las piezas que lleves.
+- **Cofre** (6 maderas refinadas): `E` lo abre junto a tu inventario; Shift+clic mueve entre los dos. Si se rompe,
+  lo que tenía cae en una bolsa. Se guarda con la partida.
+- **Horno** (10 piedras refinadas + 2 maderas refinadas): con carbón funde cobre, hierro, diamante y arena (→ cristal).
+  **Mesa de elaboración** (5 hierro refinado + 5 cobre refinado): placa de navegación, espadas de cobre/hierro,
+  escudos, flechas de cobre/hierro y armaduras de cobre y de malla.
+- **Arena**: montones en la playa (`E`). Los minerales (cobre, hierro, carbón, diamante, flor luminosa) estarán en las cuevas
+  (siguiente fase); para probar el horno ya, usa Admin → Inventario.
+- **Armas**: espada básica (10), de cobre (12) y de hierro (15). **Tirachinas** (dispara piedras, 5 de daño) y **arco**
+  (daño de la flecha: 10 normal, 15 cobre, 20 hierro; `X` cambia de flecha). Clic derecho mantenido apunta (zoom en
+  1ª persona, cámara al hombro en 3ª), clic izquierdo mantenido tensa y al soltar dispara.
+- **Escudos** (ranura «Escudo» del reloj): con el escudo puesto, clic derecho mantenido bloquea los golpes de frente
+  (gasta aguante: cobre 50, hierro 100). Bloqueando no se ataca.
+- **Antorcha** (1 madera + 1 carbón): en la mano ilumina; `R` / clic derecho la clava en el suelo y sigue iluminando.
 - **Guardar partida**: en el reloj (`Tab` o `I`), columna «Tú», botón **💾 Guardar partida**. También se guarda sola
   cada 5 minutos (solo en tierra, en el planeta de inicio). En el menú de inicio aparece **▶ Continuar partida**.
   Se guarda: inventario, ropa, vida/hambre/sed/estamina, niveles, la hora, dónde estás, la nave, lo talado y recogido,
