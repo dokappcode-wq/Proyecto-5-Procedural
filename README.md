@@ -261,6 +261,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Menú de inicio**: la cápsula de salvamento flota en órbita sobre el planeta. «Entrar al mundo» la hace caer
+  (gira el escudo, reentrada con plasma y chispas, fogonazo) y el juego empieza junto a la **cápsula estrellada**
+  (volcada, humeando, con la compuerta arrancada). Al llegar por el hiperespacio no hay caída.
+- **El reloj de pulsera**: está en la compuerta de la cápsula (brilla, tiene un haz de luz y el letrero «⌚ TU RELOJ · E»).
+  Sin él `Tab` no abre la fabricación (la `I` sí abre la mochila). Con `E` se coge: aparece en la muñeca y ya se fabrica.
+- **La nave**: en un sitio al azar de lo alto de las **Montañas Heladas** (a 350–1300 m del inicio), sobre una explanada
+  nevada. Tras coger el reloj, un haz de luz blanco marca dónde está hasta que llegas a ella. Allí arriba hace mucho frío.
+- **Edén de 5 km** (antes 1 km) con tres biomas nuevos: **Playa** (franja de arena en la costa), **Río** (ríos de agua
+  dulce: se nada en ellos y se bebe con `E` o se llena el odre) y **Montaña** (montañas bajas sin nieve, con pinos y
+  rocas). En el JSON de un sistema son las zonas `beach`, `river` y `mountain`, que se activan con
+  `terrain.params.beaches`, `rivers` y `low_mountains` (0 = no existen; así los demás sistemas no cambian).
+  Admin → Biomas → «Ir a … más cercano» para visitarlos.
 - **Niveles**: recoger (1 XP por unidad), talar un árbol (12), romper una roca (12), recoger una telaraña (4),
   fabricar (según lo que tarda) y cazar (20) dan experiencia. Cada nivel da 1 punto: en el reloj (`Tab`), columna
   «Tú», pulsa **+** en Vida (+10), Estamina (+10), Daño (+8 % de daño y de rapidez al talar/picar) o Velocidad (+3 %).

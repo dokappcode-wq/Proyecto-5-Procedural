@@ -111,8 +111,9 @@ export class UIManager {
     }
     this.el.version.textContent = `${gameInfo.TITLE} · v${gameInfo.VERSION}`;
 
-    this.el.startButton.textContent = `Entrar ${withPrep('en', system.home.name)}`;
-    this.el.startButton.addEventListener('click', () => this._start());
+    this.el.startButton.textContent = 'Entrar al mundo';
+    this.el.startButton.addEventListener('click', () => this._requestStart());
+    this._startSequence = null; // (done) => void: animación antes de empezar (la caída de la cápsula)
     // Clic en el juego = recuperar el control del ratón.
     canvas.addEventListener('mousedown', () => {
       if (this._started && !this._adminPanelOpen && !this._craftingOpen && !this._openPanels.size) input.requestPointerLock();
@@ -514,6 +515,23 @@ export class UIManager {
     const f = this.el.damageFlash;
     f.classList.add('active');
     requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('active')));
+  }
+
+  /**
+   * Animación previa al juego (p. ej. la cápsula cayendo al planeta): recibe `done`
+   * y lo llama al terminar. Sin ella, "Entrar" empieza el juego directamente.
+   */
+  setStartSequence(fn) {
+    this._startSequence = fn;
+  }
+
+  _requestStart() {
+    if (this._started || this._launching) return;
+    if (!this._startSequence) return this._start();
+    this._launching = true;
+    this._input.requestPointerLock(); // dentro del clic (los navegadores lo exigen)
+    this.el.startScreen.classList.add('launching');
+    this._startSequence(() => this._start());
   }
 
   _start() {

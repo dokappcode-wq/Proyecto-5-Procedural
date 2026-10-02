@@ -5,6 +5,9 @@ export const BiomeId = Object.freeze({
   PLAINS: 'PLAINS',
   FOREST: 'FOREST',
   FROZEN_MOUNTAINS: 'FROZEN_MOUNTAINS',
+  BEACH: 'BEACH',
+  RIVER: 'RIVER',
+  MOUNTAINS: 'MOUNTAINS',
 });
 
 /**
@@ -16,7 +19,11 @@ export const BiomeId = Object.freeze({
  *
  *   - Montañas Heladas: siguen al relieve (factor montaña del terreno), de
  *     modo que el bioma coincide con las montañas reales.
- *   - Bosque / Explanada: se reparten con ruido de la sub-seed "biome".
+ *   - Montaña (baja, opcional): sigue a las montañas bajas del terreno.
+ *   - Playa (opcional): la franja de arena antes de la costa.
+ *   - Río (opcional): las riberas de los ríos.
+ *   - Bosque / Explanada: se reparten el resto con ruido de la sub-seed "biome".
+ *   Los biomas opcionales solo existen si el perfil los define.
  *
  * Los datos de cada bioma (nombre, temperatura, relieve, colores) están en
  * GameConfig.PLANETS.<planeta>.BIOMES. Añadir un bioma = añadir su definición
@@ -36,16 +43,31 @@ export class BiomeSystem {
 
   /**
    * @param {number} mountainFactor factor montaña del terreno (0..1)
-   * @param {object} out objeto a rellenar { PLAINS, FOREST, FROZEN_MOUNTAINS }
+   * @param {object} out objeto a rellenar { PLAINS, FOREST, FROZEN_MOUNTAINS, [BEACH, RIVER, MOUNTAINS] }
+   * @param {object} [extra] factores de las capas opcionales del terreno { hills, beach, river } (0..1)
    */
-  weightsAt(x, z, mountainFactor, out = {}) {
+  weightsAt(x, z, mountainFactor, out = {}, extra = null) {
     const d = this._dist;
+    const D = this._defs;
     const mountain = smoothstep(d.MOUNTAIN_BIOME_START, d.MOUNTAIN_BIOME_END, mountainFactor);
+    let rest = 1 - mountain;
+    if (D.MOUNTAINS) {
+      out.MOUNTAINS = smoothstep(0.2, 0.5, extra?.hills ?? 0) * rest;
+      rest -= out.MOUNTAINS;
+    }
+    if (D.BEACH) {
+      out.BEACH = (extra?.beach ?? 0) * rest;
+      rest -= out.BEACH;
+    }
+    if (D.RIVER) {
+      out.RIVER = (extra?.river ?? 0) * rest;
+      rest -= out.RIVER;
+    }
     const n = this._forestNoise.fbm(x, z, { frequency: d.FOREST_FREQUENCY, octaves: 3 });
-    const forest = smoothstep(d.FOREST_THRESHOLD - d.FOREST_BLEND, d.FOREST_THRESHOLD + d.FOREST_BLEND, n) * (1 - mountain);
+    const forest = smoothstep(d.FOREST_THRESHOLD - d.FOREST_BLEND, d.FOREST_THRESHOLD + d.FOREST_BLEND, n) * rest;
     out.FROZEN_MOUNTAINS = mountain;
     out.FOREST = forest;
-    out.PLAINS = Math.max(0, 1 - mountain - forest);
+    out.PLAINS = Math.max(0, rest - forest);
     return out;
   }
 

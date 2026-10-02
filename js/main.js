@@ -69,6 +69,8 @@ import { toWorld as toShipWorld } from './ship/ShipLayout.js';
 import { PickupSystem, findDropSite } from './world/PickupSystem.js';
 import { GiantWaveSystem } from './world/GiantWave.js';
 import { ChopEffects } from './world/ChopEffects.js';
+import { CrashSite } from './world/CrashSite.js';
+import { TitleScene } from './ui/TitleScene.js';
 import { BubbleSystem } from './world/BubbleSystem.js';
 import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
@@ -95,6 +97,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const HOME = system.homeId;
   const homeProfile = system.home.profile;
   const homeName = system.home.name;
+  // La campaña (el Edén): se empieza en una cápsula estrellada y la nave está en un monte helado.
+  const campaign = file === cfg.CAMPAIGN.SYSTEM_FILE;
 
   // ---- Infraestructura -----------------------------------------------------
   const render = new RenderContext({
@@ -116,6 +120,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
       // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
       landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
+      // Campaña: el inicio en cualquier punto del planeta y la nave en lo alto de las Montañas Heladas.
+      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE } : null,
     },
   });
   // Todos los sistemas consultan el cuerpo ACTIVO a través de este proxy.
@@ -135,7 +141,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // Estructuras en las que se camina y que bloquean: construcciones + nave.
   // (Se crean más abajo; estas funciones solo se llaman durante el bucle.)
-  const structureSources = () => [construction, ship];
+  const structureSources = () => (crashSite ? [construction, ship, crashSite] : [construction, ship]);
   const combinedStructures = {
     surfaceAt: (x, z, maxY) => {
       let best = null;
@@ -271,6 +277,26 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   ship.setBreathableProvider(() => worlds.profile()?.BREATHABLE !== false);
   // Objetos sueltos del mundo (nodo espacial, cofres…): se cogen con E.
   const pickups = new PickupSystem({ scene: render.scene, worlds, events, inventory, items: cfg.ITEMS });
+  // Reloj de pulsera (fabricación): en una partida nueva de la campaña está en la cápsula estrellada.
+  let hasWatch = handoff ? handoff.watch !== false : !campaign;
+  const crashSite = campaign
+    ? new CrashSite({
+      rootOf: (id) => worlds.rootOf(id),
+      bodyId: HOME,
+      activeBody: () => worlds.activeId,
+      withWatch: !hasWatch,
+      onTakeWatch: () => {
+        hasWatch = true;
+        player.model.setWatchVisible(true);
+        playerMenu.refreshWatch();
+        events.emit(GameEvents.PLAYER_ACTION, { kind: 'harvest' });
+        message('⌚ Reloj de pulsera recuperado: Tab = fabricar · I = mochila. Empieza por madera (golpea un tronco) y piedras sueltas (E).', 'pickup');
+        if (!shipFound) setTimeout(() => message(`📡 El reloj capta la señal de la nave: está en lo alto de las ${worlds.home.biomes.get('FROZEN_MOUNTAINS')?.NAME ?? 'montañas'}. Busca el haz de luz… y abrígate antes de subir: allí arriba se congela uno.`, 'warning'), 5000);
+      },
+    })
+    : null;
+  crashSite?.setPlayer(player);
+  events.on(GameEvents.WORLD_GENERATED, () => crashSite?.place(worlds.home));
   // Burbujas de oxígeno (lunas): con batería, dentro se respira.
   const bubbles = new BubbleSystem({
     scene: render.scene, worlds, events, inventory, player, config: cfg.LIFE_SUPPORT, batteries: cfg.SHIP.BATTERIES, blockers: [ship],
@@ -331,7 +357,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount, dur }) => dropItems(itemId, amount, dur));
   // Una herramienta gastada se rompe.
   events.on(GameEvents.TOOL_BROKEN, ({ itemId }) => message(`💥 Se ha roto: ${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'warning'));
-  const interactionProviders = [ship, pickups, bubbles];
+  const interactionProviders = [ship, pickups, bubbles, ...(crashSite ? [crashSite] : [])];
   const interaction = new InteractionSystem({
     config: cfg.INTERACTION,
     resourceTypes: cfg.RESOURCE_TYPES,
@@ -539,11 +565,14 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     container: hudRoot, input, events, inventory, equipment, crafting, hotbar, time,
     items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stations: cfg.STATIONS, stats: { health, hunger, thirst, energy },
     progression, statDefs: PG.STATS,
+    hasWatch: () => hasWatch,
     onDrop: (itemId, count, dur) => {
       dropItems(itemId, count, dur);
       message(`Tiras ${count > 1 ? `${count} × ` : ''}${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'info');
     },
   });
+  playerMenu.refreshWatch();
+  player.model.setWatchVisible(hasWatch);
   // Q: tirar una unidad del objeto seleccionado en la barra (en el modo construcción, Q gira la pieza).
   const dropKey = {
     name: 'dropKey',
@@ -568,7 +597,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.UI_PANEL_TOGGLED, ({ id, open }) => {
     if (id !== 'player-menu') return;
     if (open) player.bodyYaw = player.yaw;
-    player.model.setWristPose(open);
+    player.model.setWristPose(open && hasWatch);
     camera.setPortraitView(open);
   });
   new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
@@ -942,7 +971,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     warp.enter(`Hiperespacio · rumbo al ${entry.name}`, HS.JUMP_TIME, () => {
       saveHandoff(captureState({
         systemName: system.name, target: entry.file, campaignSeed,
-        inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression,
+        inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression, hasWatch,
       }));
       const seed = entry.file === cfg.CAMPAIGN.SYSTEM_FILE && campaignSeed !== null ? `&seed=${campaignSeed}` : '';
       window.location.assign(`${window.location.pathname}?system=${encodeURIComponent(entry.file)}${seed}`);
@@ -1018,6 +1047,61 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // herramientas Admin, que leen los biomas del mundo generado.
   world.generate(String(system.seed));
 
+  // ---- Menú de inicio: la cápsula en órbita y la caída al planeta ------------------
+  let titleScene = null;
+  if (!handoff) {
+    titleScene = new TitleScene({ render, textures: getPlanetTextures(HOME), seed: system.seed });
+    titleScene.start();
+    const target = document.getElementById('title-target');
+    if (target) target.textContent = `RUMBO: ${homeName.toUpperCase()}`;
+    const flash = document.getElementById('title-flash');
+    ui.setStartSequence((done) => {
+      titleScene.launch({
+        onFlash: () => flash?.classList.add('on'),
+        onImpact: () => {
+          titleScene.stop();
+          done();
+          setTimeout(() => {
+            flash?.classList.remove('on');
+            flash?.classList.add('off');
+          }, 300);
+          setTimeout(() => flash?.classList.remove('off'), 2800);
+        },
+      });
+    });
+  }
+  // Al empezar se mira hacia la cápsula estrellada.
+  events.on(GameEvents.GAME_STARTED, () => {
+    if (!crashSite?.group || worlds.activeId !== HOME || handoff) return;
+    player.yaw = player.bodyYaw = crashSite.spawnYaw;
+    player.pitch = -0.12;
+    if (!hasWatch) setTimeout(() => message('💥 La cápsula se ha estrellado. Tu reloj de pulsera ha quedado en la compuerta (el que brilla): cógelo con E. Sin él no puedes fabricar nada.', 'warning'), 1800);
+  });
+
+  // ---- Faro de la nave: un haz de luz en el monte helado hasta que se llega a ella ----
+  let shipFound = !campaign || !!handoff;
+  const shipBeam = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.2, 2.6, 260, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xdff2ff, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }),
+  );
+  shipBeam.name = 'ShipBeacon';
+  shipBeam.visible = false;
+  render.scene.add(shipBeam);
+  const shipBeacon = {
+    name: 'shipBeacon',
+    update: (dt, t) => {
+      const s = ship.ship;
+      if (!shipFound && ship.present && Math.hypot(player.position.x - s.x, player.position.z - s.z) < 22) {
+        shipFound = true;
+        message('🚀 ¡La nave! Sube por la rampa (E en el botón de la compuerta).', 'pickup');
+      }
+      shipBeam.visible = !shipFound && hasWatch && ship.present && worlds.activeId === HOME;
+      if (!shipBeam.visible) return;
+      shipBeam.position.set(s.x, s.y + 130, s.z);
+      shipBeam.material.opacity = 0.16 + Math.sin(t * 2) * 0.05;
+    },
+  };
+
   // Llegada desde el hiperespacio: se recupera la partida y la nave aparece en el espacio.
   if (handoff) {
     applyState(handoff, {
@@ -1091,6 +1175,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
+  if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante
+  loop.add(shipBeacon);  // haz de luz sobre la nave hasta encontrarla
+  if (titleScene) loop.add(titleScene); // menú de inicio: la cápsula en órbita
   loop.add(hunger);      // supervivencia: desgaste por tiempo y actividad
   loop.add(thirst);
   loop.add(energy);
@@ -1138,6 +1225,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
+    crashSite, titleScene, get hasWatch() { return hasWatch; },
   };
 }
 

@@ -129,7 +129,7 @@ export class InteractionSystem {
       this._events.emit(GameEvents.STRUCTURE_INTERACT, { structure: target.ref });
     } else if (target?.kind === 'water' && button === 'INTERACT') {
       this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'drink' });
-      this._events.emit(GameEvents.PLAYER_DRANK, { source: 'POND' });
+      this._events.emit(GameEvents.PLAYER_DRANK, { source: target.ref?.river ? 'RIVER' : 'POND' });
     } else if (target?.kind === 'animal' && button === 'ATTACK') {
       this._hit(target.ref);
     } else if (button === 'ATTACK') {
@@ -345,12 +345,23 @@ export class InteractionSystem {
         }
       }
     }
+    // Ríos: donde la mira corta el nivel del agua, si ahí hay agua dulce (el mar no se bebe).
+    const sea = this._world.seaLevel;
+    if (best?.kind !== 'water' && this._dir.y < -0.05 && typeof sea === 'number' && this._world.isFreshWaterAt) {
+      const t = (sea - this._origin.y) / this._dir.y;
+      const hx = this._origin.x + this._dir.x * t;
+      const hz = this._origin.z + this._dir.z * t;
+      if (t > 0 && t < bestT && Math.hypot(hx - p.x, hz - p.z) <= range + 1 && this._world.isFreshWaterAt(hx, hz)) {
+        best = { kind: 'water', id: 'river', ref: { level: sea, river: true } };
+        bestT = t;
+      }
+    }
     return best ? this._describe(best) : null;
   }
 
   /** Añade el texto que mostrará la UI: { label, action }. */
   _describe(t) {
-    if (t.kind === 'water') return { ...t, label: 'Agua', action: 'Beber', key: 'E' };
+    if (t.kind === 'water') return { ...t, label: t.ref.river ? 'Agua del río' : 'Agua', action: 'Beber', key: 'E' };
     if (t.kind === 'provided') return { ...t, label: t.ref.label, action: t.ref.action, key: t.ref.key ?? 'E' };
     if (t.kind === 'structure') {
       // Las piezas sin uso (paredes, suelos…) no muestran letrero: se rompen manteniendo el clic.

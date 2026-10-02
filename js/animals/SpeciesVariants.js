@@ -18,6 +18,9 @@ const BIOME_PREFERENCES = {
   low: { PLAINS: 1, FOREST: 0.3 },
   mid: { FOREST: 1, PLAINS: 0.3 },
   high: { FROZEN_MOUNTAINS: 1, FOREST: 0.3 },
+  beach: { BEACH: 1, PLAINS: 0.4 },
+  river: { RIVER: 1, PLAINS: 0.5, FOREST: 0.3 },
+  mountain: { MOUNTAINS: 1, FOREST: 0.3 },
 };
 
 /**

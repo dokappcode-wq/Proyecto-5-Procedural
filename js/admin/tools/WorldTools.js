@@ -54,10 +54,10 @@ export function registerWorldTools(admin, { world, player, controller }) {
   admin.registerTool({
     category: 'Biomas',
     type: 'info',
-    label: 'Pesos (Expl / Bosq / Mont)',
+    label: 'Pesos de bioma',
     read: () => {
       const w = at().biomeInfo.weights;
-      return [w.PLAINS, w.FOREST, w.FROZEN_MOUNTAINS].map((v) => v.toFixed(2)).join(' / ');
+      return Object.entries(w).filter(([, v]) => v > 0.005).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · ');
     },
   });
   admin.registerTool({
@@ -71,7 +71,7 @@ export function registerWorldTools(admin, { world, player, controller }) {
       category: 'Biomas',
       label: `Ir a ${world.biomes.get(id).NAME} más cercano`,
       run: () => {
-        const p = world.findNearestBiome(id, player.position.x, player.position.z);
+        const p = world.findNearestBiome(id, player.position.x, player.position.z, { maxRadius: world.worldSize, minWeight: 0.6 });
         if (!p) throw new Error('No se ha encontrado ese bioma en esta seed');
         controller.placeAt(p.x, p.z);
       },

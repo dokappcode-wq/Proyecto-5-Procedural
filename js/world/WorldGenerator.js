@@ -39,8 +39,13 @@ export class WorldGenerator {
    * @param {object} [p.landing] lugar de aterrizaje de la nave inicial:
    *   { DISTANCE: [min, max] m del spawn, CLEAR_RADIUS, HALF_WIDTH, HALF_LENGTH }
    */
-  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false, landing = null }) {
+  /**
+   * @param {object} [p.rules] reglas del planeta de inicio de la campaña:
+   *   { SPAWN_ANYWHERE: bool, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: [min, max] m del inicio }
+   */
+  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false, landing = null, rules = null }) {
     this.name = 'world';
+    this._rules = rules;
     this._landingCfg = landing;
     this._landing = null;
     this._cfg = config;
@@ -143,10 +148,19 @@ export class WorldGenerator {
     // activa la excavación (la caché de alturas está vacía, así que todo lo que
     // se genere a partir de aquí ya incluye las charcas).
     this._spawn = this._findSpawn();
+    // La nave: en un monte helado (campaña) sobre una explanada aplanada, o cerca del inicio.
+    this._landing = null;
+    if (this._landingCfg && this._rules?.LANDING_BIOME) {
+      this._landing = this._findBiomeLandingSite(this._landingCfg, this._rules);
+      if (this._landing) {
+        const L = this._landingCfg;
+        this.terrain.setPads([{ x: this._landing.x, z: this._landing.z, radius: Math.max(L.HALF_LENGTH, L.CLEAR_RADIUS) + 1, height: this._landing.height, blend: 12 }]);
+      }
+    }
     this.water.generate({ seed: this.seed.sub.resource, terrain: this.terrain, spawn: this._spawn, bounds: this.getBounds() });
     this.terrain.setWater(this.water);
     this._buildPonds();
-    this._landing = this._landingCfg ? this._findLandingSite(this._landingCfg) : null;
+    if (this._landingCfg && !this._landing) this._landing = this._findLandingSite(this._landingCfg);
     // Zonas sin árboles ni rocas: alrededor del inicio (SPAWN_CLEAR_RADIUS) y de la nave.
     const clearZones = this._landing ? [{ x: this._landing.x, z: this._landing.z, r: this._landingCfg.CLEAR_RADIUS }] : [];
 
@@ -312,6 +326,12 @@ export class WorldGenerator {
     return null;
   }
 
+  /** ¿Hay agua dulce (un río) en (x, z)? El mar no se bebe; los ríos y las charcas sí. */
+  isFreshWaterAt(x, z) {
+    if (this.water.isWater(x, z)) return true;
+    return !!this.terrain?.sample(x, z).fresh && this.getHeightAt(x, z) < this._cfg.SEA_LEVEL;
+  }
+
   /** Lado de la región (m). */
   get worldSize() {
     return this._cfg.WORLD_SIZE;
@@ -414,12 +434,22 @@ export class WorldGenerator {
     }
   }
 
-  /** Posición inicial determinista: terreno seco y llano en la Explanada. */
+  /**
+   * Posición inicial determinista: terreno seco y llano en la Explanada, cerca del
+   * centro (o, con SPAWN_ANYWHERE, cerca de un punto al azar de la región).
+   */
   _findSpawn() {
     const c = this._cfg;
     const minPlains = this._planet.BIOME_DISTRIBUTION.SPAWN_MIN_PLAINS;
-    const maxRadius = this.getBounds().maxX - 16;
     const rng = new SeededRandom(this.seed.sub.spawn);
+    let cx = 0;
+    let cz = 0;
+    if (this._rules?.SPAWN_ANYWHERE) {
+      const r = this.getBounds().maxX * 0.6;
+      cx = rng.range(-r, r);
+      cz = rng.range(-r, r);
+    }
+    const maxRadius = this.getBounds().maxX - 16 + Math.hypot(cx, cz);
     // Rondas con radio creciente: si cerca del centro no hay explanada, se busca más lejos.
     for (let radiusLimit = c.SPAWN_SEARCH_RADIUS; ; radiusLimit = Math.min(maxRadius, radiusLimit * 1.6)) {
       let best = null;
@@ -427,8 +457,10 @@ export class WorldGenerator {
       for (let i = 0; i < c.SPAWN_ATTEMPTS; i++) {
         const angle = rng.range(0, Math.PI * 2);
         const radius = Math.sqrt(rng.next()) * radiusLimit;
-        const x = Math.cos(angle) * radius;
-        const z = Math.sin(angle) * radius;
+        const x = cx + Math.cos(angle) * radius;
+        const z = cz + Math.sin(angle) * radius;
+        const b = this.getBounds();
+        if (x < b.minX + 16 || x > b.maxX - 16 || z < b.minZ + 16 || z > b.maxZ - 16) continue;
         const s = this.terrain.sample(x, z);
         if (s.height < c.SEA_LEVEL + c.SPAWN_MIN_HEIGHT_ABOVE_SEA || s.biomes.PLAINS < minPlains) continue;
         const slope = this._slopeAt(x, z);
@@ -489,6 +521,63 @@ export class WorldGenerator {
     }
     if (best) return { x: best.x, z: best.z, yaw: best.yaw };
     return { x: sp.x + 25, z: sp.z, yaw: Math.PI / 2 };
+  }
+
+  /**
+   * Lugar de la nave en un bioma concreto (el monte helado de la campaña): al azar
+   * por la región, en lo alto (sobre la línea de nieve), a LANDING_DISTANCE m del
+   * inicio y donde el terreno es menos irregular. Después se aplana (setPads).
+   * @returns {{x, z, yaw, height} | null}
+   */
+  _findBiomeLandingSite({ HALF_WIDTH, HALF_LENGTH }, { LANDING_BIOME, LANDING_DISTANCE = [300, 1500] }) {
+    const rng = new SeededRandom(deriveSeed(this.seed.sub.spawn, 'biomeLanding'));
+    const sp = this._spawn;
+    const b = this.getBounds();
+    const snow = this._planet.BIOMES[LANDING_BIOME]?.SNOW_START_HEIGHT ?? 0;
+    const reach = Math.max(HALF_WIDTH, HALF_LENGTH) + 4;
+    let best = null;
+    for (let i = 0; i < 4000; i++) {
+      const angle = rng.range(0, Math.PI * 2);
+      const radius = rng.range(LANDING_DISTANCE[0], LANDING_DISTANCE[1]);
+      const x = sp.x + Math.cos(angle) * radius;
+      const z = sp.z + Math.sin(angle) * radius;
+      const yaw = rng.range(0, Math.PI * 2);
+      if (x < b.minX + 60 || x > b.maxX - 60 || z < b.minZ + 60 || z > b.maxZ - 60) continue;
+      const s = this.terrain.sample(x, z);
+      if ((s.biomes[LANDING_BIOME] ?? 0) < 0.85 || s.height < snow + 6) continue;
+      let min = Infinity;
+      let max = -Infinity;
+      let sum = 0;
+      let n = 0;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2;
+        for (const r of [reach * 0.5, reach]) {
+          const h = this.terrain.heightAt(x + Math.cos(a) * r, z + Math.sin(a) * r);
+          min = Math.min(min, h);
+          max = Math.max(max, h);
+          sum += h;
+          n++;
+        }
+      }
+      const height = (sum / n + s.height) / 2;
+      // Que no quede en una repisa con la ladera encima: mejor en una loma o cima (se ve de lejos).
+      // Sin barrancos ni agua al lado: el terreno de alrededor tampoco cae en picado.
+      let above = 0;
+      let below = 0;
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        for (const r of [reach * 2.2, reach * 3.5]) {
+          const d = this.terrain.heightAt(x + Math.cos(a) * r, z + Math.sin(a) * r) - height;
+          above = Math.max(above, d);
+          below = Math.max(below, -d);
+        }
+      }
+      if (below > 14 || height - below < snow) continue;
+      const score = max - min + Math.max(0, above) * 0.8;
+      if (!best || score < best.score) best = { x, z, yaw, score, height };
+      if (best.score < 4 && i > 600) break;
+    }
+    return best ? { x: best.x, z: best.z, yaw: best.yaw, height: best.height } : null;
   }
 
   _slopeAt(x, z) {

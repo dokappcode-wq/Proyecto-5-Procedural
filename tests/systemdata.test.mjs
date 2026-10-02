@@ -11,6 +11,7 @@ import { SYSTEM_SCHEMA, toJsonSchema } from '../js/systemdata/Schema.js';
 import { LIMITS } from '../js/systemdata/Catalog.js';
 
 const EDEN_TEXT = fs.readFileSync(new URL('../systems/jardin-del-eden.system.json', import.meta.url), 'utf8');
+const EDEN_1KM_TEXT = fs.readFileSync(new URL('./fixtures/eden-1km.system.json', import.meta.url), 'utf8');
 const LEGACY = JSON.parse(fs.readFileSync(new URL('./fixtures/legacy-profiles.json', import.meta.url), 'utf8'));
 const LEGACY_ID = { P1: 'MUNDO_0', P1M1: 'MOON_A', P1M2: 'MOON_B' };
 
@@ -28,7 +29,8 @@ test('el Jardín del Edén se carga sin errores ni avisos', () => {
 });
 
 test('el Edén en JSON reproduce exactamente los perfiles del planeta y las lunas de antes', () => {
-  const { system } = loadSystem(EDEN_TEXT);
+  // El Edén de 1 km (sin ríos, playas ni montañas bajas) sigue compilando igual que los perfiles antiguos.
+  const { system } = loadSystem(EDEN_1KM_TEXT);
   for (const b of system.bodies) {
     const legacy = { ...LEGACY.PLANETS[LEGACY_ID[b.id]] };
     const compiled = JSON.parse(JSON.stringify(b.profile));

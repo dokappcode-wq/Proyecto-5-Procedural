@@ -62,8 +62,10 @@ export class PlayerModel {
     // Reloj de pulsera en la muñeca izquierda (Tab: la cámara se acerca a él).
     // La esfera mira a -Z local: al levantar el brazo hacia delante queda hacia arriba.
     const strap = mat(colors.WATCH ?? 0x2b3440);
-    part(strap, 0.185, 0.07, 0.205, 0, -0.5, 0, this.leftArm);
-    part(strap, 0.13, 0.1, 0.03, 0, -0.5, -0.11, this.leftArm);
+    this._watchParts = [
+      part(strap, 0.185, 0.07, 0.205, 0, -0.5, 0, this.leftArm),
+      part(strap, 0.13, 0.1, 0.03, 0, -0.5, -0.11, this.leftArm),
+    ];
     // Pantalla: textura de lienzo con la hora (setWatchText).
     this._watchCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
     this._watchColor = new THREE.Color(colors.WATCH_SCREEN ?? 0x4fe0ff);
@@ -80,6 +82,7 @@ export class PlayerModel {
     this.watch = part(this._watchScreenMat, 0.1, 0.075, 0.012, 0, -0.5, -0.127, this.leftArm);
     this.setWatchText('--:--');
     this.watch.castShadow = false;
+    this._watchParts.push(this.watch);
 
     // Hojas que tapan pecho y entrepierna (se empieza desnudo).
     const leafGeo = makeLeafGeometry();
@@ -168,6 +171,11 @@ export class PlayerModel {
   }
 
   /** Hora en la pantalla del reloj (solo se redibuja si cambia). */
+  /** El reloj solo se ve en la muñeca cuando se lleva (se coge en la cápsula). */
+  setWatchVisible(visible) {
+    for (const m of this._watchParts) m.visible = visible;
+  }
+
   setWatchText(text) {
     if (!this._watchCanvas || text === this._watchText) return;
     this._watchText = text;

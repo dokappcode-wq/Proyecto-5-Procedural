@@ -3,58 +3,227 @@
   "name": "Sistema del Edén",
   "description": "El sistema donde empieza todo: un planeta vivo y dos lunas de roca.",
   "author": "Mundo Cero",
-  "star": { "name": "Sol del Edén", "type": "yellow_dwarf" },
+  "star": {
+    "name": "Sol del Edén",
+    "type": "yellow_dwarf"
+  },
   "planets": [
     {
       "name": "El Jardín del Edén",
-      "description": "Una isla de 1 km rodeada de mar, con explanadas, bosques y montañas heladas.",
-      "size": "small",
+      "description": "Una isla de 5 km rodeada de mar, con playas, ríos, explanadas, bosques, montañas y montañas heladas.",
+      "size": "medium",
       "radius_km": 3200,
       "color": "#5d8fc4",
-      "physics": { "gravity": 1, "breathable": true },
-      "climate": { "temperature_c": 18 },
-      "water": { "sea": true, "ponds": 16, "sea_color": "#2d6f98", "pond_color": "#3a7fa8" },
+      "physics": {
+        "gravity": 1,
+        "breathable": true
+      },
+      "climate": {
+        "temperature_c": 18
+      },
+      "water": {
+        "sea": true,
+        "ponds": 40,
+        "sea_color": "#2d6f98",
+        "pond_color": "#3a7fa8"
+      },
       "terrain": {
         "generator": "island",
-        "params": { "relief": 1, "mountains": 1, "mountain_coverage": 0.5, "roughness": 1, "craters": 0 }
+        "params": {
+          "relief": 1,
+          "mountains": 1,
+          "mountain_coverage": 0.45,
+          "roughness": 1,
+          "craters": 0,
+          "rivers": 0.6,
+          "beaches": 0.6,
+          "low_mountains": 0.5
+        }
       },
-      "surface_colors": { "sand": "#dccb8e", "seabed": "#9c8f6a", "rock": "#8e8373" },
+      "surface_colors": {
+        "sand": "#dccb8e",
+        "seabed": "#9c8f6a",
+        "rock": "#8e8373"
+      },
       "biomes": {
         "low": {
-          "name": "Explanada", "temperature_c": 18, "grass": 520,
-          "colors": { "ground": "#86b85a", "ground_alt": "#a9c766", "accent": "#d9d27a" }
+          "name": "Explanada",
+          "temperature_c": 18,
+          "grass": 520,
+          "colors": {
+            "ground": "#86b85a",
+            "ground_alt": "#a9c766",
+            "accent": "#d9d27a"
+          }
         },
         "mid": {
-          "name": "Bosque", "temperature_c": 14, "grass": 220,
-          "colors": { "ground": "#4a7a35", "ground_alt": "#3a672f", "accent": "#5e6b33" }
+          "name": "Bosque",
+          "temperature_c": 14,
+          "grass": 220,
+          "colors": {
+            "ground": "#4a7a35",
+            "ground_alt": "#3a672f",
+            "accent": "#5e6b33"
+          }
         },
         "high": {
-          "name": "Montañas Heladas", "temperature_c": -4, "grass": 0, "snow_height": 24,
-          "colors": { "ground": "#6c737f", "ground_alt": "#5a616d", "snow": "#f1f5fa", "ice": "#b4dcf0" }
+          "name": "Montañas Heladas",
+          "temperature_c": -4,
+          "grass": 0,
+          "snow_height": 24,
+          "colors": {
+            "ground": "#6c737f",
+            "ground_alt": "#5a616d",
+            "snow": "#f1f5fa",
+            "ice": "#b4dcf0"
+          }
+        },
+        "beach": {
+          "name": "Playa",
+          "temperature_c": 20,
+          "grass": 25,
+          "colors": {
+            "ground": "#e2d29a",
+            "ground_alt": "#d3c086",
+            "accent": "#f3ead0"
+          }
+        },
+        "river": {
+          "name": "Río",
+          "temperature_c": 16,
+          "grass": 640,
+          "colors": {
+            "ground": "#5c9a44",
+            "ground_alt": "#4d8a3b",
+            "accent": "#8cbf63"
+          }
+        },
+        "mountain": {
+          "name": "Montaña",
+          "temperature_c": 7,
+          "grass": 140,
+          "colors": {
+            "ground": "#7e7767",
+            "ground_alt": "#657a46",
+            "accent": "#9d9584"
+          }
         }
       },
       "flora": [
-        { "template": "broadleaf_tree", "biome": "low", "density": 0.01 },
-        { "template": "fruit_tree", "biome": "low", "density": 0.008 },
-        { "template": "bush", "biome": "low", "density": 0.05 },
-        { "template": "rock", "biome": "low", "density": 0.025 },
-        { "template": "broadleaf_tree", "biome": "mid", "density": 0.26 },
-        { "template": "pine", "biome": "mid", "density": 0.07 },
-        { "template": "fruit_tree", "biome": "mid", "density": 0.045 },
-        { "template": "bush", "biome": "mid", "density": 0.09 },
-        { "template": "rock", "biome": "mid", "density": 0.02 },
-        { "template": "pine", "biome": "high", "density": 0.025 },
-        { "template": "rock", "biome": "high", "density": 0.07 }
+        {
+          "template": "broadleaf_tree",
+          "biome": "low",
+          "density": 0.01
+        },
+        {
+          "template": "fruit_tree",
+          "biome": "low",
+          "density": 0.008
+        },
+        {
+          "template": "bush",
+          "biome": "low",
+          "density": 0.05
+        },
+        {
+          "template": "rock",
+          "biome": "low",
+          "density": 0.025
+        },
+        {
+          "template": "broadleaf_tree",
+          "biome": "mid",
+          "density": 0.26
+        },
+        {
+          "template": "pine",
+          "biome": "mid",
+          "density": 0.07
+        },
+        {
+          "template": "fruit_tree",
+          "biome": "mid",
+          "density": 0.045
+        },
+        {
+          "template": "bush",
+          "biome": "mid",
+          "density": 0.09
+        },
+        {
+          "template": "rock",
+          "biome": "mid",
+          "density": 0.02
+        },
+        {
+          "template": "pine",
+          "biome": "high",
+          "density": 0.025
+        },
+        {
+          "template": "rock",
+          "biome": "high",
+          "density": 0.07
+        },
+        {
+          "template": "rock",
+          "biome": "beach",
+          "density": 0.012
+        },
+        {
+          "template": "bush",
+          "biome": "beach",
+          "density": 0.012
+        },
+        {
+          "template": "broadleaf_tree",
+          "biome": "river",
+          "density": 0.06
+        },
+        {
+          "template": "fruit_tree",
+          "biome": "river",
+          "density": 0.02
+        },
+        {
+          "template": "bush",
+          "biome": "river",
+          "density": 0.08
+        },
+        {
+          "template": "pine",
+          "biome": "mountain",
+          "density": 0.08
+        },
+        {
+          "template": "broadleaf_tree",
+          "biome": "mountain",
+          "density": 0.02
+        },
+        {
+          "template": "rock",
+          "biome": "mountain",
+          "density": 0.06
+        }
       ],
       "fauna": [
-        { "template": "deer", "herds": 10 },
-        { "template": "goat", "herds": 10 },
-        { "template": "cow", "herds": 9 }
+        {
+          "template": "deer",
+          "herds": 40
+        },
+        {
+          "template": "goat",
+          "herds": 35
+        },
+        {
+          "template": "cow",
+          "herds": 30
+        }
       ],
       "lore": {
         "life": "Mundo basado en carbono: la vida (árboles, hierba, ciervos, cabras y vacas) usa química del carbono y agua líquida.",
         "atmosphere": "Atmósfera de nitrógeno y oxígeno, respirable. Presión y gravedad estándar (1 g).",
-        "surface": "Una isla de 1 km rodeada de mar, con explanadas, bosques y montañas heladas.",
+        "surface": "Una isla de 5 km rodeada de mar: playas de arena, ríos de agua dulce, explanadas, bosques, montañas y, en lo más alto, montañas heladas.",
         "moons": "Tiene 2 lunas: la Luna A, grande y clara, y la Luna B, pequeña, rojiza y lejana."
       },
       "moons": [
@@ -63,12 +232,30 @@
           "size": "small",
           "radius_km": 620,
           "color": "#d8d2c4",
-          "orbit": { "distance": 42, "period_hours": 96 },
+          "orbit": {
+            "distance": 42,
+            "period_hours": 96
+          },
           "sky_size_deg": 7,
-          "physics": { "gravity": 0.35, "breathable": false },
-          "climate": { "temperature_c": -30 },
-          "terrain": { "generator": "cratered", "params": { "craters": 0.5 } },
-          "palette": { "light": "#d9d6cf", "mid": "#bdb9b1", "dark": "#8f8b84", "highlight": "#f2efe8" },
+          "physics": {
+            "gravity": 0.35,
+            "breathable": false
+          },
+          "climate": {
+            "temperature_c": -30
+          },
+          "terrain": {
+            "generator": "cratered",
+            "params": {
+              "craters": 0.5
+            }
+          },
+          "palette": {
+            "light": "#d9d6cf",
+            "mid": "#bdb9b1",
+            "dark": "#8f8b84",
+            "highlight": "#f2efe8"
+          },
           "lore": {
             "life": "Sin vida: roca de silicatos (anortosita) muy clara.",
             "atmosphere": "Sin atmósfera. Hace falta traje espacial u oxígeno.",
@@ -80,12 +267,30 @@
           "size": "small",
           "radius_km": 240,
           "color": "#c98f6a",
-          "orbit": { "distance": 17, "period_hours": 30 },
+          "orbit": {
+            "distance": 17,
+            "period_hours": 30
+          },
           "sky_size_deg": 3.6,
-          "physics": { "gravity": 0.25, "breathable": false },
-          "climate": { "temperature_c": -45 },
-          "terrain": { "generator": "cratered", "params": { "craters": 0.65 } },
-          "palette": { "light": "#8a5a44", "mid": "#6e4636", "dark": "#4a2f25", "highlight": "#a87458" },
+          "physics": {
+            "gravity": 0.25,
+            "breathable": false
+          },
+          "climate": {
+            "temperature_c": -45
+          },
+          "terrain": {
+            "generator": "cratered",
+            "params": {
+              "craters": 0.65
+            }
+          },
+          "palette": {
+            "light": "#8a5a44",
+            "mid": "#6e4636",
+            "dark": "#4a2f25",
+            "highlight": "#a87458"
+          },
           "lore": {
             "life": "Sin vida: roca rica en óxidos de hierro, de ahí su color rojizo.",
             "atmosphere": "Sin atmósfera. Hace falta traje espacial u oxígeno.",
@@ -95,6 +300,9 @@
       ]
     }
   ],
-  "meteors": { "frequency": 0.5, "richness": 0.5 },
+  "meteors": {
+    "frequency": 0.5,
+    "richness": 0.5
+  },
   "unsupported_requests": []
 }

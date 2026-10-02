@@ -1,6 +1,6 @@
 import { SeededRandom, deriveSeed, hashString } from '../core/SeededRandom.js';
 import {
-  BIOME_SLOTS, BODY_DEFAULTS, BARREN_FLORA, DEFAULT_LIFE, FAUNA_TEMPLATES, FLORA_TEMPLATES, LIMITS,
+  BIOME_SLOTS, BODY_DEFAULTS, EXTRA_BIOME_LOOK, BARREN_FLORA, DEFAULT_LIFE, FAUNA_TEMPLATES, FLORA_TEMPLATES, LIMITS,
   ORBIT_UNITS, SIZE_CATEGORIES, STAR_TYPES, TERRAIN_GENERATORS, WATER_DEFAULTS,
 } from './Catalog.js';
 
@@ -105,12 +105,18 @@ function compileBody(b, kind, ctx) {
   const baseTemp = b.climate?.temperature_c ?? b.biomes?.low?.temperature_c ?? D.temperature;
   const BIOMES = {};
   const grass = {};
+  // Zonas opcionales (playa, río, montaña baja): solo si su capa de terreno existe.
+  const enabled = (slot) => !BIOME_SLOTS[slot].param || params[BIOME_SLOTS[slot].param] > 0;
   for (const [slot, { slot: id }] of Object.entries(BIOME_SLOTS)) {
+    if (!enabled(slot)) {
+      if (b.biomes?.[slot]) notes.push({ path: `${path}.biomes.${slot}`, message: `La zona "${slot}" necesita terrain.params.${BIOME_SLOTS[slot].param} > 0: se ignora.` });
+      continue;
+    }
     const j = b.biomes?.[slot] ?? {};
-    const [hill, detail] = look.SCALES[slot];
+    const [hill, detail] = look.SCALES[slot] ?? EXTRA_BIOME_LOOK.SCALES[slot];
     const def = {
-      NAME: j.name ?? look.BIOME_NAMES[slot],
-      TEMPERATURE: j.temperature_c ?? baseTemp + look.TEMPERATURE_OFFSETS[slot],
+      NAME: j.name ?? look.BIOME_NAMES[slot] ?? EXTRA_BIOME_LOOK.BIOME_NAMES[slot],
+      TEMPERATURE: j.temperature_c ?? baseTemp + (look.TEMPERATURE_OFFSETS[slot] ?? EXTRA_BIOME_LOOK.TEMPERATURE_OFFSETS[slot]),
       HILL_SCALE: j.relief ?? hill,
       DETAIL_SCALE: j.roughness ?? detail,
     };
@@ -128,10 +134,14 @@ function compileBody(b, kind, ctx) {
 
   // Flora y rocas.
   const floraList = b.flora ?? (livingDefaults ? DEFAULT_LIFE.flora : BARREN_FLORA);
-  const DENSITY = { PLAINS: {}, FOREST: {}, FROZEN_MOUNTAINS: {} };
+  const DENSITY = Object.fromEntries(Object.keys(BIOMES).map((id) => [id, {}]));
   const floraColors = {};
   const floraSize = {};
   floraList.forEach((f, i) => {
+    if (!enabled(f.biome)) {
+      notes.push({ path: `${path}.flora[${i}].biome`, message: `La zona "${f.biome}" no existe en este cuerpo (terrain.params.${BIOME_SLOTS[f.biome].param} = 0): se ignora.` });
+      return;
+    }
     const slot = BIOME_SLOTS[f.biome].slot;
     const res = FLORA_TEMPLATES[f.template].resource;
     // Color y tamaño propios: uno por tipo en todo el cuerpo (vale el último).
@@ -317,6 +327,9 @@ function paletteColors({ light, mid, dark, highlight }) {
     low: { ground: light, ground_alt: mid, accent: highlight },
     mid: { ground: mid, ground_alt: dark, accent: light },
     high: { ground: dark, ground_alt: mid, snow: highlight, ice: light },
+    beach: { ground: highlight, ground_alt: light, accent: mid },
+    river: { ground: mid, ground_alt: dark, accent: light },
+    mountain: { ground: dark, ground_alt: mid, accent: light },
   };
 }
 

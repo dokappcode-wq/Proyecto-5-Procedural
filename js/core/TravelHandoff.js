@@ -14,7 +14,7 @@
 const KEY = 'mundo0.hyperjump';
 const MAX_AGE_MS = 10 * 60 * 1000;
 
-export function captureState({ systemName, target, campaignSeed, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression = null }) {
+export function captureState({ systemName, target, campaignSeed, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time, progression = null, hasWatch = true }) {
   return {
     v: 1,
     at: Date.now(),
@@ -25,6 +25,7 @@ export function captureState({ systemName, target, campaignSeed, inventory, equi
     slots: inventory.snapshot(),
     worn: { ...equipment.slots },
     progression: progression?.snapshot() ?? null,
+    watch: !!hasWatch,
     vitals: { health: health.value, hunger: hunger.value, thirst: thirst.value, energy: energy.value },
     life: { wearing: lifeSupport.wearing, oxygen: lifeSupport.oxygen, battery: lifeSupport.battery, gas: lifeSupport.gas },
     ship: {

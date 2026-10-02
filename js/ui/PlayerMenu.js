@@ -26,7 +26,7 @@ export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTI
 const KEY_TAB = { Tab: MenuTab.CRAFTING, KeyI: MenuTab.INVENTORY };
 
 export class PlayerMenu extends ModalPanel {
-  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop, stations = {}, progression = null, statDefs = {} }) {
+  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop, stations = {}, progression = null, statDefs = {}, hasWatch = () => true }) {
     super({
       id: 'player-menu', title: 'Reloj de pulsera', container, input, events,
       footer: '<kbd>Clic</kbd> coger / dejar · <kbd>Clic dcho</kbd> la mitad / una · <kbd>Shift</kbd>+<kbd>Clic</kbd> mover rápido · <kbd>Doble clic</kbd> fabricar · <kbd>Esc</kbd> cerrar',
@@ -45,6 +45,7 @@ export class PlayerMenu extends ModalPanel {
     this.station = null;         // estación desde la que se ha abierto (o null)
     this._prog = progression;    // niveles y puntos (ProgressionSystem)
     this._statDefs = statDefs;   // PROGRESSION.STATS
+    this._hasWatch = hasWatch;   // sin el reloj de pulsera solo se abre la mochila (no se fabrica)
     this.tab = MenuTab.CRAFTING;
     this._hover = null;
     this._recipe = null;      // receta seleccionada
@@ -81,6 +82,19 @@ export class PlayerMenu extends ModalPanel {
     else if (this._input.wasPressed('INVENTORY')) this.open(MenuTab.INVENTORY);
   }
 
+  /** Sin reloj no se fabrica: aviso de dónde está. */
+  _noWatch() {
+    this._events.emit(GameEvents.UI_MESSAGE, { text: '⌚ Para fabricar necesitas tu reloj de pulsera: está en la cápsula estrellada (brilla). Cógelo con E.', type: 'warning' });
+  }
+
+  /** Actualiza pestañas y título según se lleve el reloj o no. */
+  refreshWatch() {
+    const has = this._hasWatch();
+    this._tabButtons.CRAFTING.classList.toggle('hidden', !has);
+    this.setTitle(has ? 'Reloj de pulsera' : 'Mochila');
+    if (!has && this.tab !== MenuTab.INVENTORY) this.setTab(MenuTab.INVENTORY);
+  }
+
   tick(dt) {
     this._statTimer -= dt;
     if (this._statTimer > 0) return;
@@ -91,6 +105,10 @@ export class PlayerMenu extends ModalPanel {
 
   /** @param {string} tab @param {{ station?: string }} [opts] estación (mesa de refinería) */
   open(tab, { station = null } = {}) {
+    if (tab !== MenuTab.INVENTORY && !this._hasWatch()) {
+      this._noWatch();
+      return;
+    }
     this.station = station;
     const def = station ? this._stations[station] : null;
     this._tabButtons.STATION.classList.toggle('hidden', !def);
@@ -114,6 +132,10 @@ export class PlayerMenu extends ModalPanel {
 
   setTab(tab) {
     if (!MenuTab[tab] || (tab === MenuTab.STATION && !this.station)) return;
+    if (tab !== MenuTab.INVENTORY && !this._hasWatch()) {
+      if (this.isOpen) this._noWatch();
+      return;
+    }
     if (tab !== this.tab) this._inv.returnCursor();
     this.tab = tab;
     const crafting = tab !== MenuTab.INVENTORY;

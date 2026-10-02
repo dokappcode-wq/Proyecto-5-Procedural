@@ -1201,3 +1201,68 @@ body.underwater #vignette {
   color: #1a1206; background: #ffd27a; border: 1px solid #ffe9b8; border-radius: 3px; vertical-align: middle;
 }
 #player-menu .pm-plus:hover { background: #ffe9b8; box-shadow: 0 0 8px rgba(255, 210, 122, 0.7); }
+
+/* ---- Menú de inicio con la cápsula en órbita (TitleScene dibuja el fondo 3D) ---- */
+#start-screen.title-screen {
+  background: linear-gradient(90deg, rgba(2, 4, 10, 0.82) 0%, rgba(2, 4, 10, 0.45) 34%, transparent 62%);
+  place-items: center start;
+  padding: clamp(16px, 6vw, 90px);
+  transition: opacity 0.8s ease;
+}
+#start-screen.title-screen.launching { opacity: 0; pointer-events: none; }
+.title-card {
+  text-align: left;
+  max-width: 430px;
+  background: rgba(8, 12, 20, 0.55);
+  border: 1px solid rgba(124, 196, 255, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.title-card h1 { letter-spacing: 0.12em; text-transform: uppercase; text-shadow: 0 0 24px rgba(124, 196, 255, 0.35); }
+.title-kicker { margin: 0 0 6px; color: #ff9a4a; font: 600 0.78rem ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; }
+.title-card .subtitle { margin-bottom: 18px; }
+.title-card .start-system { margin: -8px 0 14px; }
+.title-card .intro { margin: 0 0 20px; }
+.title-card #start-button {
+  width: 100%;
+  padding: 14px 28px;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #ffad5c, #ff7a2a);
+  color: #1b0d02;
+  box-shadow: 0 6px 24px rgba(255, 122, 42, 0.35);
+}
+.title-card .start-secondary { width: 100%; }
+.title-controls { margin-top: 16px; color: var(--ui-muted); font-size: 0.88rem; }
+.title-controls summary { cursor: pointer; color: var(--ui-accent); }
+.title-controls .controls { margin-top: 12px; }
+.title-telemetry {
+  position: fixed;
+  right: clamp(16px, 4vw, 48px);
+  bottom: clamp(16px, 4vh, 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font: 600 0.75rem ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  color: rgba(160, 220, 255, 0.75);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+.title-telemetry span:first-child { color: #7dffb0; }
+/* Fogonazo de la reentrada: tapa el paso del espacio al suelo. */
+#title-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, #fff8ec 0%, #ffd9a8 55%, #ff9a5a 100%);
+  transition: opacity 0.9s ease-in;
+}
+#title-flash.on { opacity: 1; }
+#title-flash.off { transition: opacity 2.2s ease-out; opacity: 0; }
+@media (max-width: 640px) {
+  #start-screen.title-screen { place-items: end center; background: linear-gradient(0deg, rgba(2, 4, 10, 0.85), transparent 70%); }
+  .title-telemetry { display: none; }
+}

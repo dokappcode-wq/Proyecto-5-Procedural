@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.12.0',
+    VERSION: '1.13.0',
   },
 
   RENDER: {
@@ -628,6 +628,7 @@ export const GameConfig = deepFreeze({
     NAME: 'Nave exploradora',
     LANDING_DISTANCE: [22, 45],  // m del inicio del jugador donde aparece aterrizada
     CLEAR_RADIUS: 11,            // m sin árboles ni rocas alrededor del lugar de aterrizaje
+    MOUNTAIN_LANDING_DISTANCE: [350, 1300], // campaña: la nave está en un monte helado a esta distancia (m) del inicio
     // Vuelo
     TAKEOFF_HEIGHT: 7,           // m sobre el suelo al terminar de despegar
     TAKEOFF_SPEED: 3,            // m/s de subida al despegar

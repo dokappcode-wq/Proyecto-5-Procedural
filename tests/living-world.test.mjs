@@ -9,7 +9,7 @@ import { TerrainGenerator } from '../js/world/TerrainGenerator.js';
 import { BiomeSystem } from '../js/world/BiomeSystem.js';
 import { WaterSystem } from '../js/world/WaterSystem.js';
 import { ResourceSystem } from '../js/world/ResourceSystem.js';
-import { HOME } from './helpers/eden.mjs';
+import { HOME_1KM as HOME } from './helpers/eden.mjs';
 
 const W = GameConfig.WORLD;
 const P = HOME;

@@ -21,9 +21,9 @@ export const LIMITS = Object.freeze({
   MAX_ERRORS: 50,          // errores que se informan como mucho
   PLANETS: 8,
   MOONS: 4,                // por planeta
-  FLORA: 12,               // entradas de flora por cuerpo
+  FLORA: 24,               // entradas de flora por cuerpo
   FAUNA: 8,                // entradas de fauna por cuerpo
-  HERDS_PER_BODY: 60,      // rebaños en total por cuerpo
+  HERDS_PER_BODY: 150,     // rebaños en total por cuerpo
   PONDS: 200,              // charcas por cuerpo
   NAME_LENGTH: 40,
   TEXT_LENGTH: 400,
@@ -55,11 +55,25 @@ export const STAR_TYPES = Object.freeze({
   red_giant: { label: 'Gigante roja', color: 0xff8a5c, radiusKm: 20000 },
 });
 
-/** Las tres zonas de bioma de cada cuerpo (de abajo arriba) y su ranura interna. */
+/**
+ * Las zonas de bioma de cada cuerpo y su ranura interna. Las tres primeras están
+ * siempre; las de `param` solo existen si el parámetro de terreno que las crea es
+ * mayor que 0 (terrain.params.beaches / rivers / low_mountains).
+ */
 export const BIOME_SLOTS = Object.freeze({
   low: { slot: 'PLAINS', label: 'zona baja y llana' },
   mid: { slot: 'FOREST', label: 'zona media ondulada' },
   high: { slot: 'FROZEN_MOUNTAINS', label: 'montañas (con nieve o polvo en las cumbres)' },
+  beach: { slot: 'BEACH', label: 'playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)', param: 'beaches' },
+  river: { slot: 'RIVER', label: 'riberas de los ríos (necesita terrain.params.rivers > 0)', param: 'rivers' },
+  mountain: { slot: 'MOUNTAINS', label: 'montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)', param: 'low_mountains' },
+});
+
+/** Valores por defecto de las zonas opcionales (playa, río, montaña baja). */
+export const EXTRA_BIOME_LOOK = Object.freeze({
+  BIOME_NAMES: { beach: 'Playa', river: 'Río', mountain: 'Montaña' },
+  TEMPERATURE_OFFSETS: { beach: 2, river: -1, mountain: -8 },
+  SCALES: { beach: [0.12, 0.25], river: [0.45, 0.7], mountain: [1.0, 1.4] }, // [relieve, rugosidad]
 });
 
 /** Flora (y rocas): plantilla → tipo de recurso del motor. `density` = probabilidad por celda de 4×4 m. */
@@ -137,6 +151,9 @@ const TERRAIN_PARAMS = {
   mountain_coverage: { min: 0, max: 1, default: 0.5, description: 'Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).' },
   roughness: { min: 0, max: 2, default: 1, description: 'Rugosidad del suelo a pequeña escala.' },
   craters: { min: 0, max: 1, default: 0, description: 'Densidad de cráteres (0 = ninguno, 1 = muchísimos).' },
+  rivers: { min: 0, max: 1, default: 0, description: 'Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".' },
+  beaches: { min: 0, max: 1, default: 0, description: 'Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".' },
+  low_mountains: { min: 0, max: 1, default: 0, description: 'Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".' },
 };
 
 /** Aplica los parámetros normalizados a un relieve base. */
@@ -151,6 +168,21 @@ function shapeTerrain(base, p) {
   t.MOUNTAIN_MASK_START = base.MOUNTAIN_MASK_START + shift;
   t.MOUNTAIN_MASK_END = base.MOUNTAIN_MASK_END + shift;
   if (p.craters > 0) t.CRATERS = { CELL: CRATER_SHAPE.CELL, CHANCE: p.craters, RADIUS: [...CRATER_SHAPE.RADIUS], DEPTH: CRATER_SHAPE.DEPTH, RIM: CRATER_SHAPE.RIM };
+  // Capas opcionales (solo si se piden: así los cuerpos que no las usan no cambian).
+  if (p.low_mountains > 0) {
+    const shiftLow = (0.5 - p.low_mountains) * 0.7;
+    t.HILLS = {
+      MASK_FREQUENCY: 1 / 420, MASK_START: 0.05 + shiftLow, MASK_END: 0.35 + shiftLow,
+      FREQUENCY: 1 / 160, HEIGHT: 24 * (p.mountains || 1), LIFT: 6 * (p.mountains || 1), OCTAVES: 3,
+    };
+  }
+  if (p.rivers > 0) {
+    t.RIVERS = {
+      FREQUENCY: (1 / 1500) * (0.5 + p.rivers), WARP: 90, WIDTH: 5, DEPTH: 1.8,
+      BANK_SLOPE: 0.22, BANK_BIOME: 22, MOUNTAIN_FADE: [0.05, 0.35],
+    };
+  }
+  if (p.beaches > 0) t.BEACHES = { WIDTH: 16 + 44 * p.beaches, HEIGHT: 1.1, DUNE: 0.6 };
   return t;
 }
 
@@ -307,6 +339,9 @@ export const BODY_DEFAULTS = Object.freeze({
       low: { ground: 0x86b85a, ground_alt: 0xa9c766, accent: 0xd9d27a },
       mid: { ground: 0x4a7a35, ground_alt: 0x3a672f, accent: 0x5e6b33 },
       high: { ground: 0x6c737f, ground_alt: 0x5a616d, snow: 0xf1f5fa, ice: 0xb4dcf0 },
+      beach: { ground: 0xe2d29a, ground_alt: 0xd3c086, accent: 0xf3ead0 },
+      river: { ground: 0x5c9a44, ground_alt: 0x4d8a3b, accent: 0x8cbf63 },
+      mountain: { ground: 0x7e7767, ground_alt: 0x657a46, accent: 0x9d9584 },
     },
   },
   MOON: {
@@ -337,7 +372,7 @@ export const DEFAULT_LIFE = Object.freeze({
     { template: 'pine', biome: 'high', density: 0.025 },
     { template: 'rock', biome: 'high', density: 0.07 },
   ],
-  grass: { low: 520, mid: 220, high: 0 },
+  grass: { low: 520, mid: 220, high: 0, beach: 25, river: 640, mountain: 140 },
   fauna: [
     { template: 'deer', herds: 10 },
     { template: 'goat', herds: 10 },

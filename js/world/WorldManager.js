@@ -80,6 +80,11 @@ export class WorldManager {
     return this._bodies.get(id).world;
   }
 
+  /** Grupo de la escena de un cuerpo (lo que se añade ahí solo se ve en ese cuerpo). */
+  rootOf(id) {
+    return this._bodies.get(id)?.root ?? null;
+  }
+
   has(id) {
     return this._bodies.has(id) || this._extra.has(id);
   }
@@ -127,6 +132,8 @@ export class WorldManager {
       planet,
       events: this._events,
       propColors: { ...o.propColors, ...(planet.PROP_COLORS ?? {}) },
+      // Reglas del planeta de inicio de la campaña: inicio en cualquier sitio, nave en las montañas heladas.
+      rules: id === this.homeId ? o.homeRules ?? null : null,
     });
     if (this._focus) world.follow(this._focus);
     this._bodies.set(id, { world, root });

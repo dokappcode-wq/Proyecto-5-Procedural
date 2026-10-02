@@ -23,6 +23,14 @@ import { smoothstep } from '../core/MathUtils.js';
  *   6. Charcas: si hay WaterSystem, excava las fuentes de agua.
  *   7. Cráteres (opcional, TERRAIN.CRATERS, p. ej. en las lunas): cuencos con
  *      borde elevado, uno como mucho por celda de una rejilla, según la seed.
+ *   8. Montañas bajas (opcional, TERRAIN.HILLS): otra máscara de montañas, más
+ *      bajas y sin nieve, lejos de las montañas altas (bioma "Montaña").
+ *   9. Ríos (opcional, TERRAIN.RIVERS): siguen la línea de nivel cero de un ruido
+ *      deformado; el cauce baja del nivel del mar (el agua es la del mar: se nada en
+ *      ellos y se bebe de ellos) y las orillas forman un valle suave. No entran en
+ *      las montañas. `river` (0..1) marca las riberas para el bioma "Río".
+ *  10. Playas (opcional, TERRAIN.BEACHES): franja llana de arena antes de la costa.
+ *  11. Explanadas (setPads): zonas aplanadas a mano, p. ej. donde está posada la nave.
  */
 export class TerrainGenerator {
   constructor({ profile, biomes, seed, worldSize, edgeMargin }) {
@@ -48,9 +56,26 @@ export class TerrainGenerator {
     // Capas opcionales (solo si el perfil las pide: el Edén no las usa).
     this._islands = p0(profile.ISLANDS) && new SimplexNoise(deriveSeed(seed, 'islands'));
     this._dunes = p0(profile.DUNES) && new SimplexNoise(deriveSeed(seed, 'dunes'));
+    this._hillsMask = p0(profile.HILLS) && new SimplexNoise(deriveSeed(seed, 'hillsMask'));
+    this._hillsNoise = p0(profile.HILLS) && new SimplexNoise(deriveSeed(seed, 'hills2'));
+    this._river = p0(profile.RIVERS) && new SimplexNoise(deriveSeed(seed, 'river'));
+    this._riverWarp = p0(profile.RIVERS) && new SimplexNoise(deriveSeed(seed, 'riverWarp'));
+    this._beachNoise = p0(profile.BEACHES) && new SimplexNoise(deriveSeed(seed, 'beach'));
 
-    this._sample = { height: 0, mountain: 0, coast: 0, biomes: {} };
+    this._sample = { height: 0, mountain: 0, coast: 0, hills: 0, river: 0, beach: 0, fresh: false, biomes: {} };
+    this._extra = { hills: 0, river: 0, beach: 0 };
     this._water = null;
+    this._pads = [];
+  }
+
+  /**
+   * Explanadas: el terreno se aplana a la altura `height` dentro de `radius` y vuelve
+   * a su forma en `blend` m más. Se llama antes de generar chunks (la caché de alturas
+   * del mundo debe estar vacía).
+   * @param {{x:number,z:number,radius:number,height:number,blend:number}[]} pads
+   */
+  setPads(pads) {
+    this._pads = pads ?? [];
   }
 
   /**
@@ -93,8 +118,45 @@ export class TerrainGenerator {
       mountainHeight = mountain * (p.MOUNTAIN_BASE_LIFT + ridges * p.MOUNTAIN_HEIGHT);
     }
 
+    // Montañas bajas (sin nieve), lejos de las altas.
+    let lowMtn = 0;
+    let hillsHeight = 0;
+    if (p.HILLS) {
+      const H = p.HILLS;
+      const m = this._hillsMask.fbm(x, z, { frequency: H.MASK_FREQUENCY, octaves: 2 });
+      lowMtn = smoothstep(H.MASK_START, H.MASK_END, m) * inland * (1 - smoothstep(0, 0.35, mountain));
+      if (lowMtn > 0) hillsHeight = lowMtn * (H.LIFT + this._hillsNoise.ridged(x, z, { frequency: H.FREQUENCY, octaves: H.OCTAVES }) * H.HEIGHT);
+    }
+
+    // Ríos: distancia (m) a la línea central, estimada con el gradiente del ruido.
+    let riverDist = Infinity;
+    let riverMask = 0;
+    if (p.RIVERS) {
+      const R = p.RIVERS;
+      riverMask = (1 - smoothstep(R.MOUNTAIN_FADE[0], R.MOUNTAIN_FADE[1], mountain)) * (1 - smoothstep(0.25, 0.75, lowMtn));
+      if (riverMask > 0) {
+        const wx = x + this._riverWarp.noise2D(x / 420, z / 420) * R.WARP;
+        const wz = z + this._riverWarp.noise2D(x / 420 + 31.7, z / 420 + 17.3) * R.WARP;
+        const o = { frequency: R.FREQUENCY, octaves: 2 };
+        const n = this._river.fbm(wx, wz, o);
+        const e = 2;
+        const gx = (this._river.fbm(wx + e, wz, o) - n) / e;
+        const gz = (this._river.fbm(wx, wz + e, o) - n) / e;
+        riverDist = Math.abs(n) / Math.max(1e-6, Math.hypot(gx, gz));
+      }
+    }
+
+    // Playas: franja antes de la costa (la arena llega hasta el agua).
+    let beach = 0;
+    if (p.BEACHES) beach = smoothstep(coastStart - p.BEACHES.WIDTH - 25, coastStart - p.BEACHES.WIDTH, edgeDist);
+
+    const extra = this._extra;
+    extra.hills = lowMtn;
+    extra.beach = beach;
+    extra.river = p.RIVERS ? (1 - smoothstep(p.RIVERS.WIDTH + 2, p.RIVERS.WIDTH + p.RIVERS.BANK_BIOME, riverDist)) * riverMask * (1 - coast) : 0;
+
     // Relieve modulado por bioma.
-    const w = this._biomes.weightsAt(x, z, mountain, this._sample.biomes);
+    const w = this._biomes.weightsAt(x, z, mountain, this._sample.biomes, extra);
     let hillScale = 0;
     let detailScale = 0;
     for (const id in w) {
@@ -107,7 +169,8 @@ export class TerrainGenerator {
       continent * p.CONTINENT_AMPLITUDE +
       hills * p.HILL_AMPLITUDE * hillScale * (1 - 0.5 * mountain) +
       detail * p.DETAIL_AMPLITUDE * detailScale +
-      mountainHeight;
+      mountainHeight +
+      hillsHeight;
 
     if (p.CRATERS) height += this._craters(x, z) * (1 - coast);
     if (p.DUNES) height += this._dunesAt(x, z) * (1 - mountain) * (1 - coast);
@@ -124,14 +187,38 @@ export class TerrainGenerator {
       height = seabed + (height - seabed) * land;
     }
 
+    // Playa: llana y baja, con dunas suaves.
+    if (beach > 0) {
+      const B = p.BEACHES;
+      const dune = (this._beachNoise.noise2D(x / 18, z / 18) * 0.5 + 0.5) * B.DUNE;
+      height += (B.HEIGHT + dune - height) * beach;
+    }
+    // Río: cauce bajo el nivel del mar y valle con orillas suaves (no sube nunca el terreno).
+    let fresh = false;
+    if (riverMask > 0) {
+      const R = p.RIVERS;
+      const t = riverDist / R.WIDTH;
+      const bed = t < 1 ? -0.15 - R.DEPTH * (1 - t * t) : -0.15 + (riverDist - R.WIDTH) * R.BANK_SLOPE;
+      height = Math.min(height, bed + (1 - riverMask) * 400);
+      fresh = riverDist < R.WIDTH + 0.5 && riverMask > 0.5;
+    }
+
     // Costa: el terreno desciende hacia el fondo marino.
     height += (p.SEA_FLOOR - height) * coast;
+    for (const pad of this._pads) {
+      const d = Math.hypot(x - pad.x, z - pad.z);
+      if (d < pad.radius + pad.blend) height += (pad.height - height) * (1 - smoothstep(pad.radius, pad.radius + pad.blend, d));
+    }
     if (this._water) height = this._water.carve(x, z, height);
 
     const s = this._sample;
     s.height = height;
     s.mountain = mountain;
     s.coast = coast;
+    s.hills = lowMtn;
+    s.river = extra.river;
+    s.beach = beach;
+    s.fresh = fresh && coast < 0.05 && height < 0; // el cauce está bajo el nivel del mar (0)
     return s;
   }
 

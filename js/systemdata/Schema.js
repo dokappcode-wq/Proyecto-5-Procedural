@@ -73,7 +73,10 @@ const biome = (slot) => obj({
   }, 'Colores de la zona.'),
 }, `Zona "${slot}": ${BIOME_SLOTS[slot].label}.`);
 
-const biomes = obj({ low: biome('low'), mid: biome('mid'), high: biome('high') }, 'Las tres zonas del cuerpo, de abajo arriba.');
+const biomes = obj(
+  Object.fromEntries(Object.keys(BIOME_SLOTS).map((slot) => [slot, biome(slot)])),
+  'Las zonas del cuerpo: low, mid y high siempre; beach, river y mountain solo si su parámetro de terreno (beaches, rivers, low_mountains) es mayor que 0.',
+);
 
 const flora = arr(obj({
   template: enm(labels(FLORA_TEMPLATES), 'Tipo de planta o roca.'),
@@ -86,7 +89,7 @@ const flora = arr(obj({
 
 const fauna = arr(obj({
   template: enm(labels(FAUNA_TEMPLATES), 'Tipo de animal.'),
-  herds: int(0, 30, 'Número de rebaños en toda la región.'),
+  herds: int(0, 60, 'Número de rebaños en toda la región.'),
   name: str(30, 'Nombre de la especie en singular (p. ej. "Ramoneador"). Si se pone, es una especie propia de este cuerpo.', { minLength: 1 }),
   size: num(0.3, 3, 'Tamaño (1 = el de la plantilla). Los grandes tienen más vida y golpean más fuerte.'),
   color: color('Color del cuerpo (la tripa y las patas salen de él).'),

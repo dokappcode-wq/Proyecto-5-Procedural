@@ -31,7 +31,7 @@ Reglas:
 - Solo JSON. Tamaño máximo 256 KB. Pon "schema_version": "1.0".
 - Usa solo las claves de esta lista; las desconocidas se ignoran. Nada de HTML, URLs, imágenes, scripts ni shaders: los textos son texto plano.
 - Si quiero algo que el formato no permite, no lo inventes: escríbelo en "unsupported_requests" (lista de textos).
-- Límites: 8 planetas, 4 lunas por planeta, 12 entradas de flora y 8 de fauna por cuerpo, nombres de 40 caracteres.
+- Límites: 8 planetas, 4 lunas por planeta, 24 entradas de flora y 8 de fauna por cuerpo, nombres de 40 caracteres.
 - El primer planeta es donde empieza el jugador. Todas las lunas se pueden visitar. Los colores van como "#rrggbb".
 - Solo "name" (del sistema, de cada planeta y de cada luna) y "planets" son obligatorios: el resto tiene valores por defecto.
 
@@ -82,7 +82,7 @@ Claves (ruta: tipo — qué es):
 - planets[].surface_colors.sand: color "#rrggbb" — Arena de la costa.
 - planets[].surface_colors.seabed: color "#rrggbb" — Fondo del mar.
 - planets[].surface_colors.rock: color "#rrggbb" — Roca de las pendientes.
-- planets[].biomes: objeto — Las tres zonas del cuerpo, de abajo arriba.
+- planets[].biomes: objeto — Las zonas del cuerpo: low, mid y high siempre; beach, river y mountain solo si su parámetro de terreno (beaches, rivers, low_mountains) es mayor que 0.
 - planets[].biomes.low: objeto — Zona "low": zona baja y llana.
 - planets[].biomes.low.name: texto (hasta 40) — Nombre de la zona.
 - planets[].biomes.low.temperature_c: número -150–150 — Temperatura media en °C.
@@ -115,10 +115,40 @@ Claves (ruta: tipo — qué es):
 - planets[].biomes.high.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
 - planets[].biomes.high.colors.snow: color "#rrggbb" — Color de las cumbres (nieve, escarcha, polvo…).
 - planets[].biomes.high.colors.ice: color "#rrggbb" — Color del hielo o de los brillos.
-- planets[].flora: lista de hasta 12 — Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.
+- planets[].biomes.beach: objeto — Zona "beach": playa: franja de arena junto al mar (necesita terrain.params.beaches > 0).
+- planets[].biomes.beach.name: texto (hasta 40) — Nombre de la zona.
+- planets[].biomes.beach.temperature_c: número -150–150 — Temperatura media en °C.
+- planets[].biomes.beach.relief: número 0–3 — Relieve propio de la zona (0 = llano, 1 = normal).
+- planets[].biomes.beach.roughness: número 0–3 — Rugosidad propia de la zona.
+- planets[].biomes.beach.grass: entero 0–800 — Matas de hierba por trozo de 64 m (0 = sin hierba).
+- planets[].biomes.beach.colors: objeto — Colores de la zona.
+- planets[].biomes.beach.colors.ground: color "#rrggbb" — Color principal del suelo.
+- planets[].biomes.beach.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
+- planets[].biomes.beach.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
+- planets[].biomes.river: objeto — Zona "river": riberas de los ríos (necesita terrain.params.rivers > 0).
+- planets[].biomes.river.name: texto (hasta 40) — Nombre de la zona.
+- planets[].biomes.river.temperature_c: número -150–150 — Temperatura media en °C.
+- planets[].biomes.river.relief: número 0–3 — Relieve propio de la zona (0 = llano, 1 = normal).
+- planets[].biomes.river.roughness: número 0–3 — Rugosidad propia de la zona.
+- planets[].biomes.river.grass: entero 0–800 — Matas de hierba por trozo de 64 m (0 = sin hierba).
+- planets[].biomes.river.colors: objeto — Colores de la zona.
+- planets[].biomes.river.colors.ground: color "#rrggbb" — Color principal del suelo.
+- planets[].biomes.river.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
+- planets[].biomes.river.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
+- planets[].biomes.mountain: objeto — Zona "mountain": montañas bajas sin nieve (necesita terrain.params.low_mountains > 0).
+- planets[].biomes.mountain.name: texto (hasta 40) — Nombre de la zona.
+- planets[].biomes.mountain.temperature_c: número -150–150 — Temperatura media en °C.
+- planets[].biomes.mountain.relief: número 0–3 — Relieve propio de la zona (0 = llano, 1 = normal).
+- planets[].biomes.mountain.roughness: número 0–3 — Rugosidad propia de la zona.
+- planets[].biomes.mountain.grass: entero 0–800 — Matas de hierba por trozo de 64 m (0 = sin hierba).
+- planets[].biomes.mountain.colors: objeto — Colores de la zona.
+- planets[].biomes.mountain.colors.ground: color "#rrggbb" — Color principal del suelo.
+- planets[].biomes.mountain.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
+- planets[].biomes.mountain.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
+- planets[].flora: lista de hasta 24 — Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.
 - planets[].flora[]: objeto — Una planta o roca en una zona.
 - planets[].flora[].template: uno de: broadleaf_tree (Árbol de hoja ancha (da madera)), pine (Pino / conífera (da madera)), fruit_tree (Árbol frutal (da fruta comestible)), bush (Arbusto (decorativo)), rock (Roca (da piedra)), mineral_rock (Veta de mineral (da mineral)) (obligatorio) — Tipo de planta o roca.
-- planets[].flora[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)) (obligatorio) — Zona en la que crece.
+- planets[].flora[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)), beach (playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)), river (riberas de los ríos (necesita terrain.params.rivers > 0)), mountain (montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)) (obligatorio) — Zona en la que crece.
 - planets[].flora[].density: número 0–0.4 (obligatorio) — Probabilidad por celda de 4×4 m (0.01 = disperso, 0.25 = bosque denso).
 - planets[].flora[].color: color "#rrggbb" — Color de las hojas (o de la roca / del mineral). Uno por tipo en todo el cuerpo.
 - planets[].flora[].fruit_color: color "#rrggbb" — Color de la fruta (solo fruit_tree).
@@ -126,12 +156,12 @@ Claves (ruta: tipo — qué es):
 - planets[].fauna: lista de hasta 8 — Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.
 - planets[].fauna[]: objeto — Una especie animal (a partir de una plantilla).
 - planets[].fauna[].template: uno de: deer (Herbívoro ágil de pradera (tipo ciervo): huye), goat (Herbívoro lanudo (tipo cabra): da lana, a veces se defiende), cow (Herbívoro grande y lento (tipo vaca): da cuero) (obligatorio) — Tipo de animal.
-- planets[].fauna[].herds: entero 0–30 (obligatorio) — Número de rebaños en toda la región.
+- planets[].fauna[].herds: entero 0–60 (obligatorio) — Número de rebaños en toda la región.
 - planets[].fauna[].name: texto (hasta 30) — Nombre de la especie en singular (p. ej. "Ramoneador"). Si se pone, es una especie propia de este cuerpo.
 - planets[].fauna[].size: número 0.3–3 — Tamaño (1 = el de la plantilla). Los grandes tienen más vida y golpean más fuerte.
 - planets[].fauna[].color: color "#rrggbb" — Color del cuerpo (la tripa y las patas salen de él).
 - planets[].fauna[].temperament: uno de: calm (Tranquilo: casi nunca huye ni ataca), shy (Asustadizo: huye en cuanto te ve), curious (Curioso: se acerca a mirarte), aggressive (Bravo: si lo golpeas, casi siempre se defiende) — Carácter.
-- planets[].fauna[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)) — Zona donde prefiere vivir.
+- planets[].fauna[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)), beach (playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)), river (riberas de los ríos (necesita terrain.params.rivers > 0)), mountain (montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)) — Zona donde prefiere vivir.
 - planets[].lore: objeto — Textos que cuenta la IA de la nave. Si faltan, se generan a partir de los datos.
 - planets[].lore.life: texto (hasta 300) — Qué vida hay (lo cuenta la IA de la nave).
 - planets[].lore.atmosphere: texto (hasta 300) — Cómo es la atmósfera.
@@ -178,7 +208,7 @@ Claves (ruta: tipo — qué es):
 - planets[].moons[].surface_colors.sand: color "#rrggbb" — Arena de la costa.
 - planets[].moons[].surface_colors.seabed: color "#rrggbb" — Fondo del mar.
 - planets[].moons[].surface_colors.rock: color "#rrggbb" — Roca de las pendientes.
-- planets[].moons[].biomes: objeto — Las tres zonas del cuerpo, de abajo arriba.
+- planets[].moons[].biomes: objeto — Las zonas del cuerpo: low, mid y high siempre; beach, river y mountain solo si su parámetro de terreno (beaches, rivers, low_mountains) es mayor que 0.
 - planets[].moons[].biomes.low: objeto — Zona "low": zona baja y llana.
 - planets[].moons[].biomes.low.name: texto (hasta 40) — Nombre de la zona.
 - planets[].moons[].biomes.low.temperature_c: número -150–150 — Temperatura media en °C.
@@ -211,10 +241,40 @@ Claves (ruta: tipo — qué es):
 - planets[].moons[].biomes.high.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
 - planets[].moons[].biomes.high.colors.snow: color "#rrggbb" — Color de las cumbres (nieve, escarcha, polvo…).
 - planets[].moons[].biomes.high.colors.ice: color "#rrggbb" — Color del hielo o de los brillos.
-- planets[].moons[].flora: lista de hasta 12 — Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.
+- planets[].moons[].biomes.beach: objeto — Zona "beach": playa: franja de arena junto al mar (necesita terrain.params.beaches > 0).
+- planets[].moons[].biomes.beach.name: texto (hasta 40) — Nombre de la zona.
+- planets[].moons[].biomes.beach.temperature_c: número -150–150 — Temperatura media en °C.
+- planets[].moons[].biomes.beach.relief: número 0–3 — Relieve propio de la zona (0 = llano, 1 = normal).
+- planets[].moons[].biomes.beach.roughness: número 0–3 — Rugosidad propia de la zona.
+- planets[].moons[].biomes.beach.grass: entero 0–800 — Matas de hierba por trozo de 64 m (0 = sin hierba).
+- planets[].moons[].biomes.beach.colors: objeto — Colores de la zona.
+- planets[].moons[].biomes.beach.colors.ground: color "#rrggbb" — Color principal del suelo.
+- planets[].moons[].biomes.beach.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
+- planets[].moons[].biomes.beach.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
+- planets[].moons[].biomes.river: objeto — Zona "river": riberas de los ríos (necesita terrain.params.rivers > 0).
+- planets[].moons[].biomes.river.name: texto (hasta 40) — Nombre de la zona.
+- planets[].moons[].biomes.river.temperature_c: número -150–150 — Temperatura media en °C.
+- planets[].moons[].biomes.river.relief: número 0–3 — Relieve propio de la zona (0 = llano, 1 = normal).
+- planets[].moons[].biomes.river.roughness: número 0–3 — Rugosidad propia de la zona.
+- planets[].moons[].biomes.river.grass: entero 0–800 — Matas de hierba por trozo de 64 m (0 = sin hierba).
+- planets[].moons[].biomes.river.colors: objeto — Colores de la zona.
+- planets[].moons[].biomes.river.colors.ground: color "#rrggbb" — Color principal del suelo.
+- planets[].moons[].biomes.river.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
+- planets[].moons[].biomes.river.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
+- planets[].moons[].biomes.mountain: objeto — Zona "mountain": montañas bajas sin nieve (necesita terrain.params.low_mountains > 0).
+- planets[].moons[].biomes.mountain.name: texto (hasta 40) — Nombre de la zona.
+- planets[].moons[].biomes.mountain.temperature_c: número -150–150 — Temperatura media en °C.
+- planets[].moons[].biomes.mountain.relief: número 0–3 — Relieve propio de la zona (0 = llano, 1 = normal).
+- planets[].moons[].biomes.mountain.roughness: número 0–3 — Rugosidad propia de la zona.
+- planets[].moons[].biomes.mountain.grass: entero 0–800 — Matas de hierba por trozo de 64 m (0 = sin hierba).
+- planets[].moons[].biomes.mountain.colors: objeto — Colores de la zona.
+- planets[].moons[].biomes.mountain.colors.ground: color "#rrggbb" — Color principal del suelo.
+- planets[].moons[].biomes.mountain.colors.ground_alt: color "#rrggbb" — Color secundario del suelo (manchas).
+- planets[].moons[].biomes.mountain.colors.accent: color "#rrggbb" — Color de acento (flores, piedras sueltas…).
+- planets[].moons[].flora: lista de hasta 24 — Flora y rocas. Si se omite: la del Jardín del Edén en cuerpos con aire; solo rocas y mineral en los demás. [] = nada.
 - planets[].moons[].flora[]: objeto — Una planta o roca en una zona.
 - planets[].moons[].flora[].template: uno de: broadleaf_tree (Árbol de hoja ancha (da madera)), pine (Pino / conífera (da madera)), fruit_tree (Árbol frutal (da fruta comestible)), bush (Arbusto (decorativo)), rock (Roca (da piedra)), mineral_rock (Veta de mineral (da mineral)) (obligatorio) — Tipo de planta o roca.
-- planets[].moons[].flora[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)) (obligatorio) — Zona en la que crece.
+- planets[].moons[].flora[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)), beach (playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)), river (riberas de los ríos (necesita terrain.params.rivers > 0)), mountain (montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)) (obligatorio) — Zona en la que crece.
 - planets[].moons[].flora[].density: número 0–0.4 (obligatorio) — Probabilidad por celda de 4×4 m (0.01 = disperso, 0.25 = bosque denso).
 - planets[].moons[].flora[].color: color "#rrggbb" — Color de las hojas (o de la roca / del mineral). Uno por tipo en todo el cuerpo.
 - planets[].moons[].flora[].fruit_color: color "#rrggbb" — Color de la fruta (solo fruit_tree).
@@ -222,12 +282,12 @@ Claves (ruta: tipo — qué es):
 - planets[].moons[].fauna: lista de hasta 8 — Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.
 - planets[].moons[].fauna[]: objeto — Una especie animal (a partir de una plantilla).
 - planets[].moons[].fauna[].template: uno de: deer (Herbívoro ágil de pradera (tipo ciervo): huye), goat (Herbívoro lanudo (tipo cabra): da lana, a veces se defiende), cow (Herbívoro grande y lento (tipo vaca): da cuero) (obligatorio) — Tipo de animal.
-- planets[].moons[].fauna[].herds: entero 0–30 (obligatorio) — Número de rebaños en toda la región.
+- planets[].moons[].fauna[].herds: entero 0–60 (obligatorio) — Número de rebaños en toda la región.
 - planets[].moons[].fauna[].name: texto (hasta 30) — Nombre de la especie en singular (p. ej. "Ramoneador"). Si se pone, es una especie propia de este cuerpo.
 - planets[].moons[].fauna[].size: número 0.3–3 — Tamaño (1 = el de la plantilla). Los grandes tienen más vida y golpean más fuerte.
 - planets[].moons[].fauna[].color: color "#rrggbb" — Color del cuerpo (la tripa y las patas salen de él).
 - planets[].moons[].fauna[].temperament: uno de: calm (Tranquilo: casi nunca huye ni ataca), shy (Asustadizo: huye en cuanto te ve), curious (Curioso: se acerca a mirarte), aggressive (Bravo: si lo golpeas, casi siempre se defiende) — Carácter.
-- planets[].moons[].fauna[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)) — Zona donde prefiere vivir.
+- planets[].moons[].fauna[].biome: uno de: low (zona baja y llana), mid (zona media ondulada), high (montañas (con nieve o polvo en las cumbres)), beach (playa: franja de arena junto al mar (necesita terrain.params.beaches > 0)), river (riberas de los ríos (necesita terrain.params.rivers > 0)), mountain (montañas bajas sin nieve (necesita terrain.params.low_mountains > 0)) — Zona donde prefiere vivir.
 - planets[].moons[].lore: objeto — Textos que cuenta la IA de la nave. Si faltan, se generan a partir de los datos.
 - planets[].moons[].lore.life: texto (hasta 300) — Qué vida hay (lo cuenta la IA de la nave).
 - planets[].moons[].lore.atmosphere: texto (hasta 300) — Cómo es la atmósfera.
@@ -250,12 +310,18 @@ Parámetros de terreno según el generador (en terrain.params, todos opcionales)
     · mountain_coverage: número 0–1, por defecto 0.5 — Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).
     · roughness: número 0–2, por defecto 1 — Rugosidad del suelo a pequeña escala.
     · craters: número 0–1, por defecto 0 — Densidad de cráteres (0 = ninguno, 1 = muchísimos).
+    · rivers: número 0–1, por defecto 0 — Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".
+    · beaches: número 0–1, por defecto 0 — Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".
+    · low_mountains: número 0–1, por defecto 0 — Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".
 - archipelago (Archipiélago): Muchas islas separadas por brazos de mar. Siempre hay una isla en el centro (donde se empieza).
     · relief: número 0–2, por defecto 1 — Colinas y ondulación general (0 = llano, 1 = normal, 2 = muy accidentado).
     · mountains: número 0–2, por defecto 0.6 — Altura de las montañas (0 = sin montañas, 1 = normal, 2 = el doble).
     · mountain_coverage: número 0–1, por defecto 0.5 — Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).
     · roughness: número 0–2, por defecto 1 — Rugosidad del suelo a pequeña escala.
     · craters: número 0–1, por defecto 0 — Densidad de cráteres (0 = ninguno, 1 = muchísimos).
+    · rivers: número 0–1, por defecto 0 — Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".
+    · beaches: número 0–1, por defecto 0 — Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".
+    · low_mountains: número 0–1, por defecto 0 — Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".
     · land_fraction: número 0.02–0.9, por defecto 0.4 — Cuánta superficie es tierra (0.05 = casi todo agua, 0.9 = casi todo tierra).
     · island_size: número 0.3–3, por defecto 1 — Tamaño de las islas (0.5 = islotes pequeños, 2 = islas grandes).
     · sea_depth: número 2–60, por defecto 14 — Profundidad del mar entre islas (m).
@@ -265,6 +331,9 @@ Parámetros de terreno según el generador (en terrain.params, todos opcionales)
     · mountain_coverage: número 0–1, por defecto 0.5 — Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).
     · roughness: número 0–2, por defecto 1 — Rugosidad del suelo a pequeña escala.
     · craters: número 0–1, por defecto 0 — Densidad de cráteres (0 = ninguno, 1 = muchísimos).
+    · rivers: número 0–1, por defecto 0 — Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".
+    · beaches: número 0–1, por defecto 0 — Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".
+    · low_mountains: número 0–1, por defecto 0 — Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".
     · land_fraction: número 0.02–0.9, por defecto 0.12 — Cuánta superficie es tierra (0.05 = casi todo agua, 0.9 = casi todo tierra).
     · island_size: número 0.3–3, por defecto 1 — Tamaño de las islas (0.5 = islotes pequeños, 2 = islas grandes).
     · sea_depth: número 2–60, por defecto 30 — Profundidad del mar entre islas (m).
@@ -277,6 +346,9 @@ Parámetros de terreno según el generador (en terrain.params, todos opcionales)
     · mountain_coverage: número 0–1, por defecto 0.5 — Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).
     · roughness: número 0–2, por defecto 1 — Rugosidad del suelo a pequeña escala.
     · craters: número 0–1, por defecto 0 — Densidad de cráteres (0 = ninguno, 1 = muchísimos).
+    · rivers: número 0–1, por defecto 0 — Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".
+    · beaches: número 0–1, por defecto 0 — Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".
+    · low_mountains: número 0–1, por defecto 0 — Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".
     · terrace_height: número 2–20, por defecto 6 — Altura de cada escalón de las mesetas (m).
 - dunes (Desierto de dunas): Mares de dunas largas y onduladas, hondonadas y algún risco. Arena dorada si no se dan colores.
     · relief: número 0–2, por defecto 0.4 — Colinas y ondulación general (0 = llano, 1 = normal, 2 = muy accidentado).
@@ -284,6 +356,9 @@ Parámetros de terreno según el generador (en terrain.params, todos opcionales)
     · mountain_coverage: número 0–1, por defecto 0.5 — Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).
     · roughness: número 0–2, por defecto 1 — Rugosidad del suelo a pequeña escala.
     · craters: número 0–1, por defecto 0 — Densidad de cráteres (0 = ninguno, 1 = muchísimos).
+    · rivers: número 0–1, por defecto 0 — Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".
+    · beaches: número 0–1, por defecto 0 — Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".
+    · low_mountains: número 0–1, por defecto 0 — Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".
     · dune_height: número 0–20, por defecto 7 — Altura de las dunas (m).
     · dune_spacing: número 15–150, por defecto 45 — Distancia entre crestas de dunas (m).
 - cratered (Desierto de cráteres): Llanuras de polvo y roca con cráteres, "mares" oscuros y montes suaves. El aspecto típico de una luna.
@@ -292,6 +367,9 @@ Parámetros de terreno según el generador (en terrain.params, todos opcionales)
     · mountain_coverage: número 0–1, por defecto 0.5 — Cuánta superficie cubren las montañas (0 = casi nada, 1 = casi todo).
     · roughness: número 0–2, por defecto 1 — Rugosidad del suelo a pequeña escala.
     · craters: número 0–1, por defecto 0.5 — Densidad de cráteres (0 = ninguno, 1 = muchísimos).
+    · rivers: número 0–1, por defecto 0 — Ríos de agua dulce que cruzan las zonas bajas hasta el mar (0 = ninguno, 1 = muchos). Necesitan mar. Crean la zona "river".
+    · beaches: número 0–1, por defecto 0 — Anchura de las playas de arena de la costa (0 = sin playa, 1 = muy anchas). Crean la zona "beach".
+    · low_mountains: número 0–1, por defecto 0 — Montañas bajas, sin nieve, entre la zona baja y las montañas altas (0 = ninguna, 1 = muchas). Crean la zona "mountain".
 
 Ejemplo mínimo:
 {
