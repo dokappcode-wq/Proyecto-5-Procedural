@@ -122,18 +122,32 @@ test('todas las recetas producen objetos definidos con ingredientes definidos', 
 
 // ---- Fase 8: armadura y odre -----------------------------------------------------
 
-test('armadura: se equipa/quita, reduce la pérdida de frío y se quita si desaparece', () => {
+test('ropa: cinco ranuras, sale del inventario al ponérsela y abriga sumando', () => {
   const w = world();
+  assert.deepEqual(Object.keys(w.equipment.slots), ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HANDS']);
   assert.equal(w.equipment.getColdLossMultiplier(), 1);
-  assert.ok(!w.equipment.toggle('LEATHER_ARMOR'), 'no se equipa sin tenerla');
-  w.inventory.addItem('LEATHER_ARMOR', 1);
-  w.itemUse.use('LEATHER_ARMOR');
-  assert.equal(w.equipment.getColdLossMultiplier(), C.EQUIPMENT.ARMOR_COLD_RESISTANCE);
-  w.itemUse.use('LEATHER_ARMOR');
-  assert.equal(w.equipment.getColdLossMultiplier(), 1);
-  w.itemUse.use('LEATHER_ARMOR');
-  w.inventory.removeItem('LEATHER_ARMOR', 1);
-  assert.equal(w.equipment.slots.BODY, null);
+  assert.ok(!w.equipment.wear('LEATHER_SHIRT'), 'no se pone sin tenerla');
+  for (const id of ['LEATHER_CAP', 'LEATHER_SHIRT', 'LEATHER_PANTS', 'LEATHER_SHOES', 'LEATHER_GLOVES']) {
+    w.inventory.addItem(id, 1);
+    assert.ok(w.itemUse.use(id));
+    assert.equal(w.inventory.getItemCount(id), 0, `${id}: puesto, ya no ocupa hueco`);
+  }
+  assert.deepEqual(w.equipment.slots, { HEAD: 'LEATHER_CAP', CHEST: 'LEATHER_SHIRT', LEGS: 'LEATHER_PANTS', FEET: 'LEATHER_SHOES', HANDS: 'LEATHER_GLOVES' });
+  assert.ok(Math.abs(w.equipment.getColdLossMultiplier() - 0.7) < 1e-9, 'el conjunto entero abriga un 30 %');
+  // Usarla otra vez la quita (vuelve al inventario).
+  w.itemUse.use('LEATHER_CAP');
+  assert.equal(w.equipment.slots.HEAD, 'LEATHER_CAP', 'sin otra en el inventario no se puede "usar"');
+  assert.ok(w.equipment.takeOff('HEAD'));
+  assert.equal(w.inventory.getItemCount('LEATHER_CAP'), 1);
+  // Una prenda no va en otra ranura; la mano (cursor) la cambia por la puesta.
+  w.inventory.addItem('LEATHER_SHIRT', 1);
+  const i = w.inventory.slots.findIndex((s) => s?.id === 'LEATHER_SHIRT');
+  w.inventory.click(i);
+  assert.ok(!w.inventory.click('eq:HEAD'), 'la camiseta no va en la cabeza');
+  assert.ok(w.inventory.click('eq:CHEST'));
+  assert.equal(w.inventory.cursor.id, 'LEATHER_SHIRT', 'se cambia por la que llevaba');
+  w.inventory.returnCursor();
+  assert.equal(w.inventory.cursor, null);
 });
 
 test('odre: se llena mirando al agua hasta su capacidad y se bebe de él', () => {

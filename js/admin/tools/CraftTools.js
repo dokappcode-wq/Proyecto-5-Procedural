@@ -18,7 +18,7 @@ export function registerCraftTools(admin, { nutrition, equipment, construction, 
     type: 'info',
     label: 'Piezas / armadura / pérdida de frío',
     read: () =>
-      `${construction.pieces.length} · ${equipment.slots.BODY ?? 'sin armadura'} · ×${equipment.getColdLossMultiplier()}` +
+      `${construction.pieces.length} · ${Object.values(equipment.slots).filter(Boolean).length}/5 prendas · ×${equipment.getColdLossMultiplier()}` +
       (construction.freeBuild ? ' · gratis' : ''),
   });
   admin.registerTool({

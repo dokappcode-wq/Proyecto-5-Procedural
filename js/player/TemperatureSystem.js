@@ -11,7 +11,7 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  * La temperatura del jugador (`value`) se acerca a la ambiente poco a poco:
  * baja como mucho LOSS_RATE °C/s y se recupera a RECOVERY_RATE °C/s. Por debajo
- * de COMFORT la armadura multiplica la pérdida (EQUIPMENT.ARMOR_COLD_RESISTANCE):
+ * de COMFORT la ropa multiplica la pérdida (1 − suma de ITEMS.*.COLD_PROTECTION de lo puesto):
  * el jugador se enfría más despacio y se queda en una temperatura menos extrema.
  *
  * Estados: NORMAL → COLD (escarcha) → FREEZING (más escarcha, peor visibilidad)

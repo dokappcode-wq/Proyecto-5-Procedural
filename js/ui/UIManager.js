@@ -178,16 +178,22 @@ export class UIManager {
     events.on(GameEvents.ANIMAL_KILLED, ({ animal }) => this.showMessage(`Has abatido: ${animal.def.NAME}`));
 
     // ---- Fases 7–9: barra rápida, comida, fabricación, construcción, sueño ----
-    events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => {
+    events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId, selectedIndex }) => {
       this._selectedId = selectedId;
+      this._selectedIndex = selectedIndex ?? null;
       this._drawHotbar();
     });
-    events.on(GameEvents.EQUIPMENT_CHANGED, ({ itemId }) => {
-      const prev = this._equippedId;
-      this._equippedId = itemId;
+    this._worn = {};
+    events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId, slots }) => {
+      const prev = this._worn[slot];
+      this._worn = { ...slots };
       this._drawHotbar();
       if (itemId) this.showMessage(`Te pones: ${this._items[itemId].NAME}`);
       else if (prev) this.showMessage(`Te quitas: ${this._items[prev].NAME}`);
+    });
+    events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount }) => {
+      const def = this._items[itemId];
+      this.showMessage(`🎒 Inventario lleno: ${amount} ${def?.ICON ?? ''} ${def?.NAME ?? itemId} se quedan en el suelo (bolsa).`, 'warning');
     });
     events.on(GameEvents.FOOD_EATEN, ({ itemId, hunger }) =>
       this.showMessage(`Comes ${this._items[itemId].NAME.toLowerCase()} (+${Math.round(hunger)} 🍗)`, 'pickup'),
@@ -361,8 +367,9 @@ export class UIManager {
     }
   }
 
-  _renderInventory({ itemId, delta, items }) {
+  _renderInventory({ itemId, delta, items, slots }) {
     this._invItems = items;
+    if (slots) this._slots = slots;
     this._drawHotbar(delta > 0 ? itemId : null);
     if (delta > 0) {
       const def = this._items[itemId];
@@ -379,23 +386,27 @@ export class UIManager {
       this._drawUseHint();
       return;
     }
-    this._invItems.forEach((it, i) => {
+    // Barra rápida: los 9 primeros huecos del inventario (vacíos incluidos).
+    const slots = this._slots ?? [];
+    for (let i = 0; i < 9; i++) {
+      const st = slots[i] ?? null;
+      const it = st ? { id: st.id, count: st.count, ...this._items[st.id] } : null;
       const slot = document.createElement('div');
       slot.className = 'inv-slot';
-      if (it.id === this._selectedId) slot.classList.add('selected');
-      if (it.id === this._equippedId) slot.classList.add('equipped');
-      slot.title = it.NAME;
+      if (!it) slot.classList.add('empty');
+      if (i === this._selectedIndex) slot.classList.add('selected');
+      slot.title = it?.NAME ?? '';
       slot.innerHTML = `<span class="label"></span><span class="key"></span><span class="icon"></span><span class="count"></span>`;
-      slot.querySelector('.label').textContent = it.NAME;
-      slot.querySelector('.key').textContent = i < 9 ? i + 1 : '';
-      slot.querySelector('.icon').textContent = it.ICON;
-      slot.querySelector('.count').textContent = it.count;
-      if (it.id === bumpId) {
+      slot.querySelector('.label').textContent = it?.NAME ?? '';
+      slot.querySelector('.key').textContent = i + 1;
+      slot.querySelector('.icon').textContent = it?.ICON ?? '';
+      slot.querySelector('.count').textContent = it && it.count > 1 ? it.count : '';
+      if (it && it.id === bumpId) {
         slot.classList.add('bump');
         setTimeout(() => slot.classList.remove('bump'), 200);
       }
       bar.appendChild(slot);
-    });
+    }
     this._drawUseHint();
   }
 
@@ -460,7 +471,7 @@ export class UIManager {
         text = `${key} Llenar (mirando al agua) o beber · ${water}/${cap}`;
         break;
       }
-      case 'EQUIP': text = `${key} ${this._equippedId === id ? 'Quitar' : 'Equipar'}`; break;
+      case 'EQUIP': text = `${key} Ponerse (se cambia por lo que lleves) · [I] Inventario`; break;
       case 'WATCH': text = `${key} Ver dónde está la nave`; break;
       default: text = id.startsWith('PLANK_BATTERY') ? 'Combustible: colócala en el puesto de carga de la nave' : 'Material · [Tab] Fabricar · [B] Construir';
     }

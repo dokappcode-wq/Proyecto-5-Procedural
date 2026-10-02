@@ -1104,3 +1104,30 @@ body.underwater #vignette {
 @media (max-width: 560px) {
   #import-panel .imp-list li { flex-wrap: wrap; }
 }
+
+/* ---- Inventario (I): mochila 9×3, barra 9×1 y ropa ------------------------------ */
+#inventory-bar .inv-slot.empty { opacity: 0.55; }
+#inventory-panel { width: min(760px, calc(100vw - 32px)); }
+#inventory-panel .inv-layout { display: flex; gap: 18px; align-items: flex-start; padding-bottom: 6px; }
+#inventory-panel h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ui-muted); margin: 6px 0; }
+#inventory-panel .inv-gear { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+#inventory-panel .inv-gear-row { display: flex; align-items: center; gap: 10px; }
+#inventory-panel .inv-gear-name { color: var(--ui-muted); font-size: 0.85rem; }
+#inventory-panel .inv-protection { font-size: 0.8rem; color: #bfe3ff; margin: 6px 0 0; }
+#inventory-panel .inv-bag { flex: 1; min-width: 0; }
+#inventory-panel .inv-grid { display: grid; grid-template-columns: repeat(9, 52px); gap: 5px; }
+#inventory-panel .inv-hotbar { padding-top: 4px; }
+#inventory-panel .inv-slot { cursor: pointer; user-select: none; }
+#inventory-panel .inv-slot:hover { border-color: rgba(255, 255, 255, 0.55); }
+#inventory-panel .inv-slot.empty .icon { opacity: 0.35; }
+#inventory-panel .inv-slot.gear { background: rgba(139, 90, 43, 0.25); }
+#inventory-panel .inv-info { min-height: 1.3em; font-size: 0.85rem; color: #e8f0f8; margin: 8px 0 0; }
+.inv-cursor {
+  position: fixed; z-index: 60; pointer-events: none; transform: translate(-50%, -50%);
+  border-color: #ffe38a; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+@media (max-width: 720px) {
+  #inventory-panel .inv-layout { flex-direction: column; }
+  #inventory-panel .inv-grid { grid-template-columns: repeat(9, minmax(28px, 1fr)); }
+  #inventory-panel .inv-slot { width: auto; height: auto; aspect-ratio: 1; font-size: 1.1rem; }
+}

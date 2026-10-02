@@ -22,6 +22,11 @@ export class PlayerModel {
     this._shirtColor = colors.SHIRT;
     const pants = mat(colors.PANTS);
     const boots = mat(colors.BOOTS);
+    this._boots = boots;
+    this._bootsColor = colors.BOOTS;
+    this._skinColor = colors.SKIN;
+    const hands = mat(colors.SKIN); // antebrazos y manos (guantes)
+    this._hands = hands;
     const hair = mat(colors.HAIR);
     const eye = mat(0x1d1d24);
 
@@ -50,7 +55,7 @@ export class PlayerModel {
     this.rightArm = this._pivot(0.34, 1.36, 0);
     for (const arm of [this.leftArm, this.rightArm]) {
       part(shirt, 0.18, 0.3, 0.2, 0, -0.12, 0, arm);
-      part(skin, 0.16, 0.34, 0.18, 0, -0.42, 0, arm);
+      part(hands, 0.16, 0.34, 0.18, 0, -0.42, 0, arm);
     }
 
     // Cabeza: pivote en el cuello para mirar arriba/abajo.
@@ -60,6 +65,13 @@ export class PlayerModel {
     part(hair, 0.42, 0.26, 0.08, 0, 0.3, 0.18, this.head);
     part(eye, 0.07, 0.07, 0.02, -0.09, 0.24, -0.205, this.head);
     part(eye, 0.07, 0.07, 0.02, 0.09, 0.24, -0.205, this.head);
+    // Gorro (oculto sin él).
+    this._capMat = mat(0x7a4a24);
+    this._cap = new THREE.Group();
+    part(this._capMat, 0.46, 0.14, 0.46, 0, 0.44, 0, this._cap);
+    part(this._capMat, 0.46, 0.04, 0.16, 0, 0.38, -0.27, this._cap); // visera
+    this._cap.visible = false;
+    this.head.add(this._cap);
 
     // Traje espacial: casco transparente, mochila con el jetpack (ocultos sin traje).
     this._pants = pants;
@@ -84,20 +96,32 @@ export class PlayerModel {
     this._actionTime = 0; // >0 durante la animación de golpear/recoger
   }
 
-  /** Traje espacial: blanco, con casco y mochila de oxígeno/jetpack. */
+  /** Traje espacial: blanco, con casco y mochila de oxígeno/jetpack (tapa la ropa). */
   setSuit(on) {
     this._suit = on;
     this._helmet.visible = on;
     this.suitParts.visible = on;
-    this._shirt.color.set(on ? 0xeef1f4 : this._armor ? 0x8b5a2b : this._shirtColor);
-    this._pants.color.set(on ? 0xdfe3e8 : this._pantsColor);
+    this._applyOutfit();
   }
 
-  /** Armadura de cuero: el torso y las mangas pasan a color cuero. */
-  setArmor(on) {
-    this._armor = on;
-    if (this._suit) return;
-    this._shirt.color.set(on ? 0x8b5a2b : this._shirtColor);
+  /**
+   * Ropa puesta: { HEAD, CHEST, LEGS, FEET, HANDS } → color de cada prenda (o null).
+   * Cada pieza del cuerpo toma el color de su prenda.
+   */
+  setOutfit(colors) {
+    this._outfit = { ...colors };
+    this._applyOutfit();
+  }
+
+  _applyOutfit() {
+    const o = this._outfit ?? {};
+    const suit = this._suit;
+    this._shirt.color.set(suit ? 0xeef1f4 : o.CHEST ?? this._shirtColor);
+    this._pants.color.set(suit ? 0xdfe3e8 : o.LEGS ?? this._pantsColor);
+    this._boots.color.set(suit ? 0xc9ced4 : o.FEET ?? this._bootsColor);
+    this._hands.color.set(suit ? 0xdfe3e8 : o.HANDS ?? this._skinColor);
+    this._cap.visible = !suit && o.HEAD != null;
+    if (o.HEAD != null) this._capMat.color.set(o.HEAD);
   }
 
   /** Animación corta del brazo derecho (golpear, recoger). */

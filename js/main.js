@@ -32,6 +32,7 @@ import { HotbarSystem } from './inventory/HotbarSystem.js';
 import { ItemUseSystem } from './inventory/ItemUseSystem.js';
 import { SleepSystem } from './player/SleepSystem.js';
 import { CraftingPanel } from './ui/CraftingPanel.js';
+import { InventoryPanel } from './ui/InventoryPanel.js';
 import { registerCraftTools } from './admin/tools/CraftTools.js';
 import { WorldManager } from './world/WorldManager.js';
 import { loadSystem } from './systemdata/SystemLoader.js';
@@ -215,7 +216,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.WORLD_GENERATED, () => controller.spawn());
 
   // ---- Inventario e interacción (recoger, golpear) --------------------------
-  const inventory = new InventorySystem({ items: cfg.ITEMS, events });
+  const inventory = new InventorySystem({ items: cfg.ITEMS, events, config: cfg.INVENTORY });
   const hotbar = new HotbarSystem({ input, inventory, events });
   const equipment = new EquipmentSystem({ items: cfg.ITEMS, config: cfg.EQUIPMENT, inventory, events });
   const crafting = new CraftingSystem({ recipes: cfg.RECIPES, items: cfg.ITEMS, inventory, events });
@@ -312,8 +313,15 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   // Las vallas, paredes y patas de la nave también frenan a los animales.
   animals.setObstacles({ resolveCollisions: (pos, r, y0, y1) => combinedStructures.resolveCollisions(pos, r, y0, y1) });
-  events.on(GameEvents.EQUIPMENT_CHANGED, ({ slot, itemId }) => {
-    if (slot === 'BODY') player.model.setArmor(itemId === 'LEATHER_ARMOR');
+  // Ropa puesta: cada pieza del personaje toma el color de su prenda.
+  events.on(GameEvents.EQUIPMENT_CHANGED, ({ slots }) => {
+    player.model.setOutfit(Object.fromEntries(Object.entries(slots).map(([k, id]) => [k, id ? cfg.ITEMS[id].COLOR ?? null : null])));
+  });
+  // Lo que no cabe en el inventario cae al suelo en una bolsa delante del jugador.
+  events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount }) => {
+    const p = player.position;
+    const ahead = 1.2;
+    pickups.drop(worlds.activeId, p.x - Math.sin(player.yaw) * ahead, p.z - Math.cos(player.yaw) * ahead, itemId, amount);
   });
   const interactionProviders = [ship, pickups, bubbles];
   const interaction = new InteractionSystem({
@@ -496,6 +504,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   const hudRoot = document.getElementById('hud');
   const craftingPanel = new CraftingPanel({ container: hudRoot, crafting, input, events });
+  // Inventario completo (I): mochila 9×3, barra rápida 9×1 y ropa (5 ranuras).
+  const inventoryPanel = new InventoryPanel({ container: hudRoot, input, events, inventory, equipment, items: cfg.ITEMS });
+  inventoryPanel.setHotbar(hotbar);
   new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
 
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
@@ -1049,6 +1060,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(spaceHUD);
   loop.add(starMapHUD);
   loop.add(craftingPanel);
+  loop.add(inventoryPanel);
   loop.add(shipMapPanel);
   loop.add(shipChargerPanel);
   loop.add(shipWatch);
@@ -1068,7 +1080,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, inventoryPanel,
   };
 }
 

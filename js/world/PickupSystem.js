@@ -48,6 +48,25 @@ export class PickupSystem {
     this._list.delete(id);
   }
 
+  /**
+   * Deja objetos en el suelo junto a (x, z) en una bolsa. Si ya hay una bolsa a
+   * menos de 3 m en ese cuerpo, se meten en ella.
+   */
+  drop(body, x, z, item, count) {
+    for (const p of this._list.values()) {
+      if (p.model !== 'BAG' || p.taken || p.body !== body || Math.hypot(p.x - x, p.z - z) > 3) continue;
+      const same = p.contents.find((c) => c.item === item);
+      if (same) same.count += count;
+      else p.contents.push({ item, count });
+      return p;
+    }
+    this._bagSeq = (this._bagSeq ?? 0) + 1;
+    return this.add({
+      id: `BAG_${this._bagSeq}`, body, x, z, model: 'BAG', label: '🎒 Bolsa', action: 'Coger', beacon: false,
+      contents: [{ item, count }],
+    });
+  }
+
   clear(body = null) {
     for (const p of [...this._list.values()]) if (!body || p.body === body) this.remove(p.id);
   }
@@ -111,15 +130,24 @@ export class PickupSystem {
   interact(id) {
     const p = this._list.get(id);
     if (!p || p.taken) return false;
-    p.taken = true;
+    // Se coge lo que quepa; lo demás se queda dentro (la bolsa o el cofre siguen ahí).
     const got = [];
+    const left = [];
     for (const { item, count } of p.contents) {
-      this._inventory.addItem(item, count);
+      const n = this._inventory.addItem(item, count, { quiet: true });
       const def = this._items[item];
-      got.push(`${def?.ICON ?? ''} ${def?.NAME ?? item}${count > 1 ? ` ×${count}` : ''}`);
+      if (n > 0) got.push(`${def?.ICON ?? ''} ${def?.NAME ?? item}${n > 1 ? ` ×${n}` : ''}`);
+      if (n < count) left.push({ item, count: count - n });
     }
     if (got.length) this._events.emit(GameEvents.UI_MESSAGE, { text: `Has cogido: ${got.join(', ')}`, type: 'biome' });
+    if (left.length) {
+      p.contents = left;
+      this._events.emit(GameEvents.UI_MESSAGE, { text: '🎒 No te cabe todo: haz hueco en el inventario (I) y vuelve a cogerlo.', type: 'warning' });
+      return got.length > 0;
+    }
+    p.taken = true;
     this._events.emit(GameEvents.PICKUP_TAKEN, { id, body: p.body, contents: p.contents });
+    if (p.model === 'BAG') this.remove(id);
     return true;
   }
 
@@ -134,7 +162,17 @@ export class PickupSystem {
 function buildModel(p) {
   const g = new THREE.Group();
   g.name = `pickup:${p.id}`;
-  if (p.model === 'CHEST') {
+  if (p.model === 'BAG') {
+    // Bolsa de cuero con lo que no cupo en el inventario.
+    const leather = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.42, 0.4), leather);
+    bag.position.y = 0.21;
+    bag.castShadow = true;
+    g.add(bag);
+    const knot = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.16), new THREE.MeshLambertMaterial({ color: 0xd9b47a }));
+    knot.position.y = 0.48;
+    g.add(knot);
+  } else if (p.model === 'CHEST') {
     const wood = new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.5, metalness: 0.6 });
     const trim = new THREE.MeshStandardMaterial({ color: 0x3fb6ff, emissive: 0x1a6fa8, emissiveIntensity: 0.8 });
     const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.8), wood);

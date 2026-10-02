@@ -22,8 +22,8 @@ export function captureState({ systemName, target, campaignSeed, inventory, equi
     target,
     campaignSeed,
     totalHours: time.totalHours,
-    inventory: inventory.getAll().map((i) => [i.id, i.count]),
-    equipment: Object.values(equipment.slots).filter(Boolean),
+    slots: inventory.snapshot(),
+    worn: { ...equipment.slots },
     vitals: { health: health.value, hunger: hunger.value, thirst: thirst.value, energy: energy.value },
     life: { wearing: lifeSupport.wearing, oxygen: lifeSupport.oxygen, battery: lifeSupport.battery, gas: lifeSupport.gas },
     ship: {
@@ -59,13 +59,12 @@ export function takeHandoff(target, storage = safeStorage()) {
  */
 export function applyState(s, { items, techs, inventory, equipment, health, hunger, thirst, energy, lifeSupport, ship, time }) {
   const num = (v, min, max, def) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def);
-  inventory.clear();
-  for (const entry of Array.isArray(s.inventory) ? s.inventory.slice(0, 200) : []) {
-    const [id, count] = Array.isArray(entry) ? entry : [];
-    if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(items, id)) inventory.addItem(id, Math.floor(num(count, 0, 9999, 0)));
-  }
-  for (const id of Array.isArray(s.equipment) ? s.equipment.slice(0, 8) : []) {
-    if (typeof id === 'string' && inventory.hasItem(id, 1) && !equipment.isEquipped(id)) equipment.toggle(id);
+  const known = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(items, id);
+  // Huecos del inventario tal cual (se comprueba cada uno) y la ropa puesta.
+  inventory.restore(Array.isArray(s.slots) ? s.slots : []);
+  for (const slot of Object.keys(equipment.slots)) equipment.equipDirect?.(slot, null);
+  for (const [slot, id] of Object.entries(s.worn && typeof s.worn === 'object' ? s.worn : {})) {
+    if (known(id) && Object.prototype.hasOwnProperty.call(equipment.slots, slot)) equipment.equipDirect(slot, id);
   }
   const v = s.vitals ?? {};
   for (const [stat, key] of [[health, 'health'], [hunger, 'hunger'], [thirst, 'thirst'], [energy, 'energy']]) {

@@ -11,6 +11,7 @@ import { BatteryBank } from '../js/ship/BatteryBank.js';
 import { captureState, saveHandoff, takeHandoff, applyState } from '../js/core/TravelHandoff.js';
 import { EventBus } from '../js/core/EventBus.js';
 import { InventorySystem } from '../js/inventory/InventorySystem.js';
+import { EquipmentSystem } from '../js/inventory/EquipmentSystem.js';
 
 test('el catálogo de systems/ es válido y cada entrada carga su sistema', () => {
   const { entries, errors } = parseSystemCatalog(fs.readFileSync(new URL('../systems/catalogo.json', import.meta.url), 'utf8'));
@@ -57,14 +58,14 @@ function memoryStorage() {
 
 function fakeGame() {
   const events = new EventBus();
-  const inventory = new InventorySystem({ items: cfg.ITEMS, events });
+  const inventory = new InventorySystem({ items: cfg.ITEMS, events, config: cfg.INVENTORY });
   const stat = (v) => ({ value: v, set(x) { this.value = x; } });
   const installed = { ...cfg.SHIP.INSTALLED_EXPLORER };
   const ship = {
     isExplorer: false, installed, podsUsed: 0, batteries: new BatteryBank(cfg.SHIP.BATTERIES),
     upgrade() { this.isExplorer = true; }, installTech(slot, t) { this.installed[slot] = t; },
   };
-  const equipment = { slots: { BODY: null }, isEquipped: (id) => equipment.slots.BODY === id, toggle(id) { equipment.slots.BODY = id; } };
+  const equipment = new EquipmentSystem({ items: cfg.ITEMS, config: cfg.EQUIPMENT, inventory, events });
   const lifeSupport = { wearing: false, oxygen: 1, battery: 1, gas: 1, toggleSuit() { this.wearing = !this.wearing; } };
   return { inventory, equipment, health: stat(100), hunger: stat(100), thirst: stat(100), energy: stat(100), lifeSupport, ship, time: { totalHours: 8 } };
 }
@@ -72,8 +73,11 @@ function fakeGame() {
 test('el traspaso lleva la partida al nuevo sistema (y solo una vez)', () => {
   const a = fakeGame();
   a.inventory.addItem('MINERAL', 7);
-  a.inventory.addItem('LEATHER_ARMOR', 1);
-  a.equipment.toggle('LEATHER_ARMOR');
+  a.inventory.addItem('LEATHER_SHIRT', 1);
+  a.inventory.addItem('LEATHER_CAP', 1);
+  a.equipment.wear('LEATHER_SHIRT');
+  a.inventory.click(a.inventory.slots.findIndex((x) => x?.id === 'LEATHER_CAP')); // coger el gorro…
+  a.inventory.click(20, {}); // …y dejarlo en la mochila
   a.hunger.set(40);
   a.lifeSupport.toggleSuit();
   a.lifeSupport.oxygen = 0.3;
@@ -93,7 +97,9 @@ test('el traspaso lleva la partida al nuevo sistema (y solo una vez)', () => {
   const b = fakeGame();
   applyState(s, { items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, ...b });
   assert.equal(b.inventory.getItemCount('MINERAL'), 7);
-  assert.equal(b.equipment.slots.BODY, 'LEATHER_ARMOR');
+  assert.equal(b.equipment.slots.CHEST, 'LEATHER_SHIRT');
+  assert.equal(b.inventory.slots[20]?.id, 'LEATHER_CAP', 'cada objeto vuelve a su hueco');
+  assert.equal(b.inventory.getItemCount('LEATHER_SHIRT'), 0, 'lo puesto no ocupa hueco');
   assert.equal(b.hunger.value, 40);
   assert.equal(b.lifeSupport.wearing, true);
   assert.equal(b.lifeSupport.oxygen, 0.3);
@@ -107,13 +113,15 @@ test('un traspaso manipulado no mete objetos ni tecnologías que no existen', ()
   const store = memoryStorage();
   store.set('mundo0.hyperjump', JSON.stringify({
     v: 1, at: Date.now(), target: 'kappa',
-    inventory: [['NO_EXISTE', 5], ['__proto__', 1], ['MINERAL', 1e9], ['WOOD', 'mucho']],
+    slots: [['NO_EXISTE', 5], ['__proto__', 1], ['MINERAL', 1e9], ['WOOD', 'mucho'], ['LEATHER_CAP', 7]],
+    worn: { HEAD: 'MEAT', CHEST: 'NO_EXISTE', __proto__: { x: 1 }, FEET: 'LEATHER_SHOES' },
     ship: { installed: { CONTROL_2: 'ARMA_SECRETA', NO_SLOT: 'AI_NODE' }, batteries: [1e9, -5, 'x', null] },
     vitals: { health: -100 }, life: { oxygen: 99 },
   }));
   const b = fakeGame();
   applyState(takeHandoff('kappa', store), { items: cfg.ITEMS, techs: cfg.SHIP.TECHNOLOGIES, ...b });
-  assert.deepEqual(b.inventory.getAll().map((i) => [i.id, i.count]), [['MINERAL', 9999]]);
+  assert.deepEqual(b.inventory.getAll().map((i) => [i.id, i.count]), [['MINERAL', 100], ['LEATHER_CAP', 1]], 'como mucho una pila por hueco');
+  assert.deepEqual(b.equipment.slots, { HEAD: null, CHEST: null, LEGS: null, FEET: 'LEATHER_SHOES', HANDS: null }, 'solo prendas en su ranura');
   assert.notEqual(b.ship.installed.CONTROL_2, 'ARMA_SECRETA');
   assert.equal(b.ship.installed.NO_SLOT, undefined);
   assert.deepEqual(b.ship.batteries.slots.map((x) => x && x.charge), [100, 0, 100, null]);

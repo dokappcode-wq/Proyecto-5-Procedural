@@ -1,13 +1,16 @@
 import { GameEvents } from '../core/GameEvents.js';
 
 /**
- * EquipmentSystem — equipamiento mínimo: una ranura (BODY) para la armadura.
- * Sin Three.js ni DOM. Nada de equipamiento avanzado.
+ * EquipmentSystem — ropa y armadura: cinco ranuras (EQUIPMENT.SLOTS):
+ *   HEAD (casco/gorro), CHEST (pechera/camiseta), LEGS (pantalones),
+ *   FEET (calzado), HANDS (guantes).
  *
- * - El objeto equipado sigue contando en el inventario (no se "mueve").
- * - Si el objeto desaparece del inventario, se desequipa solo.
- * - getColdLossMultiplier(): lo usa TemperatureSystem (Fase 10). La armadura
- *   NO da inmunidad: solo reduce la velocidad a la que se pierde temperatura.
+ * - Lo que se lleva puesto SALE del inventario (ocupa su ranura, no un hueco).
+ * - Cada prenda dice en qué ranura va (ITEMS.*.SLOT) y cuánto protege del frío
+ *   (ITEMS.*.COLD_PROTECTION, 0..1). Las protecciones se suman.
+ * - getColdLossMultiplier(): lo usa TemperatureSystem. La ropa NO da inmunidad:
+ *   solo reduce la velocidad a la que se pierde temperatura.
+ * Sin Three.js ni DOM.
  */
 export class EquipmentSystem {
   constructor({ items, config, inventory, events }) {
@@ -16,34 +19,87 @@ export class EquipmentSystem {
     this._cfg = config;
     this._inventory = inventory;
     this._events = events;
-    this.slots = { BODY: null };
+    this.slotDefs = config.SLOTS;
+    this.slots = Object.fromEntries(Object.keys(config.SLOTS).map((k) => [k, null]));
+    inventory.attachEquipment?.(this);
+  }
 
-    events.on(GameEvents.INVENTORY_CHANGED, ({ itemId, count }) => {
-      for (const slot in this.slots) if (this.slots[slot] === itemId && count === 0) this._set(slot, null);
-    });
+  slotName(slot) {
+    return this.slotDefs[slot]?.NAME?.toLowerCase() ?? slot;
+  }
+
+  canWear(slot, itemId) {
+    return Object.prototype.hasOwnProperty.call(this.slots, slot) && this._items[itemId]?.SLOT === slot;
   }
 
   isEquipped(itemId) {
     return Object.values(this.slots).includes(itemId);
   }
 
-  /** Equipa o quita el objeto. @returns {boolean} true si queda equipado */
+  /**
+   * Ponerse una prenda del inventario (si ya había otra en esa ranura, vuelve al inventario).
+   * @returns {boolean}
+   */
+  wear(itemId) {
+    const slot = this._items[itemId]?.SLOT;
+    if (!slot || !this.canWear(slot, itemId) || !this._inventory.hasItem(itemId)) return false;
+    const old = this.slots[slot];
+    this._inventory.removeItem(itemId, 1);
+    this._set(slot, itemId);
+    if (old) this._inventory.addItem(old, 1);
+    return true;
+  }
+
+  /** Quitarse la prenda de una ranura (vuelve al inventario; si no cabe, no se quita). */
+  takeOff(slot) {
+    const id = this.slots[slot];
+    if (!id) return false;
+    if (this._inventory.roomFor(id) < 1) {
+      this._events.emit(GameEvents.UI_MESSAGE, { text: 'No te cabe en el inventario: haz hueco primero.', type: 'info' });
+      return false;
+    }
+    this._set(slot, null);
+    this._inventory.addItem(id, 1);
+    return true;
+  }
+
+  /** Ponerse / quitarse (usar la prenda desde la barra rápida). @returns {boolean} true si queda puesta */
   toggle(itemId) {
-    const def = this._items[itemId];
-    if (!def?.SLOT || !this._inventory.hasItem(itemId)) return false;
-    const equipped = this.slots[def.SLOT] === itemId;
-    this._set(def.SLOT, equipped ? null : itemId);
-    return !equipped;
+    const slot = this._items[itemId]?.SLOT;
+    if (!slot) return false;
+    if (this.slots[slot] === itemId && !this._inventory.hasItem(itemId)) {
+      this.takeOff(slot);
+      return false;
+    }
+    return this.wear(itemId);
+  }
+
+  /** Ponerse algo directamente (al llegar por el hiperespacio). */
+  equipDirect(slot, itemId) {
+    if (itemId === null && Object.prototype.hasOwnProperty.call(this.slots, slot)) {
+      this._set(slot, null);
+      return true;
+    }
+    if (!this.canWear(slot, itemId)) return false;
+    this._set(slot, itemId);
+    return true;
+  }
+
+  /** Protección total contra el frío (0..1). */
+  get coldProtection() {
+    let p = 0;
+    for (const id of Object.values(this.slots)) if (id) p += this._items[id]?.COLD_PROTECTION ?? 0;
+    return Math.min(this._cfg.MAX_COLD_PROTECTION ?? 0.8, p);
   }
 
   /** Multiplicador de pérdida de temperatura (1 = sin protección). */
   getColdLossMultiplier() {
-    return this.slots.BODY === 'LEATHER_ARMOR' ? this._cfg.ARMOR_COLD_RESISTANCE : 1;
+    return 1 - this.coldProtection;
   }
 
   _set(slot, itemId) {
     if (this.slots[slot] === itemId) return;
     this.slots[slot] = itemId;
-    this._events.emit(GameEvents.EQUIPMENT_CHANGED, { slot, itemId });
+    this._events.emit(GameEvents.EQUIPMENT_CHANGED, { slot, itemId, slots: { ...this.slots } });
   }
 }

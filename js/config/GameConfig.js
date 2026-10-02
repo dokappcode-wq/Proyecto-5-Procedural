@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.6.0',
+    VERSION: '1.7.0',
   },
 
   RENDER: {
@@ -73,6 +73,7 @@ export const GameConfig = deepFreeze({
       USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado · en modo construcción: quitar pieza
       ROTATE: ['KeyQ'],                 // girar la pieza antes de colocarla
       CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
+      INVENTORY: ['KeyI'],              // abrir/cerrar el inventario (mochila 9×3 + barra + ropa)
       BUILD_MODE: ['KeyB'],             // entrar/salir del modo construcción
       SHIP_TAKEOFF: ['KeyT'],           // nave (a los mandos): despegar / aterrizar
       SHIP_HATCH: ['KeyG'],             // nave: abrir / cerrar la compuerta
@@ -199,6 +200,14 @@ export const GameConfig = deepFreeze({
     KEEP_INVENTORY_ON_DEATH: true,
   },
 
+  // Inventario por huecos: barra rápida 9 × 1 (teclas 1–9) + mochila 9 × 3 (tecla I).
+  INVENTORY: {
+    HOTBAR_SLOTS: 9,
+    MAIN_ROWS: 3,
+    MAIN_COLUMNS: 9,
+    MAX_STACK: 100,           // unidades por hueco (ITEMS.*.STACK lo cambia; la ropa no se apila)
+  },
+
   // Tipos de recurso: qué dan al recogerlos, colisión y tamaño.
   // HARVEST: cada acción de recoger da 1 ITEM hasta agotar AMOUNT. Si REMOVE_WHEN_EMPTY,
   // el recurso desaparece; si no, vuelve a dar fruto tras REGROW_SECONDS.
@@ -242,7 +251,12 @@ export const GameConfig = deepFreeze({
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN' },
-    LEATHER_ARMOR: { NAME: 'Armadura de cuero', ICON: '🦺', USE: 'EQUIP', SLOT: 'BODY' },
+    // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
+    LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
+    LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
+    LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
+    LEATHER_SHOES: { NAME: 'Zapatillas de cuero', ICON: '👟', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, COLD_PROTECTION: 0.03, COLOR: 0x4a2f18, DESC: 'Pies calientes y secos.' },
+    LEATHER_GLOVES: { NAME: 'Guantes de cuero', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, COLD_PROTECTION: 0.02, COLOR: 0x5c3a1c, DESC: 'Manos protegidas.' },
     // Combustible de la nave: se colocan en el puesto de carga (ver SHIP.BATTERIES).
     PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋', USE: 'BATTERY' },
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
@@ -272,7 +286,15 @@ export const GameConfig = deepFreeze({
 
   // Equipamiento sencillo (Fase 8).
   EQUIPMENT: {
-    ARMOR_COLD_RESISTANCE: 0.7, // multiplicador de pérdida de temperatura con armadura (1 = sin efecto)
+    // Ranuras de ropa/armadura (en este orden en el panel del inventario).
+    SLOTS: {
+      HEAD: { NAME: 'Cabeza', ICON: '🪖' },
+      CHEST: { NAME: 'Pecho', ICON: '🦺' },
+      LEGS: { NAME: 'Piernas', ICON: '👖' },
+      FEET: { NAME: 'Pies', ICON: '🥾' },
+      HANDS: { NAME: 'Manos', ICON: '🧤' },
+    },
+    MAX_COLD_PROTECTION: 0.8,   // la ropa nunca quita más del 80 % de la pérdida de calor
     WATER_CAPACITY: 3,          // unidades de agua por odre
   },
 
@@ -280,7 +302,11 @@ export const GameConfig = deepFreeze({
   // (La cama y las piezas de casa se construyen en el modo construcción: BUILD.)
   RECIPES: {
     WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
-    LEATHER_ARMOR: { RESULT: 'LEATHER_ARMOR', AMOUNT: 1, INGREDIENTS: { LEATHER: 4 } },
+    LEATHER_CAP: { RESULT: 'LEATHER_CAP', AMOUNT: 1, INGREDIENTS: { LEATHER: 1 } },
+    LEATHER_SHIRT: { RESULT: 'LEATHER_SHIRT', AMOUNT: 1, INGREDIENTS: { LEATHER: 3 } },
+    LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, INGREDIENTS: { LEATHER: 2 } },
+    LEATHER_SHOES: { RESULT: 'LEATHER_SHOES', AMOUNT: 1, INGREDIENTS: { LEATHER: 2 } },
+    LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, INGREDIENTS: { LEATHER: 1 } },
   },
 
   // Construcción modular (Fase 9): el jugador construye pieza a pieza.

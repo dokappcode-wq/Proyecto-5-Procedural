@@ -37,10 +37,11 @@ export const GameEvents = Object.freeze({
   ANIMAL_HIT: 'animal:hit',                         // { animal, killed }
   ANIMAL_KILLED: 'animal:killed',                   // { animal, drops }
   RESOURCE_HARVESTED: 'resource:harvested',         // { node, item, amount, depleted }
-  INVENTORY_CHANGED: 'inventory:changed',           // { itemId, count, delta, items }
-  HOTBAR_CHANGED: 'inventory:hotbarChanged',        // { selectedId }
+  INVENTORY_CHANGED: 'inventory:changed',           // { itemId, count, delta, items, slots, cursor }
+  HOTBAR_CHANGED: 'inventory:hotbarChanged',        // { selectedId, selectedIndex }
+  INVENTORY_FULL: 'inventory:full',                 // { itemId, amount } lo que no ha cabido
   ITEM_USED: 'inventory:itemUsed',                  // { itemId, use }
-  EQUIPMENT_CHANGED: 'inventory:equipmentChanged',  // { slot, itemId|null }
+  EQUIPMENT_CHANGED: 'inventory:equipmentChanged',  // { slot, itemId|null, slots }
 
   // Alimentación
   FOOD_EATEN: 'nutrition:foodEaten',                // { itemId, foodType, hunger }

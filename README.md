@@ -28,6 +28,7 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
+| INV | Inventario por huecos (tecla `I`): barra rápida 9×1 + mochila 9×3, pilas de hasta 100, ropa en 5 ranuras (cabeza, pecho, piernas, pies, manos). Conjunto de cuero fabricable (gorro, camiseta, pantalones, zapatillas, guantes) que abriga sumando hasta un 30 %. Lo que no cabe cae al suelo en una bolsa |
 | 1d | Importar sistemas solares: panel con archivo, arrastrar o pegar; comprobación segura (solo JSON, 256 KB, nada se ejecuta), vista previa, avisos de claves ignoradas, ideas no soportadas, errores con *Copiar error para Claude* y *Copiar prompt para Claude*; guardados en el navegador (IndexedDB) para jugarlos o borrarlos, y como destinos del hiperespacio |
 | K | Sistema Kappa: Thalassa (mundo oceánico), Pontos (solo mar, sin una isla, con una ola gigante cada 24 h) y Ferrum (enorme desierto rojo de dunas). Generador `open_ocean`, nave que amerriza y `water.giant_wave` |
 | 1c | Generadores `archipelago`, `ocean_world`, `highlands` y `dunes`; nadar y bucear (capacidad del motor: cada sistema la activa o ajusta con `water.swim/dive/visibility_m`; bajo el agua no se respira sin traje); fauna con `name`, `size`, `color`, `temperament` y `biome`; flora con `color`, `fruit_color` y `size` |
@@ -258,6 +259,12 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Inventario (I)**: pulsa `I`. Arriba la mochila (9×3) y debajo la barra rápida (9×1, teclas 1–9);
+  a la izquierda las 5 ranuras de ropa. Clic: coger/dejar/juntar/cambiar · clic derecho: coger la
+  mitad o dejar una · Shift+clic: mover entre barra y mochila (o ponerse/quitarse la ropa). Cada
+  hueco guarda hasta 100 unidades (la ropa, 1). Fabrica la ropa con cuero (`Tab`): gorro 1, camiseta 3,
+  pantalones 2, zapatillas 2, guantes 1; también se pone con clic derecho/`R` desde la barra. Si el
+  inventario se llena, lo que sobra cae en una 🎒 bolsa delante de ti (E para cogerla).
 - **Importar sistemas (1d)**: en la pantalla de inicio pulsa *📥 Importar sistema solar* (o Admin →
   Mundo → *Importar sistema solar…*, o el botón del panel de hiperespacio). El prompt también está en
   `systems/PROMPT_PARA_CLAUDE.txt` (se regenera con `npm run prompt`). *Copiar prompt para Claude*

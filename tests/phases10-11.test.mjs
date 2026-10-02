@@ -59,6 +59,9 @@ test('dormir adelanta el reloj y los periodos del día se anuncian', () => {
 
 // ---- Temperatura -----------------------------------------------------------------
 
+// Todo el conjunto de cuero puesto: 1 − suma de protecciones.
+const ARMOR_K = 1 - ['LEATHER_CAP', 'LEATHER_SHIRT', 'LEATHER_PANTS', 'LEATHER_SHOES', 'LEATHER_GLOVES'].reduce((a, id) => a + GameConfig.ITEMS[id].COLD_PROTECTION, 0);
+
 function setupTemperature({ biome = 'PLAINS', y = 5, hour = 13, armor = false, shelter = null } = {}) {
   const events = new EventBus();
   const log = [];
@@ -68,7 +71,7 @@ function setupTemperature({ biome = 'PLAINS', y = 5, hour = 13, armor = false, s
   const player = { position: { x: 0, y, z: 0 } };
   const weights = { PLAINS: 0, FOREST: 0, FROZEN_MOUNTAINS: 0, [biome]: 1 };
   const world = { seaLevel: 0, getBiomeAt: () => ({ weights }) };
-  const equipment = { armor, getColdLossMultiplier: () => (equipment.armor ? GameConfig.EQUIPMENT.ARMOR_COLD_RESISTANCE : 1) };
+  const equipment = { armor, getColdLossMultiplier: () => (equipment.armor ? ARMOR_K : 1) };
   const temperature = new TemperatureSystem({
     config: C, biomes: BIOMES, world, time, player, equipment, events,
     shelter: shelter ? { getShelterAt: () => shelter } : null,
@@ -141,14 +144,14 @@ test('al volver al calor deja de doler y se recupera gradualmente', () => {
   assert.ok(hitsAfter - hitsBefore <= 1, 'como mucho un golpe pendiente al salir');
 });
 
-test('la armadura reduce la pérdida (ARMOR_COLD_RESISTANCE) y el refugio climatizado protege', () => {
+test('la ropa reduce la pérdida de calor y el refugio climatizado protege', () => {
   const bare = setupTemperature({ biome: 'FROZEN_MOUNTAINS', y: 40, hour: 13 });
   const armored = setupTemperature({ biome: 'FROZEN_MOUNTAINS', y: 40, hour: 13, armor: true });
   bare.run(20);
   armored.run(20);
   assert.ok(armored.temperature.value > bare.temperature.value, 'con armadura se enfría más despacio');
   assert.ok(armored.temperature.target > bare.temperature.target, 'y se queda en una temperatura menos extrema');
-  const k = GameConfig.EQUIPMENT.ARMOR_COLD_RESISTANCE;
+  const k = ARMOR_K;
   const amb = bare.temperature.ambient;
   assert.ok(Math.abs(armored.temperature.target - (C.COMFORT - (C.COMFORT - amb) * k)) < 1e-9);
 
