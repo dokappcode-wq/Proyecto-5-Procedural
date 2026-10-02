@@ -37,6 +37,11 @@ export class PropMesher {
     return { props, grass };
   }
 
+  /** Geometría suelta de un nodo (en su origen, sin girar ni escalar): el árbol que cae al talarlo. */
+  nodeGeometry(n) {
+    return this._merge([{ template: this._pick(n.type, n.variant), x: 0, y: 0, z: 0, scale: 1, rotation: 0, tint: n.tint }]);
+  }
+
   _pick(type, variant) {
     const list = this._templates[type];
     return list[variant % list.length];

@@ -213,6 +213,12 @@ export class WorldGenerator {
     return hc + (hb - hc) * (1 - fx) + (hd - hc) * (1 - fz);
   }
 
+  /** Malla suelta de un recurso (geometría + material de los recursos): árbol talado que cae. */
+  propMesh(node) {
+    const geo = this._propMesher.nodeGeometry(node);
+    return geo ? new THREE.Mesh(geo, this._propMaterial) : null;
+  }
+
   get seaLevel() {
     return this._cfg.SEA_LEVEL;
   }

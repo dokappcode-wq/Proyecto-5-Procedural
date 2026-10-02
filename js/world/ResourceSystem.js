@@ -205,7 +205,7 @@ export class ResourceSystem {
           rotation: rRot * Math.PI * 2,
           variant: Math.floor(rVar * 3),
           tint: rTint,
-          radius: def.COLLISION_RADIUS * (type === 'ROCK' ? scale : size),
+          radius: def.COLLISION_RADIUS * (type === 'ROCK' || def.SCALE_COLLISION ? scale : size),
           remaining: def.HARVEST ? def.HARVEST.AMOUNT : 0,
           depleted: false,
           removed: this._removed.has(id),

@@ -11,7 +11,8 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  * Acciones:
  *   INTERACT (E)          recoger del recurso señalado / beber del agua señalada
- *   ATTACK   (clic / F)   golpear al animal señalado (o recoger si es un recurso)
+ *   ATTACK   (clic / F)   golpear al animal señalado (o recoger si es un recurso);
+ *                         los troncos (HARVEST.METHOD 'HIT') solo dan madera a golpes
  *
  * No contiene reglas de los recursos ni de los animales: delega en
  * ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
@@ -73,7 +74,14 @@ export class InteractionSystem {
 
   _act(target, button) {
     this._cooldown = this._cfg.ACTION_COOLDOWN;
-    if (target?.kind === 'resource' && target.action) {
+    if (target?.kind === 'resource' && target.hit) {
+      // Troncos: a golpes. Con E solo se explica cómo.
+      if (button === 'ATTACK') this._chop(target.ref);
+      else {
+        this._cooldown = 0;
+        this._hintChop();
+      }
+    } else if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
     } else if (target?.kind === 'provided' && button === 'INTERACT') {
       target.provider.interact(target.ref.id);
@@ -97,6 +105,27 @@ export class InteractionSystem {
     if (!result) return;
     this._inventory.addItem(result.item, result.amount);
     this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
+  }
+
+  /** Golpe al tronco: un trozo de madera por golpe; al último, el árbol cae. */
+  _chop(node) {
+    const def = this._types[node.type];
+    const result = this._world.resources.harvest(node.id);
+    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'harvest' });
+    if (!result) return;
+    const p = this._player.position;
+    this._events.emit(GameEvents.RESOURCE_HIT, {
+      node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z, felled: result.removed,
+    });
+    this._inventory.addItem(result.item, result.amount);
+    this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
+  }
+
+  _hintChop() {
+    const now = performance.now();
+    if (now - (this._hintAt ?? -1e9) < 4000) return;
+    this._hintAt = now;
+    this._events.emit(GameEvents.UI_MESSAGE, { text: '🪓 Golpea el tronco (clic o F) para sacar trozos de madera.', type: 'info' });
   }
 
   _hit(animal) {
@@ -196,6 +225,9 @@ export class InteractionSystem {
     }
     const def = this._types[t.ref.type];
     if (t.ref.remaining <= 0) return { ...t, label: `${def.NAME} (sin fruto)`, action: null };
+    if (def.HARVEST.METHOD === 'HIT') {
+      return { ...t, hit: true, label: `${def.NAME} · ${t.ref.remaining} 🪵`, action: def.HARVEST.VERB, key: 'Clic', remaining: t.ref.remaining };
+    }
     return { ...t, label: def.NAME, action: def.HARVEST.VERB, key: 'E', remaining: t.ref.remaining };
   }
 }

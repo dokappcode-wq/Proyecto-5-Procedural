@@ -31,8 +31,7 @@ import { EquipmentSystem } from './inventory/EquipmentSystem.js';
 import { HotbarSystem } from './inventory/HotbarSystem.js';
 import { ItemUseSystem } from './inventory/ItemUseSystem.js';
 import { SleepSystem } from './player/SleepSystem.js';
-import { CraftingPanel } from './ui/CraftingPanel.js';
-import { InventoryPanel } from './ui/InventoryPanel.js';
+import { PlayerMenu } from './ui/PlayerMenu.js';
 import { registerCraftTools } from './admin/tools/CraftTools.js';
 import { WorldManager } from './world/WorldManager.js';
 import { loadSystem } from './systemdata/SystemLoader.js';
@@ -68,6 +67,7 @@ import { ShipSystem } from './ship/ShipSystem.js';
 import { toWorld as toShipWorld } from './ship/ShipLayout.js';
 import { PickupSystem, findDropSite } from './world/PickupSystem.js';
 import { GiantWaveSystem } from './world/GiantWave.js';
+import { ChopEffects } from './world/ChopEffects.js';
 import { BubbleSystem } from './world/BubbleSystem.js';
 import { LifeSupportSystem } from './player/LifeSupportSystem.js';
 import { StationSystem } from './construction/StationSystem.js';
@@ -317,6 +317,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.EQUIPMENT_CHANGED, ({ slots }) => {
     player.model.setOutfit(Object.fromEntries(Object.entries(slots).map(([k, id]) => [k, id ? cfg.ITEMS[id].COLOR ?? null : null])));
   });
+  // Astillas al golpear troncos y árboles que caen al talarlos.
+  const chopEffects = new ChopEffects({ scene: render.scene, events, worlds });
   // Lo que no cabe en el inventario cae al suelo en una bolsa delante del jugador.
   events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount }) => {
     const p = player.position;
@@ -386,7 +388,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     if (locked) controlLocks.add(reason);
     else controlLocks.delete(reason);
     if (locked) construction.setActive(false);
-    for (const s of [controller, hotbar, itemUse, interaction, construction, craftingPanel]) s.enabled = controlLocks.size === 0;
+    for (const s of [controller, hotbar, itemUse, interaction, construction, playerMenu]) s.enabled = controlLocks.size === 0;
+    if (controlLocks.size) playerMenu.setOpen(false);
     if (eva?.active) controller.enabled = false; // en el paseo espacial manda EVASystem
     if (!controlLocks.size) interaction.resetTarget();
   };
@@ -503,10 +506,17 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     canvas: render.domElement,
   });
   const hudRoot = document.getElementById('hud');
-  const craftingPanel = new CraftingPanel({ container: hudRoot, crafting, input, events });
-  // Inventario completo (I): mochila 9×3, barra rápida 9×1 y ropa (5 ranuras).
-  const inventoryPanel = new InventoryPanel({ container: hudRoot, input, events, inventory, equipment, items: cfg.ITEMS });
-  inventoryPanel.setHotbar(hotbar);
+  // Menú del reloj de pulsera: Tab = fabricación, I = inventario (mochila 9×3, barra, ropa) + "Tú".
+  const playerMenu = new PlayerMenu({
+    container: hudRoot, input, events, inventory, equipment, crafting, hotbar, time,
+    items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stats: { health, hunger, thirst, energy },
+  });
+  // Al abrirlo, el jugador levanta la muñeca y la cámara se acerca al reloj.
+  events.on(GameEvents.UI_PANEL_TOGGLED, ({ id, open }) => {
+    if (id !== 'player-menu') return;
+    player.model.setWristPose(open);
+    camera.setWristView(open ? player.model.watch : null);
+  });
   new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
 
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
@@ -1028,6 +1038,14 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
+  // Reloj de pulsera: la cabeza no tapa el reloj al mirarlo y su pantalla da la hora.
+  loop.add({
+    name: 'wristWatch',
+    update: () => {
+      player.model.setHeadVisible(camera.wristBlend < 0.3);
+      player.model.setWatchText(time.clockText);
+    },
+  });
   loop.add(eva);         // paseo espacial: mueve al jugador y coloca la cámara (sustituye a los dos anteriores)
   loop.add(hotbar);      // teclas 1–9
   loop.add(construction); // modo construcción: apuntar, vista previa, colocar/quitar
@@ -1035,6 +1053,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
+  loop.add(chopEffects); // astillas y árboles que caen
   loop.add(hunger);      // supervivencia: desgaste por tiempo y actividad
   loop.add(thirst);
   loop.add(energy);
@@ -1059,8 +1078,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(ui);
   loop.add(spaceHUD);
   loop.add(starMapHUD);
-  loop.add(craftingPanel);
-  loop.add(inventoryPanel);
+  loop.add(playerMenu);
   loop.add(shipMapPanel);
   loop.add(shipChargerPanel);
   loop.add(shipWatch);
@@ -1080,7 +1098,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
-    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, inventoryPanel,
+    celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects,
   };
 }
 

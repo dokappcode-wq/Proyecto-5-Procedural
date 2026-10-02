@@ -500,65 +500,6 @@ body.build-mode #crosshair::before, body.build-mode #crosshair::after { backgrou
 .diet[data-state="TOO_MUCH_ANIMAL"] .diet-value,
 .diet[data-state="TOO_MUCH_PLANT"] .diet-value { color: #ffcf7a; }
 
-/* ---- Fabricación ---------------------------------------------------- */
-#crafting-panel {
-  pointer-events: auto; /* vive dentro del HUD, que ignora el ratón */
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 28;
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  display: flex;
-  flex-direction: column;
-  background: var(--ui-bg-strong);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-}
-#crafting-panel header, #crafting-panel footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-}
-#crafting-panel header { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.85rem; }
-#crafting-panel footer { display: block; text-align: center; color: var(--ui-muted); font-size: 0.75rem; }
-#crafting-panel .close { background: none; border: 0; color: var(--ui-fg); font-size: 1rem; cursor: pointer; }
-#crafting-panel .recipes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 10px;
-  padding: 0 14px;
-  overflow-y: auto;
-}
-.recipe {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.recipe.ready { border-color: rgba(216, 245, 176, 0.45); }
-.recipe-title { font-weight: 700; }
-.ingredients { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 0.82rem; }
-.ingredients .ok { color: #d8f5b0; }
-.ingredients .missing { color: #ff8a80; }
-.recipe button {
-  font: inherit;
-  font-weight: 600;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--ui-accent);
-  color: #06121f;
-  cursor: pointer;
-}
-.recipe button:disabled { opacity: 0.4; cursor: default; }
-.recipe button:focus-visible, #crafting-panel .close:focus-visible { outline: 2px solid #ffe38a; outline-offset: 2px; }
-
 /* ---- Sueño ---------------------------------------------------------- */
 #sleep-overlay {
   position: fixed;
@@ -1105,29 +1046,115 @@ body.underwater #vignette {
   #import-panel .imp-list li { flex-wrap: wrap; }
 }
 
-/* ---- Inventario (I): mochila 9×3, barra 9×1 y ropa ------------------------------ */
+/* ---- Barra rápida: huecos vacíos ------------------------------------------------ */
 #inventory-bar .inv-slot.empty { opacity: 0.55; }
-#inventory-panel { width: min(760px, calc(100vw - 32px)); }
-#inventory-panel .inv-layout { display: flex; gap: 18px; align-items: flex-start; padding-bottom: 6px; }
-#inventory-panel h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ui-muted); margin: 6px 0; }
-#inventory-panel .inv-gear { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
-#inventory-panel .inv-gear-row { display: flex; align-items: center; gap: 10px; }
-#inventory-panel .inv-gear-name { color: var(--ui-muted); font-size: 0.85rem; }
-#inventory-panel .inv-protection { font-size: 0.8rem; color: #bfe3ff; margin: 6px 0 0; }
-#inventory-panel .inv-bag { flex: 1; min-width: 0; }
-#inventory-panel .inv-grid { display: grid; grid-template-columns: repeat(9, 52px); gap: 5px; }
-#inventory-panel .inv-hotbar { padding-top: 4px; }
-#inventory-panel .inv-slot { cursor: pointer; user-select: none; }
-#inventory-panel .inv-slot:hover { border-color: rgba(255, 255, 255, 0.55); }
-#inventory-panel .inv-slot.empty .icon { opacity: 0.35; }
-#inventory-panel .inv-slot.gear { background: rgba(139, 90, 43, 0.25); }
-#inventory-panel .inv-info { min-height: 1.3em; font-size: 0.85rem; color: #e8f0f8; margin: 8px 0 0; }
-.inv-cursor {
-  position: fixed; z-index: 60; pointer-events: none; transform: translate(-50%, -50%);
-  border-color: #ffe38a; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+
+/* ---- Menú del reloj de pulsera (Tab / I): estilo panel tecnológico ---------------- */
+#player-menu.pm {
+  --pm-cyan: #6fe0ff;
+  --pm-line: rgba(110, 220, 255, 0.55);
+  --pm-tile: rgba(14, 44, 74, 0.82);
+  left: auto; right: 2vw; transform: translateY(-50%);
+  width: min(1060px, 64vw); max-height: calc(100vh - 40px);
+  color: #d6f2ff;
+  background:
+    repeating-linear-gradient(0deg, rgba(120, 220, 255, 0.035) 0 1px, transparent 1px 4px),
+    linear-gradient(160deg, rgba(14, 46, 78, 0.94), rgba(5, 16, 32, 0.96));
+  border: 2px solid var(--pm-line);
+  border-radius: 4px;
+  clip-path: polygon(0 18px, 18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+  box-shadow: 0 0 30px rgba(80, 200, 255, 0.35), inset 0 0 40px rgba(60, 160, 255, 0.12);
 }
-@media (max-width: 720px) {
-  #inventory-panel .inv-layout { flex-direction: column; }
-  #inventory-panel .inv-grid { grid-template-columns: repeat(9, minmax(28px, 1fr)); }
-  #inventory-panel .inv-slot { width: auto; height: auto; aspect-ratio: 1; font-size: 1.1rem; }
+#player-menu.pm > header { display: none; }
+#player-menu.pm > footer { color: #8fb8cc; border-top: 1px solid rgba(110, 220, 255, 0.2); }
+#player-menu .panel-body { padding: 10px 16px 6px; }
+#player-menu .pm-layout { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 16px; }
+#player-menu .pm-main { display: flex; flex-direction: column; min-width: 0; }
+#player-menu .pm-main > * { flex-shrink: 0; }
+#player-menu .pm-tabs { display: flex; align-items: flex-end; gap: 26px; margin-bottom: 8px; }
+#player-menu .pm-tab, #player-menu .pm-you-title {
+  font-family: 'Oswald', 'Bahnschrift', 'Arial Narrow', 'Roboto Condensed', sans-serif; font-stretch: condensed; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.02em; font-size: clamp(1.4rem, 2.6vw, 2.3rem); line-height: 1.1;
 }
+#player-menu .pm-tab {
+  background: none; border: 0; padding: 0 0 6px; cursor: pointer; color: rgba(160, 200, 220, 0.55);
+  border-bottom: 3px solid transparent;
+}
+#player-menu .pm-tab:hover { color: #cfefff; }
+#player-menu .pm-tab.active { color: #ffffff; border-bottom-color: #ffffff; }
+#player-menu .pm-close { margin-left: auto; align-self: flex-start; background: none; border: 1px solid var(--pm-line); color: var(--pm-cyan); width: 30px; height: 30px; cursor: pointer; }
+#player-menu .pm-toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
+#player-menu .pm-search, #player-menu .pm-category {
+  font: inherit; color: #e6f7ff; background: rgba(4, 22, 40, 0.85); border: 1px solid rgba(110, 220, 255, 0.35);
+  padding: 7px 10px; border-radius: 2px;
+}
+#player-menu .pm-search { flex: 1; min-width: 0; }
+#player-menu .pm-sub { margin: 4px 0; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: #7fb6cc; }
+#player-menu .pm-grid { display: grid; gap: 6px; }
+#player-menu .pm-bag, #player-menu .pm-bar { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+#player-menu .pm-recipes { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); max-height: 46vh; overflow-y: auto; padding-right: 4px; }
+/* Casilla con fondo de panal, como en los paneles tecnológicos. */
+#player-menu .pm-slot, .pm-cursor {
+  position: relative; aspect-ratio: 1; display: grid; place-items: center; user-select: none; cursor: pointer;
+  font-size: clamp(1.2rem, 2.1vw, 1.9rem);
+  background-color: var(--pm-tile, rgba(14, 44, 74, 0.82));
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='42' viewBox='0 0 24 42'%3E%3Cpath d='M12 0l12 7v14l-12 7L0 21V7z M12 28l12 7v14' fill='none' stroke='%2378c8ff' stroke-opacity='0.13'/%3E%3C/svg%3E");
+  border: 1px solid rgba(110, 220, 255, 0.22);
+}
+#player-menu .pm-slot:hover { border-color: rgba(160, 235, 255, 0.85); box-shadow: inset 0 0 12px rgba(110, 220, 255, 0.25); }
+#player-menu .pm-slot.empty .icon { opacity: 0.3; filter: grayscale(1); }
+#player-menu .pm-slot .count { position: absolute; right: 5px; bottom: 3px; font-size: 0.78rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+#player-menu .pm-slot .key { position: absolute; left: 5px; top: 3px; font-size: 0.66rem; color: #7fb6cc; font-weight: 700; }
+#player-menu .pm-slot.selected { border-color: #ffe38a; box-shadow: inset 0 0 0 1px rgba(255, 227, 138, 0.5); }
+#player-menu .pm-recipe { aspect-ratio: auto; min-height: 104px; padding: 8px 4px 6px; grid-template-rows: 1fr auto; opacity: 0.55; }
+#player-menu .pm-recipe.ready { opacity: 1; border-color: rgba(120, 230, 170, 0.5); }
+#player-menu .pm-recipe.selected { border-color: #ffffff; box-shadow: 0 0 12px rgba(110, 220, 255, 0.45); opacity: 1; }
+#player-menu .pm-recipe-name { font-size: 0.72rem; text-align: center; line-height: 1.15; color: #cfefff; }
+#player-menu .pm-badge { position: absolute; left: 5px; top: 4px; font-size: 0.72rem; font-weight: 700; color: #9ff0c0; }
+#player-menu .pm-empty { color: #8fb8cc; grid-column: 1 / -1; }
+#player-menu .pm-detail {
+  margin-top: 10px; min-height: 64px; display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px; background: rgba(4, 22, 40, 0.7); border: 1px solid rgba(110, 220, 255, 0.25);
+}
+#player-menu .pm-detail-icon { font-size: 2.2rem; }
+#player-menu .pm-detail-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; font-size: 0.86rem; }
+#player-menu .pm-detail-info b { font-size: 1rem; color: #fff; }
+#player-menu .pm-ingredients { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+#player-menu .pm-ingredients .ok { color: #9ff0c0; }
+#player-menu .pm-ingredients .missing { color: #ff9a8a; }
+#player-menu .pm-actions { display: flex; gap: 6px; }
+#player-menu .pm-craft {
+  font: inherit; font-weight: 700; padding: 9px 16px; cursor: pointer; color: #eafaff;
+  border: 1px solid var(--pm-cyan); background: rgba(60, 190, 255, 0.22); text-transform: uppercase; letter-spacing: 0.05em;
+}
+#player-menu .pm-craft:hover:not(:disabled) { background: rgba(60, 190, 255, 0.45); box-shadow: 0 0 10px rgba(80, 210, 255, 0.6); }
+#player-menu .pm-craft:disabled { opacity: 0.4; cursor: default; }
+#player-menu .pm-hint { margin: 0; color: #8fb8cc; font-size: 0.86rem; }
+/* Columna "Tú". */
+#player-menu .pm-you { border-left: 2px solid rgba(110, 220, 255, 0.35); padding-left: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#player-menu .pm-you-title { color: #fff; border-bottom: 3px solid #fff; align-self: flex-start; padding-bottom: 4px; margin: 0 0 4px; }
+#player-menu .pm-gear { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#player-menu .pm-slot.gear { font-size: 1.5rem; }
+#player-menu .pm-gear-label { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: #a8d8ec; }
+#player-menu .pm-clock { color: #9fe8ff; font-size: 0.85rem; padding: 4px 8px; background: rgba(60, 140, 200, 0.18); }
+#player-menu .pm-stats { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+#player-menu .pm-stats li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-family: 'Oswald', 'Bahnschrift', 'Arial Narrow', 'Roboto Condensed', sans-serif; font-stretch: condensed; text-transform: uppercase; font-size: 0.92rem; letter-spacing: 0.03em; }
+#player-menu .pm-stat-value { color: #fff; }
+#player-menu .pm-meter { grid-column: 1 / -1; height: 5px; background: rgba(255, 255, 255, 0.1); }
+#player-menu .pm-fill { display: block; height: 100%; background: linear-gradient(90deg, #39c49a, #7af0c6); }
+#player-menu .pm-cold { padding-top: 4px; border-top: 1px solid rgba(110, 220, 255, 0.2); }
+.pm-cursor {
+  position: fixed; width: 56px; z-index: 60; pointer-events: none; transform: translate(-50%, -50%);
+  border-color: #ffe38a; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5); color: #fff;
+}
+.pm-cursor .count { position: absolute; right: 5px; bottom: 3px; font-size: 0.78rem; font-weight: 700; text-shadow: 0 1px 2px #000; }
+@media (max-width: 900px) {
+  #player-menu.pm { right: 50%; transform: translate(50%, -50%); width: calc(100vw - 32px); }
+  #player-menu .pm-layout { grid-template-columns: 1fr; }
+  #player-menu .pm-you { border-left: 0; padding-left: 0; border-top: 2px solid rgba(110, 220, 255, 0.35); padding-top: 8px; }
+  #player-menu .pm-gear { grid-template-columns: repeat(5, 1fr); }
+}
+.message.bump { animation: msg-bump 0.25s ease-out; }
+@keyframes msg-bump { 50% { transform: scale(1.08); } }

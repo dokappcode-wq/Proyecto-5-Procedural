@@ -338,6 +338,7 @@ export class UIManager {
       node.classList.remove('visible');
       setTimeout(() => node.remove(), 600);
     }, this._cfg.MESSAGE_DURATION_MS);
+    return node;
   }
 
   _showTarget(target) {
@@ -372,8 +373,21 @@ export class UIManager {
     if (slots) this._slots = slots;
     this._drawHotbar(delta > 0 ? itemId : null);
     if (delta > 0) {
+      // Recogidas seguidas del mismo objeto se suman en un solo aviso (+1, +2, +3…).
       const def = this._items[itemId];
-      this.showMessage(`+${delta} ${def.ICON} ${def.NAME}`, 'pickup');
+      const last = this._lastPickup;
+      const now = performance.now();
+      if (last && last.itemId === itemId && now - last.at < 2500 && last.node?.classList.contains('visible')) {
+        last.total += delta;
+        last.at = now;
+        last.node.textContent = `+${last.total} ${def.ICON} ${def.NAME}`;
+        last.node.classList.remove('bump');
+        void last.node.offsetWidth;
+        last.node.classList.add('bump');
+      } else {
+        const node = this.showMessage(`+${delta} ${def.ICON} ${def.NAME}`, 'pickup');
+        this._lastPickup = { itemId, total: delta, at: now, node };
+      }
     }
   }
 

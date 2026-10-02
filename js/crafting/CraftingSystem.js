@@ -37,7 +37,16 @@ export class CraftingSystem {
         icon: this._items[item].ICON,
       })),
       canCraft: this.canCraft(id),
+      max: this.maxCraftable(id),
+      category: r.CATEGORY ?? 'OTHER',
     }));
+  }
+
+  /** Cuántas veces se puede fabricar ahora con lo que se lleva. */
+  maxCraftable(recipeId) {
+    const r = this._recipes[recipeId];
+    if (!r) return 0;
+    return Math.min(...Object.entries(r.INGREDIENTS).map(([item, n]) => Math.floor(this._inventory.getItemCount(item) / n)));
   }
 
   canCraft(recipeId) {

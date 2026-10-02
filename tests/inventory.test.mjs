@@ -126,3 +126,26 @@ test('cinco prendas de cuero: fabricables y cada una en su ranura', () => {
     assert.ok(C.RECIPES[id], `${id} tiene receta`);
   }
 });
+
+test('árboles: más grandes, se talan a golpes (un trozo de madera por golpe)', () => {
+  for (const id of ['TREE', 'PINE']) {
+    const t = C.RESOURCE_TYPES[id];
+    assert.equal(t.HARVEST.METHOD, 'HIT', `${id} se golpea`);
+    assert.equal(t.HARVEST.ITEM, 'WOOD');
+    assert.ok(t.SCALE[0] >= 1.5, `${id} es grande`);
+    assert.ok(t.SCALE_COLLISION, `${id}: el tronco choca según su tamaño`);
+  }
+  assert.ok(!C.RESOURCE_TYPES.APPLE_TREE.HARVEST.METHOD, 'las manzanas se siguen cogiendo con E');
+});
+
+test('fabricación: categorías y cuántas veces se puede fabricar', async () => {
+  const { CraftingSystem } = await import('../js/crafting/CraftingSystem.js');
+  const { events, inv } = setup();
+  const crafting = new CraftingSystem({ recipes: C.RECIPES, items: C.ITEMS, inventory: inv, events });
+  inv.addItem('LEATHER', 7);
+  const r = Object.fromEntries(crafting.getRecipes().map((x) => [x.id, x]));
+  assert.equal(r.LEATHER_SHIRT.max, 2);
+  assert.equal(r.LEATHER_GLOVES.max, 7);
+  assert.equal(r.WATERSKIN.max, 0, 'falta madera');
+  for (const x of Object.values(r)) assert.ok(C.RECIPE_CATEGORIES[x.category], `${x.id}: categoría conocida`);
+});

@@ -28,6 +28,7 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 | E5 | Meteoritos procedurales en el espacio: no se aterriza; paseo espacial con traje y jetpack de gas, gravedad propia (se camina alrededor) y minería de cristales |
 | E6 | Nodo galáctico en una luna, salto fallido al salir del sistema, cápsulas de escape y fin de la demo |
 | E4 | Aire y asfixia, traje espacial con oxígeno y batería plank, cofre lunar, burbuja de oxígeno, estaciones de carga y de oxígeno, construir en las lunas |
+| RJ | Reloj de pulsera: `Tab` (fabricación) e `I` (inventario) abren un menú tecnológico con pestañas, buscador, categorías, rejilla de recetas, detalle con ingredientes y la columna «Tú» (ropa, día y hora, vida, hambre, sed, energía, protección del frío); la cámara se acerca a la muñeca y el reloj da la hora. Árboles más grandes que se talan a golpes (un trozo de madera por golpe, astillas y el árbol cae). Se empieza desnudo, con tres hojas |
 | INV | Inventario por huecos (tecla `I`): barra rápida 9×1 + mochila 9×3, pilas de hasta 100, ropa en 5 ranuras (cabeza, pecho, piernas, pies, manos). Conjunto de cuero fabricable (gorro, camiseta, pantalones, zapatillas, guantes) que abriga sumando hasta un 30 %. Lo que no cabe cae al suelo en una bolsa |
 | 1d | Importar sistemas solares: panel con archivo, arrastrar o pegar; comprobación segura (solo JSON, 256 KB, nada se ejecuta), vista previa, avisos de claves ignoradas, ideas no soportadas, errores con *Copiar error para Claude* y *Copiar prompt para Claude*; guardados en el navegador (IndexedDB) para jugarlos o borrarlos, y como destinos del hiperespacio |
 | K | Sistema Kappa: Thalassa (mundo oceánico), Pontos (solo mar, sin una isla, con una ola gigante cada 24 h) y Ferrum (enorme desierto rojo de dunas). Generador `open_ocean`, nave que amerriza y `water.giant_wave` |
@@ -259,6 +260,13 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Talar**: acércate a un árbol o pino (ahora son más grandes), apunta al tronco y haz clic (o `F`):
+  cada golpe da 1 🪵 y salta astilla; a los 6 golpes el árbol cae. Con `E` el juego te recuerda que hay que golpearlo.
+- **Reloj de pulsera**: `Tab` levanta la muñeca, la cámara se acerca al reloj (que marca la hora) y se abre
+  FABRICACIÓN: busca, filtra por categoría, clic en una receta para ver ingredientes y *Fabricar* (o doble clic).
+  `I` abre la pestaña INVENTARIO del mismo menú; la otra tecla cambia de pestaña y `Esc` cierra.
+- **Desnudo**: al empezar no llevas ropa, solo tres hojas (pecho y entrepierna). Al ponerte camiseta o
+  pantalones de cuero, las hojas de esa zona desaparecen (mírate con `V`).
 - **Inventario (I)**: pulsa `I`. Arriba la mochila (9×3) y debajo la barra rápida (9×1, teclas 1–9);
   a la izquierda las 5 ranuras de ropa. Clic: coger/dejar/juntar/cambiar · clic derecho: coger la
   mitad o dejar una · Shift+clic: mover entre barra y mochila (o ponerse/quitarse la ropa). Cada

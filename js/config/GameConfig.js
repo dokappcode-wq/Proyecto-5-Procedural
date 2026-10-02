@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.7.0',
+    VERSION: '1.8.0',
   },
 
   RENDER: {
@@ -113,12 +113,14 @@ export const GameConfig = deepFreeze({
     MAX_WALKABLE_SLOPE_DEG: 50, // pendientes más inclinadas no se pueden subir caminando
     PITCH_LIMIT: Math.PI / 2 - 0.05,
     BODY_TURN_SPEED: 10,      // rad/s con que el cuerpo gira hacia la dirección de avance
+    // Se empieza desnudo: sin ropa, el cuerpo es del color de la piel y tres hojas
+    // tapan pecho y entrepierna (desaparecen al ponerse camiseta o pantalones).
     COLORS: {
       SKIN: 0xe0ac86,
-      SHIRT: 0x3f7fbf,
-      PANTS: 0x3b3b56,
-      BOOTS: 0x4a3222,
       HAIR: 0x4b2e1a,
+      LEAF: 0x4f9a3a,
+      WATCH: 0x2b3440,         // correa y caja del reloj de pulsera
+      WATCH_SCREEN: 0x4fe0ff,  // pantalla del reloj (brilla)
     },
   },
 
@@ -211,15 +213,17 @@ export const GameConfig = deepFreeze({
   // Tipos de recurso: qué dan al recogerlos, colisión y tamaño.
   // HARVEST: cada acción de recoger da 1 ITEM hasta agotar AMOUNT. Si REMOVE_WHEN_EMPTY,
   // el recurso desaparece; si no, vuelve a dar fruto tras REGROW_SECONDS.
+  // METHOD 'HIT': se saca golpeando (clic / F), no con E (los troncos de los árboles).
+  // SCALE_COLLISION: el radio de colisión crece con el tamaño del ejemplar.
   // AIM_HEIGHT / AIM_RADIUS: dónde y con qué tolerancia apunta la mira al recurso.
   RESOURCE_TYPES: {
     TREE: {
-      NAME: 'Árbol', COLLISION_RADIUS: 0.35, SCALE: [0.85, 1.3], AIM_HEIGHT: 1.3, AIM_RADIUS: 0.8,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar' },
+      NAME: 'Árbol', COLLISION_RADIUS: 0.24, SCALE_COLLISION: true, SCALE: [1.7, 2.4], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Golpear el tronco', METHOD: 'HIT' },
     },
     PINE: {
-      NAME: 'Pino', COLLISION_RADIUS: 0.3, SCALE: [0.8, 1.35], AIM_HEIGHT: 1.3, AIM_RADIUS: 0.8,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar' },
+      NAME: 'Pino', COLLISION_RADIUS: 0.22, SCALE_COLLISION: true, SCALE: [1.6, 2.5], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Golpear el tronco', METHOD: 'HIT' },
     },
     APPLE_TREE: {
       NAME: 'Manzano', COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1], AIM_HEIGHT: 1.8, AIM_RADIUS: 1.3,
@@ -242,7 +246,7 @@ export const GameConfig = deepFreeze({
   //   EQUIP (EquipmentSystem). Las construcciones NO son objetos: se colocan en el
   //   modo construcción (B) gastando materiales (ver BUILD).
   ITEMS: {
-    WOOD: { NAME: 'Madera', ICON: '🪵' },
+    WOOD: { NAME: 'Madera', ICON: '🪵', DESC: 'Trozos de madera: golpea el tronco de un árbol para sacarlos.' },
     STONE: { NAME: 'Piedra', ICON: '🪨' },
     WOOL: { NAME: 'Lana', ICON: '🧶' },
     MINERAL: { NAME: 'Mineral', ICON: '💎' },
@@ -250,7 +254,7 @@ export const GameConfig = deepFreeze({
     MEAT: { NAME: 'Carne', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION' },
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
-    WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN' },
+    WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
     LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
     LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
@@ -300,13 +304,18 @@ export const GameConfig = deepFreeze({
 
   // Recetas (Fase 9): ingredientes → resultado. Solo configuración.
   // (La cama y las piezas de casa se construyen en el modo construcción: BUILD.)
+  //   CATEGORY agrupa las recetas en el menú de fabricación (RECIPE_CATEGORIES).
   RECIPES: {
-    WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
-    LEATHER_CAP: { RESULT: 'LEATHER_CAP', AMOUNT: 1, INGREDIENTS: { LEATHER: 1 } },
-    LEATHER_SHIRT: { RESULT: 'LEATHER_SHIRT', AMOUNT: 1, INGREDIENTS: { LEATHER: 3 } },
-    LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, INGREDIENTS: { LEATHER: 2 } },
-    LEATHER_SHOES: { RESULT: 'LEATHER_SHOES', AMOUNT: 1, INGREDIENTS: { LEATHER: 2 } },
-    LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, INGREDIENTS: { LEATHER: 1 } },
+    WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, CATEGORY: 'SURVIVAL', INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
+    LEATHER_CAP: { RESULT: 'LEATHER_CAP', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 1 } },
+    LEATHER_SHIRT: { RESULT: 'LEATHER_SHIRT', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 3 } },
+    LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 2 } },
+    LEATHER_SHOES: { RESULT: 'LEATHER_SHOES', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 2 } },
+    LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 1 } },
+  },
+  RECIPE_CATEGORIES: {
+    CLOTHING: 'Ropa',
+    SURVIVAL: 'Supervivencia',
   },
 
   // Construcción modular (Fase 9): el jugador construye pieza a pieza.

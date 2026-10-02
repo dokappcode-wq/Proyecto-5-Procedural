@@ -17,13 +17,14 @@ export class PlayerModel {
     const box = new THREE.BoxGeometry(1, 1, 1); // compartida por todas las piezas
     const mat = (color) => new THREE.MeshLambertMaterial({ color });
     const skin = mat(colors.SKIN);
-    const shirt = mat(colors.SHIRT);
+    // Sin ropa, torso, piernas y pies son piel (la ropa los tiñe: setOutfit).
+    const shirt = mat(colors.SHIRT ?? colors.SKIN);
     this._shirt = shirt;
-    this._shirtColor = colors.SHIRT;
-    const pants = mat(colors.PANTS);
-    const boots = mat(colors.BOOTS);
+    this._shirtColor = colors.SHIRT ?? colors.SKIN;
+    const pants = mat(colors.PANTS ?? colors.SKIN);
+    const boots = mat(colors.BOOTS ?? colors.SKIN);
     this._boots = boots;
-    this._bootsColor = colors.BOOTS;
+    this._bootsColor = colors.BOOTS ?? colors.SKIN;
     this._skinColor = colors.SKIN;
     const hands = mat(colors.SKIN); // antebrazos y manos (guantes)
     this._hands = hands;
@@ -58,6 +59,43 @@ export class PlayerModel {
       part(hands, 0.16, 0.34, 0.18, 0, -0.42, 0, arm);
     }
 
+    // Reloj de pulsera en la muñeca izquierda (Tab: la cámara se acerca a él).
+    // La esfera mira a -Z local: al levantar el brazo hacia delante queda hacia arriba.
+    const strap = mat(colors.WATCH ?? 0x2b3440);
+    part(strap, 0.185, 0.07, 0.205, 0, -0.5, 0, this.leftArm);
+    part(strap, 0.13, 0.1, 0.03, 0, -0.5, -0.11, this.leftArm);
+    // Pantalla: textura de lienzo con la hora (setWatchText).
+    this._watchCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    this._watchColor = new THREE.Color(colors.WATCH_SCREEN ?? 0x4fe0ff);
+    if (this._watchCanvas) {
+      this._watchCanvas.width = 128;
+      this._watchCanvas.height = 96;
+      this._watchTex = new THREE.CanvasTexture(this._watchCanvas);
+      this._watchTex.colorSpace = THREE.SRGBColorSpace;
+      // La cara de la esfera queda girada 180° al levantar el brazo: se compensa.
+      this._watchTex.center.set(0.5, 0.5);
+      this._watchTex.rotation = Math.PI;
+    }
+    this._watchScreenMat = new THREE.MeshBasicMaterial({ color: 0xffffff, map: this._watchTex ?? null });
+    this.watch = part(this._watchScreenMat, 0.1, 0.075, 0.012, 0, -0.5, -0.127, this.leftArm);
+    this.setWatchText('--:--');
+    this.watch.castShadow = false;
+
+    // Hojas que tapan pecho y entrepierna (se empieza desnudo).
+    const leafGeo = makeLeafGeometry();
+    const leafMat = new THREE.MeshLambertMaterial({ color: colors.LEAF ?? 0x4f9a3a, side: THREE.DoubleSide });
+    const leaf = (x, y, z, size, rotZ) => {
+      const m = new THREE.Mesh(leafGeo, leafMat);
+      m.position.set(x, y, z);
+      m.scale.setScalar(size);
+      m.rotation.z = rotZ;
+      m.castShadow = true;
+      this.root.add(m);
+      return m;
+    };
+    this._chestLeaves = [leaf(-0.12, 1.24, -0.146, 0.15, 0.5), leaf(0.12, 1.24, -0.146, 0.15, -0.5)];
+    this._groinLeaf = leaf(0, 0.8, -0.146, 0.2, Math.PI);
+
     // Cabeza: pivote en el cuello para mirar arriba/abajo.
     this.head = this._pivot(0, 1.4, 0);
     part(skin, 0.4, 0.4, 0.4, 0, 0.2, 0, this.head);
@@ -89,6 +127,8 @@ export class PlayerModel {
     part(mat(0x3a4450), 0.1, 0.12, 0.1, -0.12, 0.8, 0.26, this.suitParts);
     part(mat(0x3a4450), 0.1, 0.12, 0.1, 0.12, 0.8, 0.26, this.suitParts);
     this.root.add(this.suitParts);
+    this._wrist = 0;          // 0..1: levantar el brazo izquierdo para mirar el reloj
+    this._wristTarget = 0;
     this.setSuit(false);
 
     this._walkPhase = 0;
@@ -122,6 +162,49 @@ export class PlayerModel {
     this._hands.color.set(suit ? 0xdfe3e8 : o.HANDS ?? this._skinColor);
     this._cap.visible = !suit && o.HEAD != null;
     if (o.HEAD != null) this._capMat.color.set(o.HEAD);
+    // Las hojas solo tapan lo que no tapa la ropa.
+    for (const l of this._chestLeaves) l.visible = !suit && o.CHEST == null;
+    this._groinLeaf.visible = !suit && o.LEGS == null;
+  }
+
+  /** Hora en la pantalla del reloj (solo se redibuja si cambia). */
+  setWatchText(text) {
+    if (!this._watchCanvas || text === this._watchText) return;
+    this._watchText = text;
+    const c = this._watchCanvas.getContext('2d');
+    const w = this._watchCanvas.width;
+    const h = this._watchCanvas.height;
+    c.fillStyle = '#04121e';
+    c.fillRect(0, 0, w, h);
+    const hex = `#${this._watchColor.getHexString()}`;
+    c.strokeStyle = hex;
+    c.globalAlpha = 0.35;
+    c.lineWidth = 2;
+    for (let y = 10; y < h; y += 10) {
+      c.beginPath();
+      c.moveTo(6, y);
+      c.lineTo(w - 6, y);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+    c.lineWidth = 4;
+    c.strokeRect(4, 4, w - 8, h - 8);
+    c.fillStyle = hex;
+    c.font = 'bold 40px monospace';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(text, w / 2, h / 2 + 2);
+    this._watchTex.needsUpdate = true;
+  }
+
+  /** Levantar la muñeca izquierda para mirar el reloj (menú de Tab / I). */
+  setWristPose(on) {
+    this._wristTarget = on ? 1 : 0;
+  }
+
+  /** La cabeza se oculta cuando la cámara está pegada a ella (vista del reloj). */
+  setHeadVisible(visible) {
+    this.head.visible = visible;
   }
 
   /** Animación corta del brazo derecho (golpear, recoger). */
@@ -173,6 +256,18 @@ export class PlayerModel {
       this.rightArm.rotation.z = 0;
     }
 
+    // Mirar el reloj: el brazo izquierdo sube hacia delante y cruza hacia el centro.
+    this._wrist += (this._wristTarget - this._wrist) * Math.min(1, dt * 9);
+    if (this._wrist > 0.001) {
+      const w = this._wrist * this._wrist * (3 - 2 * this._wrist);
+      const a = this.leftArm.rotation;
+      a.x += (1.38 - a.x) * w;
+      a.y += (-0.35 - a.y) * w;
+      a.z += (0.62 - a.z) * w;
+    } else {
+      this.leftArm.rotation.y = 0;
+    }
+
     // Leve rebote del torso al caminar.
     this.torso.position.y = 1.1 + Math.abs(Math.cos(this._walkPhase)) * 0.03 * moveFactor;
 
@@ -180,4 +275,15 @@ export class PlayerModel {
     this.head.rotation.y = s.headYaw;
     this.head.rotation.x = s.headPitch;
   }
+}
+
+/** Hoja (contorno puntiagudo con nervio), plana en el plano XY y con la punta hacia +Y. */
+function makeLeafGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, -0.5);
+  shape.quadraticCurveTo(0.55, -0.2, 0.32, 0.25);
+  shape.quadraticCurveTo(0.15, 0.48, 0, 0.62);
+  shape.quadraticCurveTo(-0.15, 0.48, -0.32, 0.25);
+  shape.quadraticCurveTo(-0.55, -0.2, 0, -0.5);
+  return new THREE.ShapeGeometry(shape, 6);
 }
