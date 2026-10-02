@@ -206,6 +206,31 @@ export class InventorySystem {
     return true;
   }
 
+  /**
+   * Saca `amount` unidades de un hueco concreto (tirar al suelo).
+   * @returns {{ id, count } | null} lo que se ha sacado
+   */
+  takeFromSlot(index, amount = 1) {
+    const st = this.slots[index];
+    if (!st || !(amount > 0)) return null;
+    const n = Math.min(st.count, Math.floor(amount));
+    st.count -= n;
+    if (st.count === 0) this.slots[index] = null;
+    this._emit(st.id, -n);
+    return { id: st.id, count: n };
+  }
+
+  /** Lo que se lleva con el ratón sale del inventario (para tirarlo): { id, count } o null. */
+  takeCursor(amount = Infinity) {
+    const c = this.cursor;
+    if (!c) return null;
+    const n = Math.min(c.count, amount);
+    c.count -= n;
+    if (c.count === 0) this.cursor = null;
+    this._emit(null, 0);
+    return { id: c.id, count: n };
+  }
+
   /** Devuelve al inventario lo que se lleva con el ratón (al cerrar el panel). */
   returnCursor() {
     const c = this.cursor;

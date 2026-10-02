@@ -260,9 +260,15 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
-- **Talar**: acércate a un árbol o pino (ahora son más grandes), apunta al tronco y haz clic (o `F`):
-  cada golpe da 1 🪵 y salta astilla; a los 6 golpes el árbol cae. Con `E` el juego te recuerda que hay que golpearlo.
-- **Reloj de pulsera**: `Tab` levanta la muñeca, la cámara se acerca al reloj (que marca la hora) y se abre
+- **Talar**: apunta al tronco y **mantén el clic** (o `F`): el personaje golpea sin parar, una barra muestra
+  cuánto falta y la madera va saliendo; con el puño un árbol tarda 15 s. Con el 🪓 hacha de piedra seleccionada
+  en la barra cae antes (6 s) y da la misma madera.
+- **Rocas**: con `E` coges sus piedras sueltas (vuelven con el tiempo). A puñetazos no se rompen y te haces
+  daño; con el ⛏️ pico de piedra seleccionado, manteniendo el clic se rompen (6 s) y dan 5 🪨.
+- **Tirar objetos**: `Q` tira una unidad del objeto seleccionado; en el inventario, coge algo con el ratón y
+  déjalo en «Tirar al suelo» (o haz clic fuera del menú). Cae en una 🎒 bolsa (E para recogerla). Si el
+  inventario está lleno, lo que recoges también se queda en el suelo en una bolsa.
+- **Reloj de pulsera**: `Tab` levanta la muñeca (el reloj marca la hora), la cámara se pone delante del personaje y se abre
   FABRICACIÓN: busca, filtra por categoría, clic en una receta para ver ingredientes y *Fabricar* (o doble clic).
   `I` abre la pestaña INVENTARIO del mismo menú; la otra tecla cambia de pestaña y `Esc` cierra.
 - **Desnudo**: al empezar no llevas ropa, solo tres hojas (pecho y entrepierna). Al ponerte camiseta o

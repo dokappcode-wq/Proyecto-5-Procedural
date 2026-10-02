@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.8.0',
+    VERSION: '1.9.0',
   },
 
   RENDER: {
@@ -74,6 +74,7 @@ export const GameConfig = deepFreeze({
       ROTATE: ['KeyQ'],                 // girar la pieza antes de colocarla
       CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
       INVENTORY: ['KeyI'],              // abrir/cerrar el inventario (mochila 9×3 + barra + ropa)
+      DROP: ['KeyQ'],                   // tirar al suelo una unidad del objeto seleccionado (fuera del modo construcción)
       BUILD_MODE: ['KeyB'],             // entrar/salir del modo construcción
       SHIP_TAKEOFF: ['KeyT'],           // nave (a los mandos): despegar / aterrizar
       SHIP_HATCH: ['KeyG'],             // nave: abrir / cerrar la compuerta
@@ -190,6 +191,7 @@ export const GameConfig = deepFreeze({
 
     ENERGY_RUN_EXTRA: 0.35,         // energía/s extra corriendo
     ENERGY_ACTION_COST: 0.6,        // por golpear o recoger
+    ENERGY_CHOP_COST: 0.25,         // por cada golpe al talar (se golpea a menudo)
     ENERGY_JUMP_COST: 0.3,
     ENERGY_NO_RUN_RATIO: 0.15,      // por debajo no se puede correr
     EXHAUSTED_SPEED_MULTIPLIER: 0.7, // velocidad con energía a 0
@@ -213,17 +215,19 @@ export const GameConfig = deepFreeze({
   // Tipos de recurso: qué dan al recogerlos, colisión y tamaño.
   // HARVEST: cada acción de recoger da 1 ITEM hasta agotar AMOUNT. Si REMOVE_WHEN_EMPTY,
   // el recurso desaparece; si no, vuelve a dar fruto tras REGROW_SECONDS.
-  // METHOD 'HIT': se saca golpeando (clic / F), no con E (los troncos de los árboles).
+  // METHOD 'HIT': se saca golpeando (clic / F, o manteniéndolo), no con E (los troncos).
+  //   CHOP_TIME: segundos de golpes con el puño para talarlo entero; una herramienta
+  //   (ITEMS.*.TOOL.CHOP_SPEED) lo acorta: el árbol cae antes, pero da la misma madera.
   // SCALE_COLLISION: el radio de colisión crece con el tamaño del ejemplar.
   // AIM_HEIGHT / AIM_RADIUS: dónde y con qué tolerancia apunta la mira al recurso.
   RESOURCE_TYPES: {
     TREE: {
       NAME: 'Árbol', COLLISION_RADIUS: 0.24, SCALE_COLLISION: true, SCALE: [1.7, 2.4], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Golpear el tronco', METHOD: 'HIT' },
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
     },
     PINE: {
       NAME: 'Pino', COLLISION_RADIUS: 0.22, SCALE_COLLISION: true, SCALE: [1.6, 2.5], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Golpear el tronco', METHOD: 'HIT' },
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 6, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
     },
     APPLE_TREE: {
       NAME: 'Manzano', COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1], AIM_HEIGHT: 1.8, AIM_RADIUS: 1.3,
@@ -231,7 +235,10 @@ export const GameConfig = deepFreeze({
     },
     ROCK: {
       NAME: 'Roca', COLLISION_RADIUS: 0.75, SCALE: [0.5, 1.4], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.9,
-      HARVEST: { ITEM: 'STONE', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Picar' },
+      // Con E se cogen las piedras sueltas de alrededor (vuelven a aparecer con el tiempo).
+      HARVEST: { ITEM: 'STONE', AMOUNT: 2, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 600, VERB: 'Coger piedra suelta' },
+      // Romperla entera: solo con un pico (TOOL.MINE_SPEED); a puñetazos no se rompe y duele.
+      BREAK: { ITEM: 'STONE', AMOUNT: 5, TIME: 6, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar (mantén el clic)' },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
     MINERAL_ROCK: {
@@ -256,6 +263,9 @@ export const GameConfig = deepFreeze({
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
+    // Herramientas: TOOL.CHOP_SPEED acelera la tala cuando se lleva seleccionada en la barra.
+    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, TOOL: { MINE_SPEED: 1 }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
+    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, TOOL: { CHOP_SPEED: 2.5 }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
     LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
     LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
     LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
@@ -307,6 +317,8 @@ export const GameConfig = deepFreeze({
   //   CATEGORY agrupa las recetas en el menú de fabricación (RECIPE_CATEGORIES).
   RECIPES: {
     WATERSKIN: { RESULT: 'WATERSKIN', AMOUNT: 1, CATEGORY: 'SURVIVAL', INGREDIENTS: { LEATHER: 2, WOOD: 1 } },
+    STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', INGREDIENTS: { WOOD: 3, STONE: 2 } },
+    STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', INGREDIENTS: { WOOD: 3, STONE: 3 } },
     LEATHER_CAP: { RESULT: 'LEATHER_CAP', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 1 } },
     LEATHER_SHIRT: { RESULT: 'LEATHER_SHIRT', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 3 } },
     LEATHER_PANTS: { RESULT: 'LEATHER_PANTS', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 2 } },
@@ -314,6 +326,7 @@ export const GameConfig = deepFreeze({
     LEATHER_GLOVES: { RESULT: 'LEATHER_GLOVES', AMOUNT: 1, CATEGORY: 'CLOTHING', INGREDIENTS: { LEATHER: 1 } },
   },
   RECIPE_CATEGORIES: {
+    TOOLS: 'Herramientas',
     CLOTHING: 'Ropa',
     SURVIVAL: 'Supervivencia',
   },
@@ -628,6 +641,7 @@ export const GameConfig = deepFreeze({
   // Interacción del jugador con el mundo (recoger, golpear).
   INTERACTION: {
     RANGE: 2.8,                 // m desde el jugador hasta el borde del objetivo
+    CHOP_SWING: 0.6,            // s entre golpes al talar manteniendo el clic
     ACTION_COOLDOWN: 0.45,      // s entre acciones (recoger o golpear)
     PLAYER_HIT_DAMAGE: 1,       // daño de un puñetazo
     HIT_KNOCKBACK: 3,           // m/s de empuje al animal golpeado

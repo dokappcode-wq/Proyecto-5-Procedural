@@ -16,6 +16,8 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  * Ratón en los huecos: clic coger/dejar · clic derecho la mitad/una · Shift+clic
  * mover rápido o ponerse la ropa. Recetas: clic selecciona, doble clic fabrica.
+ * Tirar: dejar lo que se lleva con el ratón en la zona «Tirar al suelo» o hacer
+ * clic fuera del menú (clic derecho: solo una unidad). Cae al suelo en una bolsa.
  * Solo vista: inventario, ropa y fabricación viven en sus sistemas. Todo el
  * texto se pinta con textContent.
  */
@@ -23,7 +25,7 @@ export const MenuTab = Object.freeze({ INVENTORY: 'INVENTORY', CRAFTING: 'CRAFTI
 const KEY_TAB = { Tab: MenuTab.CRAFTING, KeyI: MenuTab.INVENTORY };
 
 export class PlayerMenu extends ModalPanel {
-  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar }) {
+  constructor({ container, input, events, inventory, equipment, crafting, items, categories, stats, time, hotbar, onDrop }) {
     super({
       id: 'player-menu', title: 'Reloj de pulsera', container, input, events,
       footer: '<kbd>Clic</kbd> coger / dejar · <kbd>Clic dcho</kbd> la mitad / una · <kbd>Shift</kbd>+<kbd>Clic</kbd> mover rápido · <kbd>Doble clic</kbd> fabricar · <kbd>Esc</kbd> cerrar',
@@ -37,6 +39,7 @@ export class PlayerMenu extends ModalPanel {
     this._stats = stats;     // { health, hunger, thirst, energy, lifeSupport? }
     this._time = time;
     this._hotbar = hotbar;
+    this._onDrop = onDrop ?? (() => {});
     this.tab = MenuTab.CRAFTING;
     this._hover = null;
     this._recipe = null;      // receta seleccionada
@@ -171,7 +174,14 @@ export class PlayerMenu extends ModalPanel {
       this._barSlots.push(s);
       bar.append(s);
     }
-    this._invSection.append(el('h3', 'pm-sub', 'Mochila'), grid, el('h3', 'pm-sub', 'Barra rápida · 1–9'), bar);
+    // Tirar al suelo.
+    const drop = el('div', 'pm-drop', '🗑 Tirar al suelo · deja aquí lo que llevas (clic: todo · clic dcho: uno) · o pulsa Q en el juego');
+    drop.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      this._dropCursor(e.button === 2 ? 1 : Infinity);
+    });
+    drop.addEventListener('contextmenu', (e) => e.preventDefault());
+    this._invSection.append(el('h3', 'pm-sub', 'Mochila'), grid, el('h3', 'pm-sub', 'Barra rápida · 1–9'), bar, drop);
 
     // Fabricación: rejilla de recetas.
     this._craftSection = el('section', 'pm-crafting');
@@ -208,6 +218,12 @@ export class PlayerMenu extends ModalPanel {
     this._cursorEl = el('div', 'pm-slot pm-cursor hidden');
     this._cursorEl.append(el('span', 'icon'), el('span', 'count'));
     document.body.appendChild(this._cursorEl);
+    // Clic fuera del menú con algo en la mano: se tira.
+    window.addEventListener('mousedown', (e) => {
+      if (!this.isOpen || !this._inv.cursor || this.el.contains(e.target)) return;
+      e.preventDefault();
+      this._dropCursor(e.button === 2 ? 1 : Infinity);
+    }, true);
     window.addEventListener('mousemove', (e) => {
       if (!this.isOpen) return;
       this._cursorEl.style.left = `${e.clientX}px`;
@@ -294,6 +310,11 @@ export class PlayerMenu extends ModalPanel {
       this._recipeGrid.append(tile);
     }
     this._renderDetail();
+  }
+
+  _dropCursor(amount) {
+    const got = this._inv.takeCursor(amount);
+    if (got) this._onDrop(got.id, got.count);
   }
 
   _craft(id, times) {

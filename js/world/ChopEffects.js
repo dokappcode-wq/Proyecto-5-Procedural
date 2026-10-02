@@ -18,19 +18,24 @@ export class ChopEffects {
     this._worlds = worlds;
     this._chipGeo = new THREE.BoxGeometry(0.09, 0.05, 0.14);
     this._chipMat = new THREE.MeshLambertMaterial({ color: 0xc89a5e });
+    this._stoneMat = new THREE.MeshLambertMaterial({ color: 0x8e8b86 });
     this._chips = [];
     this._falling = [];
     events.on(GameEvents.RESOURCE_HIT, (e) => this._onHit(e));
     events.on(GameEvents.BODY_CHANGED, () => this.clear());
   }
 
-  _onHit({ node, x, y, z, fromX, fromZ, felled }) {
+  _onHit({ node, x, y, z, fromX, fromZ, felled, material, small }) {
+    const stone = material === 'stone';
     const dx = fromX - x;
     const dz = fromZ - z;
     const d = Math.hypot(dx, dz) || 1;
     const r = Math.max(0.25, node.radius ?? 0.4);
-    for (let i = 0; i < CHIPS_PER_HIT; i++) {
-      const m = new THREE.Mesh(this._chipGeo, this._chipMat);
+    // Roca rota: muchas esquirlas en todas direcciones; puñetazo: unas pocas.
+    const count = stone ? (felled ? 22 : small ? 3 : CHIPS_PER_HIT) : CHIPS_PER_HIT;
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(this._chipGeo, stone ? this._stoneMat : this._chipMat);
+      if (stone) m.scale.setScalar(felled ? 1.6 + Math.random() : 1.2);
       m.position.set(x + (dx / d) * r, y + (Math.random() - 0.3) * 0.4, z + (dz / d) * r);
       m.rotation.set(Math.random() * 6, Math.random() * 6, 0);
       const spread = (Math.random() - 0.5) * 2.5;
@@ -38,7 +43,7 @@ export class ChopEffects {
       this._scene.add(m);
       this._chips.push({ m, v, life: 0.7 + Math.random() * 0.3 });
     }
-    if (felled) this._fell(node, -dx / d, -dz / d);
+    if (felled && !stone) this._fell(node, -dx / d, -dz / d);
   }
 
   /** El árbol cae hacia (fx, fz) girando sobre la base. */

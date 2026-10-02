@@ -27,6 +27,7 @@ export class EnergySystem extends VitalStat {
 
     events.on(GameEvents.PLAYER_ACTION, ({ kind }) => {
       if (kind === 'hit' || kind === 'harvest') this.consume(config.ENERGY_ACTION_COST);
+      else if (kind === 'chop') this.consume(config.ENERGY_CHOP_COST ?? config.ENERGY_ACTION_COST * 0.4);
     });
     events.on(GameEvents.PLAYER_JUMPED, () => this.consume(config.ENERGY_JUMP_COST));
   }

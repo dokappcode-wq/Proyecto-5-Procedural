@@ -136,6 +136,14 @@ test('árboles: más grandes, se talan a golpes (un trozo de madera por golpe)',
     assert.ok(t.SCALE_COLLISION, `${id}: el tronco choca según su tamaño`);
   }
   assert.ok(!C.RESOURCE_TYPES.APPLE_TREE.HARVEST.METHOD, 'las manzanas se siguen cogiendo con E');
+  assert.equal(C.RESOURCE_TYPES.TREE.HARVEST.CHOP_TIME, 15, '15 s con el puño');
+  assert.ok(C.ITEMS.STONE_AXE.TOOL.CHOP_SPEED > 1, 'el hacha tala más deprisa');
+  assert.ok(C.RECIPES.STONE_AXE, 'el hacha se fabrica');
+  const rock = C.RESOURCE_TYPES.ROCK;
+  assert.equal(rock.BREAK.TOOL, 'MINE_SPEED', 'las rocas solo se rompen con pico');
+  assert.ok(rock.BREAK.FIST_DAMAGE > 0, 'a puñetazos duele');
+  assert.equal(rock.HARVEST.REMOVE_WHEN_EMPTY, false, 'coger piedras sueltas no rompe la roca');
+  assert.ok(C.ITEMS.STONE_PICKAXE.TOOL.MINE_SPEED > 0 && C.RECIPES.STONE_PICKAXE, 'el pico existe y se fabrica');
 });
 
 test('fabricación: categorías y cuántas veces se puede fabricar', async () => {
@@ -148,4 +156,17 @@ test('fabricación: categorías y cuántas veces se puede fabricar', async () =>
   assert.equal(r.LEATHER_GLOVES.max, 7);
   assert.equal(r.WATERSKIN.max, 0, 'falta madera');
   for (const x of Object.values(r)) assert.ok(C.RECIPE_CATEGORIES[x.category], `${x.id}: categoría conocida`);
+});
+
+test('tirar: se saca de un hueco o de la mano', () => {
+  const { inv } = setup();
+  inv.addItem('STONE', 10);
+  assert.deepEqual(inv.takeFromSlot(0, 3), { id: 'STONE', count: 3 });
+  assert.equal(inv.getItemCount('STONE'), 7);
+  inv.click(0);
+  assert.deepEqual(inv.takeCursor(1), { id: 'STONE', count: 1 });
+  assert.deepEqual(inv.takeCursor(), { id: 'STONE', count: 6 });
+  assert.equal(inv.cursor, null);
+  assert.equal(inv.getItemCount('STONE'), 0);
+  assert.equal(inv.takeFromSlot(0, 1), null);
 });

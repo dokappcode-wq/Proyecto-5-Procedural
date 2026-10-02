@@ -58,13 +58,20 @@ export class PickupSystem {
       const same = p.contents.find((c) => c.item === item);
       if (same) same.count += count;
       else p.contents.push({ item, count });
+      p.label = this._bagLabel(p.contents);
       return p;
     }
     this._bagSeq = (this._bagSeq ?? 0) + 1;
+    const contents = [{ item, count }];
     return this.add({
-      id: `BAG_${this._bagSeq}`, body, x, z, model: 'BAG', label: '🎒 Bolsa', action: 'Coger', beacon: false,
-      contents: [{ item, count }],
+      id: `BAG_${this._bagSeq}`, body, x, z, model: 'BAG', label: this._bagLabel(contents), action: 'Coger', beacon: false, contents,
     });
+  }
+
+  /** "🎒 Bolsa · 🪵×12 🪨×3" (como mucho 4 tipos). */
+  _bagLabel(contents) {
+    const list = contents.slice(0, 4).map((c) => `${this._items[c.item]?.ICON ?? ''}×${c.count}`).join(' ');
+    return `🎒 Bolsa · ${list}${contents.length > 4 ? ' …' : ''}`;
   }
 
   clear(body = null) {
@@ -142,6 +149,7 @@ export class PickupSystem {
     if (got.length) this._events.emit(GameEvents.UI_MESSAGE, { text: `Has cogido: ${got.join(', ')}`, type: 'biome' });
     if (left.length) {
       p.contents = left;
+      if (p.model === 'BAG') p.label = this._bagLabel(left);
       this._events.emit(GameEvents.UI_MESSAGE, { text: '🎒 No te cabe todo: haz hueco en el inventario (I) y vuelve a cogerlo.', type: 'warning' });
       return got.length > 0;
     }

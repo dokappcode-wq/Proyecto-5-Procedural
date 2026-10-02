@@ -12,7 +12,13 @@ import { GameEvents } from '../core/GameEvents.js';
  * Acciones:
  *   INTERACT (E)          recoger del recurso señalado / beber del agua señalada
  *   ATTACK   (clic / F)   golpear al animal señalado (o recoger si es un recurso);
- *                         los troncos (HARVEST.METHOD 'HIT') solo dan madera a golpes
+ *                         los troncos (HARVEST.METHOD 'HIT') se talan a golpes: manteniendo
+ *                         el clic se sigue golpeando. Talar entero lleva HARVEST.CHOP_TIME s
+ *                         con el puño (una herramienta seleccionada lo acorta) y la madera
+ *                         sale poco a poco a medida que avanza.
+ *                         Las rocas (BREAK) solo se rompen con un pico seleccionado
+ *                         (TOOL.MINE_SPEED); a puñetazos duelen (BREAK.FIST_DAMAGE). Con E
+ *                         se cogen sus piedras sueltas.
  *
  * No contiene reglas de los recursos ni de los animales: delega en
  * ResourceSystem.harvest(), AnimalSystem.hitAnimal() e InventorySystem.
@@ -23,7 +29,7 @@ import { GameEvents } from '../core/GameEvents.js';
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [] }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -36,6 +42,9 @@ export class InteractionSystem {
     this._events = events;
     this._construction = construction;
     this._providers = providers;
+    this._tool = tool ?? (() => null); // herramienta seleccionada ({ CHOP_SPEED }) o null
+    this._swing = 0;                   // s hasta el siguiente golpe al tronco
+    this._chopProgress = new Map();    // id del árbol → 0..1 de tala
 
     this._cooldown = 0;
     this._queued = null; // acción pulsada durante el enfriamiento (se ejecuta al terminar)
@@ -62,8 +71,25 @@ export class InteractionSystem {
       this._events.emit(GameEvents.INTERACTION_TARGET_CHANGED, { target: this.target });
     }
 
-    if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
-    else if (this._input.wasPressed('ATTACK')) this._queued = 'ATTACK';
+    // Talar: mientras se mantiene el clic sobre un tronco se golpea cada CHOP_SWING s.
+    const attack = this._input.wasPressed('ATTACK') || this._input.isDown('ATTACK');
+    if ((t?.hit || t?.breakable) && attack) {
+      const B = this._types[t.ref.type].BREAK;
+      if (t.hit || this._tool()?.[B.TOOL]) {
+        this._swing -= dt;
+        if (this._swing <= 0) {
+          this._swing = this._cfg.CHOP_SWING ?? 0.6;
+          this._chopSwing(t.ref);
+        }
+      } else if (this._input.wasPressed('ATTACK') && this._cooldown <= 0) {
+        this._punchRock(t.ref, B);
+      }
+      if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
+    } else {
+      this._swing = 0; // al volver a pulsar, el primer golpe es inmediato
+      if (this._input.wasPressed('INTERACT')) this._queued = 'INTERACT';
+      else if (this._input.wasPressed('ATTACK')) this._queued = 'ATTACK';
+    }
     if (this._cooldown > 0 || !this._queued) return;
     const action = this._queued;
     this._queued = null;
@@ -75,12 +101,14 @@ export class InteractionSystem {
   _act(target, button) {
     this._cooldown = this._cfg.ACTION_COOLDOWN;
     if (target?.kind === 'resource' && target.hit) {
-      // Troncos: a golpes. Con E solo se explica cómo.
-      if (button === 'ATTACK') this._chop(target.ref);
-      else {
-        this._cooldown = 0;
-        this._hintChop();
-      }
+      // Troncos: se talan en update() (manteniendo el clic). Con E solo se explica cómo.
+      this._cooldown = 0;
+      if (button === 'INTERACT') this._hintChop();
+    } else if (target?.kind === 'resource' && target.breakable) {
+      // Rocas: con E, piedras sueltas (si quedan). Picar va en update().
+      if (button !== 'INTERACT') return;
+      if (target.ref.remaining > 0) this._harvest(target.ref);
+      else this._hint('No quedan piedras sueltas. Para romper la roca hace falta un ⛏️ pico seleccionado en la barra.');
     } else if (target?.kind === 'resource' && target.action) {
       this._harvest(target.ref);
     } else if (target?.kind === 'provided' && button === 'INTERACT') {
@@ -107,18 +135,70 @@ export class InteractionSystem {
     this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
   }
 
-  /** Golpe al tronco: un trozo de madera por golpe; al último, el árbol cae. */
-  _chop(node) {
+  /**
+   * Un golpe al tronco: avanza la tala (CHOP_SWING × velocidad de la herramienta /
+   * CHOP_TIME). La madera del árbol (HARVEST.AMOUNT) sale repartida a lo largo de la
+   * tala; con el último trozo el árbol cae. Una herramienta acorta la tala, no da más madera.
+   */
+  _chopSwing(node) {
     const def = this._types[node.type];
-    const result = this._world.resources.harvest(node.id);
-    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'harvest' });
-    if (!result) return;
+    const rock = !!def.BREAK && def.HARVEST?.METHOD !== 'HIT';
+    const job = rock
+      ? { time: def.BREAK.TIME, speed: this._tool()?.[def.BREAK.TOOL] ?? 0, amount: def.BREAK.AMOUNT }
+      : { time: def.HARVEST.CHOP_TIME ?? 15, speed: this._tool()?.CHOP_SPEED ?? 1, amount: def.HARVEST.AMOUNT };
+    const swing = this._cfg.CHOP_SWING ?? 0.6;
+    const work = this._chopProgress.get(node.id) ?? { progress: 0, given: 0 };
+    work.progress = Math.min(1, work.progress + (swing * job.speed) / job.time);
+    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
+    // Trozos que ya deberían haber salido a estas alturas.
+    const due = work.progress >= 1 ? job.amount : Math.floor(work.progress * job.amount);
+    let done = false;
+    if (rock) {
+      if (due > work.given) this._inventory.addItem(def.BREAK.ITEM, due - work.given);
+      work.given = due;
+      if (work.progress >= 1) done = !!this._world.resources.removeNode(node.id);
+    } else {
+      while (job.amount - node.remaining < due) {
+        const result = this._world.resources.harvest(node.id);
+        if (!result) break;
+        this._inventory.addItem(result.item, result.amount);
+        this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
+        done = result.removed;
+      }
+    }
+    if (done || node.removed) this._chopProgress.delete(node.id);
+    else this._chopProgress.set(node.id, work);
     const p = this._player.position;
     this._events.emit(GameEvents.RESOURCE_HIT, {
-      node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z, felled: result.removed,
+      node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z,
+      felled: done, progress: work.progress, material: rock ? 'stone' : 'wood',
     });
-    this._inventory.addItem(result.item, result.amount);
-    this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
+    this._targetKey = null; // repintar la barra de progreso
+  }
+
+  /** Puñetazo a una roca: no se rompe y duele. */
+  _punchRock(node, B) {
+    this._cooldown = this._cfg.ACTION_COOLDOWN;
+    const def = this._types[node.type];
+    const p = this._player.position;
+    this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
+    this._events.emit(GameEvents.RESOURCE_HIT, {
+      node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z, felled: false, material: 'stone', small: true,
+    });
+    this._events.emit(GameEvents.PLAYER_DAMAGED, { amount: B.FIST_DAMAGE, source: 'ROCK', sourceName: 'golpear una roca', fromX: node.x, fromZ: node.z });
+    this._hint('¡Ay! Las rocas no se rompen a puñetazos: necesitas un ⛏️ pico (fabrícalo con Tab).');
+  }
+
+  _hint(text) {
+    const now = performance.now();
+    if (now - (this._hintAt2 ?? -1e9) < 3000) return;
+    this._hintAt2 = now;
+    this._events.emit(GameEvents.UI_MESSAGE, { text, type: 'warning' });
+  }
+
+  /** Cuánto se ha talado ya este árbol (0..1). */
+  chopProgress(id) {
+    return this._chopProgress.get(id)?.progress ?? 0;
   }
 
   _hintChop() {
@@ -224,9 +304,18 @@ export class InteractionSystem {
       return { ...t, label: t.ref.def.NAME, action: 'Golpear', key: 'Clic' };
     }
     const def = this._types[t.ref.type];
+    const B = def.BREAK;
+    if (B && def.HARVEST.METHOD !== 'HIT') {
+      // Roca: con pico se pica; sin pico, E coge piedras sueltas si quedan.
+      const hasTool = !!this._tool()?.[B.TOOL];
+      const progress = this.chopProgress(t.ref.id);
+      if (hasTool) return { ...t, breakable: true, label: def.NAME, action: B.VERB, key: 'Clic', progress };
+      if (t.ref.remaining > 0) return { ...t, breakable: true, label: def.NAME, action: def.HARVEST.VERB, key: 'E', progress };
+      return { ...t, breakable: true, label: def.NAME, action: 'Necesitas un pico', key: '⛏️', progress };
+    }
     if (t.ref.remaining <= 0) return { ...t, label: `${def.NAME} (sin fruto)`, action: null };
     if (def.HARVEST.METHOD === 'HIT') {
-      return { ...t, hit: true, label: `${def.NAME} · ${t.ref.remaining} 🪵`, action: def.HARVEST.VERB, key: 'Clic', remaining: t.ref.remaining };
+      return { ...t, hit: true, label: def.NAME, action: def.HARVEST.VERB, key: 'Clic', progress: this.chopProgress(t.ref.id) };
     }
     return { ...t, label: def.NAME, action: def.HARVEST.VERB, key: 'E', remaining: t.ref.remaining };
   }

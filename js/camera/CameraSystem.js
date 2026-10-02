@@ -26,14 +26,15 @@ const OCCLUSION_STEPS = 16;
  * orbita el vehículo en 3ª persona (el vehículo expone la misma interfaz que el
  * jugador + `distance`). Al soltarla vuelve suavemente al modo anterior.
  *
- * Vista del reloj (`setWristView(object3D)`): la cámara se acerca a la muñeca
- * del jugador (el reloj de pulsera) desde los ojos, dejándolo a la izquierda de
- * la pantalla para que el menú quepa a la derecha. Se mezcla suavemente.
+ * Vista de retrato (`setPortraitView(true)`): con el menú del reloj abierto, la
+ * cámara gira alrededor del jugador hasta quedar delante de él, mirándolo, con el
+ * personaje a la izquierda de la pantalla para que el menú quepa a la derecha.
  */
-const WRIST_SPEED = 7;        // rapidez de la transición
-const WRIST_DISTANCE = 0.62;  // m de la cámara al reloj
-const WRIST_SIDE = 0.62;      // m que se desplaza el punto de mira a la derecha (reloj a la izquierda)
-const WRIST_DROP = 0.36;     // y más abajo: el reloj sube a media altura de la pantalla
+const PORTRAIT_SPEED = 6;      // rapidez de la transición
+const PORTRAIT_DISTANCE = 3.0; // m delante del pecho
+const PORTRAIT_HEIGHT = 0.2;   // m por encima del pecho
+const PORTRAIT_SIDE = 2.15;    // m que se desplaza el punto de mira a la derecha (jugador a la izquierda)
+
 export class CameraSystem {
   constructor({ config, camera, input, target, terrain, events, occluders = null }) {
     this.name = 'camera';
@@ -61,23 +62,22 @@ export class CameraSystem {
     this._back = new THREE.Vector3();
     this._occluders = occluders; // { raycastDistance(origin, dir, max) } — p. ej. paredes construidas
     this._vehicle = null;        // { getEyePosition(out), yaw, pitch, distance } mientras se pilota
-    this._wristObj = null;       // reloj de pulsera (Object3D) en la vista del reloj
-    this._wrist = 0;             // 0..1 mezcla con la vista del reloj
-    this._w = new THREE.Vector3();
-    this._wq = new THREE.Quaternion();
-    this._wm = new THREE.Matrix4();
-    this._wUp = new THREE.Vector3(0, 1, 0);
+    this._portraitOn = false;
+    this._portrait = 0;          // 0..1 mezcla con la vista de retrato
+    this._chest = new THREE.Vector3();
+    this._pq = new THREE.Quaternion();
+    this._pm = new THREE.Matrix4();
+    this._pUp = new THREE.Vector3(0, 1, 0);
+    this._pLook = new THREE.Vector3();
   }
 
-  /** Acercar la cámara al reloj de la muñeca (o null para volver). */
-  setWristView(obj) {
-    if (obj) this._wristObj = obj;
-    this._wristOn = !!obj;
+  /** Cámara delante del jugador, mirándolo (menú del reloj abierto). */
+  setPortraitView(on) {
+    this._portraitOn = !!on;
   }
 
-  /** ¿Se está viendo (o yendo hacia) el reloj? */
-  get wristBlend() {
-    return this._wrist;
+  get portraitBlend() {
+    return this._portrait;
   }
 
   /** Cámara en 3ª persona alrededor de un vehículo (o null para volver al jugador). */
@@ -124,35 +124,59 @@ export class CameraSystem {
       this._blend = goal;
     }
 
-    const wGoal = this._wristOn && !this._vehicle ? 1 : 0;
-    this._wrist += (wGoal - this._wrist) * (1 - Math.exp(-WRIST_SPEED * dt));
-    if (Math.abs(wGoal - this._wrist) < 0.002) this._wrist = wGoal;
+    const pGoal = this._portraitOn && !this._vehicle ? 1 : 0;
+    this._portrait += (pGoal - this._portrait) * (1 - Math.exp(-PORTRAIT_SPEED * dt));
+    if (Math.abs(pGoal - this._portrait) < 0.002) this._portrait = pGoal;
 
     this._place();
-    if (this._wrist > 0 && this._wristObj) this._placeWrist();
+    if (this._portrait > 0) this._placePortrait();
     this._updateBodyVisibility();
   }
 
-  /** Mezcla la cámara normal con la vista del reloj. */
-  _placeWrist() {
+  /**
+   * Mezcla la cámara normal con la de retrato. La posición se interpola girando
+   * alrededor del pecho del jugador (no en línea recta, que lo atravesaría).
+   */
+  _placePortrait() {
     const cam = this._camera;
-    const w = this._w;
-    this._wristObj.updateWorldMatrix(true, false);
-    this._wristObj.getWorldPosition(w);
-    this._target.getEyePosition(this._eye);
-    // Desde los ojos hacia el reloj, un poco por encima.
-    this._tmp.copy(this._eye).sub(w).normalize();
-    this._third.copy(w).addScaledVector(this._tmp, WRIST_DISTANCE);
-    this._third.y += 0.05;
-    // Mirar a un punto algo a la derecha del reloj: el reloj queda a la izquierda.
-    this._right.set(this._tmp.z, 0, -this._tmp.x).normalize(); // derecha de la cámara (mira hacia −_tmp)
-    this._back.copy(w).addScaledVector(this._right, WRIST_SIDE);
-    this._back.y -= WRIST_DROP;
-    this._wm.lookAt(this._third, this._back, this._wUp);
-    this._wq.setFromRotationMatrix(this._wm);
-    const k = this._wrist * this._wrist * (3 - 2 * this._wrist);
-    cam.position.lerp(this._third, k);
-    cam.quaternion.slerp(this._wq, k);
+    const t = this._target;
+    const by = t.bodyYaw ?? t.yaw;
+    t.getEyePosition(this._chest);
+    this._chest.y -= 0.55;
+    // Delante del cuerpo (el frente del jugador es -Z con yaw 0).
+    const fx = -Math.sin(by);
+    const fz = -Math.cos(by);
+    let dist = PORTRAIT_DISTANCE;
+    if (this._occluders) {
+      this._tmp.set(fx, 0, fz);
+      const hit = this._occluders.raycastDistance(this._chest, this._tmp, dist + 0.3);
+      if (hit !== null) dist = Math.max(0.9, hit - 0.3);
+    }
+    const goalX = this._chest.x + fx * dist;
+    const goalZ = this._chest.z + fz * dist;
+    const goalY = this._chest.y + PORTRAIT_HEIGHT;
+
+    const k = this._portrait * this._portrait * (3 - 2 * this._portrait);
+    // Interpolación polar alrededor del pecho: ángulo, radio y altura.
+    const ox = cam.position.x - this._chest.x;
+    const oz = cam.position.z - this._chest.z;
+    const a0 = Math.atan2(ox, oz);
+    const a1 = Math.atan2(goalX - this._chest.x, goalZ - this._chest.z);
+    let da = a1 - a0;
+    da = Math.atan2(Math.sin(da), Math.cos(da));
+    const a = a0 + da * k;
+    const r = Math.hypot(ox, oz) * (1 - k) + dist * k;
+    cam.position.set(this._chest.x + Math.sin(a) * r, cam.position.y + (goalY - cam.position.y) * k, this._chest.z + Math.cos(a) * r);
+    const minY = this._terrain.getHeightAt(cam.position.x, cam.position.z) + this._cfg.MIN_HEIGHT_ABOVE_GROUND;
+    if (cam.position.y < minY) cam.position.y = minY;
+
+    // Mirar al jugador, con el punto de mira algo a su izquierda (él queda a la izquierda).
+    const rx = -Math.cos(by);
+    const rz = Math.sin(by);
+    this._pLook.set(this._chest.x + rx * PORTRAIT_SIDE, this._chest.y, this._chest.z + rz * PORTRAIT_SIDE);
+    this._pm.lookAt(cam.position, this._pLook, this._pUp);
+    this._pq.setFromRotationMatrix(this._pm);
+    cam.quaternion.slerp(this._pq, k);
   }
 
   _place() {
@@ -209,8 +233,8 @@ export class CameraSystem {
   }
 
   _updateBodyVisibility() {
-    // En la vista del reloj se ve el cuerpo (el brazo y el reloj), aunque sea 1ª persona.
-    const visible = !this._vehicle && (this._blend > this._cfg.HIDE_BODY_BELOW_BLEND || this._wrist > 0.02);
+    // En la vista de retrato se ve el cuerpo, aunque sea 1ª persona.
+    const visible = !this._vehicle && (this._blend > this._cfg.HIDE_BODY_BELOW_BLEND || this._portrait > 0.02);
     if (visible !== this._bodyVisible) {
       this._bodyVisible = visible;
       this._events.emit(GameEvents.CAMERA_BODY_VISIBILITY, { visible });

@@ -82,7 +82,8 @@ export class ItemUseSystem {
         ok = true;
         break;
       default:
-        this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
+        if (def.TOOL) this._message(`${def.NAME}: herramienta. Mantén el clic sobre ${def.TOOL.CHOP_SPEED ? 'un tronco para talar más deprisa' : 'una roca para picarla'}.`);
+        else this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
     }
     if (ok) this._events.emit(GameEvents.ITEM_USED, { itemId, use: def.USE });
     return ok;

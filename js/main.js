@@ -319,12 +319,15 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   // Astillas al golpear troncos y árboles que caen al talarlos.
   const chopEffects = new ChopEffects({ scene: render.scene, events, worlds });
-  // Lo que no cabe en el inventario cae al suelo en una bolsa delante del jugador.
-  events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount }) => {
+  // Tirar objetos: caen al suelo en una bolsa delante del jugador (E para recogerlos).
+  // También lo que no cabe en el inventario (lleno) se queda en el suelo así.
+  const dropItems = (itemId, amount) => {
+    if (!itemId || !(amount > 0)) return;
     const p = player.position;
     const ahead = 1.2;
     pickups.drop(worlds.activeId, p.x - Math.sin(player.yaw) * ahead, p.z - Math.cos(player.yaw) * ahead, itemId, amount);
-  });
+  };
+  events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount }) => dropItems(itemId, amount));
   const interactionProviders = [ship, pickups, bubbles];
   const interaction = new InteractionSystem({
     config: cfg.INTERACTION,
@@ -338,6 +341,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     events,
     construction,
     providers: interactionProviders, // nave (botones, puertas, asiento, tecnologías), objetos sueltos, burbujas, meteoritos
+    tool: () => cfg.ITEMS[hotbar.selectedId]?.TOOL ?? null, // herramienta seleccionada (hacha: tala más rápido)
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -510,12 +514,30 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const playerMenu = new PlayerMenu({
     container: hudRoot, input, events, inventory, equipment, crafting, hotbar, time,
     items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stats: { health, hunger, thirst, energy },
+    onDrop: (itemId, count) => {
+      dropItems(itemId, count);
+      message(`Tiras ${count > 1 ? `${count} × ` : ''}${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'info');
+    },
   });
-  // Al abrirlo, el jugador levanta la muñeca y la cámara se acerca al reloj.
+  // Q: tirar una unidad del objeto seleccionado en la barra (en el modo construcción, Q gira la pieza).
+  const dropKey = {
+    name: 'dropKey',
+    update: () => {
+      if (!input.wasPressed('DROP') || construction.active || controlLocks.size || hotbar.selectedIndex === null) return;
+      const got = inventory.takeFromSlot(hotbar.selectedIndex, 1);
+      if (got) {
+        dropItems(got.id, got.count);
+        message(`Tiras ${cfg.ITEMS[got.id].ICON} ${cfg.ITEMS[got.id].NAME} (Q)`, 'info');
+      }
+    },
+  };
+  // Al abrirlo, el jugador se gira hacia donde miraba, levanta la muñeca para mirar
+  // el reloj y la cámara se coloca delante de él (retrato, con el menú a la derecha).
   events.on(GameEvents.UI_PANEL_TOGGLED, ({ id, open }) => {
     if (id !== 'player-menu') return;
+    if (open) player.bodyYaw = player.yaw;
     player.model.setWristPose(open);
-    camera.setWristView(open ? player.model.watch : null);
+    camera.setPortraitView(open);
   });
   new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
 
@@ -1038,14 +1060,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(controller);  // entrada → física del jugador
   loop.add(player);      // sincroniza y anima el modelo
   loop.add(camera);      // coloca la cámara a partir del jugador
-  // Reloj de pulsera: la cabeza no tapa el reloj al mirarlo y su pantalla da la hora.
-  loop.add({
-    name: 'wristWatch',
-    update: () => {
-      player.model.setHeadVisible(camera.wristBlend < 0.3);
-      player.model.setWatchText(time.clockText);
-    },
-  });
+  // Reloj de pulsera: su pantalla da la hora del juego.
+  loop.add({ name: 'wristWatch', update: () => player.model.setWatchText(time.clockText) });
   loop.add(eva);         // paseo espacial: mueve al jugador y coloca la cámara (sustituye a los dos anteriores)
   loop.add(hotbar);      // teclas 1–9
   loop.add(construction); // modo construcción: apuntar, vista previa, colocar/quitar
@@ -1079,6 +1095,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(spaceHUD);
   loop.add(starMapHUD);
   loop.add(playerMenu);
+  loop.add(dropKey);     // Q: tirar el objeto seleccionado
   loop.add(shipMapPanel);
   loop.add(shipChargerPanel);
   loop.add(shipWatch);

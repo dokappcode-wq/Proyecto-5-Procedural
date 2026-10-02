@@ -273,6 +273,8 @@ kbd {
 #interaction-prompt .target-name { font-weight: 700; }
 #interaction-prompt .target-action { color: #ffe38a; margin-left: 6px; }
 #interaction-prompt .target-count { color: var(--ui-muted); margin-left: 4px; }
+#interaction-prompt .target-progress { display: inline-block; width: 70px; height: 6px; margin-left: 8px; background: rgba(255, 255, 255, 0.18); border-radius: 3px; overflow: hidden; vertical-align: middle; }
+#interaction-prompt .target-progress span { display: block; height: 100%; background: linear-gradient(90deg, #c8955a, #ffd27a); }
 
 /* ---- Inventario ------------------------------------------------------ */
 #inventory-bar {
@@ -1132,6 +1134,8 @@ body.underwater #vignette {
 #player-menu .pm-craft:hover:not(:disabled) { background: rgba(60, 190, 255, 0.45); box-shadow: 0 0 10px rgba(80, 210, 255, 0.6); }
 #player-menu .pm-craft:disabled { opacity: 0.4; cursor: default; }
 #player-menu .pm-hint { margin: 0; color: #8fb8cc; font-size: 0.86rem; }
+#player-menu .pm-drop { margin-top: 8px; padding: 9px; text-align: center; font-size: 0.8rem; color: #ffb4a8; border: 1px dashed rgba(255, 140, 120, 0.55); background: rgba(120, 30, 20, 0.18); cursor: pointer; user-select: none; }
+#player-menu .pm-drop:hover { background: rgba(160, 40, 30, 0.35); color: #fff; }
 /* Columna "Tú". */
 #player-menu .pm-you { border-left: 2px solid rgba(110, 220, 255, 0.35); padding-left: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 #player-menu .pm-you-title { color: #fff; border-bottom: 3px solid #fff; align-self: flex-start; padding-bottom: 4px; margin: 0 0 4px; }

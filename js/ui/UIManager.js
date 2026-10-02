@@ -360,6 +360,15 @@ export class UIManager {
       action.textContent = `[${target.key}] ${target.action}`;
       el.appendChild(action);
     }
+    if (target.progress > 0) {
+      // Tala en curso: barra de progreso (sin decir cuánta madera queda).
+      const bar = document.createElement('span');
+      bar.className = 'target-progress';
+      const fill = document.createElement('span');
+      fill.style.width = `${Math.round(target.progress * 100)}%`;
+      bar.appendChild(fill);
+      el.appendChild(bar);
+    }
     if (target.remaining) {
       const count = document.createElement('span');
       count.className = 'target-count';
@@ -487,7 +496,12 @@ export class UIManager {
       }
       case 'EQUIP': text = `${key} Ponerse (se cambia por lo que lleves) · [I] Inventario`; break;
       case 'WATCH': text = `${key} Ver dónde está la nave`; break;
-      default: text = id.startsWith('PLANK_BATTERY') ? 'Combustible: colócala en el puesto de carga de la nave' : 'Material · [Tab] Fabricar · [B] Construir';
+      default:
+        if (def.TOOL) {
+          text = def.TOOL.CHOP_SPEED ? '[Mantén clic] en un tronco: tala más deprisa' : '[Mantén clic] en una roca: picar';
+          break;
+        }
+        text = id.startsWith('PLANK_BATTERY') ? 'Combustible: colócala en el puesto de carga de la nave' : 'Material · [Tab] Fabricar · [B] Construir';
     }
     el.textContent = `${def.ICON} ${def.NAME} — ${text}`;
     el.classList.remove('hidden');
