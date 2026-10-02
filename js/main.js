@@ -1351,6 +1351,22 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   registerSpaceTools(admin, { system, hasLightspeed, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
+  // Cuevas: ir a la boca más cercana de cada tipo (de pie delante de ella, mirándola).
+  for (const [kind, label] of [['UNDERGROUND', 'Ir a la cueva subterránea más cercana'], ['MOUNTAIN', 'Ir a la cueva de montaña más cercana']]) {
+    admin.registerTool({ category: 'Jugador', label, run: () => {
+      const p = player.position;
+      const list = (world.caves?.caves ?? []).filter((c) => c.kind === kind);
+      if (worlds.activeId !== HOME || !list.length) throw new Error('Aquí no hay cuevas');
+      const c = list.reduce((a, b) => (Math.hypot(a.mouth.x - p.x, a.mouth.z - p.z) <= Math.hypot(b.mouth.x - p.x, b.mouth.z - p.z) ? a : b));
+      const [n0, n1] = c.nodes;
+      const len = Math.hypot(n1.x - n0.x, n1.z - n0.z) || 1;
+      const ux = (n1.x - n0.x) / len;
+      const uz = (n1.z - n0.z) / len;
+      controller.placeAt(n0.x - ux * 9, n0.z - uz * 9);
+      player.yaw = player.bodyYaw = Math.atan2(-ux, -uz);
+      player.pitch = -0.25;
+    } });
+  }
   // La nave llega al espacio del nuevo sistema (después de las herramientas Admin, que leen el terreno).
   if (handoff) {
     ship.enterPilot();

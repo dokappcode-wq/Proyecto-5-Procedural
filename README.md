@@ -265,6 +265,7 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   baja) y 8 de montaña (en las laderas, entran hacia dentro de la montaña). Ninguna a menos de 180 m del inicio. Son
   túneles de 85–245 m que bajan 25–40 m, con cámaras anchas cada cierto tramo; se recorren andando (sin escalones).
   Dentro, cuanto más hondo más oscuro: solo alumbran las **antorchas** (en la mano o clavadas) y las **flores luminosas**.
+  Para ir directo: Admin → Jugador → «Ir a la cueva subterránea / de montaña más cercana».
 - **Menas** (con el ⛏️ pico seleccionado, clic mantenido): **carbón** en la entrada (3), **cobre** por todo el túnel (3),
   **hierro** más adentro y más escaso (2), **diamante** muy raro al fondo (1). **Flor luminosa**: se coge con `E`.
   El horno funde el mineral con carbón (cobre/hierro/diamante refinados) y la arena en cristal.

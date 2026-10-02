@@ -205,7 +205,7 @@ export class WorldGenerator {
         sample: (x, z) => this.terrain.sample(x, z),
         isWater: (x, z, m) => this.water.isWater(x, z, m),
         // Bocas de cueva: ahí no crece nada; dentro de las cuevas, sus minerales.
-        isHole: this.caves ? (x, z) => this.isCaveHole(x, z) : null,
+        isHole: this.caves ? (x, z) => this.caves.nearMouth(x, z, 4) : null, // ni árboles ni rocas en la boca
         extraNodes: this.caves ? (cx, cz) => this.caves.nodesInChunk(cx, cz, this._cfg.CHUNK_SIZE, this._half) : null,
       },
     });

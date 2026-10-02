@@ -287,6 +287,17 @@ export class CaveSystem {
     return false;
   }
 
+  /** ¿(x, z) está junto a la boca de una cueva (a menos de `pad` m del túnel)? Ahí no crecen árboles ni rocas. */
+  nearMouth(x, z, pad = 4) {
+    for (const c of this.caves) {
+      for (let i = 0; i < Math.min(4, c.nodes.length); i++) {
+        const n = c.nodes[i];
+        if (Math.hypot(n.x - x, n.z - z) < n.r + pad) return true;
+      }
+    }
+    return false;
+  }
+
   /** ¿Hay alguna cueva cuya boca esté cerca de (x, z)? (para trocear el terreno solo donde hace falta) */
   mouthNear(x0, z0, x1, z1) {
     return this.caves.some((c) => {
