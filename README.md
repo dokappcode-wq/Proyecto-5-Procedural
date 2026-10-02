@@ -263,7 +263,8 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 - **Fabricar con tiempo**: en `Tab` cada receta dice cuánto tarda (⏱); al fabricar entra en la cola
   «Fabricando» (barra de progreso; clic en ella para cancelar y recuperar los materiales) y sigue aunque cierres el menú.
-  Piedra refinada (4 🪨, 5 s), madera refinada (2 🪵, 4 s), cuerda (5 🕸️), hacha, pico y **mesa de refinería**
+  Piedra refinada (4 🪨, 5 s), madera refinada (2 🪵, 4 s), cuerda (5 🕸️), hacha y pico (1 madera refinada + 1 piedra
+  refinada + 2 cuerdas cada uno) y **mesa de refinería**
   (4 piedras refinadas + 2 maderas refinadas, 15 s). Selecciona la mesa en la barra y clic derecho / `R` para
   colocarla (modo construcción); `E` sobre ella abre su pestaña: cuero refinado (1 cuero, 8 s), ropa de cuero
   y odre (con cuero refinado). En `Tab` esas recetas salen bloqueadas (🛠️).

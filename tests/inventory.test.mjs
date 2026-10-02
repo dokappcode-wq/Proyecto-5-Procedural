@@ -164,6 +164,7 @@ test('fabricación: categorías y cuántas veces se puede fabricar', async () =>
   assert.deepEqual(C.RECIPES.REFINERY_KIT.INGREDIENTS, { REFINED_STONE: 4, REFINED_WOOD: 2 });
   assert.deepEqual(C.RECIPES.REFINED_LEATHER.INGREDIENTS, { LEATHER: 1 });
   assert.deepEqual(C.RECIPES.ROPE.INGREDIENTS, { SPIDER_SILK: 5 });
+  for (const t of ['STONE_AXE', 'STONE_PICKAXE']) assert.deepEqual(C.RECIPES[t].INGREDIENTS, { REFINED_WOOD: 1, REFINED_STONE: 1, ROPE: 2 }, `${t}: madera y piedra refinadas + 2 cuerdas`);
   for (const x of Object.values(r)) assert.ok(C.RECIPE_CATEGORIES[x.category], `${x.id}: categoría conocida`);
 });
 
