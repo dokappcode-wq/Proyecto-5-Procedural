@@ -409,6 +409,7 @@ export class UIManager {
       slot.querySelector('.key').textContent = i + 1;
       slot.querySelector('.icon').textContent = it?.ICON ?? '';
       slot.querySelector('.count').textContent = it && it.count > 1 ? it.count : '';
+      if (st?.dur != null && it?.DURABILITY) slot.appendChild(durabilityBar(st.dur / it.DURABILITY));
       if (it && it.id === bumpId) {
         slot.classList.add('bump');
         setTimeout(() => slot.classList.remove('bump'), 200);
@@ -590,4 +591,16 @@ function createFrostTexture() {
     branch(x, y, a + (rnd() - 0.5) * 1.1, 22 + rnd() * 50, 0.8 + rnd() * 0.6, 4);
   }
   return c.toDataURL();
+}
+
+/** Barra de aguante de una herramienta (verde → rojo). */
+export function durabilityBar(ratio) {
+  const bar = document.createElement('span');
+  bar.className = 'dur';
+  const fill = document.createElement('span');
+  const r = Math.max(0, Math.min(1, ratio));
+  fill.style.width = `${Math.round(r * 100)}%`;
+  fill.style.background = `hsl(${Math.round(r * 110)}, 75%, 50%)`;
+  bar.appendChild(fill);
+  return bar;
 }

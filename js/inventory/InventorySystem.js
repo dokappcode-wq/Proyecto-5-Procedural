@@ -5,8 +5,10 @@ import { GameEvents } from '../core/GameEvents.js';
  *
  *   Huecos 0–8:   barra rápida (teclas 1–9).
  *   Huecos 9–35:  mochila (9 × 3).
- *   Cada hueco: null o { id, count }. Como mucho MAX_STACK unidades por hueco
+ *   Cada hueco: null o { id, count, dur? }. Como mucho MAX_STACK unidades por hueco
  *   (100 por defecto; ITEMS.*.STACK lo cambia, p. ej. la ropa no se apila).
+ *   Las herramientas (ITEMS.*.DURABILITY) llevan su aguante en `dur`: cada uso lo
+ *   gasta (wearSlot) y al llegar a 0 se rompen (TOOL_BROKEN).
  *
  * API por tipo de objeto (la usan recogida, fabricación, construcción…):
  *   addItem(id, n) → cantidad que ha cabido. Lo que no cabe se avisa con
@@ -56,17 +58,41 @@ export class InventorySystem {
   /**
    * Mete `amount` unidades: primero completa las pilas que ya hay (barra y luego
    * mochila) y después ocupa huecos vacíos (barra y luego mochila).
-   * @param {{ quiet?: boolean }} [opts] quiet: no avisar de lo que no cabe
+   * @param {{ quiet?: boolean, dur?: number }} [opts] quiet: no avisar de lo que no cabe;
+   *   dur: aguante de una herramienta ya usada (si no, nueva)
    * @returns {number} cantidad que ha cabido
    */
-  addItem(id, amount = 1, { quiet = false } = {}) {
+  addItem(id, amount = 1, { quiet = false, dur } = {}) {
     this._assertItem(id);
     amount = Math.floor(amount);
     if (!(amount > 0)) return 0;
-    const added = this._insert(id, amount);
+    const added = this._insert(id, amount, dur);
     if (added > 0) this._emit(id, added);
-    if (added < amount && !quiet) this._events?.emit(GameEvents.INVENTORY_FULL, { itemId: id, amount: amount - added });
+    if (added < amount && !quiet) this._events?.emit(GameEvents.INVENTORY_FULL, { itemId: id, amount: amount - added, ...(dur != null ? { dur } : {}) });
     return added;
+  }
+
+  /** Aguante máximo de una herramienta (o null si no se gasta). */
+  maxDurability(id) {
+    return this._defs[id]?.DURABILITY ?? null;
+  }
+
+  /**
+   * Gasta aguante de la herramienta de un hueco; si llega a 0, se rompe y desaparece.
+   * @returns {boolean} true si se ha roto
+   */
+  wearSlot(index, amount = 1) {
+    const st = this.slots[index];
+    if (!st || st.dur == null) return false;
+    st.dur = Math.max(0, st.dur - amount);
+    if (st.dur > 0) {
+      this._emit(null, 0);
+      return false;
+    }
+    this.slots[index] = null;
+    this._emit(st.id, -1);
+    this._events?.emit(GameEvents.TOOL_BROKEN, { itemId: st.id, index });
+    return true;
   }
 
   /** Cuántas unidades de `id` cabrían ahora. */
@@ -128,9 +154,9 @@ export class InventorySystem {
     if (!ids.size) this._emit(null, 0);
   }
 
-  /** Copia de los huecos (para guardar o viajar): [[id, count] | null, …]. */
+  /** Copia de los huecos (para guardar o viajar): [[id, count, dur?] | null, …]. */
   snapshot() {
-    return this.slots.map((s) => (s ? [s.id, s.count] : null));
+    return this.slots.map((s) => (s ? (s.dur != null ? [s.id, s.count, s.dur] : [s.id, s.count]) : null));
   }
 
   /** Restaura huecos guardados (datos no fiables: se comprueba todo). */
@@ -138,10 +164,13 @@ export class InventorySystem {
     this.slots.fill(null);
     this.cursor = null;
     (Array.isArray(list) ? list.slice(0, this.slots.length) : []).forEach((e, i) => {
-      const [id, count] = Array.isArray(e) ? e : [];
+      const [id, count, dur] = Array.isArray(e) ? e : [];
       if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(this._defs, id)) return;
       const n = Math.floor(Number(count));
-      if (n > 0) this.slots[i] = { id, count: Math.min(n, this.stackLimit(id)) };
+      if (!(n > 0)) return;
+      this.slots[i] = { id, count: Math.min(n, this.stackLimit(id)) };
+      const max = this.maxDurability(id);
+      if (max != null) this.slots[i].dur = Number.isFinite(dur) ? Math.min(max, Math.max(1, Math.round(dur))) : max;
     });
     this._emit(null, 0);
   }
@@ -174,15 +203,26 @@ export class InventorySystem {
       if (!c && here) {
         // Coger la mitad (redondeando hacia arriba).
         const take = Math.ceil(here.count / 2);
-        this.cursor = { id: here.id, count: take };
-        here.count -= take;
-        if (here.count === 0) this.slots[ref] = null;
+        if (take === here.count) {
+          this.cursor = here; // todo el hueco (conserva el aguante de las herramientas)
+          this.slots[ref] = null;
+        } else {
+          this.cursor = { id: here.id, count: take };
+          here.count -= take;
+        }
       } else if (c && (!here || (here.id === c.id && here.count < this.stackLimit(c.id)))) {
-        // Dejar una unidad.
-        if (here) here.count += 1;
-        else this.slots[ref] = { id: c.id, count: 1 };
-        c.count -= 1;
-        if (c.count === 0) this.cursor = null;
+        // Dejar una unidad (si es la última, el mismo objeto: conserva el aguante).
+        if (here) {
+          here.count += 1;
+          c.count -= 1;
+          if (c.count === 0) this.cursor = null;
+        } else if (c.count === 1) {
+          this.slots[ref] = c;
+          this.cursor = null;
+        } else {
+          this.slots[ref] = { id: c.id, count: 1 };
+          c.count -= 1;
+        }
       } else return false;
     } else if (!c) {
       if (!here) return false;
@@ -217,7 +257,7 @@ export class InventorySystem {
     st.count -= n;
     if (st.count === 0) this.slots[index] = null;
     this._emit(st.id, -n);
-    return { id: st.id, count: n };
+    return { id: st.id, count: n, ...(st.dur != null ? { dur: st.dur } : {}) };
   }
 
   /** Lo que se lleva con el ratón sale del inventario (para tirarlo): { id, count } o null. */
@@ -228,7 +268,7 @@ export class InventorySystem {
     c.count -= n;
     if (c.count === 0) this.cursor = null;
     this._emit(null, 0);
-    return { id: c.id, count: n };
+    return { id: c.id, count: n, ...(c.dur != null ? { dur: c.dur } : {}) };
   }
 
   /** Devuelve al inventario lo que se lleva con el ratón (al cerrar el panel). */
@@ -236,7 +276,7 @@ export class InventorySystem {
     const c = this.cursor;
     if (!c) return;
     this.cursor = null;
-    this.addItem(c.id, c.count);
+    this.addItem(c.id, c.count, { dur: c.dur });
   }
 
   _clickEquipment(slot, shift) {
@@ -292,7 +332,7 @@ export class InventorySystem {
           t.count += move;
           here.count -= move;
         } else if (pass === 'empty' && !t) {
-          this.slots[i] = { id: here.id, count: here.count };
+          this.slots[i] = { ...here };
           here.count = 0;
         }
       }
@@ -308,8 +348,9 @@ export class InventorySystem {
   HasItem(id, n) { return this.hasItem(id, n); }
   GetItemCount(id) { return this.getItemCount(id); }
 
-  _insert(id, amount) {
+  _insert(id, amount, dur) {
     const lim = this.stackLimit(id);
+    const max = this.maxDurability(id);
     let left = amount;
     for (const s of this.slots) {
       if (left === 0) break;
@@ -322,6 +363,7 @@ export class InventorySystem {
       if (this.slots[i]) continue;
       const move = Math.min(left, lim);
       this.slots[i] = { id, count: move };
+      if (max != null) this.slots[i].dur = dur ?? max; // herramienta: nueva o con el aguante que traía
       left -= move;
     }
     return amount - left;

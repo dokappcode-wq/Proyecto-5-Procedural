@@ -205,3 +205,40 @@ test('telarañas: entre dos árboles cercanos, dan 5–10 telarañas y con 5 se 
   assert.equal(again, res.getChunk(0, 3).nodes.filter((n) => n.type === 'COBWEB').length);
   assert.deepEqual(C.RECIPES.ROPE.INGREDIENTS, { SPIDER_SILK: 5 });
 });
+
+test('herramientas: 15 s de fabricación y aguante que se gasta golpe a golpe hasta romperse', () => {
+  const { events, inv } = setup();
+  const broken = [];
+  events.on(GameEvents.TOOL_BROKEN, (e) => broken.push(e.itemId));
+  for (const t of ['STONE_AXE', 'STONE_PICKAXE']) {
+    assert.equal(C.RECIPES[t].TIME, 15, `${t} tarda 15 s`);
+    assert.ok(C.ITEMS[t].DURABILITY > 0, `${t} tiene aguante`);
+  }
+  const max = C.ITEMS.STONE_AXE.DURABILITY;
+  inv.addItem('STONE_AXE', 1);
+  assert.equal(inv.slots[0].dur, max, 'nueva, con todo el aguante');
+  inv.wearSlot(0, 5);
+  assert.equal(inv.slots[0].dur, max - 5);
+  // Moverla con el ratón, de una en una o por Shift no la "repara".
+  inv.click(0);
+  inv.click(12);
+  assert.equal(inv.slots[12].dur, max - 5);
+  inv.click(12, { shift: true });
+  assert.equal(inv.slots[0].dur, max - 5);
+  inv.click(0);
+  inv.returnCursor();
+  assert.equal(inv.slots[0].dur, max - 5);
+  // Tirarla y volver a cogerla conserva el aguante.
+  const got = inv.takeFromSlot(0, 1);
+  assert.equal(got.dur, max - 5);
+  inv.addItem(got.id, 1, { dur: got.dur });
+  assert.equal(inv.slots[0].dur, max - 5);
+  // Guardar/viajar.
+  const snap = inv.snapshot();
+  inv.restore(snap);
+  assert.equal(inv.slots[0].dur, max - 5);
+  // Se rompe al llegar a 0.
+  assert.equal(inv.wearSlot(0, max), true);
+  assert.equal(inv.slots[0], null);
+  assert.deepEqual(broken, ['STONE_AXE']);
+});

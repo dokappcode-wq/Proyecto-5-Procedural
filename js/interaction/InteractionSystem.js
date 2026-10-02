@@ -30,7 +30,7 @@ import { SHAPES } from '../construction/BuildRules.js';
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -45,6 +45,7 @@ export class InteractionSystem {
     this._providers = providers;
     this._tool = tool ?? (() => null); // herramienta seleccionada ({ CHOP_SPEED }) o null
     this._canWork = canWork ?? (() => true); // ¿queda energía para golpear?
+    this._wearTool = wearTool ?? (() => {}); // gasta 1 de aguante de la herramienta seleccionada
     this._swing = 0;                   // s hasta el siguiente golpe al tronco
     this._chopProgress = new Map();    // id del árbol → 0..1 de tala
 
@@ -158,6 +159,8 @@ export class InteractionSystem {
       ? { time: def.BREAK.TIME, speed: this._tool()?.[def.BREAK.TOOL] ?? 0, amount: def.BREAK.AMOUNT }
       : { time: def.HARVEST.CHOP_TIME ?? 15, speed: def.HARVEST.MATERIAL === 'web' ? 1 : this._tool()?.CHOP_SPEED ?? 1, amount: node.total ?? def.HARVEST.AMOUNT };
     const swing = this._cfg.CHOP_SWING ?? 0.6;
+    // La herramienta que ayuda en este golpe se gasta (el hacha en troncos, el pico en rocas).
+    const usesTool = rock || (def.HARVEST.MATERIAL !== 'web' && !!this._tool()?.CHOP_SPEED);
     const work = this._chopProgress.get(node.id) ?? { progress: 0, given: 0 };
     work.progress = Math.min(1, work.progress + (swing * job.speed) / job.time);
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
@@ -179,6 +182,7 @@ export class InteractionSystem {
     }
     if (done || node.removed) this._chopProgress.delete(node.id);
     else this._chopProgress.set(node.id, work);
+    if (usesTool) this._wearTool();
     const p = this._player.position;
     this._events.emit(GameEvents.RESOURCE_HIT, {
       node, x: node.x, y: node.y + def.AIM_HEIGHT * node.scale, z: node.z, fromX: p.x, fromZ: p.z,
@@ -199,6 +203,7 @@ export class InteractionSystem {
     if (!C?.exists(piece)) return;
     const tool = this._tool();
     const speed = tool?.CHOP_SPEED || tool?.MINE_SPEED ? 2 : 1;
+    if (speed > 1) this._wearTool();
     const key = `st-${piece.id}`;
     const work = this._chopProgress.get(key) ?? { progress: 0 };
     work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed) / (C._cfg.BREAK_TIME ?? 3));

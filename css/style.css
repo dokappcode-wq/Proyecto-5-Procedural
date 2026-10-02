@@ -1184,3 +1184,9 @@ body.underwater #vignette {
 /* Con tres pestañas (estación) los títulos se encogen para no invadir la columna «Tú». */
 #player-menu .pm-tabs { gap: clamp(10px, 1.6vw, 26px); min-width: 0; }
 #player-menu .pm-tab { font-size: clamp(1rem, 1.7vw, 2rem); white-space: nowrap; }
+
+/* Aguante de las herramientas (barra bajo el icono). */
+.inv-slot .dur, #player-menu .pm-slot .dur {
+  position: absolute; left: 6px; right: 6px; bottom: 4px; height: 4px; background: rgba(0, 0, 0, 0.55); border-radius: 2px; overflow: hidden;
+}
+.inv-slot .dur span, #player-menu .pm-slot .dur span { display: block; height: 100%; }

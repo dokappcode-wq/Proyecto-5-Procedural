@@ -1,5 +1,6 @@
 import { ModalPanel } from './ModalPanel.js';
 import { GameEvents } from '../core/GameEvents.js';
+import { durabilityBar } from './UIManager.js';
 
 /**
  * PlayerMenu — el menú del reloj de pulsera (estilo panel tecnológico):
@@ -278,6 +279,8 @@ export class PlayerMenu extends ModalPanel {
       s.querySelector('.icon').textContent = def ? def.ICON : s.dataset.empty ?? '';
       s.querySelector('.count').textContent = stack && stack.count > 1 ? String(stack.count) : '';
       s.classList.toggle('empty', !stack);
+      s.querySelector('.dur')?.remove();
+      if (stack?.dur != null && def?.DURABILITY) s.append(durabilityBar(stack.dur / def.DURABILITY));
     };
     if (this.tab === MenuTab.INVENTORY) {
       this._mainSlots.forEach((s, k) => paint(s, inv.slots[inv.hotbarSize + k]));
@@ -337,7 +340,7 @@ export class PlayerMenu extends ModalPanel {
 
   _dropCursor(amount) {
     const got = this._inv.takeCursor(amount);
-    if (got) this._onDrop(got.id, got.count);
+    if (got) this._onDrop(got.id, got.count, got.dur);
   }
 
   /** Receta de una estación vista fuera de ella. */
@@ -382,7 +385,7 @@ export class PlayerMenu extends ModalPanel {
     const d = this._detail;
     d.replaceChildren();
     const stack = this._hover === null ? null : this._inv.getRef(this._hover);
-    if (stack) return this._itemDetail(d, stack.id, stack.count);
+    if (stack) return this._itemDetail(d, stack.id, stack.count, stack.dur);
     if (typeof this._hover === 'string') {
       const slot = this._eq.slotDefs[this._hover.slice(3)];
       d.append(el('p', 'pm-hint', `Ranura de ropa: ${slot?.NAME.toLowerCase() ?? ''}. Coge una prenda con clic y déjala aquí (o Shift+clic sobre ella).`));
@@ -392,12 +395,13 @@ export class PlayerMenu extends ModalPanel {
     d.append(el('p', 'pm-hint', this._inv.cursor ? 'Haz clic en un hueco para dejarlo.' : 'Pasa el ratón sobre un objeto para ver qué es.'));
   }
 
-  _itemDetail(d, id, count) {
+  _itemDetail(d, id, count, dur) {
     const def = this._items[id];
     d.append(el('span', 'pm-detail-icon', def.ICON));
     const info = el('div', 'pm-detail-info');
     info.append(el('b', null, `${def.NAME}${count > 1 ? ` ×${count}` : ''}`));
     const parts = [];
+    if (dur != null && def.DURABILITY) parts.push(`Aguante: ${dur}/${def.DURABILITY} golpes`);
     if (def.SLOT) parts.push(`Se pone en: ${this._eq.slotDefs[def.SLOT]?.NAME.toLowerCase()} · abriga ${Math.round((def.COLD_PROTECTION ?? 0) * 100)} %`);
     if (def.DESC) parts.push(def.DESC);
     if (parts.length) info.append(el('span', null, parts.join(' · ')));

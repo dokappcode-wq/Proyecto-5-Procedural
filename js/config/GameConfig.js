@@ -13,7 +13,7 @@
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.10.3',
+    VERSION: '1.11.0',
   },
 
   RENDER: {
@@ -291,8 +291,10 @@ export const GameConfig = deepFreeze({
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
     // Herramientas: TOOL.CHOP_SPEED acelera la tala cuando se lleva seleccionada en la barra.
-    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, TOOL: { MINE_SPEED: 1 }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
-    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, TOOL: { CHOP_SPEED: 2.5 }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
+    //   DURABILITY: golpes que aguanta (cada golpe con ella a un tronco, roca o pieza gasta 1);
+    //   al llegar a 0 se rompe. Un árbol con el hacha son ~10 golpes; una roca con el pico, ~10.
+    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 120, TOOL: { MINE_SPEED: 1 }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
+    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 120, TOOL: { CHOP_SPEED: 2.5 }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
     LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
     LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
     LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
@@ -348,8 +350,8 @@ export const GameConfig = deepFreeze({
     REFINED_STONE: { RESULT: 'REFINED_STONE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 5, INGREDIENTS: { STONE: 4 } },
     REFINED_WOOD: { RESULT: 'REFINED_WOOD', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { WOOD: 2 } },
     ROPE: { RESULT: 'ROPE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { SPIDER_SILK: 5 } },
-    STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 6, INGREDIENTS: { REFINED_WOOD: 1, REFINED_STONE: 1, ROPE: 2 } },
-    STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 6, INGREDIENTS: { REFINED_WOOD: 1, REFINED_STONE: 1, ROPE: 2 } },
+    STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 1, REFINED_STONE: 1, ROPE: 2 } },
+    STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 1, REFINED_STONE: 1, ROPE: 2 } },
     REFINERY_KIT: { RESULT: 'REFINERY_KIT', AMOUNT: 1, CATEGORY: 'STATIONS', TIME: 15, INGREDIENTS: { REFINED_STONE: 4, REFINED_WOOD: 2 } },
     // Mesa de refinería.
     REFINED_LEATHER: { RESULT: 'REFINED_LEATHER', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'REFINERY', INGREDIENTS: { LEATHER: 1 } },

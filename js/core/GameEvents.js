@@ -41,7 +41,8 @@ export const GameEvents = Object.freeze({
   RESOURCE_HARVESTED: 'resource:harvested',         // { node, item, amount, depleted }
   INVENTORY_CHANGED: 'inventory:changed',           // { itemId, count, delta, items, slots, cursor }
   HOTBAR_CHANGED: 'inventory:hotbarChanged',        // { selectedId, selectedIndex }
-  INVENTORY_FULL: 'inventory:full',                 // { itemId, amount } lo que no ha cabido
+  INVENTORY_FULL: 'inventory:full',                 // { itemId, amount, dur? } lo que no ha cabido
+  TOOL_BROKEN: 'inventory:toolBroken',              // { itemId, index } una herramienta se ha gastado del todo
   ITEM_USED: 'inventory:itemUsed',                  // { itemId, use }
   EQUIPMENT_CHANGED: 'inventory:equipmentChanged',  // { slot, itemId|null, slots }
 

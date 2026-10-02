@@ -321,13 +321,15 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const chopEffects = new ChopEffects({ scene: render.scene, events, worlds });
   // Tirar objetos: caen al suelo en una bolsa delante del jugador (E para recogerlos).
   // También lo que no cabe en el inventario (lleno) se queda en el suelo así.
-  const dropItems = (itemId, amount) => {
+  const dropItems = (itemId, amount, dur) => {
     if (!itemId || !(amount > 0)) return;
     const p = player.position;
     const ahead = 1.2;
-    pickups.drop(worlds.activeId, p.x - Math.sin(player.yaw) * ahead, p.z - Math.cos(player.yaw) * ahead, itemId, amount);
+    pickups.drop(worlds.activeId, p.x - Math.sin(player.yaw) * ahead, p.z - Math.cos(player.yaw) * ahead, itemId, amount, dur);
   };
-  events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount }) => dropItems(itemId, amount));
+  events.on(GameEvents.INVENTORY_FULL, ({ itemId, amount, dur }) => dropItems(itemId, amount, dur));
+  // Una herramienta gastada se rompe.
+  events.on(GameEvents.TOOL_BROKEN, ({ itemId }) => message(`💥 Se ha roto: ${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'warning'));
   const interactionProviders = [ship, pickups, bubbles];
   const interaction = new InteractionSystem({
     config: cfg.INTERACTION,
@@ -343,6 +345,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     providers: interactionProviders, // nave (botones, puertas, asiento, tecnologías), objetos sueltos, burbujas, meteoritos
     tool: () => cfg.ITEMS[hotbar.selectedId]?.TOOL ?? null, // herramienta seleccionada (hacha: tala más rápido)
     canWork: () => energy.canWork, // sin energía no se golpea
+    wearTool: () => hotbar.selectedIndex !== null && inventory.wearSlot(hotbar.selectedIndex, 1), // aguante de la herramienta
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
 
@@ -515,8 +518,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const playerMenu = new PlayerMenu({
     container: hudRoot, input, events, inventory, equipment, crafting, hotbar, time,
     items: cfg.ITEMS, categories: cfg.RECIPE_CATEGORIES, stations: cfg.STATIONS, stats: { health, hunger, thirst, energy },
-    onDrop: (itemId, count) => {
-      dropItems(itemId, count);
+    onDrop: (itemId, count, dur) => {
+      dropItems(itemId, count, dur);
       message(`Tiras ${count > 1 ? `${count} × ` : ''}${cfg.ITEMS[itemId].ICON} ${cfg.ITEMS[itemId].NAME}`, 'info');
     },
   });
@@ -527,7 +530,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       if (!input.wasPressed('DROP') || construction.active || controlLocks.size || hotbar.selectedIndex === null) return;
       const got = inventory.takeFromSlot(hotbar.selectedIndex, 1);
       if (got) {
-        dropItems(got.id, got.count);
+        dropItems(got.id, got.count, got.dur);
         message(`Tiras ${cfg.ITEMS[got.id].ICON} ${cfg.ITEMS[got.id].NAME} (Q)`, 'info');
       }
     },

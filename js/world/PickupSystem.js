@@ -52,17 +52,18 @@ export class PickupSystem {
    * Deja objetos en el suelo junto a (x, z) en una bolsa. Si ya hay una bolsa a
    * menos de 3 m en ese cuerpo, se meten en ella.
    */
-  drop(body, x, z, item, count) {
+  drop(body, x, z, item, count, dur) {
     for (const p of this._list.values()) {
       if (p.model !== 'BAG' || p.taken || p.body !== body || Math.hypot(p.x - x, p.z - z) > 3) continue;
-      const same = p.contents.find((c) => c.item === item);
+      // Las herramientas usadas van aparte: cada una conserva su aguante.
+      const same = dur == null && p.contents.find((c) => c.item === item && c.dur == null);
       if (same) same.count += count;
-      else p.contents.push({ item, count });
+      else p.contents.push(dur == null ? { item, count } : { item, count, dur });
       p.label = this._bagLabel(p.contents);
       return p;
     }
     this._bagSeq = (this._bagSeq ?? 0) + 1;
-    const contents = [{ item, count }];
+    const contents = [dur == null ? { item, count } : { item, count, dur }];
     return this.add({
       id: `BAG_${this._bagSeq}`, body, x, z, model: 'BAG', label: this._bagLabel(contents), action: 'Coger', beacon: false, contents,
     });
@@ -140,11 +141,11 @@ export class PickupSystem {
     // Se coge lo que quepa; lo demás se queda dentro (la bolsa o el cofre siguen ahí).
     const got = [];
     const left = [];
-    for (const { item, count } of p.contents) {
-      const n = this._inventory.addItem(item, count, { quiet: true });
+    for (const { item, count, dur } of p.contents) {
+      const n = this._inventory.addItem(item, count, { quiet: true, dur });
       const def = this._items[item];
       if (n > 0) got.push(`${def?.ICON ?? ''} ${def?.NAME ?? item}${n > 1 ? ` ×${n}` : ''}`);
-      if (n < count) left.push({ item, count: count - n });
+      if (n < count) left.push(dur == null ? { item, count: count - n } : { item, count: count - n, dur });
     }
     if (got.length) this._events.emit(GameEvents.UI_MESSAGE, { text: `Has cogido: ${got.join(', ')}`, type: 'biome' });
     if (left.length) {
