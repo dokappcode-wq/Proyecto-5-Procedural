@@ -300,6 +300,7 @@ export class StoryPart2 {
     if (s.demoEnded) return;
     s.demoEnded = true;
     s.stage = 'POSTGAME';
+    this.story._ui.bossBar(null, null);
     this.story._autosave('fin de la demo');
     setTimeout(() => this.story._ui.endScreen({
       title: '🚀 Fin de la demo',
@@ -368,7 +369,7 @@ export class StoryPart2 {
     const rel = { x: p.x - a.center.x, z: p.z - a.center.z };
     const along = rel.x * a.dir.x + rel.z * a.dir.z;
     const across = rel.x * a.side.x + rel.z * a.side.z;
-    return Math.abs(along) < a.len / 2 + 3 && Math.abs(across) < a.radius * 0.75 && Math.abs(p.y - a.floor) < 4;
+    return Math.abs(along) < a.len / 2 + a.radius * 0.8 && Math.abs(across) < a.radius * 0.8 && Math.abs(p.y - a.floor) < 4;
   }
 
   _openChest() {

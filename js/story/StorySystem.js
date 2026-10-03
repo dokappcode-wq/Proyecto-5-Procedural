@@ -152,7 +152,7 @@ export class StorySystem {
       s.scanStart ??= this._absHours();
     }
     this._applyTheme();
-    this._d.shipAI?.setName?.(this.state.watchName);
+    this._setAIName(this.state.watchName);
     this._refresh();
     this._d.part2?.onRestore?.();
     if (this.state.tutorial === 'on') this._tutorial.start(this.state.tutStep);
@@ -160,6 +160,16 @@ export class StorySystem {
 
   snapshot() {
     return { ...this.state, tutStep: this._tutorial.step ?? this.state.tutStep };
+  }
+
+  /** El nombre del reloj es el de la IA de la nave (sin que la IA lo anuncie). */
+  _setAIName(name) {
+    const ai = this._d.shipAI;
+    if (!ai || ai.aiName === name) return;
+    const say = ai.say;
+    ai.say = () => {};
+    ai.setName(name);
+    ai.say = say;
   }
 
   _applyTheme() {
@@ -179,7 +189,7 @@ export class StorySystem {
     this._ui.watchSetup({ name: this.state.watchName, color: this.state.watchColor, title: '⌚ Ajustes del reloj', allowCancel: true }, ({ name, color }) => {
       this.state.watchName = name;
       this.state.watchColor = color;
-      this._d.shipAI?.setName?.(name);
+      this._setAIName(name);
       this._applyTheme();
       this._refresh();
     });
@@ -483,7 +493,7 @@ export class StorySystem {
         this.state.watchName = name;
         this.state.watchColor = color;
         this.state.named = true;
-        this._d.shipAI?.setName?.(name);
+        this._setAIName(name);
         this._applyTheme();
         this._ui.transmission({ text: 'Sample ha llegado al planeta Eden, comenzando evacuación del person---' }, () => this._askTutorial());
       });
