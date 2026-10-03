@@ -261,6 +261,16 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Enemigos (v1.17)**. Nada aparece a menos de 256 m (4 chunks) del inicio. Todos avisan antes de golpear (levantan los
+  brazos o el mazo): un paso atrás, esquivar (toque de `Shift`) o el escudo los paran.
+  - **Gólems** (30 de vida, 25 de daño, lentos): montones de piedras en el suelo y en las cámaras de las cuevas; al acercarte
+    las piedras se juntan y te atacan. Sueltan piedra y a veces mineral sin refinar. Si te alejas, vuelven y se duermen.
+  - **Slimes** (10 de vida, 10 de daño): salen de noche cerca de ti y se deshacen al amanecer. Sueltan slime.
+  - **Goblins** (20 de vida, 20 de daño, corren como tú andando): en **bases** alrededor de un árbol grande (empalizada,
+    chozas, hoguera, tótem; 3–5 goblins) y en **equipos de exploración** que recorren el planeta con un **jefe goblin**
+    negro (40 de vida, 30 de daño). Sueltan cuero, madera y 1/3 de las veces una moneda; el jefe, además, hierro refinado.
+    Al limpiar una base aparece su botín junto al árbol.
+  - Admin → Enemigos: crear uno delante e ir a la base, el equipo o el gólem más cercano.
 - **Cuevas (v1.16)**: 12 subterráneas (un agujero en el suelo de llanuras y bosques, rodeado de rocas, con una rampa que
   baja) y 8 de montaña (en las laderas, entran hacia dentro de la montaña). Ninguna a menos de 180 m del inicio. Son
   túneles de 85–245 m que bajan 25–40 m, con cámaras anchas cada cierto tramo; se recorren andando (sin escalones).

@@ -13,6 +13,9 @@
 // Piezas de construcción (Fase 9 + 2). Cada pieza es un OBJETO que se fabrica en el reloj
 // (o en su estación) con RECIPE y se coloca seleccionándolo en la barra (o "Colocar" desde la
 // mochila). Al romperla vuelve al inventario. ITEM: objeto propio si ya existía (mesa de refinería).
+const GOLEM_BIOMES = { MOUNTAINS: 0.4, PLAINS: 0.5, FOREST: 0.5, FROZEN_MOUNTAINS: 0.4 };
+const BASE_BIOMES = { FOREST: 0.5, PLAINS: 0.6 };
+
 const BUILD_PIECES = {
   FOUNDATION: { NAME: 'Cimiento', ICON: '🪨', RECIPE: { STONE: 4 }, TIME: 3 },
   FLOOR: { NAME: 'Suelo', ICON: '🟫', RECIPE: { WOOD: 2 }, TIME: 2 },
@@ -47,7 +50,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.16.0',
+    VERSION: '1.17.0',
   },
 
   RENDER: {
@@ -376,6 +379,8 @@ export const GameConfig = deepFreeze({
     SPIDER_SILK: { NAME: 'Telaraña', ICON: '🕸️', DESC: 'Se saca golpeando las telarañas que hay entre algunos árboles. Con 5 se hace una cuerda.' },
     ROPE: { NAME: 'Cuerda', ICON: '🪢', DESC: 'Hecha con 5 telarañas.' },
     MINERAL: { NAME: 'Mineral', ICON: '💎' },
+    SLIME: { NAME: 'Slime', ICON: '🟢', DESC: 'Baba pegajosa. La sueltan los slimes que salen de noche.' },
+    COIN: { NAME: 'Moneda goblin', ICON: '🪙', DESC: 'Moneda tosca de los goblins.' },
     LEATHER: { NAME: 'Cuero', ICON: '🟫', DESC: 'Se refina en la mesa de refinería.' },
     REFINED_LEATHER: { NAME: 'Cuero refinado', ICON: '🟤', DESC: 'Cuero curtido en la mesa de refinería: para la ropa y el odre.' },
     REFINED_STONE: { NAME: 'Piedra refinada', ICON: '⬜', DESC: 'Bloque de piedra tallada (4 piedras).' },
@@ -889,6 +894,51 @@ export const GameConfig = deepFreeze({
   //   TEMPERAMENT ante el jugador: FLEE (huye), CURIOUS (se acerca), NEUTRAL (lo ignora)
   //   HIT_REACTION al ser golpeado: FLEE (huye) o FIGHT (se defiende y ataca)
   // Las probabilidades de cada especie están en TEMPERAMENT_WEIGHTS / HIT_REACTION_WEIGHTS.
+  // Lugares especiales del Edén (campaña, WorldSites): alrededor del inicio no hay nada.
+  SITES: {
+    SAFE_RADIUS: 256, // m (4 chunks): a partir de aquí aparecen enemigos y lugares
+    LIST: [
+      // Algunos a media distancia (para encontrarlos pronto) y el resto por todo el planeta.
+      { id: 'GOLEMS_NEAR', kind: 'GOLEMS', count: 4, distance: [290, 650], biomes: GOLEM_BIOMES, radius: 5, spacing: 120, maxRelief: 4, minHeight: 4 },
+      { id: 'GOBLIN_BASE_NEAR', kind: 'GOBLIN_BASE', count: 2, distance: [380, 850], biomes: BASE_BIOMES, radius: 16, spacing: 220, maxRelief: 5, minHeight: 4, pad: true, padBlend: 10 },
+      { id: 'GOBLIN_BASE', count: 5, biomes: BASE_BIOMES, radius: 16, spacing: 220, maxRelief: 5, minHeight: 4, pad: true, padBlend: 10 },
+      { id: 'GOLEMS', count: 16, biomes: GOLEM_BIOMES, radius: 5, spacing: 120, maxRelief: 4, minHeight: 4 },
+    ],
+  },
+
+  // Enemigos (EnemySystem). Todos atacan con un amago antes del golpe: se puede esquivar o bloquear.
+  ENEMIES: {
+    ACTIVE_RADIUS: 110,     // m: solo se simulan y dibujan los cercanos
+    DEATH_TIME: 1.8,
+    LEASH: 45,              // m de su casa: más lejos, se vuelven
+    GOLEMS_PER_SITE: [1, 3],
+    CAVE_GOLEMS: 14,        // gólems dormidos en las cámaras de las cuevas
+    GOBLINS_PER_BASE: [3, 5],
+    GOBLIN_TEAMS: 4,        // equipos de exploración (con un jefe goblin cada uno)
+    TEAM_SIZE: [3, 4],
+    BASE_LOOT: { COIN: [2, 4], LEATHER: [1, 2], REFINED_WOOD: [1, 3] },
+    SLIMES: { MAX: 4, EVERY: [10, 22], DISTANCE: [20, 34] }, // de noche, alrededor del jugador
+    TYPES: {
+      GOLEM: {
+        NAME: 'Gólem', HEALTH: 30, DAMAGE: 25, SPEED: 1.5, RANGE: 2.2, WINDUP: 1.3, COOLDOWN: 2.6, AGGRO: 24,
+        WAKE_DISTANCE: 7, ASSEMBLE_TIME: 2.2, RADIUS: 0.65, HEIGHT: 2.4, KNOCKBACK: 0.15,
+        DROPS: { STONE: [3, 5] }, ORE_DROP: { CHANCE: 0.75, TYPES: { COPPER_ORE: 0.45, IRON_ORE: 0.3, COAL: 0.25 }, AMOUNT: [1, 2] },
+      },
+      SLIME: {
+        NAME: 'Slime', HEALTH: 10, DAMAGE: 10, SPEED: 2.6, RANGE: 1.5, WINDUP: 0.55, COOLDOWN: 1.7, AGGRO: 32,
+        RADIUS: 0.45, HEIGHT: 1.55, KNOCKBACK: 1.2, DROPS: { SLIME: [1, 2] },
+      },
+      GOBLIN: {
+        NAME: 'Goblin', HEALTH: 20, DAMAGE: 20, SPEED: 4.3, RANGE: 1.9, WINDUP: 1.25, COOLDOWN: 2.4, AGGRO: 20,
+        RADIUS: 0.45, HEIGHT: 1.45, KNOCKBACK: 0.8, DROPS: { LEATHER: [1, 1], WOOD: [1, 2] }, COIN_CHANCE: 1 / 3,
+      },
+      GOBLIN_BOSS: {
+        NAME: 'Jefe goblin', HEALTH: 40, DAMAGE: 30, SPEED: 4.3, RANGE: 2.1, WINDUP: 1.05, COOLDOWN: 2.2, AGGRO: 26,
+        RADIUS: 0.55, HEIGHT: 1.8, KNOCKBACK: 0.5, DROPS: { LEATHER: [1, 1], WOOD: [1, 2], COIN: [1, 1], REFINED_IRON: [1, 1] },
+      },
+    },
+  },
+
   ANIMALS: {
     CURIOUS_STOP_DISTANCE: 2.4,   // m: los curiosos se paran a esta distancia
     CURIOUS_INTEREST_TIME: [8, 18], // s que dura la curiosidad antes de perder interés

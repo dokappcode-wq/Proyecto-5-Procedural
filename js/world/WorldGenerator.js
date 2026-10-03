@@ -13,6 +13,7 @@ import { ResourceSystem } from './ResourceSystem.js';
 import { PropMesher } from './props/PropMesher.js';
 import { CaveSystem } from './CaveSystem.js';
 import { buildCaveMeshes, markStencil, hideOverCaves } from './CaveMesher.js';
+import { planSites } from './WorldSites.js';
 
 /**
  * WorldGenerator — mundo procedural finito generado a partir de una seed.
@@ -157,19 +158,40 @@ export class WorldGenerator {
     this._spawn = this._findSpawn();
     // La nave: en un monte helado (campaña) sobre una explanada aplanada, o cerca del inicio.
     this._landing = null;
+    const pads = [];
     if (this._landingCfg && this._rules?.LANDING_BIOME) {
       this._landing = this._findBiomeLandingSite(this._landingCfg, this._rules);
       if (this._landing) {
         const L = this._landingCfg;
-        this.terrain.setPads([{ x: this._landing.x, z: this._landing.z, radius: Math.max(L.HALF_LENGTH, L.CLEAR_RADIUS) + 1, height: this._landing.height, blend: 12 }]);
+        pads.push({ x: this._landing.x, z: this._landing.z, radius: Math.max(L.HALF_LENGTH, L.CLEAR_RADIUS) + 1, height: this._landing.height, blend: 12 });
       }
     }
+    // Lugares especiales (campaña): bases de goblins, gólems, lugares de la historia…
+    // Lejos del inicio; algunos con su explanada y todos sin árboles encima.
+    this.sites = {};
+    let siteClear = [];
+    if (this._rules?.SITES) {
+      const plan = planSites({
+        seed: this.seed.sub.spawn,
+        requests: this._rules.SITES,
+        terrain: this.terrain,
+        bounds: this.getBounds(),
+        spawn: this._spawn,
+        safeRadius: this._rules.SAFE_RADIUS ?? 0,
+        avoid: this._landing ? [{ x: this._landing.x, z: this._landing.z, r: 70 }] : [],
+      });
+      this.sites = plan.sites;
+      pads.push(...plan.pads);
+      siteClear = plan.clearZones;
+    }
+    if (pads.length) this.terrain.setPads(pads);
     this.water.generate({ seed: this.seed.sub.resource, terrain: this.terrain, spawn: this._spawn, bounds: this.getBounds() });
     this.terrain.setWater(this.water);
     this._buildPonds();
     if (this._landingCfg && !this._landing) this._landing = this._findLandingSite(this._landingCfg);
     // Zonas sin árboles ni rocas: alrededor del inicio (SPAWN_CLEAR_RADIUS) y de la nave.
     const clearZones = this._landing ? [{ x: this._landing.x, z: this._landing.z, r: this._landingCfg.CLEAR_RADIUS }] : [];
+    clearZones.push(...siteClear);
 
     // Cuevas (campaña): túneles bajo el terreno, con su malla y sus minerales.
     this._caveGroup?.parent?.remove(this._caveGroup);
@@ -183,7 +205,10 @@ export class WorldGenerator {
         terrain: { sample: (x, z) => this.terrain.sample(x, z), heightAt: (x, z) => this.terrain.heightAt(x, z) },
         bounds: this.getBounds(),
         spawn: this._spawn,
-        avoid: this._landing ? [{ x: this._landing.x, z: this._landing.z, r: 80 }] : [],
+        avoid: [
+          ...(this._landing ? [{ x: this._landing.x, z: this._landing.z, r: 80 }] : []),
+          ...Object.values(this.sites).flat().map((t) => ({ x: t.x, z: t.z, r: t.radius + 25 })),
+        ],
         isWater: (x, z) => this.water.isWater(x, z, 8),
       });
       this._caveGroup = buildCaveMeshes(this.caves.caves, (x, z) => this.terrain.heightAt(x, z), this._propMesher._colors);
@@ -260,6 +285,11 @@ export class WorldGenerator {
   propMesh(node) {
     const geo = this._propMesher.nodeGeometry(node);
     return geo ? new THREE.Mesh(geo, this._propMaterial) : null;
+  }
+
+  /** Lugares especiales de un tipo (WorldSites): [{ id, kind, x, z, radius, height, yaw, seed }]. */
+  getSites(kind) {
+    return this.sites?.[kind] ?? [];
   }
 
   get seaLevel() {

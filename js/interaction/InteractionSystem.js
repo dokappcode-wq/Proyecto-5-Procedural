@@ -310,7 +310,7 @@ export class InteractionSystem {
     }
     for (const source of this.creatures) {
       for (const a of source.getAnimalsNear(p.x, p.z, range + 2)) {
-        consider({ kind: 'animal', id: a.id, ref: a, source }, a.x, a.y + 0.8 * a.scale, a.z, 0.75 * a.scale, 0.5 * a.scale);
+        consider({ kind: 'animal', id: a.id, ref: a, source }, a.x, a.aimY ?? a.y + 0.8 * a.scale, a.z, a.aimRadius ?? 0.75 * a.scale, a.reach ?? 0.5 * a.scale);
       }
     }
 
@@ -382,7 +382,8 @@ export class InteractionSystem {
       return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };
     }
     if (t.kind === 'animal') {
-      return { ...t, label: t.ref.def.NAME, action: 'Golpear', key: 'Clic' };
+      const hp = t.ref.maxHealth ? ` ❤ ${Math.ceil(t.ref.health)}/${t.ref.maxHealth}` : '';
+      return { ...t, label: `${t.ref.def.NAME}${hp}`, action: 'Golpear', key: 'Clic' };
     }
     const def = this._types[t.ref.type];
     const B = def.BREAK;

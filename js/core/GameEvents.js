@@ -47,6 +47,8 @@ export const GameEvents = Object.freeze({
   INTERACTION_TARGET_CHANGED: 'interaction:targetChanged', // { target: { kind, label, action } | null }
   ANIMAL_HIT: 'animal:hit',                         // { animal, killed }
   ANIMAL_KILLED: 'animal:killed',                   // { animal, drops }
+  ENEMY_KILLED: 'enemy:killed',                     // { enemy, drops }
+  ENEMY_ATTACKED: 'enemy:attacked',                 // { enemy }  (un enemigo ha descargado un golpe)
   RESOURCE_HIT: 'resource:hit',                    // { node, x, y, z, fromX, fromZ, felled } golpe a un tronco
   RESOURCE_HARVESTED: 'resource:harvested',         // { node, item, amount, depleted }
   INVENTORY_CHANGED: 'inventory:changed',           // { itemId, count, delta, items, slots, cursor }

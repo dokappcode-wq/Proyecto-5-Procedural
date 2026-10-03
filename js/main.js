@@ -17,6 +17,7 @@ import { SkyDome } from './world/SkyDome.js';
 import { BiomeTracker } from './world/BiomeTracker.js';
 import { DiscoveryTracker } from './world/DiscoveryTracker.js';
 import { AnimalSystem } from './animals/AnimalSystem.js';
+import { EnemySystem } from './enemies/EnemySystem.js';
 import { InventorySystem } from './inventory/InventorySystem.js';
 import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { HealthSystem } from './player/HealthSystem.js';
@@ -124,7 +125,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
       landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
       // Campaña: el inicio en cualquier punto del planeta y la nave en lo alto de las Montañas Heladas.
-      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE, CAVES: cfg.CAVES } : null,
+      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE, CAVES: cfg.CAVES, SITES: cfg.SITES.LIST, SAFE_RADIUS: cfg.SITES.SAFE_RADIUS } : null,
     },
   });
   // Todos los sistemas consultan el cuerpo ACTIVO a través de este proxy.
@@ -180,7 +181,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       resolveCollisions: (pos, r, y0, y1) => {
         const a = world.resources?.resolveCollisions(pos, r) ?? false;
         const b = combinedStructures.resolveCollisions(pos, r, y0, y1);
-        return a || b;
+        const c = enemies?.resolveCollisions(pos, r, y0, y1) ?? false; // bases y enemigos despiertos
+        return a || b || c;
       },
     },
     // Superficies: suelos, cimientos, escaleras y tejados construidos; suelo y rampa de la nave.
@@ -455,6 +457,18 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const combat = new CombatSystem({
     input, items: cfg.ITEMS, inventory, hotbar, equipment, player, controller, camera: render.camera, cameraSystem: camera, held,
     scene: render.scene, world, events, power: () => progression.damageMultiplier, creatures: interaction.creatures,
+  });
+  // Enemigos (Fase 4): gólems, slimes de noche, bases de goblins y equipos de exploración.
+  const enemies = new EnemySystem({
+    config: cfg.ENEMIES, safeRadius: cfg.SITES.SAFE_RADIUS, scene: render.scene, worlds, homeId: HOME, player, events, time,
+    obstacles: combinedStructures, pickups, isSheltered: () => ship.isAboard(),
+  });
+  enemies.playerAlive = () => !health.dead;
+  interaction.creatures.push(enemies); // (CombatSystem comparte la lista)
+  events.on(GameEvents.ENEMY_KILLED, ({ enemy, drops }) => {
+    progression.addXp(PG.XP.KILL * (enemy.type === 'GOBLIN_BOSS' ? 4 : enemy.type === 'SLIME' ? 1 : 2));
+    const list = Object.entries(drops ?? {}).map(([id, n]) => `${cfg.ITEMS[id]?.ICON ?? ''} ${n} ${cfg.ITEMS[id]?.NAME ?? id}`).join(' · ');
+    message(`⚔️ ${enemy.def.NAME} derrotado${list ? `: ${list}` : ''}`, 'pickup');
   });
   // En modo construcción el clic coloca/quita piezas: se pausan la barra de
   // objetos, "usar" y la interacción normal (recoger, golpear).
@@ -1272,6 +1286,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   saveGame.register('world', { save: () => worlds.home.resources.snapshot(), load: (d) => worlds.home.reloadResources(d) });
   saveGame.register('construction', { save: () => construction.snapshot(), load: (d) => construction.restore(d) });
+  saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
   saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
   saveGame.register('flags', {
     save: () => ({ shipFound, respawnBed: respawnBed && !respawnBed.ship ? { x: respawnBed.x, z: respawnBed.z } : null }),
@@ -1351,6 +1366,25 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   registerSpaceTools(admin, { system, hasLightspeed, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
+  // Enemigos: crear uno delante e ir al más cercano.
+  admin.registerTool({ category: 'Enemigos', type: 'info', label: 'Activos', read: () => `${enemies.activeCount} cerca · ${enemies.enemies.filter((e) => e.alive).length} vivos · ${enemies.bases.filter((b) => !b.cleared).length} bases` });
+  for (const [type, label] of [['GOLEM', 'Gólem'], ['SLIME', 'Slime'], ['GOBLIN', 'Goblin'], ['GOBLIN_BOSS', 'Jefe goblin']]) {
+    admin.registerTool({ category: 'Enemigos', label: `Crear ${label} delante`, run: () => {
+      if (worlds.activeId !== HOME) throw new Error('Solo en el planeta de inicio');
+      enemies.spawnNear(type);
+    } });
+  }
+  for (const [kind, label] of [['BASE', 'base goblin'], ['TEAM', 'equipo de exploración'], ['GOLEM', 'gólem']]) {
+    admin.registerTool({ category: 'Enemigos', label: `Ir a la ${label} más cercana`, run: () => {
+      const p = player.position;
+      const it = enemies.nearest(kind, p.x, p.z);
+      if (!it || worlds.activeId !== HOME) throw new Error('No hay');
+      const a = Math.atan2(p.x - it.x, p.z - it.z);
+      const d = kind === 'BASE' ? 24 : 14;
+      controller.placeAt(it.x + Math.sin(a) * d, it.z + Math.cos(a) * d);
+      player.yaw = player.bodyYaw = a;
+    } });
+  }
   // Cuevas: ir a la boca más cercana de cada tipo (de pie delante de ella, mirándola).
   for (const [kind, label] of [['UNDERGROUND', 'Ir a la cueva subterránea más cercana'], ['MOUNTAIN', 'Ir a la cueva de montaña más cercana']]) {
     admin.registerTool({ category: 'Jugador', label, run: () => {
@@ -1391,6 +1425,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos
+  loop.add(enemies);     // gólems, slimes, goblins
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
   loop.add(torches);     // luz de las antorchas clavadas y de las flores luminosas
@@ -1450,7 +1485,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
   window.__MUNDO0__ = {
-    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, discovery, inventory, interaction,
+    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, enemies, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,

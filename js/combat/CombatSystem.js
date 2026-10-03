@@ -251,9 +251,11 @@ export class CombatSystem {
   _hitCreature(p) {
     for (const source of this.creatures) {
       for (const a of source.getAnimalsNear(p.pos.x, p.pos.z, 4)) {
-        const r = 0.75 * (a.scale ?? 1) + 0.15;
-        const cy = a.y + 0.8 * (a.scale ?? 1);
-        if (Math.hypot(a.x - p.pos.x, cy - p.pos.y, a.z - p.pos.z) > r) continue;
+        const r = (a.aimRadius ?? 0.75 * (a.scale ?? 1)) + 0.15;
+        const cy = a.aimY ?? a.y + 0.8 * (a.scale ?? 1);
+        // Enemigos (con HEIGHT): cuenta todo el cuerpo, de los pies a la cabeza.
+        const body = !!a.def?.HEIGHT && p.pos.y > a.y - 0.2 && p.pos.y < a.y + a.def.HEIGHT * a.scale && Math.hypot(a.x - p.pos.x, a.z - p.pos.z) < r;
+        if (!body && Math.hypot(a.x - p.pos.x, cy - p.pos.y, a.z - p.pos.z) > r) continue;
         const { killed, drops } = source.hitAnimal(a, p.damage, p.from.x, p.from.z);
         if (killed && drops) for (const [item, n] of Object.entries(drops)) this._inv.addItem(item, n);
         this._events.emit(GameEvents.PROJECTILE_HIT, { x: p.pos.x, y: p.pos.y, z: p.pos.z, target: a, killed });
