@@ -80,6 +80,19 @@ export class CameraSystem {
     return this._portrait;
   }
 
+  /**
+   * Plano de cine (escenas de la historia): `shot(dt)` → { pos, look } (Vector3) cada
+   * frame, o null para volver a la cámara normal. Entra y sale con una transición suave.
+   */
+  setCinematic(shot, { speed = 3 } = {}) {
+    this._cineFn = shot;
+    this._cineSpeed = speed;
+  }
+
+  get cinematic() {
+    return !!this._cineFn;
+  }
+
   /** Cámara en 3ª persona alrededor de un vehículo (o null para volver al jugador). */
   setVehicleView(view) {
     this._vehicle = view;
@@ -142,7 +155,23 @@ export class CameraSystem {
 
     this._place();
     if (this._portrait > 0) this._placePortrait();
+    this._placeCinematic(dt);
     this._updateBodyVisibility();
+  }
+
+  _placeCinematic(dt) {
+    this._cineK ??= 0;
+    const goal = this._cineFn ? 1 : 0;
+    this._cineK += (goal - this._cineK) * (1 - Math.exp(-(this._cineSpeed ?? 3) * dt));
+    if (Math.abs(goal - this._cineK) < 0.002) this._cineK = goal;
+    if (this._cineFn) this._cineShot = this._cineFn(dt) ?? this._cineShot;
+    if (this._cineK <= 0 || !this._cineShot) return;
+    const cam = this._camera;
+    const k = this._cineK;
+    cam.position.lerp(this._cineShot.pos, k);
+    this._pm.lookAt(this._cineShot.pos, this._cineShot.look, this._pUp);
+    this._pq.setFromRotationMatrix(this._pm);
+    cam.quaternion.slerp(this._pq, k);
   }
 
   /**
@@ -263,7 +292,7 @@ export class CameraSystem {
 
   _updateBodyVisibility() {
     // En la vista de retrato se ve el cuerpo, aunque sea 1ª persona.
-    const visible = !this._vehicle && (this._blend > this._cfg.HIDE_BODY_BELOW_BLEND || this._portrait > 0.02);
+    const visible = !this._vehicle && (this._blend > this._cfg.HIDE_BODY_BELOW_BLEND || this._portrait > 0.02 || (this._cineK ?? 0) > 0.3);
     if (visible !== this._bodyVisible) {
       this._bodyVisible = visible;
       this._events.emit(GameEvents.CAMERA_BODY_VISIBILITY, { visible });

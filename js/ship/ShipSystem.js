@@ -76,6 +76,7 @@ export class ShipSystem {
     this.piloting = false;
     this.hasSpaceNode = false;
     this.crippled = false;   // salto galáctico fallido: motores y navegación fuera de servicio
+    this.damaged = null;     // campaña: texto de la avería (propulsores, placa de navegación) o null
     this.podsUsed = 0;
     this.body = system.homeId;
     this._activeBody = () => system.homeId;
@@ -305,6 +306,11 @@ export class ShipSystem {
 
   command(cmd) {
     if (cmd === 'STAND_UP') return this.exitPilot();
+    // Nave averiada (campaña): sin propulsores ni placa de navegación no despega.
+    if (this.damaged && (cmd === 'ORBIT' || cmd === 'TAKEOFF_OR_LAND' || cmd === 'TAKEOFF')) {
+      this._message(this.damaged, 'danger');
+      return false;
+    }
     if (this.crippled && (cmd === 'ORBIT' || cmd === 'TAKEOFF_OR_LAND' || cmd === 'TAKEOFF' || cmd === 'LAND')) {
       this._message('Motores y navegación fuera de servicio. Evacúa en una cápsula de escape.', 'danger');
       return false;

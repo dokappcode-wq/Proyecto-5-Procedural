@@ -30,7 +30,7 @@ const BUILD_PIECES = {
   REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️', ITEM: 'REFINERY_KIT', STATION_PIECE: true },
   CHEST: { NAME: 'Cofre', ICON: '📦', RECIPE: { REFINED_WOOD: 6 }, TIME: 10, DESC: 'Guarda objetos: colócalo y E para abrirlo (27 huecos).' },
   FURNACE: { NAME: 'Horno', ICON: '🔥', RECIPE: { REFINED_STONE: 10, REFINED_WOOD: 2 }, TIME: 15, STATION_PIECE: true, DESC: 'Funde menas, diamante y arena con carbón (E para usarlo).' },
-  WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰', RECIPE: { REFINED_IRON: 5, REFINED_COPPER: 5 }, TIME: 20, STATION_PIECE: true, DESC: 'Recetas avanzadas: placa de navegación, armas y armaduras de metal (E para usarla).' },
+  WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰', RECIPE: { REFINED_IRON: 5, REFINED_COPPER: 5 }, TIME: 20, STATION_PIECE: true, LOCK: 'WORKBENCH', DESC: 'Recetas avanzadas: placa de navegación, armas y armaduras de metal (E para usarla).' },
   TORCH: { NAME: 'Antorcha', ICON: '🔥', ITEM: 'TORCH' },
   // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
   CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', RECIPE: { STONE: 4, MINERAL: 3 }, TIME: 8, BODIES: 'MOON' },
@@ -44,13 +44,13 @@ const PIECE_ITEMS = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([, d
 ]));
 const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([, d]) => d.RECIPE).map(([type, d]) => [
   `PIECE_${type}`,
-  { RESULT: pieceItemId(type), AMOUNT: 1, CATEGORY: d.STATION_PIECE ? 'STATIONS' : 'CONSTRUCTION', TIME: d.TIME ?? 3, INGREDIENTS: d.RECIPE },
+  { RESULT: pieceItemId(type), AMOUNT: 1, CATEGORY: d.STATION_PIECE ? 'STATIONS' : 'CONSTRUCTION', TIME: d.TIME ?? 3, INGREDIENTS: d.RECIPE, ...(d.LOCK ? { LOCK: d.LOCK } : {}) },
 ]));
 
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.17.0',
+    VERSION: '1.18.0',
   },
 
   RENDER: {
@@ -110,6 +110,7 @@ export const GameConfig = deepFreeze({
       ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
       USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado · en modo construcción: quitar pieza
       AMMO_NEXT: ['KeyX'],              // arco: cambiar de tipo de flecha
+      COMPASS: ['KeyJ'],                // historia: mostrar / ocultar la brújula
       ROTATE: ['KeyQ'],                 // girar la pieza antes de colocarla
       CRAFTING: ['Tab'],                // abrir/cerrar el panel de fabricación
       INVENTORY: ['KeyI'],              // abrir/cerrar el inventario (mochila 9×3 + barra + ropa)
@@ -898,6 +899,10 @@ export const GameConfig = deepFreeze({
   SITES: {
     SAFE_RADIUS: 256, // m (4 chunks): a partir de aquí aparecen enemigos y lugares
     LIST: [
+      // Lugares de la historia (primero: así añadir otros después no los mueve).
+      { id: 'HERMIT_TOWER', count: 1, distance: [380, 700], biomes: { PLAINS: 0.6, FOREST: 0.5 }, radius: 9, spacing: 200, maxRelief: 6, minHeight: 5, pad: true, padBlend: 8 },
+      { id: 'NODE_ARENA', count: 1, distance: [650, 1150], biomes: { PLAINS: 0.6, FOREST: 0.5, MOUNTAINS: 0.5 }, radius: 19, spacing: 300, maxRelief: 8, minHeight: 5, pad: true, padBlend: 12 },
+      { id: 'RESEARCH_CENTER', count: 1, distance: [950, 1700], biomes: { PLAINS: 0.6, FOREST: 0.5 }, radius: 24, spacing: 300, maxRelief: 8, minHeight: 7, pad: true, padBlend: 14 },
       // Algunos a media distancia (para encontrarlos pronto) y el resto por todo el planeta.
       { id: 'GOLEMS_NEAR', kind: 'GOLEMS', count: 4, distance: [290, 650], biomes: GOLEM_BIOMES, radius: 5, spacing: 120, maxRelief: 4, minHeight: 4 },
       { id: 'GOBLIN_BASE_NEAR', kind: 'GOBLIN_BASE', count: 2, distance: [380, 850], biomes: BASE_BIOMES, radius: 16, spacing: 220, maxRelief: 5, minHeight: 4, pad: true, padBlend: 10 },

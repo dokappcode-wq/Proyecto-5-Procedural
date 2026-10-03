@@ -121,7 +121,9 @@ test('WorldSites: deterministas, lejos del inicio y separados', () => {
   assert.ok(a.sites.GOBLIN_BASE.length >= 5 && a.sites.GOLEMS.length >= 10);
   for (const s of all) assert.ok(Math.hypot(s.x, s.z) >= 256 + s.radius, `${s.id} demasiado cerca`);
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) assert.ok(Math.hypot(all[i].x - all[j].x, all[i].z - all[j].z) > 20);
-  assert.equal(a.pads.length, a.sites.GOBLIN_BASE.length, 'las bases tienen su explanada');
+  const padded = C.SITES.LIST.filter((r) => r.pad).map((r) => r.kind ?? r.id);
+  assert.equal(a.pads.length, padded.reduce((n, k, i) => n + (padded.indexOf(k) === i ? a.sites[k].length : 0), 0), 'las bases y los lugares de la historia tienen su explanada');
+  for (const k of ['HERMIT_TOWER', 'NODE_ARENA', 'RESEARCH_CENTER']) assert.equal(a.sites[k].length, 1, k);
 });
 
 test('en el Edén: gólems, bases con 3–5 goblins y equipos con un jefe, nada cerca del inicio', async () => {

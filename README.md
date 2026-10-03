@@ -261,6 +261,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Historia, primera parte (v1.18)** (partida nueva en el Edén):
+  - La cápsula se estrella, la compuerta sale despedida y el personaje salta fuera.
+  - Al coger el reloj: nombre (el de la futura IA) y color (9 colores; tiñe la interfaz y se cambia en el reloj,
+    columna «Tú» → ⌚ Nombre y color del reloj). Luego una transmisión que se corta y la elección tutorial / juego libre.
+  - Tutorial: pasos con flecha (madera, piedras, fabricar, telaraña, manzanas, guardar, ir a la torre). `K` lo salta.
+  - Torre del ermitaño (luz cálida a lo lejos): escalera de caracol por fuera; arriba, a oscuras, el ermitaño da la
+    clave A1. Al cogerla se une al reloj y aparece la brújula (`J` la oculta).
+  - Nodo espacial (pedestal con una caja y dos anillas): sin A1 está sellado. Al cogerlo despiertan 4 gólems y suben
+    los muros hasta derrotarlos; después cae otra cápsula del cielo.
+  - En la cápsula está Nova (con el nombre del reloj): se presenta, te escanea y lanza un escáner de 24 h para
+    encontrar la nave; mientras, te sigue y cambia de cara (normal, feliz, preocupada, enfadada, triste).
+  - Antes de cada evento se guarda la partida sola.
 - **Enemigos (v1.17)**. Nada aparece a menos de 256 m (4 chunks) del inicio. Todos avisan antes de golpear (levantan los
   brazos o el mazo): un paso atrás, esquivar (toque de `Shift`) o el escudo los paran.
   - **Gólems** (30 de vida, 25 de daño, lentos): montones de piedras en el suelo y en las cámaras de las cuevas; al acercarte

@@ -107,6 +107,7 @@ export class Enemy {
   /** Despierta (gólem) o se pone a perseguir. */
   alert() {
     if (!this.alive) return;
+    this.locked = false;
     if (this.state === S.DORMANT) {
       this.state = S.ASSEMBLING;
       this.timer = this.def.ASSEMBLE_TIME ?? 1.5;
@@ -193,7 +194,7 @@ export class Enemy {
 
     switch (this.state) {
       case S.DORMANT:
-        if (sees && dist < (d.WAKE_DISTANCE ?? 6)) {
+        if (!this.locked && sees && dist < (d.WAKE_DISTANCE ?? 6)) {
           this.alert();
           if (this.group) for (const m of this.group.members) m.alert();
         }

@@ -113,6 +113,16 @@ export class CrashSite {
     hatch.position.set(hx, world.getHeightAt(hx, hz) + 0.05, hz);
     hatch.rotation.set(0.12, rng.range(0, Math.PI * 2), -0.08);
     root.add(hatch);
+    // Postura de la compuerta cerrada (para la animación de la primera partida).
+    pod.updateMatrixWorld(true);
+    this._hatch = hatch;
+    this._hatchRest = { pos: hatch.position.clone(), quat: hatch.quaternion.clone() };
+    this._hatchClosed = {
+      pos: pod.localToWorld(new THREE.Vector3(0, 1.05, 0.98)),
+      quat: pod.quaternion.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2)),
+    };
+    this._door = pod.localToWorld(new THREE.Vector3(0, 1.0, 1.5));
+    this._hatchAnim = null;
 
     // El reloj, en el borde de la compuerta.
     this._watch = buildWatchBeacon();
@@ -153,12 +163,65 @@ export class CrashSite {
     this.group = null;
   }
 
+  /** Compuerta en su sitio (cerrada), antes de que salga despedida. */
+  closeHatch() {
+    if (!this._hatch) return;
+    this._hatch.position.copy(this._hatchClosed.pos);
+    this._hatch.quaternion.copy(this._hatchClosed.quat);
+    this._hatch.scale.setScalar(1.35);
+    this._watch.group.visible = false;
+    this._hatchAnim = { kind: 'closed', t: 0 };
+  }
+
+  rattleHatch(seconds = 1) {
+    if (this._hatch) this._hatchAnim = { kind: 'rattle', t: 0, dur: seconds };
+  }
+
+  /** La compuerta sale despedida y cae a su sitio en el suelo. */
+  blowHatch() {
+    if (!this._hatch) return;
+    this._hatchAnim = { kind: 'blow', t: 0, dur: 0.95 };
+    this._blowPuff = 1;
+  }
+
+  /** Un punto justo fuera de la compuerta (de donde sale el jugador). */
+  doorWorld() {
+    return this._door?.clone() ?? null;
+  }
+
+  _updateHatch(dt) {
+    const a = this._hatchAnim;
+    if (!a) return;
+    a.t += dt;
+    const h = this._hatch;
+    if (a.kind === 'rattle') {
+      h.position.copy(this._hatchClosed.pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05));
+      if (a.t >= a.dur) h.position.copy(this._hatchClosed.pos);
+    } else if (a.kind === 'blow') {
+      const k = Math.min(1, a.t / a.dur);
+      h.position.lerpVectors(this._hatchClosed.pos, this._hatchRest.pos, k);
+      h.position.y += Math.sin(k * Math.PI) * 2.2;
+      h.quaternion.slerpQuaternions(this._hatchClosed.quat, this._hatchRest.quat, k);
+      h.rotateX(Math.sin(k * Math.PI) * 4);
+      h.scale.setScalar(1.35 + (1 - 1.35) * k);
+      if (k >= 1) {
+        h.position.copy(this._hatchRest.pos);
+        h.quaternion.copy(this._hatchRest.quat);
+        h.scale.setScalar(1);
+        this._watch.group.visible = !this.watchTaken;
+        this._hatchAnim = null;
+      }
+    }
+  }
+
   update(dt) {
     if (!this.group) return;
     this._t += dt;
     const t = this._t;
+    this._updateHatch(dt);
+    if (this._blowPuff > 0) this._blowPuff = Math.max(0, this._blowPuff - dt * 0.3);
     // Humo (más flojo con el tiempo) y llamas solo al principio.
-    this._smoke.update(dt, Math.max(0.35, 1 - t / 240), Math.max(0, 1 - t / 120));
+    this._smoke.update(dt, Math.max(0.35, 1 - t / 240, this._blowPuff ?? 0), Math.max(0, 1 - t / 120));
     if (this._interior) this._interior.intensity = 1 + Math.sin(t * 17) * 0.15 + Math.sin(t * 7.3) * 0.2;
     if (!this.watchTaken) this._watch.update(t, this._playerDist?.() ?? Infinity);
   }

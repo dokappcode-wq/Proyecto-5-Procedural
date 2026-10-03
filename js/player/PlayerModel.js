@@ -181,6 +181,14 @@ export class PlayerModel {
     for (const m of this._watchParts) m.visible = visible;
   }
 
+  /** Color de la pantalla del reloj (el que elige el jugador). */
+  setWatchColor(hex) {
+    this._watchColor.set(hex);
+    const t = this._watchText;
+    this._watchText = null;
+    this.setWatchText(t ?? '--:--');
+  }
+
   setWatchText(text) {
     if (!this._watchCanvas || text === this._watchText) return;
     this._watchText = text;
@@ -239,7 +247,14 @@ export class PlayerModel {
   }
 
   setVisible(visible) {
-    this.root.visible = visible;
+    this._wantVisible = visible;
+    this.root.visible = visible && !this.hidden;
+  }
+
+  /** Oculto a la fuerza (escenas de la historia: aún dentro de la cápsula). */
+  setHidden(hidden) {
+    this.hidden = hidden;
+    this.root.visible = (this._wantVisible ?? true) && !hidden;
   }
 
   /**

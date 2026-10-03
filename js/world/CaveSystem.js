@@ -47,10 +47,11 @@ export class CaveSystem {
    * @param {object[]} [p.avoid] zonas a evitar { x, z, r } (nave, cápsula…)
    * @param {Function} [p.isWater]
    */
-  generate({ seed, terrain, bounds, spawn, avoid = [], isWater = () => false }) {
+  generate({ seed, terrain, bounds, spawn, avoid = [], isWater = () => false, dungeon = null }) {
     const C = this._cfg;
     const rng = new SeededRandom(deriveSeed(seed, 'caves'));
     this.caves = [];
+    this.dungeon = null;
     this._grid.clear();
     const mouths = [];
     const farEnough = (x, z) =>
@@ -65,6 +66,16 @@ export class CaveSystem {
     };
     const inside = (x, z, margin) => x > bounds.minX + margin && x < bounds.maxX - margin && z > bounds.minZ + margin && z < bounds.maxZ - margin;
 
+    // La mazmorra de la historia (bajo el centro de investigación), antes que las demás.
+    if (dungeon) {
+      const d = this._carveDungeon(dungeon, terrain, inside, isWater);
+      if (d) {
+        d.id = this.caves.length;
+        this.caves.push(d);
+        this.dungeon = d;
+        mouths.push({ x: dungeon.x, z: dungeon.z });
+      }
+    }
     for (const kind of ['UNDERGROUND', 'MOUNTAIN']) {
       const want = kind === 'UNDERGROUND' ? C.UNDERGROUND : C.MOUNTAIN;
       let made = 0;
@@ -93,8 +104,68 @@ export class CaveSystem {
       }
     }
     for (const cave of this.caves) this._index(cave);
-    for (const cave of this.caves) cave.content = this._content(cave, new SeededRandom(deriveSeed(seed, `caveContent:${cave.id}`)));
+    for (const cave of this.caves) cave.content = cave.kind === 'DUNGEON' ? [] : this._content(cave, new SeededRandom(deriveSeed(seed, `caveContent:${cave.id}`)));
     return this.caves;
+  }
+
+  /**
+   * La mazmorra: escalera de bajada desde la trampilla del búnker, una cuesta natural
+   * con dos cámaras (construcciones abandonadas y gólems) y, al fondo, una gran sala
+   * llana (la del gólem gigante). Prueba varios rumbos hasta que todo queda bajo roca.
+   * @param {{ x, z, yaw, depth?, arenaRadius? }} d
+   */
+  _carveDungeon(d, terrain, inside, isWater) {
+    const C = this._cfg;
+    const step = C.STEP;
+    const R = d.arenaRadius ?? 14;
+    for (let k = 0; k < 16; k++) {
+      const heading0 = d.yaw + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 8);
+      const surface0 = terrain.heightAt(d.x, d.z);
+      const target = surface0 - (d.depth ?? 38);
+      const nodes = [];
+      let x = d.x;
+      let z = d.z;
+      let floor = surface0;
+      let h = heading0;
+      let ok = true;
+      const chambers = [];
+      for (let i = 0; ; i++) {
+        let r = 2.4;
+        const arena = floor <= target + 0.01 && i > 8;
+        if (i > 0) {
+          if (!arena) h += Math.sin(i * 1.7 + k) * 0.18;
+          x += Math.cos(h) * step;
+          z += Math.sin(h) * step;
+          // Escalera del búnker (más empinada) y después la cuesta natural.
+          const drop = i <= 2 ? step * 0.62 : step * 0.42;
+          floor = Math.max(target, floor - drop);
+        }
+        const chamber = !arena && (i === 7 || i === 13);
+        if (chamber) {
+          r = 6.5;
+          chambers.push(i);
+        } else if (i === 6 || i === 8 || i === 12 || i === 14) r = 4;
+        if (arena) r = R;
+        if (!inside(x, z, 70)) ok = false;
+        const surface = terrain.heightAt(x, z);
+        if (surface < 4 || isWater?.(x, z)) ok = false;
+        if (i > 3 && surface - (floor + (FLOOR_K + CEIL_K) * r) < 2.5) ok = false;
+        if (!ok) break;
+        nodes.push({ x, z, floor, r, y: floor + FLOOR_K * r, chamber: chamber || arena, arena });
+        if (nodes.filter((n) => n.arena).length >= 5) break;
+        if (i > 40) {
+          ok = false;
+          break;
+        }
+      }
+      if (!ok) continue;
+      // Más estrecho entre las cámaras y la sala (transición suave del radio).
+      const cave = this._finish('DUNGEON', nodes);
+      cave.arenaStart = nodes.findIndex((n) => n.arena);
+      cave.chambers = chambers;
+      return cave;
+    }
+    return null;
   }
 
   /** Recorrido de una cueva desde la boca. @returns {object|null} */

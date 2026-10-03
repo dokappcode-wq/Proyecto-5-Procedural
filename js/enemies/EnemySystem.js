@@ -470,6 +470,42 @@ export class EnemySystem {
     for (const b of this.bases) if (this._cleared.has(b.id)) b.cleared = true;
   }
 
+  // ---- Historia ----------------------------------------------------------------------------
+
+  /**
+   * Gólems de la historia (guardianes del nodo, mazmorra…): dormidos y "bloqueados"
+   * (no despiertan al acercarse) hasta que la historia los llama con alert().
+   * Devuelve los vivos (los ya derrotados no vuelven).
+   */
+  storyGolems(tag, spots, { leash = 30, y = null, type = 'GOLEM' } = {}) {
+    const out = [];
+    spots.forEach((s, i) => {
+      const id = `story:${tag}:${i}`;
+      if (this._dead.has(id)) return;
+      let e = this.enemies.find((m) => m.id === id && !m.removed);
+      if (!e) {
+        e = this._add(type, id, s.x, s.z, { dormant: type === 'GOLEM', y: s.y ?? y, home: { x: s.x, z: s.z, radius: 4, leash } });
+        e.story = tag;
+      }
+      e.locked = true;
+      out.push(e);
+    });
+    return out;
+  }
+
+  /** Vuelve a dormir a los gólems vivos de un grupo de la historia (p. ej. al morir el jugador). */
+  resetStoryGolems(tag) {
+    for (const e of this.enemies) {
+      if (e.story !== tag || !e.alive) continue;
+      e.state = EnemyState.DORMANT;
+      e.assemble = 0;
+      e.locked = true;
+      e.health = e.maxHealth;
+      e.x = e.home.x;
+      e.z = e.home.z;
+    }
+  }
+
   // ---- Depuración ------------------------------------------------------------------------
 
   /** Crea un enemigo junto al jugador (Admin). */

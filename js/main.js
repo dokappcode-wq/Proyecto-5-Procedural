@@ -18,6 +18,9 @@ import { BiomeTracker } from './world/BiomeTracker.js';
 import { DiscoveryTracker } from './world/DiscoveryTracker.js';
 import { AnimalSystem } from './animals/AnimalSystem.js';
 import { EnemySystem } from './enemies/EnemySystem.js';
+import { StaticColliders } from './story/StaticColliders.js';
+import { StoryUI } from './story/StoryUI.js';
+import { StorySystem } from './story/StorySystem.js';
 import { InventorySystem } from './inventory/InventorySystem.js';
 import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { HealthSystem } from './player/HealthSystem.js';
@@ -145,7 +148,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // Estructuras en las que se camina y que bloquean: construcciones + nave.
   // (Se crean más abajo; estas funciones solo se llaman durante el bucle.)
-  const structureSources = () => (crashSite ? [construction, ship, crashSite] : [construction, ship]);
+  // Edificios de la historia (torre, arena del nodo, centro de investigación…).
+  const storyColliders = new StaticColliders();
+  const structureSources = () => (crashSite ? [construction, ship, crashSite, storyColliders] : [construction, ship, storyColliders]);
   const combinedStructures = {
     surfaceAt: (x, z, maxY) => {
       let best = null;
@@ -232,6 +237,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const hotbar = new HotbarSystem({ input, inventory, events });
   const equipment = new EquipmentSystem({ items: cfg.ITEMS, config: cfg.EQUIPMENT, inventory, events });
   const crafting = new CraftingSystem({ recipes: cfg.RECIPES, items: cfg.ITEMS, inventory, events });
+  // Receta de la mesa de elaboración: de momento se sabe desde el principio (en la segunda parte
+  // de la historia la dará Nova).
+  crafting.unlock('WORKBENCH');
   // Construcción modular (B): paredes, suelos, puertas, ventanas, vallas, pilares...
   const construction = new ConstructionSystem({
     scene: render.scene,
@@ -296,6 +304,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         playerMenu.refreshWatch();
         events.emit(GameEvents.PLAYER_ACTION, { kind: 'harvest' });
         message('⌚ Reloj de pulsera recuperado: Tab = fabricar · I = mochila. Empieza por madera (golpea un tronco) y piedras sueltas (E).', 'pickup');
+        if (story.onWatchTaken()) return; // la historia: nombre, color, transmisión, tutorial
         if (!shipFound) setTimeout(() => message(`📡 El reloj capta la señal de la nave: está en lo alto de las ${worlds.home.biomes.get('FROZEN_MOUNTAINS')?.NAME ?? 'montañas'}. Busca el haz de luz… y abrígate antes de subir: allí arriba se congela uno.`, 'warning'), 5000);
       },
     })
@@ -714,7 +723,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       const inside = worlds.activeId === HOME && !!world.inCave?.(p.x, p.y + 1, p.z);
       const depth = inside ? world.getHeightAt(p.x, p.z) - (p.y + player.eyeHeight) : 0;
       const k = inside ? Math.max(0, Math.min(1, (depth - 1) / cfg.CAVES.DARKNESS_DEPTH)) : 0;
-      atmosphere.setCave(k);
+      atmosphere.setCave(Math.max(k, story.darkness)); // también la habitación del ermitaño
       if (k > 0.6 && !caveMsg) {
         caveMsg = true;
         message('🕳️ Una cueva: aquí abajo no llega la luz. Lleva una 🔥 antorcha (1 madera + 1 carbón) y un ⛏️ pico para las menas.', 'info');
@@ -879,7 +888,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     });
   };
   // (Ya no se da el mapa de papel de la señal: el nodo se encuentra por su haz de luz azul.)
-  events.on(GameEvents.WORLD_GENERATED, () => dropSpaceNode());
+  events.on(GameEvents.WORLD_GENERATED, () => (campaign ? pickups.clear(HOME) : dropSpaceNode()));
   events.on(GameEvents.GAME_STARTED, () => {
     gameStarted = true;
   });
@@ -1166,6 +1175,20 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   events.on(GameEvents.AI_SAY, ({ name, text, type }) => events.emit(GameEvents.UI_MESSAGE, { text: `🤖 ${name}: ${text}`, type }));
   const aiPanel = new AIPanel({ container: hudRoot, input, events, ai: shipAI });
+  // ---- Historia (campaña del Edén) ----------------------------------------------------
+  const storyUI = new StoryUI({ container: hudRoot, input, events });
+  const story = new StorySystem({
+    campaign, config: cfg, events, input, ui: storyUI, player, controller, worlds, homeId: HOME, camera, inventory, enemies, crashSite,
+    shipAI, ship, time, colliders: storyColliders, lock: setControlLock, items: cfg.ITEMS, pickups, health,
+  });
+  interactionProviders.push(story);
+  events.on(GameEvents.WATCH_SETTINGS_REQUEST, () => (campaign ? story.openWatchSettings() : message('El reloj de la campaña solo se configura en el Edén.', 'info')));
+  const storyKeys = {
+    name: 'storyKeys',
+    update: () => {
+      if (input.wasPressed('COMPASS')) story.toggleCompass();
+    },
+  };
   const starMapHUD = new StarMapHUD({ container: hudRoot, events, map: starMap, system, spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED });
   // Reloj de la nave: se coge en el laboratorio; al usarlo muestra dónde está la nave.
   const shipWatch = new ShipWatchHUD({ container: hudRoot, events, player, ship, time, inventory, watchItem: cfg.SHIP.WATCH_ITEM });
@@ -1204,7 +1227,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     if (!crashSite?.group || worlds.activeId !== HOME || handoff || save) return;
     player.yaw = player.bodyYaw = crashSite.spawnYaw;
     player.pitch = -0.12;
-    if (!hasWatch) setTimeout(() => message('💥 La cápsula se ha estrellado. Tu reloj de pulsera ha quedado en la compuerta (el que brilla): cógelo con E. Sin él no puedes fabricar nada.', 'warning'), 1800);
+    // Campaña: la IA de la nave está apagada hasta que Nova llega a la nave.
+    if (ship.installed && Object.values(ship.installed).includes('AI_NODE')) ship.uninstallTech('AI_NODE');
+    story.startNewGame();
   });
 
   // ---- Faro de la nave: un haz de luz en el monte helado hasta que se llega a ella ----
@@ -1224,7 +1249,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         shipFound = true;
         message('🚀 ¡La nave! Sube por la rampa (E en el botón de la compuerta).', 'pickup');
       }
-      shipBeam.visible = !shipFound && hasWatch && ship.present && worlds.activeId === HOME;
+      shipBeam.visible = !shipFound && hasWatch && ship.present && worlds.activeId === HOME && (!campaign || story.shipRevealed);
       if (!shipBeam.visible) return;
       shipBeam.position.set(s.x, s.y + 130, s.z);
       shipBeam.material.opacity = 0.16 + Math.sin(t * 2) * 0.05;
@@ -1286,6 +1311,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   saveGame.register('world', { save: () => worlds.home.resources.snapshot(), load: (d) => worlds.home.reloadResources(d) });
   saveGame.register('construction', { save: () => construction.snapshot(), load: (d) => construction.restore(d) });
+  saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
   saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
   saveGame.register('flags', {
@@ -1307,7 +1333,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     }
     const at = Date.now();
     events.emit(GameEvents.GAME_SAVED, { reason, at });
-    if (!silent || reason !== 'auto') message(reason === 'auto' ? '💾 Guardado automático' : '💾 Partida guardada', 'info');
+    if (!silent) message(reason === 'auto' ? '💾 Guardado automático' : '💾 Partida guardada', 'info');
     return true;
   };
   events.on(GameEvents.GAME_SAVE_REQUEST, ({ reason, silent } = {}) => saveNow(reason ?? 'manual', { silent }));
@@ -1426,6 +1452,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(enemies);     // gólems, slimes, goblins
+  loop.add(story);       // la historia: escenas, Nova, brújula, tutorial
+  loop.add(storyKeys);
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
   loop.add(torches);     // luz de las antorchas clavadas y de las flores luminosas
@@ -1485,7 +1513,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
   window.__MUNDO0__ = {
-    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, enemies, discovery, inventory, interaction,
+    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, enemies, story, storyUI, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,

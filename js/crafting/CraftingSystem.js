@@ -24,6 +24,7 @@ export class CraftingSystem {
     this.queue = [];   // [{ uid, recipeId, time, left, ingredients }]
     this._uid = 0;
     this._subs = {};   // cuerpo sin madera/lana: las piezas de construcción usan piedra/mineral
+    this.unlocked = new Set(); // recetas con LOCK (la historia las desbloquea)
     events.on(GameEvents.BODY_CHANGED, ({ planet }) => (this._subs = planet?.BUILD_SUBSTITUTE ?? {}));
     events.on(GameEvents.CRAFT_REQUEST, ({ recipeId, station }) => this.craft(recipeId, { station }));
   }
@@ -41,9 +42,19 @@ export class CraftingSystem {
     return out;
   }
 
+  /** ¿Receta disponible? (las que tienen LOCK solo cuando se desbloquean). */
+  isUnlocked(recipeId) {
+    const r = this._recipes[recipeId];
+    return !!r && (!r.LOCK || this.unlocked.has(r.LOCK));
+  }
+
+  unlock(key) {
+    this.unlocked.add(key);
+  }
+
   /** Lista de recetas con su disponibilidad actual (para la UI). */
   getRecipes() {
-    return Object.entries(this._recipes).map(([id, r]) => ({
+    return Object.entries(this._recipes).filter(([id]) => this.isUnlocked(id)).map(([id, r]) => ({
       id,
       result: r.RESULT,
       amount: r.AMOUNT,
@@ -86,6 +97,10 @@ export class CraftingSystem {
     const r = this._recipes[recipeId];
     if (!r) return false;
     const name = this._items[r.RESULT].NAME;
+    if (!this.isUnlocked(recipeId)) {
+      this._message(`Aún no conoces la receta: ${name}.`, 'danger');
+      return false;
+    }
     if (r.STATION && r.STATION !== station) {
       this._message(`${name} se fabrica en una estación (${r.STATION_NAME ?? r.STATION}).`, 'danger');
       return false;

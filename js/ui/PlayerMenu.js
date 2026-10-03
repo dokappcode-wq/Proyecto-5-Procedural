@@ -275,7 +275,15 @@ export class PlayerMenu extends ModalPanel {
     save.type = 'button';
     save.addEventListener('click', () => this._events.emit(GameEvents.GAME_SAVE_REQUEST, { reason: 'manual' }));
     this._saveInfo = el('div', 'pm-save-info', '');
-    you.append(gear, this._clock, this._statList, save, this._saveInfo);
+    // Nombre y color del reloj (el color tiñe la interfaz): se cambia cuando se quiera.
+    const watchBtn = el('button', 'pm-save pm-watch', '⌚ Nombre y color del reloj');
+    watchBtn.type = 'button';
+    watchBtn.addEventListener('click', () => {
+      this.setOpen(false);
+      this._events.emit(GameEvents.WATCH_SETTINGS_REQUEST, {});
+    });
+    this._watchBtn = watchBtn;
+    you.append(gear, this._clock, this._statList, save, this._saveInfo, watchBtn);
     this._events.on(GameEvents.GAME_SAVED, ({ at }) => {
       const d = new Date(at);
       this._saveInfo.textContent = `Guardada a las ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;

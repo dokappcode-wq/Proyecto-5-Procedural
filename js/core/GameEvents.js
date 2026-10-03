@@ -25,6 +25,7 @@ export const GameEvents = Object.freeze({
   CHEST_OPEN: 'construction:chestOpen',           // { piece }
   PROJECTILE_HIT: 'combat:projectileHit',         // { x, y, z, target? }
   PLAYER_BLOCKED: 'combat:blocked',               // { amount } golpe parado con el escudo
+  WATCH_SETTINGS_REQUEST: 'story:watchSettings',  // {}  (cambiar nombre y color del reloj)
   GAME_SAVED: 'game:saved',                        // { reason, at }
   PLAYER_CLIMB_CHANGED: 'player:climbChanged',      // { climbing } escalando una pendiente
   PLAYER_LEVEL_UP: 'player:levelUp',              // { level, points }
