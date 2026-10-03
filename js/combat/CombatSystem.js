@@ -227,8 +227,11 @@ export class CombatSystem {
           p.life = 0;
           break;
         }
-        // ¿Suelo?
-        const ground = this._world.getHeightAt(p.pos.x, p.pos.z);
+        // ¿Suelo? Bajo tierra (cuevas, mazmorra) sigue volando por el hueco hasta su suelo o la roca.
+        let ground = this._world.getHeightAt(p.pos.x, p.pos.z);
+        if (p.pos.y <= ground && this._world.inCave?.(p.pos.x, p.pos.y, p.pos.z)) {
+          ground = this._world.caveFloorAt?.(p.pos.x, p.pos.z, p.pos.y)?.floor ?? -Infinity;
+        }
         if (p.pos.y <= ground) {
           p.pos.y = ground + 0.02;
           p.stuck = 1;
