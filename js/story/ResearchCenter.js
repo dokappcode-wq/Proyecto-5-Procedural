@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BUILD_MODELS, toGeometry } from '../construction/BuildModels.js';
+import { LAB, toWorldLab } from './LabLayout.js';
 
 /**
  * ResearchCenter — el centro de investigación abandonado (segunda parte de la historia).
@@ -10,23 +11,8 @@ import { BUILD_MODELS, toGeometry } from '../construction/BuildModels.js';
  *       B dormitorio (literas, taquillas)             D búnker (trampilla abierta → la mazmorra)
  *   La puerta de entrada tiene un teclado: la abre la IA (contraseña).
  *
- * `labLayout(site)` es puro (sin Three.js): dónde está la trampilla del búnker y hacia
- * dónde baja la mazmorra (lo usa CaveSystem al generar el mundo).
+ * La planta (puerta, trampilla, rumbo de la mazmorra) está en LabLayout.js.
  */
-export const LAB = { W: 26, D: 18, H: 3.4, CORR: 1.6, WALL: 0.3 };
-
-export function toWorldLab(site, lx, lz) {
-  const c = Math.cos(site.yaw);
-  const s = Math.sin(site.yaw);
-  return { x: site.x + lx * c + lz * s, z: site.z - lx * s + lz * c };
-}
-
-export function labLayout(site) {
-  const hatch = toWorldLab(site, 4.2, -4.2);
-  // La mazmorra baja hacia el fondo de la sala del búnker (+x local).
-  return { hatch, heading: -site.yaw, door: toWorldLab(site, 0, LAB.D / 2 + 0.8), keypad: toWorldLab(site, 1.6, LAB.D / 2 + 0.35) };
-}
-
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
 
 export function buildResearchCenter(site, ground, { textColor = '#4fb6ff' } = {}) {
@@ -137,7 +123,7 @@ export function buildResearchCenter(site, ground, { textColor = '#4fb6ff' } = {}
   box(lambert(0x7a5a36), 11.5, 0.5, 2.2, 1.6, 1.0, 1.0); // cajas
   box(lambert(0x7a5a36), 11.2, 1.3, 2.4, 1.0, 0.6, 0.8);
   // ---- Sala D: búnker con la trampilla abierta ----
-  const hatchL = { x: 4.2, z: -4.2 };
+  const hatchL = LAB.HATCH;
   const rim = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.18, 6, 20), stripe);
   rim.rotation.x = Math.PI / 2;
   rim.position.set(hatchL.x, 0.08, hatchL.z);

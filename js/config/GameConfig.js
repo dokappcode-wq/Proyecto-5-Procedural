@@ -50,7 +50,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.18.0',
+    VERSION: '1.19.0',
   },
 
   RENDER: {
@@ -382,6 +382,7 @@ export const GameConfig = deepFreeze({
     MINERAL: { NAME: 'Mineral', ICON: '💎' },
     SLIME: { NAME: 'Slime', ICON: '🟢', DESC: 'Baba pegajosa. La sueltan los slimes que salen de noche.' },
     COIN: { NAME: 'Moneda goblin', ICON: '🪙', DESC: 'Moneda tosca de los goblins.' },
+    THRUSTER: { NAME: 'Propulsor', ICON: '🔥', DESC: 'Propulsor de nave. Los de la tuya quedaron destrozados.' },
     LEATHER: { NAME: 'Cuero', ICON: '🟫', DESC: 'Se refina en la mesa de refinería.' },
     REFINED_LEATHER: { NAME: 'Cuero refinado', ICON: '🟤', DESC: 'Cuero curtido en la mesa de refinería: para la ropa y el odre.' },
     REFINED_STONE: { NAME: 'Piedra refinada', ICON: '⬜', DESC: 'Bloque de piedra tallada (4 piedras).' },

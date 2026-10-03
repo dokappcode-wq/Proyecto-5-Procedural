@@ -210,6 +210,8 @@ export class WorldGenerator {
           ...Object.values(this.sites).flat().map((t) => ({ x: t.x, z: t.z, r: t.radius + 25 })),
         ],
         isWater: (x, z) => this.water.isWater(x, z, 8),
+        // La mazmorra de la historia (si la campaña dice dónde empieza).
+        dungeon: this._rules.DUNGEON?.(this.sites) ?? null,
       });
       this._caveGroup = buildCaveMeshes(this.caves.caves, (x, z) => this.terrain.heightAt(x, z), this._propMesher._colors);
       this._scene.add(this._caveGroup);

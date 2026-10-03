@@ -21,6 +21,8 @@ import { EnemySystem } from './enemies/EnemySystem.js';
 import { StaticColliders } from './story/StaticColliders.js';
 import { StoryUI } from './story/StoryUI.js';
 import { StorySystem } from './story/StorySystem.js';
+import { labLayout } from './story/LabLayout.js';
+import { StoryPart2 } from './story/StoryPart2.js';
 import { InventorySystem } from './inventory/InventorySystem.js';
 import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { HealthSystem } from './player/HealthSystem.js';
@@ -106,6 +108,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const homeName = system.home.name;
   // La campaña (el Edén): se empieza en una cápsula estrellada y la nave está en un monte helado.
   const campaign = file === cfg.CAMPAIGN.SYSTEM_FILE;
+  // La mazmorra empieza en la trampilla del búnker del centro de investigación.
+  const dungeonStart = (sites) => {
+    const s = sites.RESEARCH_CENTER?.[0];
+    if (!s) return null;
+    const L = labLayout(s);
+    return { x: L.hatch.x, z: L.hatch.z, yaw: L.heading };
+  };
 
   // ---- Infraestructura -----------------------------------------------------
   const render = new RenderContext({
@@ -128,7 +137,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       // La nave aparece aterrizada cerca del inicio, en un claro sin árboles.
       landing: { DISTANCE: cfg.SHIP.LANDING_DISTANCE, CLEAR_RADIUS: cfg.SHIP.CLEAR_RADIUS, HALF_WIDTH: 3.6, HALF_LENGTH: 8.3 },
       // Campaña: el inicio en cualquier punto del planeta y la nave en lo alto de las Montañas Heladas.
-      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE, CAVES: cfg.CAVES, SITES: cfg.SITES.LIST, SAFE_RADIUS: cfg.SITES.SAFE_RADIUS } : null,
+      homeRules: campaign ? { SPAWN_ANYWHERE: true, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: cfg.SHIP.MOUNTAIN_LANDING_DISTANCE, CAVES: cfg.CAVES, SITES: cfg.SITES.LIST, SAFE_RADIUS: cfg.SITES.SAFE_RADIUS, DUNGEON: dungeonStart } : null,
     },
   });
   // Todos los sistemas consultan el cuerpo ACTIVO a través de este proxy.
@@ -237,9 +246,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const hotbar = new HotbarSystem({ input, inventory, events });
   const equipment = new EquipmentSystem({ items: cfg.ITEMS, config: cfg.EQUIPMENT, inventory, events });
   const crafting = new CraftingSystem({ recipes: cfg.RECIPES, items: cfg.ITEMS, inventory, events });
-  // Receta de la mesa de elaboración: de momento se sabe desde el principio (en la segunda parte
-  // de la historia la dará Nova).
-  crafting.unlock('WORKBENCH');
+  // La receta de la mesa de elaboración la da Nova en la campaña; fuera de ella se sabe desde el principio.
+  if (!campaign) crafting.unlock('WORKBENCH');
   // Construcción modular (B): paredes, suelos, puertas, ventanas, vallas, pilares...
   const construction = new ConstructionSystem({
     scene: render.scene,
@@ -723,7 +731,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       const inside = worlds.activeId === HOME && !!world.inCave?.(p.x, p.y + 1, p.z);
       const depth = inside ? world.getHeightAt(p.x, p.z) - (p.y + player.eyeHeight) : 0;
       const k = inside ? Math.max(0, Math.min(1, (depth - 1) / cfg.CAVES.DARKNESS_DEPTH)) : 0;
-      atmosphere.setCave(Math.max(k, story.darkness)); // también la habitación del ermitaño
+      atmosphere.setCave(Math.max(Math.min(k, story.caveCap ?? 1), story.darkness)); // también la habitación del ermitaño
       if (k > 0.6 && !caveMsg) {
         caveMsg = true;
         message('🕳️ Una cueva: aquí abajo no llega la luz. Lleva una 🔥 antorcha (1 madera + 1 carbón) y un ⛏️ pico para las menas.', 'info');
@@ -1182,6 +1190,12 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     shipAI, ship, time, colliders: storyColliders, lock: setControlLock, items: cfg.ITEMS, pickups, health,
   });
   interactionProviders.push(story);
+  // Segunda parte: la nave, el centro de investigación, la mazmorra y el gólem gigante.
+  const storyPart2 = new StoryPart2({
+    story, events, worlds, homeId: HOME, ship, shipAI, inventory, crafting, enemies, pickups, colliders: storyColliders, player,
+    hotbar, health, creatures: interaction.creatures, installSpaceNode, items: cfg.ITEMS,
+  });
+  story._d.part2 = storyPart2;
   events.on(GameEvents.WATCH_SETTINGS_REQUEST, () => (campaign ? story.openWatchSettings() : message('El reloj de la campaña solo se configura en el Edén.', 'info')));
   const storyKeys = {
     name: 'storyKeys',
@@ -1392,6 +1406,29 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   registerSpaceTools(admin, { system, hasLightspeed, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
   registerCoreDebugTools(admin, { player, controller, camera, loop, renderer: render.renderer });
+  // Historia: ir a cada lugar y adelantar el escáner de Nova.
+  if (campaign) {
+    admin.registerTool({ category: 'Historia', type: 'info', label: 'Etapa', read: () => `${story.state.stage}${story.state.stage === 'SCAN' ? ` (${Math.ceil(story.scanLeft())} h)` : ''}` });
+    const goTo = (label, where) => admin.registerTool({ category: 'Historia', label, run: () => {
+      const t = where();
+      if (!t || worlds.activeId !== HOME) throw new Error('No disponible');
+      controller.placeAt(t.x, t.z);
+      if (t.y !== undefined) player.teleport(t.x, t.y + 0.1, t.z);
+      if (t.yaw !== undefined) player.yaw = player.bodyYaw = t.yaw;
+    } });
+    goTo('Ir a la torre del ermitaño', () => story._built?.tower && { ...story._built.tower.bottom });
+    goTo('Ir al nodo espacial', () => story._built?.arena && { x: story._built.arena.center.x + 6, z: story._built.arena.center.z });
+    goTo('Ir a la nave', () => ({ x: ship.ship.x + 14, z: ship.ship.z + 14 }));
+    goTo('Ir al centro de investigación', () => storyPart2.built?.lab && { ...storyPart2.built.lab.entrance });
+    goTo('Ir a la sala de las cascadas (mazmorra)', () => {
+      const a = storyPart2.built?.dungeon?.arena;
+      return a && { x: a.entrance.x + a.dir.x * 3, z: a.entrance.z + a.dir.z * 3, y: a.floor };
+    });
+    admin.registerTool({ category: 'Historia', label: 'Acabar el escáner de Nova (24 h)', run: () => {
+      if (story.state.stage !== 'SCAN') throw new Error('Nova aún no está escaneando');
+      time.advance(Math.ceil(story.scanLeft()) + 0.1);
+    } });
+  }
   // Enemigos: crear uno delante e ir al más cercano.
   admin.registerTool({ category: 'Enemigos', type: 'info', label: 'Activos', read: () => `${enemies.activeCount} cerca · ${enemies.enemies.filter((e) => e.alive).length} vivos · ${enemies.bases.filter((b) => !b.cleared).length} bases` });
   for (const [type, label] of [['GOLEM', 'Gólem'], ['SLIME', 'Slime'], ['GOBLIN', 'Goblin'], ['GOBLIN_BOSS', 'Jefe goblin']]) {
@@ -1513,7 +1550,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // Acceso de depuración desde la consola del navegador (solo desarrollo).
   window.__MUNDO0__ = {
-    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, enemies, story, storyUI, discovery, inventory, interaction,
+    config: cfg, events, render, input, world, lighting, sky, biomeTracker, animals, enemies, story, storyUI, storyPart2, discovery, inventory, interaction,
     health, hunger, thirst, energy, nutrition, hotbar, equipment, crafting, construction, itemUse, sleep, player,
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,

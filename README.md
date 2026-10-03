@@ -261,6 +261,22 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Historia, segunda parte (v1.19)**:
+  - Tras las 24 h de escaneo, Nova encuentra la nave (te da el mapa 📜 y la marca en la brújula; se enciende su faro).
+    La nave está averiada: humo en los propulsores, no despega y no tiene baterías.
+  - Al llegar, Nova entra y se conecta a su panel (la IA de la nave pasa a ser ella): diagnóstico, receta de la
+    **mesa de elaboración** (antes no se conoce) y el **centro de investigación** marcado.
+  - Centro de investigación: la puerta pide contraseña y Nova la introduce por el reloj. Dentro: laboratorio,
+    dormitorio, taller con una mesa de elaboración ya montada, notas y el búnker con la trampilla abierta.
+  - Mazmorra: cuesta abajo, dos cámaras con construcciones abandonadas y 6 gólems; al fondo, la sala de las cascadas
+    con el **Cofre N** (4 pilas mini-plack) y un tirachinas en el suelo (por si no llevas arco).
+  - Al abrir el cofre caen rocas que tapan la salida y se levanta el **gólem gigante** (300 de vida): solo le hace daño
+    disparar a su ojo azul; golpea el suelo con una onda (20, se salta o se esquiva) que hace caer 5 piedras; llama a
+    4 gólems; desde 150 de vida se tapa el ojo 10 s cada 50 y da manotazos (50). Derrotado, se abre la salida y da
+    **2 propulsores**. Si mueres, la pelea vuelve a empezar al entrar en la sala.
+  - Reparar la nave (E en la parte de atrás): 2 propulsores, placa de navegación (mesa de elaboración), 4 baterías y
+    el nodo espacial. Después, despega (T), sube y sal al espacio (O): **fin de la demo** (se puede seguir jugando).
+  - Admin → Historia: ir a cada lugar y acabar el escáner de Nova.
 - **Historia, primera parte (v1.18)** (partida nueva en el Edén):
   - La cápsula se estrella, la compuerta sale despedida y el personaje salta fuera.
   - Al coger el reloj: nombre (el de la futura IA) y color (9 colores; tiñe la interfaz y se cambia en el reloj,

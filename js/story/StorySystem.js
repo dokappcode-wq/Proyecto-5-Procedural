@@ -129,6 +129,7 @@ export class StorySystem {
   startNewGame() {
     if (!this.enabled) return;
     this.state = defaultStoryState();
+    this._d.part2?.onNewGame?.();
     this._applyTheme();
     this._refresh();
     this._playIntro();
@@ -153,6 +154,7 @@ export class StorySystem {
     this._applyTheme();
     this._d.shipAI?.setName?.(this.state.watchName);
     this._refresh();
+    this._d.part2?.onRestore?.();
     if (this.state.tutorial === 'on') this._tutorial.start(this.state.tutStep);
   }
 
@@ -309,7 +311,6 @@ export class StorySystem {
     if (!b) return out;
     if ((s.stage === 'NODE' || s.stage === 'ARENA') && b.arena) out.push({ id: 'node', icon: '🔷', x: b.arena.center.x, z: b.arena.center.z, label: 'Nodo espacial' });
     if (s.stage === 'CAPSULE' && b.capsuleSpot) out.push({ id: 'cap2', icon: '🚀', x: b.capsuleSpot.x, z: b.capsuleSpot.z, label: 'Cápsula' });
-    if (s.keyTaken && b.tower && s.stage !== 'NODE') out.push({ id: 'tower', icon: '🗼', x: b.tower.site.x, z: b.tower.site.z, label: 'Torre del ermitaño' });
     for (const m of this._d.part2?.markers?.() ?? []) out.push(m);
     return out;
   }

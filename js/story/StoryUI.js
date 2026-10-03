@@ -279,6 +279,42 @@ export class StoryUI {
     setTimeout(() => flash.remove(), 2400);
   }
 
+  /** Barra de vida del jefe (arriba). ratio null la oculta. */
+  bossBar(name, ratio, note = '') {
+    if (!this._boss) {
+      this._boss = el('div', 'boss-bar hidden');
+      this._bossName = el('div', 'bb-name');
+      const track = el('div', 'bb-track');
+      this._bossFill = el('div', 'bb-fill');
+      track.append(this._bossFill);
+      this._bossNote = el('div', 'bb-note');
+      this._boss.append(this._bossName, track, this._bossNote);
+      this._root.append(this._boss);
+    }
+    this._boss.classList.toggle('hidden', ratio === null);
+    if (ratio === null) return;
+    this._bossName.textContent = name;
+    this._bossFill.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+    this._bossNote.textContent = note;
+  }
+
+  /** Pantalla de fin de la demo: lines de texto y un botón para seguir jugando. */
+  endScreen({ title, lines, button }, done) {
+    const m = this._modal('demo-end');
+    m.back.classList.add('demo-end');
+    m.box.append(el('h2', null, title));
+    for (const l of lines) m.box.append(el('p', 'muted', l));
+    const b = el('button', 'primary', button);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      m.close();
+      done?.();
+    });
+    const row = el('div', 'buttons');
+    row.append(b);
+    m.box.append(row);
+  }
+
   // ---- HUD: brújula y objetivo ----------------------------------------------------
 
   _buildHud() {
