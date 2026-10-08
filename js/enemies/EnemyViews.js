@@ -151,7 +151,7 @@ function golemView(enemy) {
   root.scale.setScalar(enemy.scale);
   return {
     root,
-    update(e, t) {
+    update(e, t, dt = 1 / 60) {
       // Montaje: cada piedra vuela de su sitio en el montón a su sitio en el cuerpo.
       let k = e.assemble;
       if (e.state === 'DEAD') k = Math.max(0, 1 - e.deathProgress * 1.6);
@@ -166,28 +166,58 @@ function golemView(enemy) {
       eyeMat.opacity = glow;
       crystal.material.opacity = glow;
       if (up) {
-        const sw = Math.sin(e.gait) * Math.min(1, e.speed / 1.2);
-        hipL.rotation.x = sw * 0.5;
-        hipR.rotation.x = -sw * 0.5;
-        let arm = -sw * 0.35;
-        let elbowBend = -0.25;
+        const z = Math.min(1, dt * 10);
+        const moving = Math.min(1, e.speed / 1.2);
+        const sw = Math.sin(e.gait) * moving;
+        const hit = e.hitFlash / 0.3; // 1 → 0 justo tras recibir un golpe
+        // Andar pesado: cadera que se balancea, hombros que giran, brazos que cuelgan.
+        let legL = sw * 0.5;
+        let legR = -sw * 0.5;
+        let armLx = -sw * 0.35;
+        let armRx = sw * 0.35;
+        let elbowL = -0.25 - Math.max(0, sw) * 0.2;
+        let elbowR = -0.25 - Math.max(0, -sw) * 0.2;
+        let lean = 0.06 + moving * 0.08;
+        let twist = Math.sin(e.gait) * 0.12 * moving;
+        let dip = Math.abs(Math.sin(e.gait)) * 0.06 * moving;
+        let spread = 0.12;
         if (e.windup > 0) {
-          arm = -2.7 * smooth(e.windup);
-          elbowBend = -0.6 * e.windup;
+          // Los dos puños juntos por encima de la cabeza (maza de dos manos).
+          const w = smooth(e.windup);
+          armLx = armRx = -2.9 * w;
+          elbowL = elbowR = -0.7 * w;
+          spread = 0.12 - 0.25 * w;
+          lean = 0.06 - 0.3 * w;
+          legL = 0.25 * w;
+          legR = -0.3 * w;
+          twist = 0;
         }
         if (e.strike > 0) {
-          arm = -0.9;
-          elbowBend = -0.05;
+          // ¡Golpe! Los puños bajan delante y el cuerpo se dobla.
+          armLx = armRx = -0.95;
+          elbowL = elbowR = -0.05;
+          spread = -0.1;
+          lean = 0.45;
+          dip = -0.18;
+          twist = 0;
         }
-        armL.rotation.x = arm;
-        armR.rotation.x = e.windup > 0 || e.strike > 0 ? arm : sw * 0.35;
-        armL.userData.elbow.rotation.x = elbowBend;
-        armR.userData.elbow.rotation.x = e.windup > 0 || e.strike > 0 ? elbowBend : -0.25;
-        armL.rotation.z = -0.12;
-        armR.rotation.z = 0.12;
-        torso.rotation.x = e.strike > 0 ? 0.3 : e.windup > 0 ? -0.18 * e.windup : 0.06;
-        head.rotation.y = Math.sin(t * 0.7) * 0.15;
-        inner.position.y = Math.abs(Math.sin(e.gait)) * 0.06;
+        // Al recibir un golpe: se tambalea hacia atrás.
+        lean -= hit * 0.35;
+        damp(hipL.rotation, 'x', legL, z);
+        damp(hipR.rotation, 'x', legR, z);
+        damp(armL.rotation, 'x', armLx, e.strike > 0 ? 1 : z);
+        damp(armR.rotation, 'x', armRx, e.strike > 0 ? 1 : z);
+        damp(armL.rotation, 'z', -spread, z);
+        damp(armR.rotation, 'z', spread, z);
+        damp(armL.userData.elbow.rotation, 'x', elbowL, z);
+        damp(armR.userData.elbow.rotation, 'x', elbowR, z);
+        damp(torso.rotation, 'x', lean, e.strike > 0 ? 1 : z);
+        damp(torso.rotation, 'y', twist, z);
+        damp(inner.rotation, 'z', Math.sin(e.gait) * 0.05 * moving, z);
+        damp(inner.position, 'z', -hit * 0.25, z);
+        torso.scale.y = 1 + Math.sin(t * 1.4) * 0.015 * (1 - moving);
+        head.rotation.y = e.state === 'IDLE' ? Math.sin(t * 0.5) * 0.5 : Math.sin(t * 0.7) * 0.1;
+        inner.position.y = dip;
       } else inner.position.y = 0;
       if (e.state === 'DEAD' && e.deathProgress > 0.75) inner.position.y = -(e.deathProgress - 0.75) * 2;
       flash(mats, e.hitFlash / 0.3);
@@ -230,7 +260,8 @@ function slimeView(enemy) {
   return {
     root,
     update(e, t) {
-      const wob = Math.sin(t * 6 + e.x) * 0.06;
+      const hit = e.hitFlash / 0.3;
+      const wob = Math.sin(t * 6 + e.x) * 0.06 - hit * 0.25; // al recibir: se aplasta
       const moving = Math.min(1, e.speed / 1.5);
       const hop = Math.abs(Math.sin(e.gait * 1.6)) * 0.25 * moving;
       let sy = 1 + wob;
@@ -391,42 +422,80 @@ function goblinView(enemy) {
   root.scale.setScalar(enemy.scale);
   return {
     root,
-    update(e, t) {
+    update(e, t, dt = 1 / 60) {
+      const z = Math.min(1, dt * 12);
       const moving = Math.min(1, e.speed / 2);
+      const run = clamp01((e.speed - 2) / 2); // corriendo (persiguiendo)
       const ph = e.gait * 1.4;
       const sw = Math.sin(ph) * moving;
-      legL.hip.rotation.x = sw * 0.7 - 0.25;
-      legR.hip.rotation.x = -sw * 0.7 - 0.25;
-      legL.knee.rotation.x = 0.35 + Math.max(0, -Math.cos(ph)) * 0.6 * moving;
-      legR.knee.rotation.x = 0.35 + Math.max(0, Math.cos(ph)) * 0.6 * moving;
-      armL.shoulder.rotation.x = -sw * 0.6 - 0.2;
-      armL.elbow.rotation.x = -0.4;
-      body.position.y = Math.abs(Math.sin(ph)) * 0.05 * moving + Math.sin(t * 2.2) * 0.01 - 0.03;
-      // Amago: la porra sube despacio por detrás de la cabeza… y baja de golpe.
+      const hit = e.hitFlash / 0.3;
+      // Piernas: zancada (más larga corriendo) con rodillas que se doblan.
+      let hipL = sw * (0.7 + run * 0.35) - 0.25;
+      let hipR = -sw * (0.7 + run * 0.35) - 0.25;
+      let kneeL = 0.35 + Math.max(0, -Math.cos(ph)) * (0.6 + run * 0.5) * moving;
+      let kneeR = 0.35 + Math.max(0, Math.cos(ph)) * (0.6 + run * 0.5) * moving;
+      // Brazo libre: bombea al correr; quieto, a veces se rasca la cabeza.
+      let armLx = -sw * (0.6 + run * 0.6) - 0.2;
+      let elbowL = -0.4 - run * 0.7;
+      const idle = e.state === 'IDLE' && moving < 0.1;
+      const scratch = idle ? clamp01(Math.sin(t * 0.45 + e.x) * 3 - 2) : 0;
+      if (scratch > 0) {
+        armLx = -2.5 * scratch - 0.2 * (1 - scratch);
+        elbowL = -0.4 - 1.6 * scratch;
+      }
+      let bodyY = Math.abs(Math.sin(ph)) * (0.05 + run * 0.06) * moving + Math.sin(t * 2.2) * 0.01 - 0.03;
+      let bodyZ = 0;
+      // La porra: amago lento por encima de la cabeza… y salto con golpe.
       let a = sw * 0.6 - 0.25;
       let el = -0.5;
-      let lean = 0.38;
+      let lean = 0.38 + run * 0.2;
       if (e.windup > 0) {
         const w = smooth(e.windup);
         a = -2.9 * w;
         el = -0.5 - 0.9 * w;
         lean = 0.38 - 0.3 * w;
+        hipL = hipR = -0.25 - 0.45 * w; // se agacha para saltar
+        kneeL = kneeR = 0.35 + 0.8 * w;
+        bodyY = -0.12 * w;
       }
       if (e.strike > 0) {
+        const k2 = e.strike / 0.35; // 1 → 0
         a = -0.3;
         el = -0.05;
-        lean = 0.62;
+        lean = 0.7;
+        bodyY = Math.sin(k2 * Math.PI) * 0.18;
+        bodyZ = (1 - k2) * 0.3;
+        hipL = -0.6;
+        hipR = 0.2;
       }
-      armR.shoulder.rotation.x = a;
-      armR.elbow.rotation.x = el;
-      torso.rotation.x = lean;
-      head.rotation.y = e.state === 'IDLE' ? Math.sin(t * 0.8 + e.x) * 0.4 : 0;
-      head.rotation.x = -0.25 + Math.sin(t * 1.7 + e.z) * 0.04;
+      // Golpeado: se echa atrás y encoge la cabeza.
+      lean -= hit * 0.5;
+      bodyZ -= hit * 0.15;
+      damp(legL.hip.rotation, 'x', hipL, z);
+      damp(legR.hip.rotation, 'x', hipR, z);
+      damp(legL.knee.rotation, 'x', kneeL, z);
+      damp(legR.knee.rotation, 'x', kneeR, z);
+      damp(armL.shoulder.rotation, 'x', armLx, z);
+      damp(armL.elbow.rotation, 'x', elbowL, z);
+      damp(armR.shoulder.rotation, 'x', a, e.strike > 0 ? 1 : z);
+      damp(armR.elbow.rotation, 'x', el, e.strike > 0 ? 1 : z);
+      damp(torso.rotation, 'x', lean, e.strike > 0 ? 1 : z);
+      damp(torso.rotation, 'y', Math.sin(ph) * 0.15 * moving, z);
+      body.position.y = bodyY;
+      damp(body.position, 'z', bodyZ, z);
+      // Cabeza: mira alrededor quieto; al correr, hacia delante; sacudida al recibir.
+      const look = idle ? Math.sin(t * 0.8 + e.x) * 0.5 : 0;
+      damp(head.rotation, 'y', look, Math.min(1, dt * 4));
+      head.rotation.x = -0.25 - run * 0.15 + Math.sin(t * 1.7 + e.z) * 0.04 + hit * 0.3;
       if (e.state === 'DEAD') {
         const k = smooth(Math.min(1, e.deathProgress * 1.6));
         body.rotation.x = -k * Math.PI * 0.48;
-        body.position.y = k * 0.15 - Math.max(0, e.deathProgress - 0.7) * 1.2;
-      } else body.rotation.x = 0;
+        body.rotation.z = k * 0.35;
+        body.position.y = k * 0.15 - Math.max(0, e.deathProgress - 0.7) * 1.2 + Math.sin(Math.min(1, e.deathProgress * 2.2) * Math.PI) * 0.12;
+      } else {
+        body.rotation.x = 0;
+        body.rotation.z = 0;
+      }
       flash(mats, e.hitFlash / 0.3);
     },
   };
@@ -557,6 +626,11 @@ export function buildGoblinBase(site, groundAt, rng) {
 }
 
 // ---- utilidades ----------------------------------------------------------------------------
+
+/** Acerca o[k] a v (suavizado por fotograma: k = fracción). */
+function damp(o, key, v, k) {
+  o[key] += (v - o[key]) * k;
+}
 
 function clamp01(v) {
   return v < 0 ? 0 : v > 1 ? 1 : v;

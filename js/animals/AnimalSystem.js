@@ -248,7 +248,7 @@ export class AnimalSystem {
       active++;
     }
     this.activeCount = active;
-    for (const id in this._renderers) this._renderers[id].update(this._visible[id] ?? []);
+    for (const id in this._renderers) this._renderers[id].update(this._visible[id] ?? [], dt);
   }
 
   // ---- Consultas ---------------------------------------------------------------
