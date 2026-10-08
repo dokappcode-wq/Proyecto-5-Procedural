@@ -261,6 +261,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Animaciones y estructuras (v1.21)**:
+  - **Armas en 3ª persona**: cada arma sale del puño hacia delante (el escudo, en el antebrazo) y cambia la pose
+    de reposo. Golpes con poses clave: tajo en diagonal (espada, antorcha), de arriba abajo (hacha, pico), directo
+    (puño); además agacharse a coger, beber, soltar la goma o la cuerda y empujar con el escudo. **Nadar**: braza
+    boca abajo al moverse y pataleo quieto. En 1ª persona, un golpe distinto por arma.
+  - **Enemigos**: transiciones suaves y reacción al golpe; gólem pesado con golpe a dos manos; goblin que corre,
+    se agacha y salta al atacar, se rasca y mira alrededor; slime que se aplasta.
+  - **Animales**: rodillas, cabeza que baja a pastar y se levanta alerta, cola, paso en diagonal y galope al huir;
+    ciervo con cuernas, vaca con manchas y cuernos, cabra lanuda con barba.
+  - **Estructuras**: todas las piezas de construcción con más detalle (tablas, vigas, clavos, sillares, tejas,
+    herrajes…) sin salirse de su colisión; torre del ermitaño de sillares, centro de investigación con fachada,
+    placas solares y antena, y base goblin con puerta, banderolas, choza en el árbol y asador.
 - **Mejoras (v1.20)**:
   - **Cuevas**: se recorren sin atascos. El suelo es continuo en las uniones (antes había escalones invisibles de
     hasta 1 m al entrar en las cámaras), las paredes dibujadas coinciden con la colisión, el fondo es pared, las menas
