@@ -192,7 +192,7 @@ export class ResourceSystem {
       for (const n of chunk.nodes) {
         if (n.removed || n.radius <= 0) continue;
         // Solo a su altura: los árboles de arriba no estorban dentro de una cueva, ni al revés.
-        if (pos.y !== undefined && Math.abs(pos.y - n.y) > 4) continue;
+        if (pos.y !== undefined && (pos.y < n.y - 1.2 || pos.y > n.y + 4)) continue;
         const dx = pos.x - n.x;
         const dz = pos.z - n.z;
         const min = n.radius + radius;
@@ -278,7 +278,7 @@ export class ResourceSystem {
       nodes.push({
         id, type: e.type, x: e.x, y: e.y, z: e.z, scale,
         rotation: rng.next() * Math.PI * 2, variant: Math.floor(rng.next() * 3), tint: rng.next(),
-        radius: def.COLLISION_RADIUS * scale,
+        radius: def.COLLISION_RADIUS * scale * 0.45, // medio metidas en la pared: solo choca lo que asoma
         remaining: def.HARVEST ? def.HARVEST.AMOUNT : 0,
         depleted: false, removed: this._removed.has(id), cave: true,
       });

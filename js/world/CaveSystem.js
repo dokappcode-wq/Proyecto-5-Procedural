@@ -25,7 +25,7 @@ import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
  */
 const FLOOR_K = 0.7;  // suelo a 0,7·r bajo el centro
 const CEIL_K = 0.85;  // techo a 0,85·r sobre el centro
-const WALK_K = 0.7;   // anchura caminable: 0,7·r a cada lado del eje
+const WALK_K = 0.58;  // anchura caminable: 0,58·r a cada lado del eje (el suelo dibujado llega a ~0,6·r)
 const MAX_SLOPE = 0.62; // caída máxima del suelo por tramo (fracción de STEP): rampa caminable
 const MIN_RADIUS = 1.8;
 const MOUTH_WIDEN = [1.6, 1.45, 1.2];
@@ -92,7 +92,7 @@ export class CaveSystem {
           heading = rng.range(0, Math.PI * 2);
         } else {
           const mount = (s.biomes.MOUNTAINS ?? 0) + (s.biomes.FROZEN_MOUNTAINS ?? 0);
-          if (mount < 0.6 || sl.m < 0.45 || sl.m > 1.4 || s.height < 12) continue;
+          if (mount < 0.6 || sl.m < 0.45 || sl.m > 0.78 || s.height < 12) continue; // ladera que se sube andando hasta la boca
           heading = Math.atan2(sl.gz, sl.gx); // cuesta arriba: hacia dentro de la montaña
         }
         const cave = this._carvePath({ kind, x, z, heading, rng: new SeededRandom(deriveSeed(seed, `cave:${kind}:${made}:${attempt}`)), terrain, inside });
@@ -308,15 +308,34 @@ export class CaveSystem {
    * @returns {{ floor: number, ceil: number } | null}
    */
   floorAt(x, z, feet, step = 0.6) {
-    let best = null;
+    // En las uniones se solapan dos tramos (y en el lado de dentro de una curva, los
+    // dos a la vez a media altura de su rampa). El suelo es la media ponderada: cada
+    // tramo pesa más cuanto más lejos está el punto de sus extremos, así el suelo pasa
+    // de uno a otro sin escalones. (Antes ganaba el suelo más alto: el extremo de un
+    // tramo ancho asomaba sobre la rampa anterior y dejaba un escalón invisible.)
+    let sw = 0;
+    let floor = 0;
+    let ceil = 0;
+    let r = 0;
+    let cave = null;
+    let wmax = -1;
     for (const s of this._segmentsAt(x, z)) {
       if (s.d > s.r * WALK_K) continue;
-      const ceil = s.y + CEIL_K * s.r;
-      if (feet < s.floor - 1.5 || feet > ceil - 0.4) continue;
+      const c = s.y + CEIL_K * s.r;
+      if (feet < s.floor - 1.5 || feet > c - 0.4) continue;
       if (s.floor > feet + step) continue;
-      if (!best || s.floor > best.floor) best = { floor: s.floor, ceil, r: s.r, cave: s.cave };
+      // Y menos cuanto más cerca de su borde caminable (entra y sale sin saltos).
+      const w = (Math.min(s.t, 1 - s.t) + 1e-4) * Math.min(1, Math.max(0.02, s.r * WALK_K - s.d));
+      sw += w;
+      floor += s.floor * w;
+      ceil += c * w;
+      r += s.r * w;
+      if (w > wmax) {
+        wmax = w;
+        cave = s.cave;
+      }
     }
-    return best;
+    return sw ? { floor: floor / sw, ceil: ceil / sw, r: r / sw, cave } : null;
   }
 
   /** ¿(x, y, z) está dentro del hueco de alguna cueva (con un margen hacia dentro)? */
@@ -387,7 +406,7 @@ export class CaveSystem {
     const C = this._cfg.CONTENT;
     const out = [];
     const n = cave.nodes.length;
-    const along = (i, side, f = 0.55) => {
+    const along = (i, side, f = 0.7) => { // por defecto, metidas en la pared (no estorban al pasar)
       const a = cave.nodes[i];
       const b = cave.nodes[Math.min(n - 1, i + 1)];
       const hx = b.x - a.x;
@@ -408,10 +427,10 @@ export class CaveSystem {
       const side = () => (rng.next() < 0.5 ? -1 : 1);
       if (rng.next() < C.COPPER_PER_NODE) out.push({ type: 'COPPER_ORE', ...along(i, side()) });
       if (deep > 0.3 && rng.next() < C.IRON_PER_NODE) out.push({ type: 'IRON_ORE', ...along(i, side()) });
-      if (deep > 0.6 && rng.next() < C.DIAMOND_PER_NODE) out.push({ type: 'DIAMOND_ORE', ...along(i, side(), 0.5) });
+      if (deep > 0.6 && rng.next() < C.DIAMOND_PER_NODE) out.push({ type: 'DIAMOND_ORE', ...along(i, side(), 0.68) });
       if (cave.nodes[i].chamber) {
         const flowers = Math.round(rng.range(C.GLOW_FLOWERS[0], C.GLOW_FLOWERS[1]));
-        for (let k = 0; k < flowers; k++) out.push({ type: 'GLOW_FLOWER', ...along(i, side(), rng.range(0.1, 0.6)) });
+        for (let k = 0; k < flowers; k++) out.push({ type: 'GLOW_FLOWER', ...along(i, side(), rng.range(0.15, 0.55)) });
       }
     }
     return out;

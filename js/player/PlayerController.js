@@ -397,6 +397,7 @@ export class PlayerController {
     const t = this._terrain;
     if (!C || p.state.isFlying) return this._setClimbing(false);
     if (this._caveFloor(pos.x, pos.z, pos.y)) return this._setClimbing(false); // en una cueva no se escala el terreno de arriba
+    if (t.isCaveHole?.(pos.x, pos.z)) return this._setClimbing(false); // ni por el borde del agujero de la boca
     // Altura del terreno bajo la huella (en una pendiente, el punto más alto).
     const foot = (x, z) => {
       const r = this._cfg.RADIUS;
@@ -523,7 +524,8 @@ export class PlayerController {
     if (st?.blocksAt(x, z, cfg.RADIUS, feet + cfg.MAX_STEP_HEIGHT, feet + p.height)) return true;
     // Sobre una construcción no cuenta la pendiente del terreno de debajo.
     const onStructure = st && st.surfaceAt(x, z, feet + cfg.MAX_STEP_HEIGHT) !== null;
-    if (rise > 0.01 && p.state.onGround && !onStructure) {
+    // En una cueva tampoco: el terreno de arriba no es el suelo que se pisa (y las rampas de la cueva ya son caminables).
+    if (rise > 0.01 && p.state.onGround && !onStructure && !this._caveFloor(x, z, feet)) {
       const t = this._terrain;
       const d = 0.5;
       const gx = (t.getHeightAt(x + d, z) - t.getHeightAt(x - d, z)) / (2 * d);

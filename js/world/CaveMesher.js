@@ -97,28 +97,28 @@ function caveGeometry(cave, heightAt, colors) {
   const up = new THREE.Vector3(0, 1, 0);
   const T = new THREE.Vector3();
   const S = new THREE.Vector3();
-  const U = new THREE.Vector3();
   for (let k = 0; k < rings.length; k++) {
     const ring = rings[k];
     const prev = rings[Math.max(0, k - 1)];
     const next = rings[Math.min(rings.length - 1, k + 1)];
-    T.set(next.x - prev.x, next.y - prev.y, next.z - prev.z).normalize();
+    // Secciones verticales (no inclinadas con la cuesta): así el suelo dibujado está
+    // justo a la altura del suelo de la física (centro − 0,7·r) también en las rampas.
+    T.set(next.x - prev.x, 0, next.z - prev.z).normalize();
     S.crossVectors(T, up).normalize();
-    U.crossVectors(S, T).normalize();
     const mouth = ring.i <= 4;
     for (let j = 0; j < RING; j++) {
       const a = (j / RING) * Math.PI * 2;
-      const jit = 0.82 + 0.3 * hash2D(cave.id * 131 + 7, k, j);
+      // Relieve: poco en la mitad de abajo (las paredes que se tocan al andar coinciden
+      // con la colisión), más en el techo.
+      const low = Math.sin(a) < 0;
+      const jit = low ? 0.96 + 0.08 * hash2D(cave.id * 131 + 7, k, j) : 1 + 0.12 * hash2D(cave.id * 131 + 7, k, j);
       const rx = ring.r * jit;
-      let v = Math.sin(a) * ring.r * 0.85 * jit;
+      let v = Math.sin(a) * ring.r * jit * (low ? 1 : 0.85); // techo algo aplastado (roca encima)
       const isFloor = v < -0.7 * ring.r;
-      if (isFloor) v = -0.7 * ring.r + (hash2D(cave.id, k * 3, j) - 0.5) * 0.08;
-      const ox = S.x * Math.cos(a) * rx + U.x * v;
-      const oy = S.y * Math.cos(a) * rx + U.y * v;
-      const oz = S.z * Math.cos(a) * rx + U.z * v;
-      const x = ring.x + ox;
-      const z = ring.z + oz;
-      let y = ring.y + oy;
+      if (isFloor) v = -0.7 * ring.r + (hash2D(cave.id, k * 3, j) - 0.5) * 0.06;
+      const x = ring.x + S.x * Math.cos(a) * rx;
+      const z = ring.z + S.z * Math.cos(a) * rx;
+      let y = ring.y + v;
       if (mouth) {
         const g = heightAt(x, z);
         if (y > g - 0.05) y = g - 0.05; // lo que asoma se queda a ras del suelo: el agujero
