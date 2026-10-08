@@ -71,9 +71,9 @@ export class Player {
     this.state.onGround = false;
   }
 
-  /** Animación de acción (golpear, recoger). Solo visual. */
-  playAction() {
-    this.model.playAction();
+  /** Animación de acción (golpear, recoger, beber…). Solo visual. */
+  playAction(kind = 'hit') {
+    this.model.playAction(kind);
   }
 
   setBodyVisible(visible) {
@@ -91,6 +91,7 @@ export class Player {
       maxSpeed: this._cfg.RUN_SPEED,
       onGround: this.state.onGround || this.state.isFlying,
       climbing: this.state.isClimbing,
+      swimming: this.state.isSwimming,
       crouch: this.crouch,
       dodging: this.state.dodging > 0,
       climbMoving: this.state.isClimbing && this.state.isMoving,

@@ -339,10 +339,27 @@ export class PlayerModel {
     this.head.visible = visible;
   }
 
-  /** Animación corta del brazo derecho (golpear, recoger). */
-  playAction(duration = 0.32) {
-    this._actionTime = duration;
-    this._actionDuration = duration;
+  /**
+   * Qué lleva en cada mano ('sword' | 'tool' | 'torch' | 'bow' | 'slingshot' | 'item' | null;
+   * izquierda: 'shield' | null): cambia la pose de reposo y el golpe.
+   */
+  setHeldKind(right, left = null) {
+    this._heldR = right ?? null;
+    this._heldL = left ?? null;
+  }
+
+  /**
+   * Acción corta: según lo que hace (kind) y lo que lleva en la mano, un tajo en
+   * diagonal (espada), un golpe de arriba abajo (hacha, pico), un directo (puño),
+   * agacharse a coger, beber, soltar la goma o la cuerda, o empujar con el escudo.
+   */
+  playAction(kind = 'hit', duration = null) {
+    const name = actionName(kind, this._heldR);
+    const anim = ACTIONS[name];
+    if (!anim) return;
+    this._action = anim;
+    this._actionDuration = duration ?? anim.duration;
+    this._actionTime = this._actionDuration;
   }
 
   setVisible(visible) {
@@ -356,9 +373,136 @@ export class PlayerModel {
     this.root.visible = (this._wantVisible ?? true) && !hidden;
   }
 
+  /** Pose de reposo del brazo según lo que se lleva (se suma al balanceo de andar). */
+  _holdPose(t) {
+    const R = this._armR;
+    const L = this._armL;
+    switch (this._heldR) {
+      case 'sword':
+      case 'tool':
+        R.shoulder.rotation.x = R.shoulder.rotation.x * 0.5 + 0.12;
+        R.elbow.rotation.x = 0.7 + Math.sin(t * 1.3) * 0.03;
+        R.shoulder.rotation.z = 0.14;
+        R.hand.rotation.x = -0.55; // muñeca: el arma apunta al frente y algo abajo
+        break;
+      case 'torch':
+        R.shoulder.rotation.set(0.55 + R.shoulder.rotation.x * 0.15, 0, 0.18);
+        R.elbow.rotation.x = 1.05;
+        break;
+      case 'bow':
+      case 'slingshot':
+        R.elbow.rotation.x = 0.45;
+        break;
+      default:
+        break;
+    }
+    if (this._heldL === 'shield' && this._combatPose !== 'block') {
+      L.shoulder.rotation.set(0.35 + L.shoulder.rotation.x * 0.2, 0.15, -0.12);
+      L.elbow.rotation.x = 1.35;
+    }
+  }
+
+  /** Mezcla las poses clave de una acción (u: 0…1) con la pose actual. */
+  _applyAction(anim, u) {
+    this._actionDrop = 0;
+    const keys = anim.keys;
+    let i = 0;
+    while (i < keys.length - 2 && u > keys[i + 1].t) i++;
+    const a = keys[i];
+    const b = keys[i + 1];
+    const k = smooth01((u - a.t) / Math.max(1e-4, b.t - a.t));
+    const v = (name) => {
+      const x = a[name];
+      const y = b[name];
+      if (x === undefined && y === undefined) return undefined;
+      const xx = x ?? y;
+      const yy = y ?? x;
+      return Array.isArray(xx) ? xx.map((n, j) => n + (yy[j] - n) * k) : xx + (yy - xx) * k;
+    };
+    // Entra y sale suave.
+    const w = smooth01(Math.min(1, u / 0.1)) * smooth01(Math.min(1, (1 - u) / 0.22));
+    const mix = (obj, prop, val) => {
+      if (val === undefined) return;
+      obj[prop] += (val - obj[prop]) * w;
+    };
+    const rot = (o, val) => {
+      if (!val) return;
+      mix(o.rotation, 'x', val[0]);
+      mix(o.rotation, 'y', val[1]);
+      mix(o.rotation, 'z', val[2]);
+    };
+    rot(this._armR.shoulder, v('rs'));
+    mix(this._armR.elbow.rotation, 'x', v('re'));
+    mix(this._armR.hand.rotation, 'x', v('rw'));
+    rot(this._armL.shoulder, v('ls'));
+    mix(this._armL.elbow.rotation, 'x', v('le'));
+    const tp = v('tp');
+    const ty = v('ty');
+    if (tp !== undefined) this.torso.rotation.x += (tp - this.torso.rotation.x) * w;
+    if (ty !== undefined) this.torso.rotation.y += (ty - this.torso.rotation.y) * w;
+    const kn = v('kn');
+    if (kn !== undefined) {
+      for (const L of [this._legL, this._legR]) {
+        L.hip.rotation.x += (kn - L.hip.rotation.x) * w;
+        L.knee.rotation.x += (-kn * 2 - L.knee.rotation.x) * w;
+        L.ankle.rotation.x += (kn - L.ankle.rotation.x) * w;
+      }
+      this._actionDrop = (THIGH + SHIN) * (1 - Math.cos(kn)) * w;
+    }
+    const step = v('step');
+    if (step !== undefined) {
+      this._legL.hip.rotation.x += (step - this._legL.hip.rotation.x) * w;
+      this._legR.hip.rotation.x += (-step * 0.6 - this._legR.hip.rotation.x) * w;
+    }
+    this._actionHead = (v('hd') ?? 0) * w;
+  }
+
+  _swim(dt, s) {
+    this._swimK = Math.min(1, (this._swimK ?? 0) + dt * 4);
+    const k = this._swimK;
+    const moving = s.horizontalSpeed > 0.4;
+    this._swimPh = (this._swimPh ?? 0) + dt * (moving ? 3.2 : 2.2);
+    const p = this._swimPh;
+    const R = this._armR;
+    const L = this._armL;
+    const lerp = (o, prop, val) => (o[prop] += (val - o[prop]) * k);
+    if (moving) {
+      // Braza: brazos delante, se abren y vuelven al pecho; patada de rana.
+      const open = Math.max(0, Math.sin(p));
+      const pull = Math.max(0, -Math.sin(p));
+      for (const [A, side] of [[L, -1], [R, 1]]) {
+        lerp(A.shoulder.rotation, 'x', 2.5 - pull * 0.9);
+        lerp(A.shoulder.rotation, 'z', side * (0.15 + open * 0.9));
+        lerp(A.shoulder.rotation, 'y', 0);
+        lerp(A.elbow.rotation, 'x', 0.1 + pull * 1.3);
+      }
+      for (const [Lg, side] of [[this._legL, -1], [this._legR, 1]]) {
+        lerp(Lg.hip.rotation, 'x', -0.35 + pull * 0.6);
+        lerp(Lg.hip.rotation, 'z', side * -pull * 0.35);
+        lerp(Lg.knee.rotation, 'x', -pull * 1.4);
+      }
+      lerp(this.pelvis.rotation, 'x', -1.15); // boca abajo
+      lerp(this.torso.rotation, 'x', -0.1);
+      this._swimLift = 0.5 * k; // el cuerpo, tumbado a flor de agua
+    } else {
+      // Flotando: brazos que reman a los lados y piernas que pedalean.
+      for (const [A, side] of [[L, -1], [R, 1]]) {
+        lerp(A.shoulder.rotation, 'x', 0.4 + Math.sin(p) * 0.25);
+        lerp(A.shoulder.rotation, 'z', side * (0.9 + Math.sin(p * 2) * 0.2));
+        lerp(A.elbow.rotation, 'x', 0.5);
+      }
+      for (const [Lg, ph] of [[this._legL, 0], [this._legR, Math.PI]]) {
+        lerp(Lg.hip.rotation, 'x', 0.35 + Math.sin(p + ph) * 0.35);
+        lerp(Lg.knee.rotation, 'x', -0.5 - Math.max(0, Math.cos(p + ph)) * 0.6);
+      }
+      lerp(this.pelvis.rotation, 'x', 0.1);
+      this._swimLift = 0;
+    }
+  }
+
   /**
    * @param {number} dt
-   * @param {{ horizontalSpeed, maxSpeed, onGround, headPitch, headYaw, climbing?, climbMoving?, crouch?, dodging? }} s
+   * @param {{ horizontalSpeed, maxSpeed, onGround, headPitch, headYaw, climbing?, climbMoving?, crouch?, dodging?, swimming? }} s
    */
   animate(dt, s) {
     this._t += dt;
@@ -394,7 +538,7 @@ export class PlayerModel {
       const sw = -Math.sin(phase) * A * 0.9;
       Ar.shoulder.rotation.set(sw, 0, side * (0.08 + 0.04 * Math.sin(t * 1.4)));
       Ar.elbow.rotation.set(0.25 + Math.max(0, sw) * 0.8 + (running ? 0.7 : 0), 0, 0);
-      Ar.hand.rotation.set(0, 0, 0);
+      Ar.hand.rotation.set(0, 0, 0); // (la muñeca la giran la pose del arma y las acciones)
     };
     armPose(this._armL, ph, -1);
     armPose(this._armR, ph + Math.PI, 1);
@@ -402,13 +546,14 @@ export class PlayerModel {
     const bob = Math.abs(Math.cos(ph)) * 0.035 * this._swing;
     let pelvisY = HIP_Y - 0.02 * this._swing + bob - this._land * 0.08;
     this.pelvis.rotation.set(0, Math.sin(ph) * 0.1 * this._swing, 0);
-    this.torso.rotation.set((running ? 0.16 : 0.04) * this._swing, -Math.sin(ph) * 0.16 * this._swing, 0);
+    // (el frente es −Z: inclinarse hacia delante es girar en X negativo)
+    this.torso.rotation.set(-(running ? 0.16 : 0.04) * this._swing, -Math.sin(ph) * 0.16 * this._swing, 0);
     const breathe = 1 + Math.sin(t * 2.1) * 0.012 * (1 - this._swing);
     this._chest.scale.set(1, breathe, 1);
     this._scarfTail.rotation.x = 0.15 + this._swing * 0.5 + Math.sin(t * 6) * 0.05 * this._swing;
 
     // ---- En el aire: piernas recogidas y brazos abiertos.
-    if (!s.onGround && !s.climbing) {
+    if (!s.onGround && !s.climbing && !s.swimming) {
       const k = Math.min(1, this._air * 4);
       this._legL.hip.rotation.x = 0.55 * k;
       this._legL.knee.rotation.x = -0.9 * k;
@@ -431,18 +576,24 @@ export class PlayerModel {
       this._legR.hip.rotation.x = 0.5 + c * 0.4;
       this._legL.knee.rotation.x = -0.8 + c * 0.3;
       this._legR.knee.rotation.x = -0.8 - c * 0.3;
-      this.torso.rotation.set(0.15, 0, 0);
+      this.torso.rotation.set(-0.15, 0, 0);
     }
 
-    // ---- Golpe / recoger: el brazo derecho toma impulso hacia atrás y descarga delante.
-    if (this._actionTime > 0) {
+    // ---- Nadando: braza (moviéndose) o pataleo para flotar (quieto).
+    if (s.swimming) this._swim(dt, s);
+    else {
+      this._swimK = Math.max(0, (this._swimK ?? 0) - dt * 4);
+      this._swimLift = 0;
+    }
+
+    // ---- Lo que lleva en la mano cambia cómo cuelga el brazo.
+    this._holdPose(t);
+
+    // ---- Acción (golpe, coger, beber…): poses clave encima de lo demás.
+    if (this._actionTime > 0 && this._action) {
       this._actionTime = Math.max(0, this._actionTime - dt);
       const u = 1 - this._actionTime / this._actionDuration;
-      const wind = u < 0.3 ? u / 0.3 : 1;
-      const strike = u < 0.3 ? 0 : Math.sin(((u - 0.3) / 0.7) * Math.PI);
-      this._armR.shoulder.rotation.set(-0.5 * (1 - strike) * wind + 1.9 * strike, 0, 0.1);
-      this._armR.elbow.rotation.x = 1.1 * (1 - strike) * wind + 0.15;
-      this.torso.rotation.y += -0.35 * wind * (1 - strike) + 0.3 * strike;
+      this._applyAction(this._action, u);
     }
 
     // ---- Mirar el reloj: el brazo izquierdo sube por delante con el codo doblado.
@@ -481,20 +632,88 @@ export class PlayerModel {
         L.ankle.rotation.x = th;
       }
       pelvisY -= (THIGH + SHIN) * (1 - Math.cos(th));
-      this.torso.rotation.x += 0.35 * c;
+      this.torso.rotation.x -= 0.35 * c;
     }
-    this.pelvis.position.y = pelvisY;
+    this.pelvis.position.y = pelvisY - (this._actionTime > 0 ? this._actionDrop ?? 0 : 0) + (this._swimLift ?? 0);
+    if (!(this._actionTime > 0)) this._actionHead = 0;
 
     // ---- Cabeza: mira hacia donde mira la cámara (compensando el giro del torso).
     this.head.rotation.order = 'YXZ';
     this.head.rotation.y = s.headYaw - this.torso.rotation.y - this.pelvis.rotation.y;
-    this.head.rotation.x = s.headPitch - this.torso.rotation.x * 0.7;
+    this.head.rotation.x = s.headPitch - this.torso.rotation.x * 0.7 - this.pelvis.rotation.x * 0.85 + (this._actionHead ?? 0);
     // Parpadeo.
     this._blink -= dt;
     if (this._blink < 0) this._blink = 2.5 + Math.random() * 2.5;
     const closed = this._blink < 0.12 ? 0.15 : 1;
     for (const e of this._eyes) e.scale.y = closed;
   }
+}
+
+// ---- Acciones: poses clave (t de 0 a 1). rs/ls hombro [x, y, z], re/le codo, rw muñeca, tp/ty
+// torso (inclinación: negativa hacia delante; giro), kn rodillas (agacharse), step paso adelante, hd cabeza. ----
+const ACTIONS = {
+  // Puño: recoge el brazo junto al pecho y lanza un directo con giro de hombros.
+  punch: { duration: 0.32, keys: [
+    { t: 0, rs: [0.3, 0, 0.1], re: 1.7, ty: -0.25 },
+    { t: 0.28, rs: [0.2, 0, 0.15], re: 2.0, ty: -0.4, ls: [0.6, 0, -0.1], le: 1.6 },
+    { t: 0.5, rs: [1.5, 0.15, 0], re: 0.05, ty: 0.45, step: 0.3 },
+    { t: 1, rs: [0.4, 0, 0.1], re: 1.2, ty: 0 },
+  ] },
+  // Espada: sube por encima del hombro derecho y corta en diagonal hacia la izquierda.
+  slash: { duration: 0.42, keys: [
+    { t: 0, rs: [0.6, 0, 0.3], re: 0.8, rw: -0.5, ty: 0 },
+    { t: 0.32, rs: [2.7, -0.3, 0.7], re: 1.4, rw: 0.5, ty: -0.55, tp: 0.1, ls: [0.5, 0, -0.3], le: 0.9 },
+    { t: 0.58, rs: [0.9, 0.6, -0.6], re: 0.15, rw: -1.2, ty: 0.6, tp: -0.25, step: 0.35 },
+    { t: 1, rs: [0.5, 0, 0.15], re: 0.7, rw: -0.5, ty: 0, tp: -0.04 },
+  ] },
+  // Hacha y pico: por encima de la cabeza y de arriba abajo, doblándose.
+  chop: { duration: 0.42, keys: [
+    { t: 0, rs: [0.6, 0, 0.15], re: 0.8, rw: -0.5, tp: -0.04 },
+    { t: 0.35, rs: [3.0, 0, 0.15], re: 1.3, rw: 0.6, tp: 0.2, ty: -0.2, ls: [2.6, 0, -0.1], le: 1.2 },
+    { t: 0.6, rs: [0.75, 0, 0.05], re: 0.1, rw: -1.35, tp: -0.45, ty: 0.1, ls: [0.9, 0, 0.1], le: 0.3, kn: 0.25 },
+    { t: 1, rs: [0.5, 0, 0.12], re: 0.7, rw: -0.5, tp: -0.04, ty: 0 },
+  ] },
+  // Coger algo del suelo o colocar: se agacha y alarga la mano.
+  reach: { duration: 0.45, keys: [
+    { t: 0, rs: [0.2, 0, 0.1], re: 0.3 },
+    { t: 0.45, rs: [0.9, 0, 0.05], re: 0.2, tp: -0.75, kn: 0.6, hd: -0.25, ls: [0.3, 0, -0.2], le: 0.6 },
+    { t: 1, rs: [0.2, 0, 0.1], re: 0.3, tp: -0.04, kn: 0 },
+  ] },
+  // Beber: la mano a la boca y la cabeza atrás.
+  drink: { duration: 0.6, keys: [
+    { t: 0, rs: [0.2, 0, 0.1], re: 0.3 },
+    { t: 0.35, rs: [1.0, -0.5, 0.1], re: 2.2, hd: 0.35 },
+    { t: 0.75, rs: [1.0, -0.5, 0.1], re: 2.2, hd: 0.4 },
+    { t: 1, rs: [0.2, 0, 0.1], re: 0.3, hd: 0 },
+  ] },
+  // Soltar la goma o la cuerda: la mano que tensaba sale hacia atrás.
+  release: { duration: 0.28, keys: [
+    { t: 0, rs: [1.35, 0.55, 0], re: 1.6 },
+    { t: 0.3, rs: [1.2, 0.9, 0.2], re: 0.5, ty: 0.3 },
+    { t: 1, rs: [0.6, 0.3, 0.1], re: 0.8, ty: 0.1 },
+  ] },
+  // Bloquear: el escudo sale hacia delante de golpe.
+  block: { duration: 0.3, keys: [
+    { t: 0, ls: [1.1, 0.5, 0], le: 1.2 },
+    { t: 0.35, ls: [1.4, 0.3, 0], le: 0.7, tp: 0.1 },
+    { t: 1, ls: [1.1, 0.5, 0], le: 1.2 },
+  ] },
+};
+
+function actionName(kind, held) {
+  if (kind === 'harvest' || kind === 'place') return 'reach';
+  if (kind === 'drink') return 'drink';
+  if (kind === 'shoot') return 'release';
+  if (kind === 'block') return 'block';
+  if (kind === 'land') return null;
+  if (held === 'sword' || held === 'torch') return 'slash';
+  if (held === 'tool') return 'chop';
+  return 'punch';
+}
+
+function smooth01(v) {
+  const c = v < 0 ? 0 : v > 1 ? 1 : v;
+  return c * c * (3 - 2 * c);
 }
 
 /** Hoja (contorno puntiagudo con nervio), plana en el plano XY y con la punta hacia +Y. */

@@ -371,7 +371,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Lo que se lleva en la mano: en 3ª persona en el personaje; en 1ª, la mano en pantalla.
   const held = new HeldItems({ player, camera: render.camera, render, items: cfg.ITEMS, lighting });
   events.on(GameEvents.HOTBAR_CHANGED, ({ selectedId }) => held.setHeld(selectedId ?? null, equipment.slots.OFFHAND ?? null));
-  events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && kind !== 'place' && held.playAction(kind === 'chop' ? 0.42 : 0.3));
+  events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && kind !== 'land' && kind !== 'block' && held.playAction(kind === 'chop' ? 0.42 : kind === 'harvest' || kind === 'place' ? 0.4 : 0.32, kind));
   events.on(GameEvents.EQUIPMENT_CHANGED, () => {
     held.setHandColor(player.model.handColor);
     held.setSleeveColor?.(player.model.sleeveColor);
@@ -410,7 +410,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     weapon: () => cfg.ITEMS[hotbar.selectedId]?.WEAPON ?? null, // espada seleccionada: su daño
     suppressAttack: () => combat.suppressAttack, // bloqueando o con arco/tirachinas el clic no golpea
   });
-  events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && player.playAction());
+  events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'land' && player.playAction(kind));
 
   // ---- Supervivencia: cuatro sistemas independientes -----------------------
   const S = cfg.SURVIVAL;

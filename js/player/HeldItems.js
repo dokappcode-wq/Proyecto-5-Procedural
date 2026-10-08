@@ -84,6 +84,7 @@ export class HeldItems {
 
   /** Objeto en la mano derecha (el seleccionado en la barra) y en la izquierda (escudo). */
   setHeld(rightId, leftId = null) {
+    const changed = rightId !== this._rightId || leftId !== this._leftId;
     if (rightId !== this._rightId) {
       this._rightId = rightId;
       this._swap('tp', this._rightAnchor, rightId, 'right3');
@@ -94,6 +95,7 @@ export class HeldItems {
       this._swap('tpLeft', this._leftAnchor, leftId, 'left3');
       this._swap('fpLeft', this._fpLeft, leftId, 'left1');
     }
+    if (changed) this._model.setHeldKind?.(this._models.tp?.kind ?? null, this._models.tpLeft?.kind ?? null);
   }
 
   /** Color de las manos (piel o guantes). */
@@ -107,9 +109,10 @@ export class HeldItems {
   }
 
   /** Golpe / acción: animación del brazo en 1ª persona (en 3ª la hace PlayerModel). */
-  playAction(duration = 0.32) {
+  playAction(duration = 0.32, kind = 'hit') {
     this._swing = 1;
     this._swingDur = duration;
+    this._swingKind = kind;
   }
 
   /** Vista en 1ª persona (con el cuerpo oculto) o no. */
@@ -172,11 +175,22 @@ export class HeldItems {
     let lift = 0;
     let chop = 0;
     let jab = 0;
+    let slash = 0;
+    let reach = 0;
     if (this._swing > 0) {
       this._swing = Math.max(0, this._swing - dt / this._swingDur);
       const u = 1 - this._swing;
-      const tool = fp && fp.kind !== 'item';
-      if (tool) {
+      const kind = this._swingKind;
+      if (kind === 'harvest' || kind === 'place') {
+        reach = Math.sin(u * Math.PI);
+      } else if (kind === 'shoot') {
+        jab = -0.4 * Math.sin(u * Math.PI);
+      } else if (fp?.kind === 'sword' || fp?.kind === 'torch') {
+        // Tajo de derecha a izquierda: sube a la derecha y barre la pantalla.
+        if (u < 0.3) slash = -smooth(u / 0.3);
+        else if (u < 0.6) slash = -1 + 2 * smooth((u - 0.3) / 0.3);
+        else slash = 1 - smooth((u - 0.6) / 0.4);
+      } else if (fp && fp.kind !== 'item') {
         if (u < 0.28) lift = smooth(u / 0.28);
         else if (u < 0.55) {
           lift = 1 - smooth((u - 0.28) / 0.27);
@@ -189,11 +203,15 @@ export class HeldItems {
     const a = this._armPivot;
     const empty = !fp ? 1 : 0;
     a.position.set(
-      0.3 - empty * 0.05 + bx - this._sway.x - aim * (ranged ? 0.3 : 0.24) - jab * 0.08,
-      -0.3 + empty * 0.05 + by - this._sway.y - block * 0.1 + lift * 0.08 - chop * 0.12 + aim * (ranged ? 0.1 : 0),
-      -0.5 - jab * 0.3 + aim * 0.04,
+      0.3 - empty * 0.05 + bx - this._sway.x - aim * (ranged ? 0.3 : 0.24) - jab * 0.08 - slash * 0.22 - reach * 0.1,
+      -0.3 + empty * 0.05 + by - this._sway.y - block * 0.1 + lift * 0.08 - chop * 0.12 + aim * (ranged ? 0.1 : 0) + Math.abs(slash) * 0.06 * (slash < 0 ? 1 : -0.5) - reach * 0.12,
+      -0.5 - jab * 0.3 + aim * 0.04 - reach * 0.15,
     );
-    a.rotation.set(lift * 0.55 - chop * 1.25 + aim * 0.08, -aim * (ranged ? 0.05 : 0.25) + jab * 0.2, -jab * 0.25 + lift * 0.1);
+    a.rotation.set(
+      lift * 0.55 - chop * 1.25 + aim * 0.08 - Math.max(0, slash) * 0.35 - reach * 0.6,
+      -aim * (ranged ? 0.05 : 0.25) + jab * 0.2 + slash * 0.9,
+      -jab * 0.25 + lift * 0.1 + slash * 1.1,
+    );
 
     // Izquierda: con escudo, delante; con tirachinas o arco al apuntar, tensa la goma o
     // la cuerda hacia la cara (cuanto más tensa, más cerca).
@@ -237,14 +255,20 @@ function placeModel(m, where) {
   g.rotation.set(0, 0, 0);
   g.scale.setScalar(1);
   if (where === 'right3') {
-    g.scale.setScalar(1.3); // un poco más grande que en la realidad: que se lea desde la cámara
-    // Brazo colgando: el mango apunta hacia delante (−Z) y el filo hacia abajo.
-    if (m.kind === 'bow') g.rotation.set(0, 0, 0);
-    else if (m.kind === 'torch') g.rotation.set(-1.2, 0, 0);
-    else g.rotation.set(-0.75, 0, 0.25); // inclinado hacia delante y hacia fuera: se ve por encima del hombro
+    g.scale.setScalar(1.15); // un poco más grande que en la realidad: que se lea desde la cámara
+    // El puño cierra en el origen; el antebrazo va por +Y de la mano. El arma sale del puño
+    // perpendicular al antebrazo (hacia delante): con el codo doblado apunta al frente.
+    if (m.kind === 'bow' || m.kind === 'slingshot') g.rotation.set(-0.35, 0, 0);
+    else if (m.kind === 'torch') g.rotation.set(-1.25, 0, 0);
+    else if (m.kind === 'item') g.rotation.set(-1.3, 0, 0);
+    else g.rotation.set(-1.45, 0, 0.08);
+    g.position.set(0, -0.02, -0.02);
   } else if (where === 'left3') {
-    if (m.kind === 'shield') g.position.set(-0.08, 0.02, 0.08);
-    g.rotation.set(0, Math.PI / 2, 0);
+    if (m.kind === 'shield') {
+      // Escudo en el antebrazo, con la cara hacia fuera (delante con el codo doblado).
+      g.rotation.set(-Math.PI / 2, 0, 0);
+      g.position.set(-0.05, 0.12, -0.04);
+    } else g.rotation.set(-1.45, 0, 0);
   } else if (where === 'right1') {
     // Vista en 1ª persona: el mango sale de la mano hacia arriba, inclinado hacia dentro y adelante.
     g.scale.setScalar(0.62);
