@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { boulderGeo } from '../render/Rocks.js';
 
 /**
  * Gólem gigante — «Guardián del altar», el jefe del fondo de la mazmorra.
@@ -477,25 +478,6 @@ function segmentHitsPlayer(a, b, p, w) {
 
 const STONE = [0x8a877d, 0x7b786f, 0x969286, 0x6d6a62];
 const MOSS = [0x4f6d2a, 0x3f5a22, 0x5a7a33];
-
-/** Pedrusco irregular: un icosaedro con los vértices desplazados (mismo ruido por vértice). */
-function boulderGeo(seed, detail = 1, rough = 0.2) {
-  const g = new THREE.IcosahedronGeometry(1, detail);
-  const pos = g.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const h = hash3(Math.round(v.x * 100), Math.round(v.y * 100), Math.round(v.z * 100) + seed * 131);
-    const k = 1 + (h - 0.5) * rough * 2;
-    // Algo aplanadas por abajo y por los lados: parecen bloques tallados por el tiempo.
-    v.multiplyScalar(k);
-    v.x = Math.sign(v.x) * Math.pow(Math.abs(v.x), 0.85);
-    v.z = Math.sign(v.z) * Math.pow(Math.abs(v.z), 0.85);
-    pos.setXYZ(i, v.x, v.y, v.z);
-  }
-  g.computeVertexNormals();
-  return g;
-}
 
 function glowTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(80,200,255,0)') {
   const c = document.createElement('canvas');
@@ -1160,12 +1142,6 @@ function clamp01(v) {
 function smooth(v) {
   const c = clamp01(v);
   return c * c * (3 - 2 * c);
-}
-
-function hash3(x, y, z) {
-  let h = (x * 374761393 + y * 668265263 + z * 2147483647) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 function mulberry(seed) {

@@ -351,6 +351,7 @@ export class StorySystem {
     if (b?.tower) {
       const h = b.tower.hermit;
       h.crystal.rotation.y = t;
+      h.animate?.(t);
       // El ermitaño mira al jugador cuando está cerca.
       const dx = p.x - h.group.position.x;
       const dz = p.z - h.group.position.z;

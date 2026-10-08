@@ -142,48 +142,84 @@ export function buildHermitTower(site, ground) {
   };
 }
 
-/** El ermitaño: encapuchado, barba blanca, ojos que brillan en la oscuridad y un bastón. */
+/**
+ * El ermitaño: túnica con capa y capucha, cara arrugada con nariz grande, barba larga y
+ * cejas blancas, ojos que brillan en la oscuridad, cinturón de cuerda con una bolsa y un
+ * bastón retorcido con un cristal. `animate(t)`: respira, se apoya en el bastón y mueve la cabeza.
+ */
 export function buildHermit() {
   const g = new THREE.Group();
   g.name = 'Hermit';
-  const robe = lambert(0x3a2f26);
+  const robe = lambert(0x3d3128);
   const robe2 = lambert(0x2c241d);
+  const cloakM = lambert(0x4a3b2c);
   const skin = lambert(0xc9a98a);
   const beard = lambert(0xe8e4dc);
-  const body = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.35, 8), robe);
-  body.position.y = 0.68;
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), robe);
-  shoulders.position.y = 1.25;
-  shoulders.scale.set(1.2, 0.7, 1);
+  const rope = lambert(0xb89a6a);
+  const ball = new THREE.IcosahedronGeometry(1, 1);
+  const add = (parent, geo, mat, [x, y, z], [sx, sy, sz] = [1, 1, 1], rot = [0, 0, 0]) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.scale.set(sx, sy, sz);
+    m.rotation.set(...rot);
+    m.castShadow = true;
+    parent.add(m);
+    return m;
+  };
+  const body = new THREE.Group();
+  g.add(body);
+  // Túnica que se abre abajo, capa por detrás y cinturón de cuerda con bolsa.
+  add(body, new THREE.CylinderGeometry(0.2, 0.42, 1.15, 10), robe, [0, 0.6, 0]);
+  add(body, new THREE.CylinderGeometry(0.21, 0.2, 0.1, 10), rope, [0, 0.95, 0]);
+  add(body, ball, lambert(0x6b4a2e), [0.17, 0.82, 0.12], [0.07, 0.09, 0.05]);
+  const cloak = add(body, new THREE.CylinderGeometry(0.3, 0.5, 1.3, 10, 1, true, Math.PI * 0.6, Math.PI * 0.8), cloakM, [0, 0.72, -0.02]);
+  cloak.material = cloakM.clone();
+  cloak.material.side = THREE.DoubleSide;
+  add(body, ball, robe, [0, 1.25, 0], [0.27, 0.16, 0.2]); // hombros
+  // Cabeza.
   const head = new THREE.Group();
-  head.position.set(0, 1.45, 0.04);
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), skin);
-  const hood = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.5, 8, 1, true), robe2);
-  hood.position.set(0, 0.1, -0.03);
+  head.position.set(0, 1.42, 0.04);
+  body.add(head);
+  add(head, ball, skin, [0, 0.03, 0], [0.12, 0.14, 0.12]);
+  add(head, ball, skin, [0, 0.0, 0.12], [0.035, 0.05, 0.04]); // nariz
+  for (const s of [-1, 1]) add(head, new THREE.BoxGeometry(0.07, 0.022, 0.03), beard, [s * 0.05, 0.085, 0.105], [1, 1, 1], [0, 0, s * -0.25]); // cejas
+  add(head, new THREE.ConeGeometry(0.11, 0.5, 7), beard, [0, -0.25, 0.08], [1, 1, 0.6], [Math.PI + 0.12, 0, 0]);
+  add(head, ball, beard, [0, -0.06, 0.08], [0.11, 0.07, 0.06]); // bigote
+  const eyeM = new THREE.MeshBasicMaterial({ color: 0xffe9a8 });
+  for (const x of [-0.045, 0.045]) add(head, new THREE.SphereGeometry(0.016, 6, 4), eyeM, [x, 0.045, 0.11]);
+  // Capucha: casquete abierto por delante y pico atrás.
+  const hood = add(head, new THREE.SphereGeometry(0.19, 12, 8, Math.PI * 0.85, Math.PI * 1.3, 0, Math.PI * 0.62), robe2, [0, 0.04, -0.02], [1, 1.12, 1.05]);
   hood.material = robe2.clone();
   hood.material.side = THREE.DoubleSide;
-  const b = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 6), beard);
-  b.rotation.x = Math.PI;
-  b.position.set(0, -0.2, 0.1);
-  const eyeM = new THREE.MeshBasicMaterial({ color: 0xffe9a8 });
-  const eyes = [-0.05, 0.05].map((x) => {
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), eyeM);
-    e.position.set(x, 0.03, 0.135);
-    return e;
-  });
-  head.add(face, hood, b, ...eyes);
-  const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.7, 5), lambert(0x5b4128));
-  staff.position.set(0.35, 0.85, 0.12);
-  staff.rotation.z = -0.08;
-  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), new THREE.MeshBasicMaterial({ color: 0x8fe8ff }));
-  crystal.position.set(0.42, 1.75, 0.12);
-  const glow = new THREE.PointLight(0x8fe8ff, 0.25, 3, 2);
+  add(head, new THREE.ConeGeometry(0.09, 0.24, 6), robe2, [0, 0.14, -0.17], [1, 1, 1], [-1.0, 0, 0]);
+  // Brazos con mangas anchas; las dos manos en el bastón.
+  const sleeve = new THREE.CylinderGeometry(0.06, 0.1, 0.42, 8);
+  const armR = add(body, sleeve, robe, [0.24, 1.08, 0.08], [1, 1, 1], [-0.6, 0, 0.35]);
+  const armL = add(body, sleeve, robe, [-0.14, 1.06, 0.17], [1, 1, 1], [-1.1, 0.5, -0.7]);
+  add(body, ball, skin, [0.33, 0.92, 0.2], [0.045, 0.05, 0.045]);
+  add(body, ball, skin, [0.3, 1.05, 0.22], [0.045, 0.05, 0.045]);
+  // Bastón retorcido con el cristal en la horquilla.
+  const staffCurve = new THREE.CatmullRomCurve3([[0.33, 0.0, 0.2], [0.34, 0.6, 0.22], [0.3, 1.2, 0.2], [0.36, 1.6, 0.21], [0.42, 1.78, 0.19]].map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  add(g, new THREE.TubeGeometry(staffCurve, 16, 0.025, 6), lambert(0x5b4128), [0, 0, 0]);
+  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.075), new THREE.MeshBasicMaterial({ color: 0x8fe8ff }));
+  crystal.position.set(0.43, 1.86, 0.19);
+  const glow = new THREE.PointLight(0x8fe8ff, 0.35, 3.5, 2);
   glow.position.copy(crystal.position);
-  g.add(body, shoulders, head, staff, crystal, glow);
-  g.traverse((o) => {
-    if (o.isMesh) o.castShadow = true;
-  });
-  return { group: g, head, crystal };
+  g.add(crystal, glow);
+  return {
+    group: g,
+    head,
+    crystal,
+    animate(t) {
+      body.scale.y = 1 + Math.sin(t * 1.6) * 0.008;
+      body.rotation.z = Math.sin(t * 0.5) * 0.015;
+      head.rotation.z = Math.sin(t * 0.7) * 0.05;
+      head.rotation.x = 0.08 + Math.sin(t * 0.9) * 0.04;
+      armR.rotation.x = -0.6 + Math.sin(t * 1.6) * 0.02;
+      armL.rotation.x = -1.1 + Math.sin(t * 1.6) * 0.02;
+      crystal.position.y = 1.86 + Math.sin(t * 2) * 0.015;
+    },
+  };
 }
 
 // ---- Arena del nodo espacial ------------------------------------------------------------

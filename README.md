@@ -261,6 +261,24 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Mejoras (v1.20)**:
+  - **Cuevas**: se recorren sin atascos. El suelo es continuo en las uniones (antes había escalones invisibles de
+    hasta 1 m al entrar en las cámaras), las paredes dibujadas coinciden con la colisión, el fondo es pared, las menas
+    quedan metidas en la pared, los árboles de arriba no estorban dentro y las bocas de montaña se suben andando.
+  - **Gólem gigante, «guardián del altar»** (según la hoja de diseño): la sala es un altar redondo con gradas sobre el
+    agua, cataratas en las esquinas, el techo abierto con haces de luz y muros bajos para cubrirse. Despierta de
+    rodillas en el altar al abrir el Cofre N. Solo se le daña en el **cristal azul del pecho**. Ataques: **golpe al
+    suelo** (onda: sáltala o esquívala), **lanza rocas** (marca roja en el suelo; muévete o cúbrete y la roca da en el
+    muro; dejan piedras para el tirachinas) y **láser del cristal** (te persigue: corre o ponte tras un muro). Después
+    del láser el cristal queda **al rojo** unos segundos: doble daño. A mitad de vida ruge (**fase 2**): más rápido,
+    se mueve por el altar y encadena ataques. Al final el cristal estalla y se desmorona.
+  - **Protagonista** nuevo (explorador con flequillo, chaqueta, bufanda roja y mochila al vestirse; codos y rodillas;
+    andar, correr, saltar, aterrizar, respirar y parpadear). **Mano en 1ª persona** con manga, dedos y reloj, impulso
+    y tajo con herramientas, directo con el puño, inercia al girar y la otra mano tensando el tirachinas o el arco.
+  - **Herramientas** (hacha, pico, espada, tirachinas de rama, arco recurvado, antorcha, escudo) más detalladas.
+  - **Nave**: morro afilado, aristas biseladas, ventanas sueltas, alerones con luces, deriva, toberas y patas nuevas.
+  - **Personajes**: gólems de roca con musgo y un cristal en el pecho, goblins con orejas en punta, nariz, colmillos,
+    codos, rodillas y porra con clavos; slimes con burbujas; el ermitaño con capa, barba larga y bastón retorcido.
 - **Historia, segunda parte (v1.19)**:
   - Tras las 24 h de escaneo, Nova encuentra la nave (te da el mapa 📜 y la marca en la brújula; se enciende su faro).
     La nave está averiada: humo en los propulsores, no despega y no tiene baterías.
@@ -270,10 +288,9 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
     dormitorio, taller con una mesa de elaboración ya montada, notas y el búnker con la trampilla abierta.
   - Mazmorra: cuesta abajo, dos cámaras con construcciones abandonadas y 6 gólems; al fondo, la sala de las cascadas
     con el **Cofre N** (4 pilas mini-plack) y un tirachinas en el suelo (por si no llevas arco).
-  - Al abrir el cofre caen rocas que tapan la salida y se levanta el **gólem gigante** (300 de vida): solo le hace daño
-    disparar a su ojo azul; golpea el suelo con una onda (20, se salta o se esquiva) que hace caer 5 piedras; llama a
-    4 gólems; desde 150 de vida se tapa el ojo 10 s cada 50 y da manotazos (50). Derrotado, se abre la salida y da
-    **2 propulsores**. Si mueres, la pelea vuelve a empezar al entrar en la sala.
+  - Al abrir el cofre caen rocas que tapan la salida y se levanta el **gólem gigante** (300 de vida; desde la v1.20,
+    con los ataques de la hoja de diseño: ver arriba). Derrotado, se abre la salida y da **2 propulsores**. Si mueres,
+    la pelea vuelve a empezar al entrar en la sala.
   - Reparar la nave (E en la parte de atrás): 2 propulsores, placa de navegación (mesa de elaboración), 4 baterías y
     el nodo espacial. Después, despega (T), sube y sal al espacio (O): **fin de la demo** (se puede seguir jugando).
   - Admin → Historia: ir a cada lugar y acabar el escáner de Nova.
