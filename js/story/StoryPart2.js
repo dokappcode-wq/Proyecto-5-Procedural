@@ -433,6 +433,7 @@ export class StoryPart2 {
       { at: 2.6, run: () => {
         story._ui.caption('El guardián del altar despierta');
         this.boss.start();
+        this.events.emit(GameEvents.BOSS_EVENT, { type: 'awake', x: this.boss.x, y: this.boss.y, z: this.boss.z });
         story._cam.setCinematic(() => ({ pos: shore, look: look() }), { speed: 2 });
       } },
       { at: 6.2, run: () => story._cam.setCinematic(() => ({ pos: near, look: look() }), { speed: 0.8 }) },
@@ -465,7 +466,10 @@ export class StoryPart2 {
     const B = this.boss;
     if (t.boss === 'crystal') {
       const res = B.hitCrystal(damage);
-      if (res.ok) this.events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
+      if (res.ok) {
+        this.events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
+        this.events.emit(GameEvents.BOSS_EVENT, { type: 'crystalHit', x: B.crystal.x, y: B.crystal.y, z: B.crystal.z });
+      }
       for (const ev of res.events) this._bossEvent(ev);
     } else {
       this.events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
@@ -493,6 +497,7 @@ export class StoryPart2 {
   }
 
   _bossEvent(ev) {
+    this.events.emit(GameEvents.BOSS_EVENT, ev.x === undefined && this.boss ? { ...ev, x: this.boss.x, y: this.boss.y, z: this.boss.z } : ev);
     const a = this.built.dungeon.arena;
     const fx = this.bossView?.fx;
     switch (ev.type) {

@@ -559,6 +559,16 @@ export class ConstructionSystem {
     return best;
   }
 
+  /** La pieza cuya superficie caminable está más alta en (x, z) sin pasar de maxY: { piece, top } o null. */
+  pieceUnder(x, z, maxY) {
+    let best = null;
+    for (const p of this._near(x, z, 2)) {
+      const s = surfaceAt(p, x, z);
+      if (s && s.top <= maxY && (!best || s.top > best.top)) best = { piece: p, top: s.top };
+    }
+    return best;
+  }
+
   /** ¿Alguna superficie en el círculo actúa como muro entre y0 e y1? (bordes altos de suelos) */
   blocksAt(x, z, r, y0, y1) {
     for (const p of this._near(x, z, 2 + r)) {

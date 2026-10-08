@@ -50,7 +50,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.21.0',
+    VERSION: '1.22.0',
   },
 
   RENDER: {
@@ -121,6 +121,7 @@ export const GameConfig = deepFreeze({
       SHIP_LEGS: ['KeyL'],              // nave: recoger / sacar las patas de aterrizaje
       SHIP_ORBIT: ['KeyO'],             // nave: salir al espacio (en vuelo, a bastante altura)
       STAR_MAP: ['KeyM'],               // a los mandos: mapa estelar 3D
+      MUTE: ['KeyN'],                   // silenciar / activar el sonido
       HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
       HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
       HOTBAR_7: ['Digit7'], HOTBAR_8: ['Digit8'], HOTBAR_9: ['Digit9'],

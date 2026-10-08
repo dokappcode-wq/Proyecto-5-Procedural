@@ -99,6 +99,7 @@ import { ShipWatchHUD } from './ui/ShipWatchHUD.js';
 import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
+import { AudioSystem } from './audio/AudioSystem.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null } = {}) {
   const cfg = GameConfig;
@@ -1197,6 +1198,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     hotbar, health, creatures: interaction.creatures, installSpaceNode, items: cfg.ITEMS,
   });
   story._d.part2 = storyPart2;
+  // Sonido: efectos, ambiente y música generados con WebAudio (N: silenciar).
+  const audio = new AudioSystem({
+    events, input, player, camera: render.camera, worlds, homeId: HOME, construction, ship, enemies, animals, time, story2: storyPart2, items: cfg.ITEMS,
+  });
   events.on(GameEvents.WATCH_SETTINGS_REQUEST, () => (campaign ? story.openWatchSettings() : message('El reloj de la campaña solo se configura en el Edén.', 'info')));
   const storyKeys = {
     name: 'storyKeys',
@@ -1521,6 +1526,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(starMap);     // mapa estelar 3D
   loop.add(maps);        // mapas del planeta y de la luna actual (se dibujan poco a poco)
   loop.add(ui);
+  loop.add(audio);       // sonido (tras la cámara: oye desde donde mira)
   loop.add(spaceHUD);
   loop.add(starMapHUD);
   loop.add(playerMenu);
@@ -1556,7 +1562,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, combat, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, audio, get hasWatch() { return hasWatch; },
   };
 }
 

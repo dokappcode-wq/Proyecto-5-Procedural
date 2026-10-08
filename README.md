@@ -89,6 +89,7 @@ Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 | Paseo espacial: `W`/`S` · `A`/`D` · `Espacio`/`C` · `Shift` | Jetpack adelante/atrás · lados · subir/bajar · más empuje (sobre un meteorito: caminar y saltar) |
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
+| `N` | Silenciar / activar el sonido |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
 
 Todas las teclas se configuran en `js/config/GameConfig.js` → `INPUT.KEYBINDINGS`.
@@ -111,6 +112,11 @@ js/
 │   ├── SystemCompiler.js    JSON validado → perfiles del motor (determinista)
 │   ├── SystemLoader.js      Tubería completa + informe "Copiar error para Claude"
 │   └── SolarSystem.js       El sistema en juego: cuerpo de inicio, lunas, nombres, teclas de rumbo
+├── audio/
+│   ├── AudioSystem.js  Efectos posicionales, ambiente, eco de cueva, motor y láser; volúmenes y N (silenciar)
+│   ├── Synth.js        Recetas de sonido con WebAudio (osciladores, ruido filtrado, envolventes)
+│   ├── Music.js        Música generativa por estado de ánimo (día, noche, cueva, jefe, espacio)
+│   └── AudioMath.js    Partes puras: volúmenes guardados, superficie de los pasos, panorama, ánimo
 ├── core/
 │   ├── EventBus.js     Pub/sub entre sistemas (sin llamadas directas)
 │   ├── GameEvents.js   Catálogo de eventos
@@ -261,6 +267,20 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Sonido (v1.22)**: todo se genera con WebAudio, sin archivos de audio. Empieza a sonar con el primer clic o tecla;
+  `N` silencia o activa (se recuerda en el navegador).
+  - **Efectos**: pasos según el suelo (hierba, piedra en cuevas y montañas, nieve, arena, madera de lo construido,
+    metal en la nave, agua al nadar), golpes al talar y picar, árbol que cae, roca que se desmorona, puñetazos,
+    armas (arco, tirachinas, escudo), comer, beber, recoger, fabricar, construir, romper piezas, puertas y cofres,
+    daño, caídas, chapuzón y burbujas. Los sonidos del mundo se oyen a izquierda o derecha y bajan con la distancia.
+  - **Criaturas**: gólems (pisadas, gruñidos, se desmoronan), goblins (parloteo, chillidos), slimes (chapoteo,
+    revientan), vacas, cabras y ciervos. **Jefe**: despierta entre rocas, ruge, golpe al suelo, rocas, carga y
+    zumbido del láser, siseo del cristal al rojo, grietas y estallido final.
+  - **Ambiente**: viento (más fuerte en lo alto y en la nieve), mar con olas, ríos y charcas cerca, cascadas en la
+    sala del gólem, eco y goteo en las cuevas, pájaros de día, grillos y búhos de noche; bajo el agua todo suena
+    apagado. La nave zumba al volar.
+  - **Música generativa** (nunca se repite igual): día cálido, noche tranquila, cueva misteriosa, pelea contra el
+    jefe con percusión y espacio (también en el menú de inicio). Fuera de la pelea toca a ratos y descansa.
 - **Animaciones y estructuras (v1.21)**:
   - **Armas en 3ª persona**: cada arma sale del puño hacia delante (el escudo, en el antebrazo) y cambia la pose
     de reposo. Golpes con poses clave: tajo en diagonal (espada, antorcha), de arriba abajo (hacha, pico), directo
