@@ -565,6 +565,22 @@ export function buildGoblinBase(site, groundAt, rng) {
       hut.add(s);
     }
     hut.add(mesh(box(0.7, 1.0, 0.05), lambert(0x2b2016), [0, 0.5, 1.45]));
+    // Remiendos de piel cosidos, faldón y un cráneo con cuernos sobre la puerta.
+    for (let k = 0; k < 4; k++) {
+      const pa = k * 1.7 + i;
+      const patch = mesh(box(0.55, 0.5, 0.04), k % 2 ? hideDark : lambert(0xa27c52), [Math.sin(pa) * 1.12, 0.9 + (k % 2) * 0.5, Math.cos(pa) * 1.12]);
+      patch.rotation.set(0.6 * Math.cos(pa) * 0, pa, 0);
+      patch.lookAt(Math.sin(pa) * 3, 0.5 + (k % 2) * 0.5, Math.cos(pa) * 3);
+      patch.rotateX(-0.55);
+      hut.add(patch);
+    }
+    hut.add(mesh(cyl(9), hideDark, [0, 0.12, 0], [1.72, 0.24, 1.72]));
+    hut.add(mesh(box(0.2, 0.18, 0.18), bone, [0, 1.25, 1.2]));
+    for (const sx of [-1, 1]) {
+      const horn = mesh(cone(4), bone, [sx * 0.17, 1.33, 1.2], [0.04, 0.2, 0.04]);
+      horn.rotation.z = -sx * 0.9;
+      hut.add(horn);
+    }
     group.add(hut);
     colliders.push({ x: cx + x, z: cz + z, r: 1.6, h: 2.6 });
   }
@@ -579,7 +595,21 @@ export function buildGoblinBase(site, groundAt, rng) {
     const z = Math.sin(a) * R;
     const h = 1.6 + rng() * 0.6;
     const y = local(x, z);
-    group.add(mesh(cyl(5), stake, [x, y + h / 2, z], [0.13, h, 0.13]), mesh(cone(5), stake, [x, y + h + 0.18, z], [0.13, 0.36, 0.13]));
+    const st = new THREE.Group();
+    st.position.set(x, y, z);
+    st.rotation.set((rng() - 0.5) * 0.08, 0, (rng() - 0.5) * 0.08);
+    st.add(mesh(cyl(5), i % 3 ? stake : lambert(0x6c4e2e), [0, h / 2, 0], [0.13, h, 0.13]), mesh(cone(5), stake, [0, h + 0.18, 0], [0.13, 0.36, 0.13]));
+    // Ataduras de cuerda con la estaca siguiente (dos alturas).
+    if (Math.abs(wrap((i + 1) / n * Math.PI * 2 - gate)) >= 0.17) {
+      const step = ((Math.PI * 2) / n) * R;
+      for (const hy of [0.55, 1.25]) {
+        const lash = mesh(box(step, 0.05, 0.05), lambert(0xb89a6a), [0, hy, 0]);
+        lash.position.set(-Math.sin(a) * step * 0.5, hy, Math.cos(a) * step * 0.5);
+        lash.rotation.y = -a + Math.PI / 2;
+        st.add(lash);
+      }
+    }
+    group.add(st);
     colliders.push({ x: cx + x, z: cz + z, r: 0.28, h });
   }
   // Calaveras sobre las estacas de la entrada.
@@ -619,6 +649,55 @@ export function buildGoblinBase(site, groundAt, rng) {
   totem.rotation.y = -(gate + 0.9) - Math.PI / 2;
   group.add(totem);
   colliders.push({ x: cx + tx, z: cz + tz, r: 0.35, h: 3 });
+  // Choza en la plataforma del árbol.
+  const tree = new THREE.Group();
+  tree.position.set(1.2, 4.29, -0.8);
+  tree.add(mesh(cyl(8), hide, [0, 0.55, 0], [1.0, 1.1, 1.0]), mesh(cone(8), hideDark, [0, 1.5, 0], [1.25, 0.9, 1.25]), mesh(box(0.45, 0.7, 0.05), lambert(0x2b2016), [0, 0.35, 0.99]));
+  group.add(tree);
+  // Asador sobre la hoguera (dos horquillas, el palo y un trozo de carne).
+  for (const sx of [-1, 1]) fire.add(mesh(cyl(5), bark, [sx * 0.7, 0.45, 0], [0.04, 0.9, 0.04]));
+  const spit = mesh(cyl(5), bark, [0, 0.85, 0], [0.03, 1.6, 0.03]);
+  spit.rotation.z = Math.PI / 2;
+  fire.add(spit, mesh(ico(), lambert(0x8a3a2a), [0, 0.85, 0], [0.16, 0.12, 0.12]));
+  // Troncos para sentarse alrededor.
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.5;
+    const seat = mesh(cyl(7), bark, [fx + Math.cos(a) * 1.8, local(fx + Math.cos(a) * 1.8, fz + Math.sin(a) * 1.8) + 0.2, fz + Math.sin(a) * 1.8], [0.22, 1.2, 0.22]);
+    seat.rotation.set(Math.PI / 2, 0, a + Math.PI / 2);
+    group.add(seat);
+  }
+  // Puerta: dos postes altos, travesaño con un cráneo grande y banderolas.
+  for (const sx of [-1, 1]) {
+    const a = gate + sx * 0.2;
+    const x = Math.cos(a) * (R + 0.2);
+    const z = Math.sin(a) * (R + 0.2);
+    group.add(mesh(cyl(6), lambert(0x5a3d22), [x, local(x, z) + 1.6, z], [0.18, 3.2, 0.18]));
+    const ban = mesh(box(0.05, 1.0, 0.45), lambert(sx < 0 ? 0x8a2a1e : 0x2a4a1e), [x, local(x, z) + 2.2, z]);
+    ban.rotation.y = -gate;
+    group.add(ban);
+  }
+  const gx = Math.cos(gate) * (R + 0.2);
+  const gz = Math.sin(gate) * (R + 0.2);
+  const beam = mesh(box(0.2, 0.2, R * 0.42), lambert(0x5a3d22), [gx, local(gx, gz) + 3.1, gz]);
+  beam.rotation.y = -gate;
+  group.add(beam, mesh(box(0.42, 0.38, 0.4), bone, [gx, local(gx, gz) + 3.45, gz]));
+  // Botín robado: cajas, un barril y monedas.
+  const lx = Math.cos(gate + 2.4) * 4.2;
+  const lz = Math.sin(gate + 2.4) * 4.2;
+  const ly = local(lx, lz);
+  group.add(
+    mesh(box(0.7, 0.6, 0.7), lambert(0x7a5a36), [lx, ly + 0.3, lz]),
+    mesh(box(0.5, 0.45, 0.5), lambert(0x6c4e2e), [lx + 0.8, ly + 0.22, lz + 0.2]),
+    mesh(cyl(9), lambert(0x6a4a2a), [lx - 0.7, ly + 0.45, lz + 0.4], [0.35, 0.9, 0.35]),
+    mesh(cyl(9), lambert(0xe2b23a), [lx + 0.2, ly + 0.66, lz - 0.05], [0.25, 0.08, 0.25]),
+  );
+  // Lanzas apoyadas.
+  for (let i = 0; i < 3; i++) {
+    const sp = mesh(cyl(5), bark, [lx - 1.4 + i * 0.25, ly + 1.0, lz - 0.6], [0.035, 2.2, 0.035]);
+    sp.rotation.z = 0.25;
+    sp.add(mesh(cone(4), stoneM, [0, 0.62, 0], [2.2, 0.08, 2.2]));
+    group.add(sp);
+  }
   group.traverse((o) => {
     if (o.isMesh) o.receiveShadow = true;
   });

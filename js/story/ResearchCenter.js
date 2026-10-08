@@ -29,11 +29,13 @@ export function buildResearchCenter(site, ground, { textColor = '#4fb6ff' } = {}
   const prims = [];
   const world = (lx, lz) => toWorldLab(site, lx, lz);
   // Caja local (cx, cz, w, d) → mesh + primitiva de colisión.
-  const box = (mat, lx, ly, lz, w, h, d, { wall = true, walk = false, roof = false, collide = true } = {}) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(lx, ly, lz);
-    m.castShadow = m.receiveShadow = true;
-    g.add(m);
+  const box = (mat, lx, ly, lz, w, h, d, { wall = true, walk = false, roof = false, collide = true, mesh = true } = {}) => {
+    const m = mesh ? new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat) : null;
+    if (m) {
+      m.position.set(lx, ly, lz);
+      m.castShadow = m.receiveShadow = true;
+      g.add(m);
+    }
     if (collide) {
       const p = world(lx, lz);
       prims.push({ cx: p.x, cz: p.z, hx: w / 2, hz: d / 2, yaw: site.yaw, y0: ground + ly - h / 2, y1: ground + ly + h / 2, wall, walk, roof });
@@ -53,6 +55,7 @@ export function buildResearchCenter(site, ground, { textColor = '#4fb6ff' } = {}
   box(wallM, W2, H / 2, 0, T, H, L.D);
   // Tejado plano y cornisa.
   box(wallDark, 0, H + 0.15, 0, L.W + 0.6, 0.3, L.D + 0.6, { wall: false, roof: true });
+  const beacon = decorateExterior(g, { W2, D2, H, T, wallM, wallDark, metal, stripe, box, textColor });
   // Muros del pasillo con una puerta a cada sala (y un muro entre las salas de cada lado).
   const C = L.CORR;
   for (const sx of [-1, 1]) {
@@ -194,6 +197,7 @@ export function buildResearchCenter(site, ground, { textColor = '#4fb6ff' } = {}
     door,
     lights,
     panels,
+    beacon,
     drawKeypad,
     notes,
     keypad: { ...world(1.6, D2 + 0.35), y: ground + 1.35 },
@@ -201,6 +205,128 @@ export function buildResearchCenter(site, ground, { textColor = '#4fb6ff' } = {}
     hatch: { ...world(hatchL.x, hatchL.z), y: ground },
     entrance: world(0, D2 + 3),
   };
+}
+
+/**
+ * Fachada y tejado: zócalo (se pisa), paneles y franjas, ventanas, marquesina con
+ * farolas y el letrero, pretil, máquinas, placas solares y una antena con baliza,
+ * tuberías, un generador, depósitos, cajas y una antena parabólica en el suelo.
+ * @returns {THREE.Mesh} la luz de la baliza (parpadea)
+ */
+function decorateExterior(g, { W2, D2, H, T, wallM, wallDark, metal, stripe, box, textColor }) {
+  const panel = lambert(0xb3b7b3);
+  const band = lambert(0x3f6f8f);
+  const dirt = lambert(0x8a8a7e);
+  const glass = new THREE.MeshLambertMaterial({ color: 0x2b3d4a, flatShading: true });
+  const deco = (mat, x, y, z, w, h, d, rot = 0) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    m.rotation.y = rot;
+    m.castShadow = m.receiveShadow = true;
+    g.add(m);
+    return m;
+  };
+  // Zócalo de hormigón alrededor (escalón que se sube andando).
+  box(dirt, 0, 0.12, D2 + 0.55, 2 * W2 + 1.2, 0.24, 0.8, { wall: false, walk: true });
+  box(dirt, 0, 0.12, -D2 - 0.55, 2 * W2 + 1.2, 0.24, 0.8, { wall: false, walk: true });
+  box(dirt, -W2 - 0.55, 0.12, 0, 0.8, 0.24, 2 * D2, { wall: false, walk: true });
+  box(dirt, W2 + 0.55, 0.12, 0, 0.8, 0.24, 2 * D2, { wall: false, walk: true });
+  // Paneles, franja azul y suciedad abajo (en las cuatro fachadas, muy pegados).
+  const o = T / 2 + 0.012;
+  const faces = [
+    { len: 2 * W2, at: (u) => [u, D2 + o], rot: 0 },
+    { len: 2 * W2, at: (u) => [u, -D2 - o], rot: 0 },
+    { len: 2 * D2, at: (u) => [W2 + o, u], rot: Math.PI / 2 },
+    { len: 2 * D2, at: (u) => [-W2 - o, u], rot: Math.PI / 2 },
+  ];
+  faces.forEach((f, fi) => {
+    const [cx, cz] = f.at(0);
+    deco(band, cx, H - 0.75, cz, f.len, 0.28, 0.02, f.rot);
+    deco(dirt, cx, 0.35, cz, f.len, 0.45, 0.02, f.rot);
+    for (let u = -f.len / 2 + 2.6; u < f.len / 2 - 0.5; u += 2.6) {
+      const [x, z] = f.at(u);
+      if (fi === 0 && Math.abs(u) < 1.6) continue; // la puerta
+      deco(wallDark, x, H / 2, z, 0.06, H, 0.03, f.rot);
+    }
+    // Ventanas (ni en la puerta ni delante del búnker).
+    for (let u = -f.len / 2 + 3.9; u < f.len / 2 - 2; u += 5.2) {
+      if (fi === 0 && Math.abs(u) < 3) continue;
+      const [x, z] = f.at(u);
+      deco(metal, x, 1.9, z, 1.9, 1.15, 0.035, f.rot);
+      deco(glass, x, 1.9, z, 1.7, 0.95, 0.045, f.rot);
+      deco(metal, x, 1.9, z, 0.06, 0.95, 0.05, f.rot);
+      deco(panel, x, 1.28, z, 2.0, 0.08, 0.1, f.rot);
+    }
+  });
+  // Marquesina sobre la puerta con dos postes (chocan), farolas y letrero.
+  box(wallDark, 0, H - 0.2, D2 + 1.4, 4.2, 0.18, 2.6, { wall: false, roof: true });
+  for (const sx of [-1.8, 1.8]) box(metal, sx, (H - 0.3) / 2, D2 + 2.5, 0.16, H - 0.3, 0.16);
+  const lampM = new THREE.MeshBasicMaterial({ color: 0xfff2c8 });
+  for (const sx of [-1.35, 1.35]) {
+    deco(metal, sx, 2.75, D2 + 0.26, 0.24, 0.16, 0.22);
+    const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.16), lampM);
+    bulb.position.set(sx, 2.66, D2 + 0.28);
+    g.add(bulb);
+  }
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 0.7), new THREE.MeshBasicMaterial({ map: textTexture(['CENTRO DE INVESTIGACIÓN · NODO'], '#18232c', textColor), transparent: false }));
+  plate.position.set(0, H - 0.02 + 0.45, D2 + T / 2 + 0.02);
+  g.add(plate);
+  deco(stripe, 0, 0.015 + 0.24, D2 + 2.6, 2.4, 0.02, 0.5);
+  // Pretil del tejado y, encima, máquinas, rejillas, placas solares y antena.
+  const R = H + 0.3;
+  for (const [x, z, w, d] of [[0, D2 + 0.25, 2 * W2 + 0.6, 0.2], [0, -D2 - 0.25, 2 * W2 + 0.6, 0.2], [W2 + 0.25, 0, 0.2, 2 * D2 + 0.6], [-W2 - 0.25, 0, 0.2, 2 * D2 + 0.6]]) deco(wallM, x, R + 0.25, z, w, 0.5, d);
+  for (const [x, z] of [[-8, -4], [-4.5, -4], [6, 4]]) {
+    deco(metal, x, R + 0.45, z, 1.6, 0.9, 1.2);
+    deco(lambert(0x3a4045), x, R + 0.92, z, 1.1, 0.05, 0.9);
+    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.06, 12), lambert(0x2a2f33));
+    fan.position.set(x, R + 0.95, z);
+    g.add(fan);
+  }
+  const solar = lambert(0x24395a);
+  for (let i = 0; i < 5; i++) {
+    const m = deco(solar, -9 + i * 2.2, R + 0.55, 4.5, 2.0, 0.06, 1.4);
+    m.rotation.x = -0.45;
+    deco(metal, -9 + i * 2.2, R + 0.25, 4.85, 0.08, 0.5, 0.08);
+  }
+  deco(metal, 9.5, R + 2.5, -5.5, 0.14, 5, 0.14);
+  for (const y of [1.5, 3, 4.4]) {
+    const arm = deco(metal, 9.5, R + y, -5.5, 1.2 - y * 0.15, 0.05, 0.05);
+    arm.rotation.y = y;
+  }
+  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.8, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.35), lambert(0xd8dcd8, { side: THREE.DoubleSide }));
+  dish.position.set(9.5, R + 3.4, -5.0);
+  dish.rotation.x = -1.0;
+  g.add(dish);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3a2a }));
+  beacon.position.set(9.5, R + 5.1, -5.5);
+  g.add(beacon);
+  // Tuberías por la fachada lateral, generador, depósitos y cajas.
+  const pipeM = lambert(0x7f8a8f);
+  for (const [y, r] of [[0.7, 0.12], [1.05, 0.08]]) {
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 2 * D2 - 2, 10), pipeM);
+    pipe.rotation.x = Math.PI / 2;
+    pipe.position.set(W2 + T / 2 + r + 0.02, y, 0);
+    g.add(pipe);
+  }
+  box(lambert(0x56604a), W2 + 2.6, 0.75, 4, 1.6, 1.5, 2.6);
+  deco(stripe, W2 + 2.6, 1.52, 4, 1.62, 0.05, 2.62);
+  deco(lambert(0x2a2f33), W2 + 1.78, 1.0, 4, 0.04, 0.6, 1.6);
+  for (const z of [-2, -0.4]) {
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 2.2, 14), lambert(0xc9cdc9));
+    tank.position.set(W2 + 2.2, 1.1, z);
+    tank.castShadow = true;
+    g.add(tank);
+    box(null, W2 + 2.2, 1.1, z, 1.2, 2.2, 1.2, { mesh: false }); // solo la colisión
+    deco(band, W2 + 2.2, 1.6, z, 1.22, 0.12, 1.22);
+  }
+  const crate = lambert(0x7a5a36);
+  for (const [x, z, s2] of [[-W2 - 2, 5, 1.0], [-W2 - 2.1, 3.9, 0.8], [-W2 - 1.9, 5.1, 0.6]]) box(crate, x, s2 / 2 + (s2 === 0.6 ? 1.0 : 0), z, s2, s2, s2);
+  const gdish = new THREE.Mesh(new THREE.SphereGeometry(1.3, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.32), lambert(0xd8dcd8, { side: THREE.DoubleSide }));
+  gdish.position.set(-W2 - 3.2, 1.6, -4);
+  gdish.rotation.set(-0.9, 0.6, 0);
+  g.add(gdish);
+  box(metal, -W2 - 3.2, 0.7, -4, 0.3, 1.4, 0.3);
+  return beacon;
 }
 
 function textTexture(lines, bg, fg) {

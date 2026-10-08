@@ -41,8 +41,8 @@ export function buildHermitTower(site, ground) {
   const wood = lambert(0x6b4a2b);
   const ivy = lambert(0x3f6b2e);
   const prims = [];
-  // Fuste.
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(T.R, T.R + 0.35, T.H + 1, 14), stone);
+  // Fuste de sillares (cada piedra con su tono, en hiladas desplazadas).
+  const shaft = new THREE.Mesh(masonry(new THREE.CylinderGeometry(T.R, T.R + 0.35, T.H + 1, 20, 34), [0x8d877c, 0x857f74, 0x968f83, 0x7c766c, 0x9a9488], 7), vcol());
   shaft.position.set(x0, y0 + (T.H - 1) / 2, z0);
   shaft.castShadow = shaft.receiveShadow = true;
   g.add(shaft);
@@ -53,11 +53,41 @@ export function buildHermitTower(site, ground) {
     band.position.set(x0, y0 + T.H * h, z0);
     g.add(band);
   }
-  // Hiedra.
+  // Zócalo y basamento.
+  const plinth = new THREE.Mesh(masonry(new THREE.CylinderGeometry(T.R + 0.6, T.R + 0.8, 1.2, 20, 2), [0x6e695f, 0x77716a, 0x66615a], 3), vcol());
+  plinth.position.set(x0, y0 - 0.1, z0);
+  plinth.receiveShadow = true;
+  g.add(plinth);
+  // Saeteras a lo largo del fuste.
+  const slitM = lambert(0x1e1b18);
+  for (let i = 0; i < 7; i++) {
+    const a = site.yaw + Math.PI + i * 1.9;
+    const h = 3 + i * 2.6;
+    const r = T.R + 0.35 * (1 - h / (T.H + 1)) + 0.02;
+    addBox(g, slitM, x0 + Math.cos(a) * r, y0 + h, z0 + Math.sin(a) * r, 0.16, 0.9, 0.06, Math.atan2(-Math.cos(a), -Math.sin(a)));
+  }
+  // Ménsulas bajo la habitación de arriba.
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
+    addBox(g, stoneDark, x0 + Math.cos(a) * (T.R + 0.15), top - 0.45, z0 + Math.sin(a) * (T.R + 0.15), 0.3, 0.5, 0.35, Math.atan2(-Math.cos(a), -Math.sin(a)));
+  }
+  // Hiedra: tiras de hojas que trepan.
+  const leaf = new THREE.IcosahedronGeometry(1, 0);
+  const ivy2 = lambert(0x4f7a34);
   for (let i = 0; i < 9; i++) {
     const a = site.yaw + i * 0.7;
-    const h = 2 + (i * 2.3) % (T.H - 4);
-    addBox(g, ivy, x0 + Math.cos(a) * (T.R + 0.05), y0 + h, z0 + Math.sin(a) * (T.R + 0.05), 0.5, 1.8, 0.12, -a + Math.PI / 2);
+    const h0 = 0.5 + (i * 2.3) % (T.H - 6);
+    const len = 3 + (i % 4) * 1.5;
+    for (let k = 0; k < len / 0.35; k++) {
+      const h = h0 + k * 0.35;
+      const aa = a + Math.sin(k * 0.9 + i) * 0.06;
+      const r = T.R + 0.35 * (1 - h / (T.H + 1)) + 0.05;
+      const m = new THREE.Mesh(leaf, k % 3 ? ivy : ivy2);
+      m.position.set(x0 + Math.cos(aa) * r, y0 + h, z0 + Math.sin(aa) * r);
+      m.scale.set(0.28 + (k % 2) * 0.1, 0.22, 0.12);
+      m.rotation.set(k, a, k * 0.7);
+      g.add(m);
+    }
   }
   // Escalera de caracol por fuera (sube TURNS vueltas hasta la puerta de arriba).
   const n = Math.ceil(T.H / T.RISE);
@@ -105,8 +135,15 @@ export function buildHermitTower(site, ground) {
   g.add(win);
   // Dintel de la puerta.
   addBox(g, stoneDark, x0 + Math.cos(aDoor) * wallR, top + T.ROOM_H - 0.3, z0 + Math.sin(aDoor) * wallR, 1.9, 0.6, 0.4, Math.atan2(-Math.cos(aDoor), -Math.sin(aDoor)));
-  // Tejado cónico.
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(T.R + 0.9, 5, 14), roofM);
+  // Tejado cónico de tejas (bandas de tonos), con alero y remate.
+  const roof = new THREE.Mesh(masonry(new THREE.ConeGeometry(T.R + 0.9, 5, 20, 7), [0x7a3426, 0x8a3e2c, 0x6c2e22, 0x803a29], 5), vcol());
+  const eave = new THREE.Mesh(new THREE.TorusGeometry(T.R + 0.85, 0.14, 4, 20), lambert(0x4a3020));
+  eave.rotation.x = Math.PI / 2;
+  eave.position.set(x0, top + T.ROOM_H + 0.05, z0);
+  g.add(eave);
+  const finial = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), lambert(0xc9a24a));
+  finial.position.set(x0, top + T.ROOM_H + 5.05, z0);
+  g.add(finial);
   roof.position.set(x0, top + T.ROOM_H + 2.5, z0);
   roof.castShadow = true;
   g.add(roof);
@@ -346,6 +383,41 @@ export function buildMiniNode() {
     cube.rotation.set(t, t * 1.3, 0);
     ring.rotation.set(t * 2, 0.5, 0);
   };
+  return g;
+}
+
+/** Material de colores por vértice (sillares, tejas). */
+function vcol() {
+  return new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+}
+
+/**
+ * Colorea una geometría por caras con tonos al azar (fijo por semilla): cada cuadro
+ * de la malla es una piedra; las hiladas alternas desplazan el tono para que parezca
+ * aparejo. Devuelve la geometría no indexada con color por vértice.
+ */
+function masonry(geo, palette, seed) {
+  const g = geo.toNonIndexed();
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  const c = new THREE.Color();
+  let a = seed >>> 0;
+  const r = () => {
+    a = (a * 1664525 + 1013904223) >>> 0;
+    return a / 4294967296;
+  };
+  for (let t = 0; t < n / 3; t += 2) {
+    // Dos triángulos = un cuadro = una piedra (a veces se juntan dos con el mismo tono).
+    c.setHex(palette[Math.floor(r() * palette.length)]);
+    const k = 0.92 + r() * 0.12;
+    for (let v = t * 3; v < Math.min(n, (t + 2) * 3); v++) {
+      col[v * 3] = c.r * k;
+      col[v * 3 + 1] = c.g * k;
+      col[v * 3 + 2] = c.b * k;
+    }
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
   return g;
 }
 

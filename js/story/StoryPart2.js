@@ -727,6 +727,7 @@ export class StoryPart2 {
       const near = Math.hypot(b.lab.site.x - p.x, b.lab.site.z - p.z) < 70;
       for (const l of b.lab.lights) l.visible = near;
       b.lab.panels[2].material.color.setHex(Math.sin(this._t * 23) > 0.6 ? 0x6f7a85 : 0xe9f4ff); // un panel parpadea
+      if (b.lab.beacon) b.lab.beacon.visible = this._t % 1.6 < 0.25; // baliza de la antena
     }
     if (b.dungeon) {
       const d = b.dungeon;
