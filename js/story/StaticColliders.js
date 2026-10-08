@@ -86,11 +86,15 @@ export class StaticColliders {
     return hit;
   }
 
-  /** Distancia a lo largo de un rayo hasta la primera pared (para la cámara). */
-  raycastDistance(o, d, max) {
+  /**
+   * Distancia a lo largo de un rayo hasta la primera pared (para la cámara).
+   * `only`: lista de grupos a mirar (por defecto, todos).
+   */
+  raycastDistance(o, d, max, only = null) {
     let best = null;
     const steps = Math.ceil(max / 0.25);
     for (const g of this.groups) {
+      if (only && !only.includes(g.id)) continue;
       const on = typeof g.enabled === 'function' ? g.enabled() : g.enabled;
       if (!on) continue;
       const b = g.bounds;

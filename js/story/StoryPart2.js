@@ -113,13 +113,27 @@ export class StoryPart2 {
       // Seis gólems dormidos en las cámaras (despiertan al acercarse).
       const golems = this.enemies.storyGolems('dungeon', d.golemSpots, { leash: 22 });
       for (const g of golems) g.locked = false;
-      // El gólem gigante.
+      // El altar (gradas que se pisan) y los muros bajos y columnas (cobertura).
       const a = d.arena;
-      const bx = a.center.x + a.dir.x * a.len * 0.15;
-      const bz = a.center.z + a.dir.z * a.len * 0.15;
-      this.boss = new BossLogic({ x: bx, y: a.floor, z: bz, heading: Math.atan2(-a.dir.x, -a.dir.z) });
+      this.colliders.add('arenaAltar', a.altarPrims, { enabled: onHome });
+      this.colliders.add('arenaCover', a.cover, { enabled: onHome });
+      // El gólem gigante, dormido de rodillas en el altar.
+      const bx = a.center.x + a.dir.x * 0.6;
+      const bz = a.center.z + a.dir.z * 0.6;
+      const COVER = ['arenaCover', 'arenaAltar'];
+      const env = {
+        floorY: a.floor,
+        groundAt: (x, z) => a.groundAt(x, z),
+        ray: (ox, oy, oz, dx, dy, dz, max) => this.colliders.raycastDistance({ x: ox, y: oy, z: oz }, { x: dx, y: dy, z: dz }, max, COVER),
+        blocked: (ax, ay, az, bx2, by, bz2) => {
+          const l = Math.hypot(bx2 - ax, by - ay, bz2 - az);
+          if (l < 1e-3) return false;
+          return this.colliders.raycastDistance({ x: ax, y: ay, z: az }, { x: (bx2 - ax) / l, y: (by - ay) / l, z: (bz2 - az) / l }, l, COVER) !== null;
+        },
+      };
+      this.boss = new BossLogic({ x: bx, y: a.floor + a.altar.height, z: bz, heading: Math.atan2(-a.dir.x, -a.dir.z), env, seed: w.seed.value });
       this.bossView = new BossView(b.root, this.boss);
-      this.colliders.add('boss', [{ x: bx, z: bz, r: 2.2, y0: a.floor - 1, y1: a.floor + 7, wall: true }], { enabled: () => onHome() && this.boss.state !== 'DORMANT' && !(this.boss.state === 'DEAD' && this.boss.death > 0.6) });
+      this._bossCollider(onHome);
       this._stoneRng = new SeededRandom(deriveSeed(w.seed.value, 'bossStones'));
     }
     // Humo de los propulsores rotos de la nave.
@@ -127,10 +141,20 @@ export class StoryPart2 {
     this._applySmoke();
   }
 
+  /** Colisión del cuerpo del gólem (se mueve por el altar en la fase 2). */
+  _bossCollider(onHome = () => this.worlds.activeId === this.homeId) {
+    const B = this.boss;
+    this._bossAt = { x: B.x, z: B.z };
+    this.colliders.add('boss', [{ x: B.x, z: B.z, r: 2.0, y0: B.y - 1, y1: B.y + 8, wall: true }], {
+      enabled: () => onHome() && this.boss && this.boss.state !== 'DORMANT' && !(this.boss.state === 'DEAD' && this.boss.death > 0.15),
+    });
+  }
+
   _dispose() {
     if (!this.built) return;
     this.built.root.parent?.remove(this.built.root);
-    for (const id of ['lab', 'labDoor', 'barrier', 'boss']) this.colliders.remove(id);
+    for (const id of ['lab', 'labDoor', 'barrier', 'boss', 'arenaAltar', 'arenaCover']) this.colliders.remove(id);
+    this.bossView?.dispose();
     this.built = null;
     this.boss = null;
     this.bossView = null;
@@ -149,7 +173,7 @@ export class StoryPart2 {
       case 'LAB': return s.labOpened ? 'Explora el centro de investigación: el búnker baja a una cueva' : 'Ve al centro de investigación (sigue la brújula) y deja que Nova abra la puerta';
       case 'DUNGEON': return 'Baja por la cueva del búnker hasta el fondo (lleva antorchas)';
       case 'BOSS':
-        return this.bossActive ? `¡Dispara al ojo azul del gólem gigante! (${Math.ceil(this.boss.health)}/${BOSS.HEALTH})` : 'Vuelve a la sala de las cascadas';
+        return this.bossActive ? `¡Dispara al cristal azul del pecho del gólem! (${Math.ceil(this.boss.health)}/${BOSS.HEALTH})` : 'Vuelve a la sala de las cascadas';
       case 'REPAIR': return `Repara la nave: ${this._requirements().text}`;
       case 'ESCAPE': return 'A los mandos: despega (T), sube y sal al espacio (O)';
       default: return '';
@@ -369,7 +393,7 @@ export class StoryPart2 {
     const rel = { x: p.x - a.center.x, z: p.z - a.center.z };
     const along = rel.x * a.dir.x + rel.z * a.dir.z;
     const across = rel.x * a.side.x + rel.z * a.side.z;
-    return Math.abs(along) < a.len / 2 + a.radius * 0.8 && Math.abs(across) < a.radius * 0.8 && Math.abs(p.y - a.floor) < 4;
+    return Math.abs(along) < a.len / 2 + a.halfW && Math.abs(across) < a.halfW + 0.5 && Math.abs(p.y - a.floor) < 4;
   }
 
   _openChest() {
@@ -386,32 +410,40 @@ export class StoryPart2 {
   _startBoss() {
     const d = this.built.dungeon;
     const story = this.story;
+    const A = d.arena;
     this.bossActive = true;
     this._barrierT = 0;
     this._barrierGoal = 1;
+    this._tips = new Set();
     story._lock(true);
     story._ui.letterbox(true, '¡Las rocas tapan la salida!');
     const g = d.barrier.at;
-    const camPos = new THREE.Vector3(g.x + d.arena.dir.x * 9, g.y + 4, g.z + d.arena.dir.z * 9);
+    const camPos = new THREE.Vector3(g.x + A.dir.x * 9, g.y + 4, g.z + A.dir.z * 9);
     const lookGate = new THREE.Vector3(g.x, g.y + 2, g.z);
-    const c = d.arena.center;
-    const camBoss = new THREE.Vector3(c.x - d.arena.dir.x * 16, c.y + 6, c.z - d.arena.dir.z * 16);
-    const lookBoss = new THREE.Vector3(this.boss.x, c.y + 4.5, this.boss.z);
+    // Plano de la hoja de diseño: desde la orilla, el altar entre las cataratas y la luz.
+    const c = A.center;
+    const shore = new THREE.Vector3(c.x - A.dir.x * (A.len / 2 + 2), c.y + 2.2, c.z - A.dir.z * (A.len / 2 + 2));
+    const near = new THREE.Vector3(c.x - A.dir.x * 13 - A.side.x * 3, c.y + 3.2, c.z - A.dir.z * 13 - A.side.z * 3);
+    const look = () => {
+      const k = this.boss.crystal;
+      return new THREE.Vector3(k.x, k.y - 0.5, k.z);
+    };
     story._cam.setCinematic(() => ({ pos: camPos, look: lookGate }), { speed: 4 });
     story._sequence([
       { at: 2.6, run: () => {
-        story._ui.caption('El gólem gigante');
+        story._ui.caption('El guardián del altar despierta');
         this.boss.start();
-        story._cam.setCinematic(() => ({ pos: camBoss, look: lookBoss }), { speed: 2 });
+        story._cam.setCinematic(() => ({ pos: shore, look: look() }), { speed: 2 });
       } },
+      { at: 6.2, run: () => story._cam.setCinematic(() => ({ pos: near, look: look() }), { speed: 0.8 }) },
     ], {
-      duration: 8,
+      duration: 9,
       done: () => {
         story._cam.setCinematic(null, { speed: 2.5 });
         story._ui.letterbox(false);
         story._lock(false);
-        if (!this.s.slingTaken) this._msg('🎯 ¡Dispárale al ojo azul! Junto a la entrada de la sala hay un tirachinas en el suelo; cada golpe suyo hace caer piedras.', 'warning');
-        else this._msg('🎯 ¡Dispárale al ojo azul!', 'warning');
+        const sling = this.s.slingTaken ? '' : ' En la orilla de la entrada hay un tirachinas.';
+        this._msg(`🎯 ¡Dispara al cristal azul de su pecho! Sus golpes y sus rocas dejan piedras para el tirachinas.${sling}`, 'warning');
       },
     });
   }
@@ -419,24 +451,25 @@ export class StoryPart2 {
   _bossTargets(x, z, r) {
     const B = this.boss;
     if (!B || !this.bossActive || !B.fighting) return [];
-    const e = B.eye;
+    const c = B.crystal;
     const out = [];
-    const eye = { id: 'bossEye', x: e.x, y: e.y - 0.8, z: e.z, aimY: e.y, aimRadius: BOSS.EYE_RADIUS, reach: 0.5, scale: 1, def: { NAME: 'Ojo del gólem gigante' }, health: B.health, maxHealth: B.maxHealth, boss: 'eye' };
-    const body = { id: 'bossBody', x: B.x, y: B.y, z: B.z, aimY: B.y + 3, aimRadius: 2.0, reach: 1.6, scale: 1, def: { NAME: 'Gólem gigante', HEIGHT: 6.4 }, health: B.health, maxHealth: B.maxHealth, boss: 'body' };
-    if (Math.hypot(e.x - x, e.z - z) <= r + 2) out.push(eye);
+    // El cristal va primero (está delante del cuerpo): las piedras lo encuentran antes.
+    const crystal = { id: 'bossCrystal', x: c.x, y: c.y - 0.8, z: c.z, aimY: c.y, aimRadius: BOSS.CRYSTAL_RADIUS, reach: 0.5, scale: 1, def: { NAME: 'Cristal del guardián' }, health: B.health, maxHealth: B.maxHealth, boss: 'crystal' };
+    const body = { id: 'bossBody', x: B.x, y: B.y, z: B.z, aimY: B.y + 3.5, aimRadius: 1.6, reach: 1.6, scale: 1, def: { NAME: 'Gólem gigante', HEIGHT: 7.6 }, health: B.health, maxHealth: B.maxHealth, boss: 'body' };
+    if (Math.hypot(c.x - x, c.z - z) <= r + 2) out.push(crystal);
     if (Math.hypot(B.x - x, B.z - z) <= r + 3) out.push(body);
     return out;
   }
 
   _hitBoss(t, damage) {
     const B = this.boss;
-    if (t.boss === 'eye') {
-      const res = B.hitEye(damage);
-      if (!res.ok) this._hint('🛡️ ¡Se tapa el ojo con la mano! Espera a que lo destape (y esquiva el manotazo).');
+    if (t.boss === 'crystal') {
+      const res = B.hitCrystal(damage);
+      if (res.ok) this.events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
       for (const ev of res.events) this._bossEvent(ev);
     } else {
       this.events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
-      this._hint('🪨 Su cuerpo es de roca. ¡Dispara al ojo azul! (arco o tirachinas)');
+      this._hint('🪨 Su cuerpo es de roca. ¡Dispara al cristal azul de su pecho! (tirachinas o arco)');
     }
     return { killed: false, drops: null };
   }
@@ -447,38 +480,62 @@ export class StoryPart2 {
     this._msg(text, 'warning');
   }
 
-  _bossEvent(ev) {
+  /** Un consejo la primera vez que hace cada cosa. */
+  _tip(id, text) {
+    if (this._tips?.has(id)) return;
+    this._tips?.add(id);
+    this._msg(text, 'warning');
+  }
+
+  _hurt(amount, source, name) {
     const B = this.boss;
-    const d = this.built.dungeon;
-    const a = d.arena;
+    this.events.emit(GameEvents.PLAYER_DAMAGED, { amount, source, sourceName: name, fromX: B.x, fromZ: B.z, attack: true });
+  }
+
+  _bossEvent(ev) {
+    const a = this.built.dungeon.arena;
+    const fx = this.bossView?.fx;
     switch (ev.type) {
+      case 'slamWindup':
+        this._tip('slam', '✊ ¡Va a golpear el suelo! Salta la onda (Espacio) o esquívala (toque de Shift) en el momento justo.');
+        break;
       case 'slam':
-        this._dropStones();
-        if (!this._slamHint) {
-          this._slamHint = true;
-          this._msg('🌊 ¡Onda! Sáltala (Espacio) o esquívala (toque de Shift).', 'warning');
-        }
+        fx?.burst(ev.x, ev.y, ev.z, 18, 1.2);
+        this._dropStones(BOSS.STONES_PER_SLAM);
+        break;
+      case 'slamHit':
+        this._hurt(ev.amount, 'BOSS_SLAM', 'el puñetazo del gólem gigante');
         break;
       case 'waveHit':
-        this.events.emit(GameEvents.PLAYER_DAMAGED, { amount: BOSS.SLAM_DAMAGE, source: 'BOSS_WAVE', sourceName: 'la onda del gólem gigante', fromX: B.x, fromZ: B.z, attack: true });
+        this._hurt(ev.amount, 'BOSS_WAVE', 'la onda del gólem gigante');
         break;
-      case 'slap':
-        if (ev.hit) this.events.emit(GameEvents.PLAYER_DAMAGED, { amount: BOSS.SLAP_DAMAGE, source: 'BOSS_SLAP', sourceName: 'el manotazo del gólem gigante', fromX: B.x, fromZ: B.z, attack: true });
+      case 'rockWindup':
+        this._tip('rock', '🪨 ¡Coge una roca para lanzarla! Muévete o cúbrete tras un muro bajo.');
         break;
-      case 'cover':
-        this._msg('🖐️ ¡Se tapa el ojo y ataca con la otra mano! Aléjate o esquiva el manotazo.', 'warning');
+      case 'rockImpact':
+        fx?.burst(ev.x, ev.y, ev.z, 12, 0.9);
+        for (let i = 0; i < BOSS.STONES_PER_ROCK; i++) {
+          const ang = (i / BOSS.STONES_PER_ROCK) * Math.PI * 2 + this._t;
+          const x = ev.x + Math.cos(ang) * 0.9;
+          const z = ev.z + Math.sin(ang) * 0.9;
+          this.pickups.drop(this.homeId, x, z, 'STONE', 1, null, a.groundAt(x, z));
+        }
         break;
-      case 'uncover':
-        this._msg('👁️ ¡Ha destapado el ojo!', 'info');
+      case 'rockHit':
+        this._hurt(ev.amount, 'BOSS_ROCK', 'una roca del gólem gigante');
         break;
-      case 'adds': {
-        this._adds = (this._adds ?? 0) + 1;
-        const spots = [-1, 1].map((k) => ({ x: a.center.x + a.side.x * k * a.radius * 0.6 + a.dir.x * (this._adds === 1 ? -4 : 4), z: a.center.z + a.side.z * k * a.radius * 0.6 + a.dir.z * (this._adds === 1 ? -4 : 4), y: a.floor }));
-        const gs = this.enemies.storyGolems(`bossAdds${this._adds}`, spots, { leash: 30 });
-        gs.forEach((g) => g.alert());
-        this._msg('🪨 ¡El gólem gigante llama a otros gólems!', 'warning');
+      case 'laserCharge':
+        this._tip('laser', '💠 ¡El cristal se carga! El láser te persigue: corre (Shift) o ponte detrás de un muro.');
         break;
-      }
+      case 'laserHit':
+        this._hurt(ev.amount, 'BOSS_LASER', 'el láser del cristal');
+        break;
+      case 'vent':
+        this._tip('vent', '🔥 ¡El cristal se ha quedado al rojo! Ahora le haces más daño: ¡dispara!');
+        break;
+      case 'phase2':
+        this._msg('⚠️ ¡El guardián se enfurece! Ahora es más rápido y encadena ataques.', 'warning');
+        break;
       case 'dead':
         this._bossDead();
         break;
@@ -487,15 +544,15 @@ export class StoryPart2 {
     }
   }
 
-  _dropStones() {
+  _dropStones(n) {
     const a = this.built.dungeon.arena;
     const rng = this._stoneRng;
     const spots = [];
-    for (let i = 0; i < 40 && spots.length < BOSS.STONES_PER_SLAM; i++) {
+    for (let i = 0; i < 40 && spots.length < n; i++) {
       const f = rng.range(-0.45, 0.45);
-      const s = rng.range(-0.6, 0.6);
-      const x = a.center.x + a.dir.x * a.len * f + a.side.x * a.radius * s;
-      const z = a.center.z + a.dir.z * a.len * f + a.side.z * a.radius * s;
+      const s = rng.range(-0.8, 0.8);
+      const x = a.center.x + a.dir.x * a.len * f + a.side.x * a.halfW * s;
+      const z = a.center.z + a.dir.z * a.len * f + a.side.z * a.halfW * s;
       if (Math.hypot(x - this.boss.x, z - this.boss.z) < 3.5) continue;
       if (spots.some((p) => Math.hypot(p.x - x, p.z - z) < 3.3)) continue;
       spots.push({ x, z });
@@ -504,7 +561,7 @@ export class StoryPart2 {
     const mat = (this._rockMat ??= new THREE.MeshLambertMaterial({ color: 0x8a857c, flatShading: true }));
     for (const p of spots) {
       const m = new THREE.Mesh(geo, mat);
-      m.position.set(p.x, a.floor + 12 + Math.random() * 4, p.z);
+      m.position.set(p.x, a.floor + 14 + Math.random() * 4, p.z);
       this.built.root.add(m);
       this._falling.push({ m, v: 0, x: p.x, z: p.z });
     }
@@ -514,19 +571,22 @@ export class StoryPart2 {
     const story = this.story;
     const B = this.boss;
     const d = this.built.dungeon;
+    const A = d.arena;
     story._lock(true);
-    story._ui.letterbox(true, '¡El gólem gigante cae!');
-    const c = d.arena.center;
-    const cam = new THREE.Vector3(c.x - d.arena.dir.x * 14 + d.arena.side.x * 6, c.y + 5, c.z - d.arena.dir.z * 14 + d.arena.side.z * 6);
-    const look = new THREE.Vector3(B.x, c.y + 3, B.z);
+    story._ui.bossBar(null, null);
+    story._ui.letterbox(true, '¡El cristal se rompe!');
+    const c = A.center;
+    const cam = new THREE.Vector3(c.x - A.dir.x * 15 + A.side.x * 6, c.y + 4, c.z - A.dir.z * 15 + A.side.z * 6);
+    const look = new THREE.Vector3(B.x, B.y + 3, B.z);
     story._cam.setCinematic(() => ({ pos: cam, look }), { speed: 3 });
     story._sequence([
-      { at: 3.4, run: () => {
+      { at: 2.4, run: () => story._ui.caption('El guardián cae. El altar queda libre.') },
+      { at: 4.2, run: () => {
         this._barrierGoal = 0;
         story._ui.caption('Las rocas de la salida se apartan');
       } },
     ], {
-      duration: 5.5,
+      duration: 6.5,
       done: () => {
         this.bossActive = false;
         this.s.bossDefeated = true;
@@ -536,7 +596,7 @@ export class StoryPart2 {
         story._ui.letterbox(false);
         story._lock(false);
         this.inventory.addItem('THRUSTER', 2);
-        this._msg('🔥 ¡2 propulsores! El gólem gigante los guardaba en su pecho. Vuelve a la nave a repararla.', 'pickup');
+        this._msg('🔥 ¡2 propulsores! Estaban bajo el altar del guardián. Vuelve a la nave a repararla.', 'pickup');
         this._say('¿Lo has derrotado? ¡Increíble! Trae los propulsores, la placa de navegación y las baterías.', 'pickup');
         this.story._autosave('el gólem gigante derrotado');
       },
@@ -546,6 +606,7 @@ export class StoryPart2 {
   _resetBoss() {
     if (!this.boss) return;
     this.boss.reset();
+    this.bossView?.reassemble();
     this.bossActive = false;
     this._barrierGoal = 0;
     this._barrierK = 0;
@@ -671,9 +732,9 @@ export class StoryPart2 {
       const d = b.dungeon;
       const inside = onHome && this._inDungeon();
       for (const l of d.lights) l.visible = inside;
-      d.animate(this._t);
-      // La sala de las cascadas tiene algo de luz propia (no es negra del todo).
-      this.story.caveCap = inside && this._inArena() ? 0.45 : 1;
+      d.animate(this._t, { runes: this.boss && this.boss.state !== 'DORMANT' && this.boss.state !== 'DEAD' ? 1 : 0 });
+      // La sala de las cascadas tiene luz propia (el techo abierto): no es negra.
+      this.story.caveCap = inside && this._inArena() ? 0.22 : 1;
       if (inside && !s.dungeonEntered && (s.stage === 'LAB' || s.stage === 'DUNGEON')) {
         s.dungeonEntered = true;
         s.stage = 'DUNGEON';
@@ -682,7 +743,7 @@ export class StoryPart2 {
       }
       if (s.stage === 'DUNGEON' && this._inArena() && !this._arenaHint) {
         this._arenaHint = true;
-        this._msg('💧 Una sala enorme con cascadas… Al fondo, un cofre con una «N».', 'info');
+        this._msg('💧 Una sala enorme con cascadas y un altar en el centro… Sobre él, un cofre con una «N» (y algo enorme, de rodillas, detrás).', 'info');
       }
       // Volver a la sala tras morir en la pelea: se repite.
       if (s.stage === 'BOSS' && !this.bossActive && !s.bossDefeated && this._inArena() && !this.story._seq) this._startBoss();
@@ -694,10 +755,14 @@ export class StoryPart2 {
       // El jefe.
       if (this.boss) {
         if (this.bossActive) {
-          const info = { x: p.x, y: p.y, z: p.z, alive: !this.health.dead, onGround: this.player.state.onGround, dodging: this.player.state.dodging > 0 };
+          const v = this.player.velocity;
+          const info = { x: p.x, y: p.y, z: p.z, vx: v.x, vz: v.z, alive: !this.health.dead, onGround: this.player.state.onGround, dodging: this.player.state.dodging > 0 };
           for (const ev of this.boss.update(dt, info)) this._bossEvent(ev);
-          const note = this.boss.covered > 0 ? '🖐️ Ojo tapado' : this.boss.windup === 'SLAM' ? '¡Va a golpear el suelo!' : '';
-          if (this.boss.fighting) this.story._ui.bossBar('GÓLEM GIGANTE', this.boss.health / BOSS.HEALTH, note);
+          const B = this.boss;
+          if (Math.hypot(B.x - this._bossAt.x, B.z - this._bossAt.z) > 0.05) this._bossCollider();
+          const notes = { SLAM: '✊ ¡Va a golpear el suelo!', ROCK: '🪨 ¡Va a lanzar una roca!', ROAR: '⚠️ ¡Se enfurece!', VENT: '🔥 Cristal al rojo: ¡dispara!' };
+          const note = B.action === 'LASER' ? (B.laser?.phase === 'FIRE' ? '💠 ¡Láser!' : '💠 ¡El cristal se carga!') : notes[B.action] ?? '';
+          if (B.fighting) this.story._ui.bossBar(B.phase === 2 ? 'GUARDIÁN DEL ALTAR · FASE 2' : 'GUARDIÁN DEL ALTAR', B.health / BOSS.HEALTH, note);
         } else if (this.boss.state === 'DEAD') this.boss.update(dt, { x: p.x, y: p.y, z: p.z });
         this.bossView.root.visible = onHome && (inside || this._inArena() || this.bossActive);
         if (this.bossView.root.visible) this.bossView.update(dt, this._t);
@@ -711,9 +776,10 @@ export class StoryPart2 {
         f.v += 18 * dt;
         f.m.position.y -= f.v * dt;
         f.m.rotation.x += dt * 5;
-        if (f.m.position.y > d.arena.floor + 0.25) return true;
+        const gy = d.arena.groundAt(f.x, f.z);
+        if (f.m.position.y > gy + 0.25) return true;
         b.root.remove(f.m);
-        this.pickups.drop(this.homeId, f.x, f.z, 'STONE', 1, null, d.arena.floor);
+        this.pickups.drop(this.homeId, f.x, f.z, 'STONE', 1, null, gy);
         return false;
       });
     }

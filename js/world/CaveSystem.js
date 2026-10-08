@@ -29,6 +29,8 @@ const WALK_K = 0.58;  // anchura caminable: 0,58·r a cada lado del eje (el suel
 const MAX_SLOPE = 0.62; // caída máxima del suelo por tramo (fracción de STEP): rampa caminable
 const MIN_RADIUS = 1.8;
 const MOUTH_WIDEN = [1.6, 1.45, 1.2];
+const END_GAP = 0.6; // m que se queda el jugador antes de la pared del fondo
+const ARENA_WIDE = 1.4; // la sala del gólem gigante: 1,4 veces más ancha que alta
 
 export class CaveSystem {
   constructor({ config }) {
@@ -150,9 +152,17 @@ export class CaveSystem {
         const surface = terrain.heightAt(x, z);
         if (surface < 4 || isWater?.(x, z)) ok = false;
         if (i > 3 && surface - (floor + (FLOOR_K + CEIL_K) * r) < 2.5) ok = false;
+        // La sala es más ancha (ARENA_WIDE): también roca encima a los lados.
+        if (arena) {
+          for (const k of [-1, 1]) {
+            const sx = x - Math.sin(h) * k * r * ARENA_WIDE * 0.8;
+            const sz = z + Math.cos(h) * k * r * ARENA_WIDE * 0.8;
+            if (terrain.heightAt(sx, sz) - (floor + FLOOR_K * r + 0.5 * CEIL_K * r) < 2.5) ok = false;
+          }
+        }
         if (!ok) break;
-        nodes.push({ x, z, floor, r, y: floor + FLOOR_K * r, chamber: chamber || arena, arena });
-        if (nodes.filter((n) => n.arena).length >= 5) break;
+        nodes.push({ x, z, floor, r, w: arena ? ARENA_WIDE : 1, y: floor + FLOOR_K * r, chamber: chamber || arena, arena });
+        if (nodes.filter((n) => n.arena).length >= 6) break;
         if (i > 40) {
           ok = false;
           break;
@@ -250,10 +260,10 @@ export class CaveSystem {
     let minZ = Infinity;
     let maxZ = -Infinity;
     for (const n of nodes) {
-      minX = Math.min(minX, n.x - n.r);
-      maxX = Math.max(maxX, n.x + n.r);
-      minZ = Math.min(minZ, n.z - n.r);
-      maxZ = Math.max(maxZ, n.z + n.r);
+      minX = Math.min(minX, n.x - n.r * (n.w ?? 1));
+      maxX = Math.max(maxX, n.x + n.r * (n.w ?? 1));
+      minZ = Math.min(minZ, n.z - n.r * (n.w ?? 1));
+      maxZ = Math.max(maxZ, n.z + n.r * (n.w ?? 1));
     }
     return { kind, nodes, mouth: { x: nodes[0].x, z: nodes[0].z, y: nodes[0].floor }, bbox: { minX, maxX, minZ, maxZ } };
   }
@@ -264,7 +274,7 @@ export class CaveSystem {
     for (let i = 0; i < cave.nodes.length - 1; i++) {
       const a = cave.nodes[i];
       const b = cave.nodes[i + 1];
-      const r = Math.max(a.r, b.r) + 1;
+      const r = Math.max(a.r * (a.w ?? 1), b.r * (b.w ?? 1)) + 1;
       const x0 = Math.floor((Math.min(a.x, b.x) - r) / cs);
       const x1 = Math.floor((Math.max(a.x, b.x) + r) / cs);
       const z0 = Math.floor((Math.min(a.z, b.z) - r) / cs);
@@ -290,14 +300,17 @@ export class CaveSystem {
       const dx = b.x - a.x;
       const dz = b.z - a.z;
       const len2 = dx * dx + dz * dz || 1e-6;
-      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len2));
+      const tr = ((x - a.x) * dx + (z - a.z) * dz) / len2;
+      const t = Math.max(0, Math.min(1, tr));
       const cx = a.x + dx * t;
       const cz = a.z + dz * t;
       const d = Math.hypot(x - cx, z - cz);
       const r = a.r + (b.r - a.r) * t;
-      if (d > r * 1.05) continue;
+      // Anchura: las salas grandes (la del gólem gigante) son más anchas que altas (w > 1).
+      const wr = r * ((a.w ?? 1) + ((b.w ?? 1) - (a.w ?? 1)) * t);
+      if (d > wr * 1.05) continue;
       const floor = a.floor + (b.floor - a.floor) * t;
-      out.push({ cave, i, t, d, r, floor, y: floor + FLOOR_K * r });
+      out.push({ cave, i, t, tr, len: Math.sqrt(len2), d, r, wr, floor, y: floor + FLOOR_K * r });
     }
     return out;
   }
@@ -320,12 +333,14 @@ export class CaveSystem {
     let cave = null;
     let wmax = -1;
     for (const s of this._segmentsAt(x, z)) {
-      if (s.d > s.r * WALK_K) continue;
+      if (s.d > s.wr * WALK_K) continue;
+      // El fondo de la cueva es una pared plana en el último nodo: no se pasa de ella.
+      if (s.i === s.cave.nodes.length - 2 && (s.tr - 1) * s.len > -END_GAP) continue;
       const c = s.y + CEIL_K * s.r;
       if (feet < s.floor - 1.5 || feet > c - 0.4) continue;
       if (s.floor > feet + step) continue;
       // Y menos cuanto más cerca de su borde caminable (entra y sale sin saltos).
-      const w = (Math.min(s.t, 1 - s.t) + 1e-4) * Math.min(1, Math.max(0.02, s.r * WALK_K - s.d));
+      const w = (Math.min(s.t, 1 - s.t) + 1e-4) * Math.min(1, Math.max(0.02, s.wr * WALK_K - s.d));
       sw += w;
       floor += s.floor * w;
       ceil += c * w;
@@ -344,7 +359,7 @@ export class CaveSystem {
     // el suelo aplanado. Una caja se saldría por las esquinas de arriba.
     for (const s of this._segmentsAt(x, z)) {
       if (y < s.floor - 0.1) continue;
-      const hx = s.d / Math.max(0.1, s.r * 0.84 - margin);
+      const hx = s.d / Math.max(0.1, s.wr * 0.84 - margin);
       const hy = Math.max(0, y - s.y) / Math.max(0.1, s.r * 0.84 * CEIL_K - margin);
       if (hx * hx + hy * hy <= 1) return true;
     }

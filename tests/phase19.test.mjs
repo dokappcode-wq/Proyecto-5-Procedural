@@ -21,64 +21,112 @@ const run = (b, p, s) => {
   return ev;
 };
 
-test('gólem gigante: valores de la lista', () => {
+test('gólem gigante: valores de la hoja de diseño', () => {
   assert.equal(BOSS.HEALTH, 300);
-  assert.equal(BOSS.SLAP_DAMAGE, 50);
-  assert.equal(BOSS.SLAM_DAMAGE, 20);
-  assert.deepEqual(BOSS.COVER_AT, [150, 100, 50]);
-  assert.equal(BOSS.COVER_TIME, 10);
-  assert.equal(BOSS.ADDS_AT.length * BOSS.ADDS_EACH, 4, '4 gólems en total');
-  assert.equal(BOSS.STONES_PER_SLAM, 5);
+  assert.equal(BOSS.PHASE2_AT, 150);
+  assert.equal(BOSS.SLAM.WAVE_DAMAGE, 20);
+  assert.ok(BOSS.ROCK.DAMAGE > 0 && BOSS.LASER.DAMAGE > 0);
+  for (const k of ['WINDUP']) assert.ok(BOSS.SLAM[k][1] < BOSS.SLAM[k][0], 'fase 2 más rápida');
+  assert.ok(BOSS.COOLDOWN[1] < BOSS.COOLDOWN[0]);
 });
 
-test('gólem gigante: se levanta, golpea el suelo y la onda se salta o se esquiva', () => {
-  const b = new BossLogic({ x: 0, y: 0, z: 0 });
-  assert.equal(b.eyeOpen, false, 'dormido no se le daña');
+const rise = (b) => {
   b.start();
-  const risen = run(b, player(), BOSS.RISE_TIME + 0.1);
-  assert.ok(risen.some((e) => e.type === 'risen'));
-  assert.ok(b.fighting && b.eyeOpen);
-  // En el suelo, la onda le alcanza.
-  const ev = run(b, player({ z: 8 }), BOSS.SLAM_EVERY + 3);
+  return run(b, player(), BOSS.RISE_TIME + 0.1);
+};
+
+test('gólem gigante: despierta, golpea el suelo y la onda se salta o se esquiva', () => {
+  const b = new BossLogic({ x: 0, y: 0, z: 0 });
+  assert.equal(b.hitCrystal(10).ok, false, 'dormido no se le daña');
+  assert.ok(rise(b).some((e) => e.type === 'risen'));
+  assert.ok(b.fighting);
+  // Cerca: casi siempre golpea el suelo. En el suelo, la onda (o el puño) le alcanza.
+  const ev = run(b, player({ z: 9 }), 20);
   assert.ok(ev.some((e) => e.type === 'slam'));
-  assert.equal(ev.filter((e) => e.type === 'waveHit').length >= 1, true);
-  // Saltando (en el aire) o esquivando, no.
+  assert.ok(ev.some((e) => e.type === 'waveHit' || e.type === 'slamHit'));
+  // Saltando o esquivando, no.
   const b2 = new BossLogic({ x: 0, y: 0, z: 0 });
-  b2.start();
-  run(b2, player(), BOSS.RISE_TIME + 0.1);
-  const air = run(b2, player({ z: 8, onGround: false }), BOSS.SLAM_EVERY + 3);
+  rise(b2);
+  const air = run(b2, player({ z: 9, onGround: false, dodging: true }), 20);
   assert.ok(air.some((e) => e.type === 'slam'));
-  assert.equal(air.filter((e) => e.type === 'waveHit').length, 0);
+  assert.equal(air.filter((e) => e.type === 'waveHit' || e.type === 'slamHit').length, 0);
 });
 
-test('gólem gigante: solo el ojo, se tapa a 150/100/50 y ataca con la mano; refuerzos y muerte', () => {
+test('gólem gigante: lanza rocas adonde va el jugador; un muro le cubre', () => {
+  const far = player({ z: 16 }); // con un muro de 2 m a 1 m delante (z = 15)
+  const hits = (env) => {
+    const b = new BossLogic({ x: 0, y: 0, z: 0, env, seed: 3 });
+    rise(b);
+    const ev = run(b, far, 60);
+    return { thrown: ev.filter((e) => e.type === 'rockThrow').length, hit: ev.filter((e) => e.type === 'rockHit').length, impacts: ev.filter((e) => e.type === 'rockImpact') };
+  };
+  const open = hits({});
+  assert.ok(open.thrown >= 2, 'lanza rocas desde lejos');
+  assert.ok(open.hit >= 1, 'quieto, le dan');
+  assert.ok(open.impacts.every((e) => Math.hypot(e.x - far.x, e.z - far.z) < 3), 'caen donde está');
+  // Con un muro entre los dos (cualquier segmento que cruce z = 15), no le dan.
+  const wall = {
+    blocked: (ax, ay, az, bx, by, bz) => (az - 15) * (bz - 15) < 0 && Math.min(ay, by) < 2,
+    ray: (ox, oy, oz, dx, dy, dz, max) => {
+      if (Math.abs(dz) < 1e-6) return null;
+      const t = (15 - oz) / dz;
+      return t > 0 && t < max && oy + dy * t < 2 ? t : null;
+    },
+  };
+  assert.equal(hits(wall).hit, 0);
+});
+
+test('gólem gigante: el láser persigue al jugador; corriendo se escapa; luego el cristal queda al rojo', () => {
+  const laser = (speed) => {
+    const b = new BossLogic({ x: 0, y: 0, z: 0, seed: 5 });
+    rise(b);
+    // Forzar el láser.
+    b.cooldown = 99;
+    b._begin('LASER', []);
+    const ev = [];
+    let ang = 0;
+    for (let t = 0; t < 5; t += 1 / 30) {
+      ang += (speed / 14) / 30;
+      const p = player({ x: Math.sin(ang) * 14, z: Math.cos(ang) * 14 });
+      ev.push(...b.update(1 / 30, p));
+    }
+    return { b, hits: ev.filter((e) => e.type === 'laserHit').length, vent: ev.some((e) => e.type === 'vent') };
+  };
+  const still = laser(0);
+  assert.ok(still.hits >= 3, `quieto le da (${still.hits})`);
+  assert.ok(still.vent, 'después, al rojo');
+  const run7 = laser(7.5);
+  assert.ok(run7.hits < still.hits, `corriendo, menos (${run7.hits} < ${still.hits})`);
+  // Al rojo hace más daño.
+  const b = still.b;
+  assert.equal(b.action, 'VENT');
+  const h = b.health;
+  b.hitCrystal(5);
+  assert.equal(h - b.health, 5 * BOSS.CRYSTAL_MULT * BOSS.VENT_MULT);
+});
+
+test('gólem gigante: solo el cristal; fase 2 a la mitad (ruge y es más rápido); se rompe y cae', () => {
   const b = new BossLogic({ x: 0, y: 0, z: 0 });
-  b.start();
-  run(b, player(), BOSS.RISE_TIME + 0.1);
+  rise(b);
   const all = [];
-  let covers = 0;
-  let blocked = 0;
   for (let i = 0; i < 400 && b.alive; i++) {
-    const r = b.hitEye(10);
-    if (!r.ok) blocked++;
+    const r = b.hitCrystal(5);
     all.push(...r.events);
-    if (r.events.some((e) => e.type === 'cover')) {
-      covers++;
-      assert.ok(!b.eyeOpen, 'tapado');
-      // Mientras está tapado: manotazos (50) a quien está delante y cerca.
-      const ev = run(b, player({ z: 6 }), BOSS.COVER_TIME + 0.2);
-      assert.ok(ev.some((e) => e.type === 'slap' && e.hit));
-      assert.ok(ev.some((e) => e.type === 'uncover'));
+    if (b.health <= BOSS.PHASE2_AT && b.phase === 2 && !all.some((e) => e.type === 'checked')) {
+      all.push({ type: 'checked' });
+      assert.equal(b.action, 'ROAR');
     }
   }
-  assert.equal(covers, 3);
-  assert.equal(all.filter((e) => e.type === 'adds').length, 2);
+  assert.ok(all.some((e) => e.type === 'phase2'));
+  assert.ok(all.filter((e) => e.type === 'crack').length >= 3, 'el cristal se agrieta');
   assert.ok(all.some((e) => e.type === 'dead'));
   assert.equal(b.alive, false);
-  assert.ok(blocked === 0, 'nunca se dispara con el ojo tapado en esta prueba (se espera a destaparlo)');
+  run(b, player(), BOSS.DEATH_TIME + 0.1);
+  assert.equal(b.death, 1);
   b.reset();
   assert.equal(b.health, 300);
   assert.equal(b.state, 'DORMANT');
+  assert.equal(b.phase, 1);
 });
 
 test('receta de la mesa de elaboración: bloqueada hasta que la da Nova', () => {

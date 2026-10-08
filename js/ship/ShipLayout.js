@@ -98,7 +98,8 @@ export function createShipLayout(bp) {
     box(I, W, D.BOTTOM, D.ROOF, D.FRONT, D.REAR),
     box(-W, W, D.BOTTOM, D.ROOF, D.REAR - WALL, D.REAR),
     box(-W, W, D.BOTTOM, D.ROOF, D.FRONT, D.FRONT + WALL),
-    box(-W * 0.68, W * 0.68, D.BOTTOM, 4.8, D.NOSE, D.FRONT),
+    box(-W * 0.68, W * 0.68, D.BOTTOM, 3.3, D.NOSE, D.FRONT), // morro (bajo el parabrisas)
+    box(-0.12, 0.12, D.ROOF, D.ROOF + 1.6, D.REAR - 3.3, D.REAR), // deriva de cola
   ];
   for (const e of bp.engines) STATIC.push(box(e.x - e.r, e.x + e.r, e.y - e.r, e.y + e.r, D.REAR, D.REAR + 1.2));
   for (const p of bp.partitions) {

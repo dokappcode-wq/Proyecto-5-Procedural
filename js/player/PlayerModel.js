@@ -1,72 +1,164 @@
 import * as THREE from 'three';
 
 /**
- * PlayerModel — representación visual del personaje (humanoide de bloques).
+ * PlayerModel — el protagonista (explorador low-poly, como en la hoja de diseño:
+ * pelo castaño con flequillo, chaqueta con cuello, bufanda roja, mochila con el
+ * saco enrollado, pantalón y botas). Empieza sin ropa, con hojas; cada prenda tiñe
+ * su parte del cuerpo (setOutfit) y con la chaqueta aparecen la bufanda y la mochila.
  *
- * Solo presentación: recibe el estado ya calculado y anima extremidades.
- * La parte frontal mira hacia -Z local, que coincide con la convención de
- * "adelante" de Three.js, de modo que rotation.y = yaw alinea cuerpo y vista.
+ * Solo presentación: recibe el estado ya calculado y anima el esqueleto.
+ * La parte frontal mira hacia −Z local (convención de Three.js): rotation.y = yaw.
  *
- * Alturas (m): piernas 0–0.8, torso 0.8–1.4, cabeza 1.4–1.8.
+ * Esqueleto (alturas en m): pelvis 0,92 → piernas (cadera, rodilla, tobillo) y
+ * torso → hombros (hombro, codo, mano) y cuello → cabeza (≈1,82 arriba del todo).
+ * Campos que usan otros sistemas: root, leftArm/rightArm (hombros), leftHand/rightHand,
+ * head, torso, watch.
  */
+const HIP_Y = 0.92;
+const THIGH = 0.42;
+const SHIN = 0.42;
+const UPPER_ARM = 0.27;
+const FOREARM = 0.25;
+
 export class PlayerModel {
   constructor({ colors }) {
     this.root = new THREE.Group();
     this.root.name = 'PlayerModel';
-
-    const box = new THREE.BoxGeometry(1, 1, 1); // compartida por todas las piezas
-    const mat = (color) => new THREE.MeshLambertMaterial({ color });
-    const skin = mat(colors.SKIN);
-    // Sin ropa, torso, piernas y pies son piel (la ropa los tiñe: setOutfit).
-    const shirt = mat(colors.SHIRT ?? colors.SKIN);
-    this._shirt = shirt;
-    this._shirtColor = colors.SHIRT ?? colors.SKIN;
-    const pants = mat(colors.PANTS ?? colors.SKIN);
-    const boots = mat(colors.BOOTS ?? colors.SKIN);
-    this._boots = boots;
-    this._bootsColor = colors.BOOTS ?? colors.SKIN;
+    const mat = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
     this._skinColor = colors.SKIN;
-    const hands = mat(colors.SKIN); // antebrazos y manos (guantes)
-    this._hands = hands;
+    this._shirtColor = colors.SHIRT ?? colors.SKIN;
+    this._pantsColor = colors.PANTS ?? colors.SKIN;
+    this._bootsColor = colors.BOOTS ?? colors.SKIN;
+    const skin = (this._skin = mat(colors.SKIN));
+    const shirt = (this._shirt = mat(this._shirtColor));
+    const pants = (this._pants = mat(this._pantsColor));
+    const boots = (this._boots = mat(this._bootsColor));
+    const hands = (this._hands = mat(colors.SKIN)); // manos (o guantes)
     const hair = mat(colors.HAIR);
-    const eye = mat(0x1d1d24);
-
-    const part = (material, sx, sy, sz, x, y, z, parent) => {
-      const m = new THREE.Mesh(box, material);
-      m.scale.set(sx, sy, sz);
+    const hairDark = mat(new THREE.Color(colors.HAIR).multiplyScalar(0.7).getHex());
+    const white = mat(0xf4f1ea);
+    const pupil = mat(0x2a1d14);
+    const mouth = mat(0x8a4a3a);
+    const sole = (this._sole = mat(0x3a2a20));
+    this._accent = mat(0x4a3322); // cinturón y correas
+    const parts = [];
+    const mesh = (geo, material, parent, [x, y, z] = [0, 0, 0], [sx, sy, sz] = [1, 1, 1], rot = null) => {
+      const m = new THREE.Mesh(geo, material);
       m.position.set(x, y, z);
+      m.scale.set(sx, sy, sz);
+      if (rot) m.rotation.set(...rot);
+      m.castShadow = true;
+      parent.add(m);
+      parts.push(m);
+      return m;
+    };
+    const group = (parent, [x, y, z]) => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      parent.add(g);
+      return g;
+    };
+    // Geometrías compartidas.
+    const capsule = (r, len) => new THREE.CapsuleGeometry(r, len, 2, 8);
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const ball = new THREE.IcosahedronGeometry(1, 1);
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 10);
+
+    // ---- Pelvis (sube y baja al agacharse) → piernas y torso.
+    const pelvis = (this.pelvis = group(this.root, [0, HIP_Y, 0]));
+    mesh(cyl, pants, pelvis, [0, 0.03, 0], [0.18, 0.17, 0.13]);
+    this._belt = mesh(cyl, this._accent, pelvis, [0, 0.1, 0], [0.175, 0.04, 0.125]);
+    this._buckle = mesh(box, mat(0xc9a64a), pelvis, [0, 0.1, -0.125], [0.05, 0.035, 0.01]);
+    const leg = (s) => {
+      const hip = group(pelvis, [s * 0.1, -0.02, 0]);
+      mesh(capsule(0.088, THIGH + 0.04 - 0.176), pants, hip, [0, -THIGH / 2, 0]);
+      const knee = group(hip, [0, -THIGH, 0]);
+      mesh(capsule(0.074, SHIN + 0.02 - 0.148), pants, knee, [0, -SHIN / 2 + 0.01, 0]);
+      const ankle = group(knee, [0, -SHIN + 0.025, 0]);
+      // Bota: caña, empeine y suela.
+      mesh(cyl, boots, ankle, [0, 0.03, 0], [0.072, 0.12, 0.08]);
+      mesh(box, boots, ankle, [0, -0.025, -0.05], [0.12, 0.08, 0.2]);
+      mesh(box, sole, ankle, [0, -0.07, -0.05], [0.13, 0.025, 0.215]);
+      return { hip, knee, ankle };
+    };
+    this._legL = leg(-1);
+    this._legR = leg(1);
+    this.leftLeg = this._legL.hip;
+    this.rightLeg = this._legR.hip;
+
+    // ---- Torso (se inclina y gira al andar).
+    const torso = (this.torso = group(pelvis, [0, 0.1, 0]));
+    this._chest = group(torso, [0, 0, 0]);
+    const chestGeo = new THREE.CylinderGeometry(0.215, 0.17, 0.42, 10);
+    mesh(chestGeo, shirt, this._chest, [0, 0.21, 0], [1, 1, 0.68]);
+    mesh(ball, shirt, this._chest, [0, 0.4, 0], [0.24, 0.075, 0.15]); // hombros redondeados
+    // Chaqueta: cuello, cremallera y bolsillos (solo con la prenda del pecho).
+    const jacket = (this._jacket = new THREE.Group());
+    this._chest.add(jacket);
+    this._jacketMat = mat(0x5e6a3e);
+    mesh(new THREE.TorusGeometry(0.1, 0.035, 5, 10), this._jacketMat, jacket, [0, 0.45, 0], [1, 1, 0.85], [Math.PI / 2, 0, 0]);
+    mesh(box, this._accent, jacket, [0, 0.2, -0.142], [0.018, 0.36, 0.01]);
+    for (const s of [-1, 1]) mesh(box, this._jacketMat, jacket, [s * 0.09, 0.12, -0.13], [0.08, 0.07, 0.02]);
+    // Bufanda roja (con la chaqueta).
+    const scarfMat = mat(0xb8342a);
+    this._scarf = new THREE.Group();
+    this._chest.add(this._scarf);
+    mesh(new THREE.TorusGeometry(0.095, 0.04, 6, 12), scarfMat, this._scarf, [0, 0.47, 0], [1, 1, 0.9], [Math.PI / 2, 0, 0]);
+    this._scarfTail = mesh(box, scarfMat, this._scarf, [0.06, 0.32, -0.12], [0.07, 0.22, 0.025], [0.15, 0, 0.12]);
+    // Mochila con el saco enrollado (con la chaqueta).
+    const packMat = mat(0x6b4a2e);
+    this._pack = new THREE.Group();
+    this._chest.add(this._pack);
+    mesh(box, packMat, this._pack, [0, 0.22, 0.17], [0.3, 0.36, 0.14]);
+    mesh(box, mat(0x5a3d25), this._pack, [0, 0.13, 0.25], [0.24, 0.14, 0.04]); // bolsillo
+    mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.36, 10), mat(0x5e6b3a), this._pack, [0, 0.45, 0.17], [1, 1, 1], [0, 0, Math.PI / 2]);
+    for (const s of [-1, 1]) {
+      mesh(box, this._accent, this._pack, [s * 0.1, 0.27, -0.005], [0.035, 0.36, 0.3]); // correas por los hombros
+    }
+    // Hojas (sin ropa).
+    const leafGeo = makeLeafGeometry();
+    const leafMat = new THREE.MeshLambertMaterial({ color: colors.LEAF ?? 0x4f9a3a, side: THREE.DoubleSide });
+    const leaf = (parent, x, y, z, size, rotZ) => {
+      const m = new THREE.Mesh(leafGeo, leafMat);
+      m.position.set(x, y, z);
+      m.scale.setScalar(size);
+      m.rotation.z = rotZ;
       m.castShadow = true;
       parent.add(m);
       return m;
     };
+    this._chestLeaves = [leaf(this._chest, -0.085, 0.3, -0.138, 0.13, 0.5), leaf(this._chest, 0.085, 0.3, -0.138, 0.13, -0.5)];
+    this._groinLeaf = leaf(pelvis, 0, 0.0, -0.125, 0.17, Math.PI);
 
-    // Piernas: pivote en la cadera para animar la zancada.
-    this.leftLeg = this._pivot(-0.12, 0.8, 0);
-    this.rightLeg = this._pivot(0.12, 0.8, 0);
-    for (const leg of [this.leftLeg, this.rightLeg]) {
-      part(pants, 0.22, 0.62, 0.26, 0, -0.31, 0, leg);
-      part(boots, 0.24, 0.18, 0.3, 0, -0.71, -0.02, leg);
-    }
+    // ---- Brazos: hombro → codo → mano (manopla con pulgar).
+    const arm = (s) => {
+      const shoulder = group(this._chest, [s * 0.255, 0.38, 0]);
+      mesh(capsule(0.066, UPPER_ARM + 0.05 - 0.132), shirt, shoulder, [0, -UPPER_ARM / 2 + 0.01, 0]);
+      const elbow = group(shoulder, [0, -UPPER_ARM, 0]);
+      const fore = mesh(capsule(0.058, FOREARM + 0.04 - 0.116), shirt, elbow, [0, -FOREARM / 2 + 0.01, 0]);
+      const cuff = mesh(cyl, hands, elbow, [0, -FOREARM + 0.04, 0], [0.05, 0.05, 0.05]);
+      const hand = group(elbow, [0, -FOREARM - 0.02, 0]);
+      mesh(box, hands, hand, [0, -0.03, 0], [0.085, 0.1, 0.06]);
+      mesh(box, hands, hand, [0, -0.09, -0.012], [0.08, 0.045, 0.05], [0.4, 0, 0]); // dedos doblados
+      mesh(box, hands, hand, [-s * 0.045, -0.035, -0.03], [0.03, 0.06, 0.03], [0.3, 0, s * 0.4]); // pulgar
+      return { shoulder, elbow, hand, fore, cuff };
+    };
+    this._armL = arm(-1);
+    this._armR = arm(1);
+    this.leftArm = this._armL.shoulder;
+    this.rightArm = this._armR.shoulder;
+    this.leftHand = this._armL.hand;
+    this.rightHand = this._armR.hand;
+    this._forearms = [this._armL.fore, this._armR.fore];
 
-    // Torso
-    this.torso = part(shirt, 0.5, 0.6, 0.28, 0, 1.1, 0, this.root);
-
-    // Brazos: pivote en el hombro.
-    this.leftArm = this._pivot(-0.34, 1.36, 0);
-    this.rightArm = this._pivot(0.34, 1.36, 0);
-    for (const arm of [this.leftArm, this.rightArm]) {
-      part(shirt, 0.18, 0.3, 0.2, 0, -0.12, 0, arm);
-      part(hands, 0.16, 0.34, 0.18, 0, -0.42, 0, arm);
-    }
-
-    // Reloj de pulsera en la muñeca izquierda (Tab: la cámara se acerca a él).
-    // La esfera mira a -Z local: al levantar el brazo hacia delante queda hacia arriba.
+    // Reloj en la muñeca izquierda (la esfera mira a −Z: al levantar el brazo, hacia arriba).
     const strap = mat(colors.WATCH ?? 0x2b3440);
+    const wrist = this._armL.elbow;
+    const wy = -FOREARM + 0.07;
     this._watchParts = [
-      part(strap, 0.185, 0.07, 0.205, 0, -0.5, 0, this.leftArm),
-      part(strap, 0.13, 0.1, 0.03, 0, -0.5, -0.11, this.leftArm),
+      mesh(cyl, strap, wrist, [0, wy, 0], [0.058, 0.04, 0.058]),
+      mesh(box, strap, wrist, [0, wy, -0.055], [0.075, 0.06, 0.02]),
     ];
-    // Pantalla: textura de lienzo con la hora (setWatchText).
     this._watchCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
     this._watchColor = new THREE.Color(colors.WATCH_SCREEN ?? 0x4fe0ff);
     if (this._watchCanvas) {
@@ -74,69 +166,74 @@ export class PlayerModel {
       this._watchCanvas.height = 96;
       this._watchTex = new THREE.CanvasTexture(this._watchCanvas);
       this._watchTex.colorSpace = THREE.SRGBColorSpace;
-      // La cara de la esfera queda girada 180° al levantar el brazo: se compensa.
       this._watchTex.center.set(0.5, 0.5);
       this._watchTex.rotation = Math.PI;
     }
     this._watchScreenMat = new THREE.MeshBasicMaterial({ color: 0xffffff, map: this._watchTex ?? null });
-    this.watch = part(this._watchScreenMat, 0.1, 0.075, 0.012, 0, -0.5, -0.127, this.leftArm);
-    this.setWatchText('--:--');
+    this.watch = mesh(box, this._watchScreenMat, wrist, [0, wy, -0.066], [0.06, 0.045, 0.004]);
     this.watch.castShadow = false;
     this._watchParts.push(this.watch);
+    this.setWatchText('--:--');
 
-    // Hojas que tapan pecho y entrepierna (se empieza desnudo).
-    const leafGeo = makeLeafGeometry();
-    const leafMat = new THREE.MeshLambertMaterial({ color: colors.LEAF ?? 0x4f9a3a, side: THREE.DoubleSide });
-    const leaf = (x, y, z, size, rotZ) => {
-      const m = new THREE.Mesh(leafGeo, leafMat);
-      m.position.set(x, y, z);
-      m.scale.setScalar(size);
-      m.rotation.z = rotZ;
-      m.castShadow = true;
-      this.root.add(m);
-      return m;
-    };
-    this._chestLeaves = [leaf(-0.12, 1.24, -0.146, 0.15, 0.5), leaf(0.12, 1.24, -0.146, 0.15, -0.5)];
-    this._groinLeaf = leaf(0, 0.8, -0.146, 0.2, Math.PI);
-
-    // Cabeza: pivote en el cuello para mirar arriba/abajo.
-    this.head = this._pivot(0, 1.4, 0);
-    part(skin, 0.4, 0.4, 0.4, 0, 0.2, 0, this.head);
-    part(hair, 0.42, 0.1, 0.42, 0, 0.42, 0.0, this.head);
-    part(hair, 0.42, 0.26, 0.08, 0, 0.3, 0.18, this.head);
-    part(eye, 0.07, 0.07, 0.02, -0.09, 0.24, -0.205, this.head);
-    part(eye, 0.07, 0.07, 0.02, 0.09, 0.24, -0.205, this.head);
-    // Gorro (oculto sin él).
+    // ---- Cuello y cabeza (algo grande: estilo de la hoja de diseño).
+    mesh(cyl, skin, this._chest, [0, 0.47, 0], [0.055, 0.08, 0.055]);
+    const head = (this.head = group(this._chest, [0, 0.5, 0]));
+    mesh(ball, skin, head, [0, 0.14, 0], [0.135, 0.155, 0.14]);
+    mesh(ball, skin, head, [0, 0.07, -0.03], [0.1, 0.07, 0.1]); // mandíbula
+    for (const s of [-1, 1]) mesh(ball, skin, head, [s * 0.135, 0.13, 0.01], [0.025, 0.04, 0.025]); // orejas
+    mesh(ball, skin, head, [0, 0.11, -0.142], [0.022, 0.03, 0.025]); // nariz
+    this._eyes = [];
+    for (const s of [-1, 1]) {
+      const e = group(head, [s * 0.05, 0.155, -0.128]);
+      mesh(ball, white, e, [0, 0, 0], [0.026, 0.03, 0.012]);
+      mesh(ball, pupil, e, [0, -0.003, -0.008], [0.014, 0.018, 0.008]);
+      mesh(box, hairDark, head, [s * 0.052, 0.198, -0.13], [0.055, 0.012, 0.01], [0, 0, s * -0.12]); // ceja
+      this._eyes.push(e);
+    }
+    mesh(box, mouth, head, [0, 0.065, -0.13], [0.04, 0.008, 0.008]);
+    // Pelo: casquete, nuca y flequillo de mechones.
+    mesh(ball, hair, head, [0, 0.2, 0.012], [0.145, 0.115, 0.15]);
+    mesh(ball, hair, head, [0, 0.13, 0.065], [0.14, 0.12, 0.1]);
+    for (let i = 0; i < 5; i++) {
+      const x = -0.1 + i * 0.05;
+      mesh(new THREE.ConeGeometry(0.035, 0.1, 4), hair, head, [x, 0.215, -0.115], [1, 1, 0.6], [Math.PI * 0.62, 0, (i - 2) * 0.18]);
+    }
+    mesh(new THREE.ConeGeometry(0.04, 0.12, 4), hair, head, [0.02, 0.32, 0.02], [1, 1, 1], [-0.4, 0, -0.3]); // remolino
+    // Gorro (prenda de la cabeza).
     this._capMat = mat(0x7a4a24);
     this._cap = new THREE.Group();
-    part(this._capMat, 0.46, 0.14, 0.46, 0, 0.44, 0, this._cap);
-    part(this._capMat, 0.46, 0.04, 0.16, 0, 0.38, -0.27, this._cap); // visera
+    mesh(new THREE.SphereGeometry(0.158, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), this._capMat, this._cap, [0, 0.19, 0.01]);
+    mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 12, 1, false, Math.PI * 0.75, Math.PI * 1.5), this._capMat, this._cap, [0, 0.19, -0.03]); // visera
     this._cap.visible = false;
-    this.head.add(this._cap);
+    head.add(this._cap);
 
-    // Traje espacial: casco transparente, mochila con el jetpack (ocultos sin traje).
-    this._pants = pants;
-    this._pantsColor = colors.PANTS;
+    // ---- Traje espacial: casco transparente y mochila de oxígeno/jetpack.
     this.suitParts = new THREE.Group();
     const helmet = new THREE.Mesh(
-      new THREE.SphereGeometry(0.34, 16, 12),
+      new THREE.SphereGeometry(0.26, 16, 12),
       new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.2, depthWrite: false }),
     );
-    helmet.position.set(0, 0.22, 0);
-    this.head.add(helmet);
+    helmet.position.set(0, 0.15, 0);
+    head.add(helmet);
     this._helmet = helmet;
     const tank = mat(0xd8dde3);
-    part(tank, 0.4, 0.5, 0.16, 0, 1.12, 0.24, this.suitParts);
-    part(mat(0x3a4450), 0.1, 0.12, 0.1, -0.12, 0.8, 0.26, this.suitParts);
-    part(mat(0x3a4450), 0.1, 0.12, 0.1, 0.12, 0.8, 0.26, this.suitParts);
-    this.root.add(this.suitParts);
-    this._wrist = 0;          // 0..1: levantar el brazo izquierdo para mirar el reloj
-    this._wristTarget = 0;
-    this.setSuit(false);
+    mesh(box, tank, this.suitParts, [0, 0.24, 0.19], [0.32, 0.4, 0.14]);
+    mesh(cyl, mat(0x3a4450), this.suitParts, [-0.09, 0.02, 0.2], [0.04, 0.1, 0.04]);
+    mesh(cyl, mat(0x3a4450), this.suitParts, [0.09, 0.02, 0.2], [0.04, 0.1, 0.04]);
+    this._chest.add(this.suitParts);
 
+    this._parts = parts;
+    this._wrist = 0;
+    this._wristTarget = 0;
+    this._outfit = {};
+    this.setSuit(false);
     this._walkPhase = 0;
     this._swing = 0;
-    this._actionTime = 0; // >0 durante la animación de golpear/recoger
+    this._actionTime = 0;
+    this._t = 0;
+    this._blink = 2;
+    this._air = 0;
+    this._land = 0;
   }
 
   /** Traje espacial: blanco, con casco y mochila de oxígeno/jetpack (tapa la ropa). */
@@ -147,10 +244,7 @@ export class PlayerModel {
     this._applyOutfit();
   }
 
-  /**
-   * Ropa puesta: { HEAD, CHEST, LEGS, FEET, HANDS } → color de cada prenda (o null).
-   * Cada pieza del cuerpo toma el color de su prenda.
-   */
+  /** Ropa puesta: { HEAD, CHEST, LEGS, FEET, HANDS } → color de cada prenda (o null). */
   setOutfit(colors) {
     this._outfit = { ...colors };
     this._applyOutfit();
@@ -159,13 +253,20 @@ export class PlayerModel {
   _applyOutfit() {
     const o = this._outfit ?? {};
     const suit = this._suit;
-    this._shirt.color.set(suit ? 0xeef1f4 : o.CHEST ?? this._shirtColor);
+    const chest = suit ? 0xeef1f4 : o.CHEST ?? this._shirtColor;
+    this._shirt.color.set(chest);
+    this._jacketMat.color.set(new THREE.Color(chest).multiplyScalar(0.82));
     this._pants.color.set(suit ? 0xdfe3e8 : o.LEGS ?? this._pantsColor);
     this._boots.color.set(suit ? 0xc9ced4 : o.FEET ?? this._bootsColor);
     this._hands.color.set(suit ? 0xdfe3e8 : o.HANDS ?? this._skinColor);
+    this._sole.color.set(o.FEET != null || suit ? 0x3a2a20 : this._skinColor);
     this._cap.visible = !suit && o.HEAD != null;
     if (o.HEAD != null) this._capMat.color.set(o.HEAD);
-    // Las hojas solo tapan lo que no tapa la ropa.
+    const clothed = !suit && o.CHEST != null;
+    this._jacket.visible = clothed;
+    this._scarf.visible = clothed;
+    this._pack.visible = clothed;
+    this._belt.visible = this._buckle.visible = suit || o.LEGS != null;
     for (const l of this._chestLeaves) l.visible = !suit && o.CHEST == null;
     this._groinLeaf.visible = !suit && o.LEGS == null;
   }
@@ -175,7 +276,11 @@ export class PlayerModel {
     return this._hands.color.getHex();
   }
 
-  /** Hora en la pantalla del reloj (solo se redibuja si cambia). */
+  /** Color de las mangas (piel sin ropa, o la chaqueta). */
+  get sleeveColor() {
+    return this._shirt.color.getHex();
+  }
+
   /** El reloj solo se ve en la muñeca cuando se lleva (se coge en la cápsula). */
   setWatchVisible(visible) {
     for (const m of this._watchParts) m.visible = visible;
@@ -189,6 +294,7 @@ export class PlayerModel {
     this.setWatchText(t ?? '--:--');
   }
 
+  /** Hora en la pantalla del reloj (solo se redibuja si cambia). */
   setWatchText(text) {
     if (!this._watchCanvas || text === this._watchText) return;
     this._watchText = text;
@@ -223,7 +329,7 @@ export class PlayerModel {
     this._wristTarget = on ? 1 : 0;
   }
 
-  /** Pose de combate: 'aim' (arco/tirachinas: brazos al frente), 'block' (escudo delante) o null. */
+  /** Pose de combate: 'aim' (arco/tirachinas), 'block' (escudo delante) o null. */
   setCombatPose(pose) {
     this._combatPose = pose;
   }
@@ -239,13 +345,6 @@ export class PlayerModel {
     this._actionDuration = duration;
   }
 
-  _pivot(x, y, z) {
-    const g = new THREE.Group();
-    g.position.set(x, y, z);
-    this.root.add(g);
-    return g;
-  }
-
   setVisible(visible) {
     this._wantVisible = visible;
     this.root.visible = visible && !this.hidden;
@@ -259,86 +358,142 @@ export class PlayerModel {
 
   /**
    * @param {number} dt
-   * @param {{horizontalSpeed:number, maxSpeed:number, onGround:boolean, headPitch:number, headYaw:number}} s
+   * @param {{ horizontalSpeed, maxSpeed, onGround, headPitch, headYaw, climbing?, climbMoving?, crouch?, dodging? }} s
    */
   animate(dt, s) {
-    const moveFactor = Math.min(s.horizontalSpeed / s.maxSpeed, 1);
-    const targetSwing = s.onGround ? moveFactor * 0.9 : 0.25;
-    this._swing += (targetSwing - this._swing) * Math.min(1, dt * 10);
-    this._walkPhase += dt * (4 + s.horizontalSpeed * 1.6) * (moveFactor > 0.05 ? 1 : 0);
+    this._t += dt;
+    const t = this._t;
+    const moveFactor = Math.min(s.horizontalSpeed / Math.max(0.1, s.maxSpeed), 1);
+    const running = s.horizontalSpeed > 5.2;
+    const target = s.onGround ? moveFactor : 0;
+    this._swing += (target - this._swing) * Math.min(1, dt * 10);
+    if (moveFactor > 0.05) this._walkPhase += dt * (4.2 + s.horizontalSpeed * 1.35);
+    const ph = this._walkPhase;
+    const A = this._swing * (running ? 0.85 : 0.6);
+    const sinP = Math.sin(ph);
+    // Aterrizaje: un pequeño rebote al tocar el suelo.
+    if (!s.onGround) this._air += dt;
+    else {
+      if (this._air > 0.35) this._land = 1;
+      this._air = 0;
+    }
+    this._land = Math.max(0, this._land - dt * 5);
 
-    const swing = Math.sin(this._walkPhase) * this._swing;
-    this.leftLeg.rotation.x = swing;
-    this.rightLeg.rotation.x = -swing;
-    if (s.onGround) {
-      this.leftArm.rotation.x = -swing * 0.8;
-      this.rightArm.rotation.x = swing * 0.8;
-      this.leftArm.rotation.z = this.rightArm.rotation.z = 0;
-    } else {
-      // En el aire: brazos ligeramente abiertos.
-      this.leftArm.rotation.x = this.rightArm.rotation.x = -0.4;
-      this.leftArm.rotation.z = -0.35;
-      this.rightArm.rotation.z = 0.35;
+    // ---- Piernas: zancada con rodilla y pie que acompaña.
+    const legPose = (L, phase) => {
+      const sw = Math.sin(phase) * A;
+      const kneeBend = Math.max(0, -Math.cos(phase)) * A * 1.5 + 0.06 * this._swing;
+      L.hip.rotation.set(sw, 0, 0);
+      L.knee.rotation.set(-kneeBend, 0, 0);
+      L.ankle.rotation.set(-(sw - kneeBend) * 0.5, 0, 0);
+    };
+    legPose(this._legL, ph);
+    legPose(this._legR, ph + Math.PI);
+    // ---- Brazos: balanceo opuesto con el codo algo doblado.
+    const armPose = (Ar, phase, side) => {
+      const sw = -Math.sin(phase) * A * 0.9;
+      Ar.shoulder.rotation.set(sw, 0, side * (0.08 + 0.04 * Math.sin(t * 1.4)));
+      Ar.elbow.rotation.set(0.25 + Math.max(0, sw) * 0.8 + (running ? 0.7 : 0), 0, 0);
+      Ar.hand.rotation.set(0, 0, 0);
+    };
+    armPose(this._armL, ph, -1);
+    armPose(this._armR, ph + Math.PI, 1);
+    // ---- Cuerpo: rebote, giro de hombros, inclinación al correr, respiración.
+    const bob = Math.abs(Math.cos(ph)) * 0.035 * this._swing;
+    let pelvisY = HIP_Y - 0.02 * this._swing + bob - this._land * 0.08;
+    this.pelvis.rotation.set(0, Math.sin(ph) * 0.1 * this._swing, 0);
+    this.torso.rotation.set((running ? 0.16 : 0.04) * this._swing, -Math.sin(ph) * 0.16 * this._swing, 0);
+    const breathe = 1 + Math.sin(t * 2.1) * 0.012 * (1 - this._swing);
+    this._chest.scale.set(1, breathe, 1);
+    this._scarfTail.rotation.x = 0.15 + this._swing * 0.5 + Math.sin(t * 6) * 0.05 * this._swing;
+
+    // ---- En el aire: piernas recogidas y brazos abiertos.
+    if (!s.onGround && !s.climbing) {
+      const k = Math.min(1, this._air * 4);
+      this._legL.hip.rotation.x = 0.55 * k;
+      this._legL.knee.rotation.x = -0.9 * k;
+      this._legR.hip.rotation.x = -0.15 * k;
+      this._legR.knee.rotation.x = -0.4 * k;
+      this._armL.shoulder.rotation.set(0.5 * k, 0, -0.55 * k);
+      this._armR.shoulder.rotation.set(0.3 * k, 0, 0.55 * k);
+      this._armL.elbow.rotation.x = this._armR.elbow.rotation.x = 0.6 * k;
     }
 
-    // Escalando: brazos arriba alternándose (y piernas), como trepando.
+    // ---- Escalando: brazos arriba alternándose, piernas empujando.
     if (s.climbing) {
       if (s.climbMoving) this._climbPhase = (this._climbPhase ?? 0) + dt * 7;
       const c = Math.sin(this._climbPhase ?? 0);
-      this.leftArm.rotation.x = 2.5 + c * 0.45;
-      this.rightArm.rotation.x = 2.5 - c * 0.45;
-      this.leftArm.rotation.z = this.rightArm.rotation.z = 0;
-      this.leftLeg.rotation.x = 0.4 - c * 0.35;
-      this.rightLeg.rotation.x = 0.4 + c * 0.35;
+      this._armL.shoulder.rotation.set(2.6 + c * 0.4, 0, -0.15);
+      this._armR.shoulder.rotation.set(2.6 - c * 0.4, 0, 0.15);
+      this._armL.elbow.rotation.x = 0.4 - c * 0.3;
+      this._armR.elbow.rotation.x = 0.4 + c * 0.3;
+      this._legL.hip.rotation.x = 0.5 - c * 0.4;
+      this._legR.hip.rotation.x = 0.5 + c * 0.4;
+      this._legL.knee.rotation.x = -0.8 + c * 0.3;
+      this._legR.knee.rotation.x = -0.8 - c * 0.3;
+      this.torso.rotation.set(0.15, 0, 0);
     }
 
-    // Golpe/recogida: el brazo derecho se lanza hacia delante.
+    // ---- Golpe / recoger: el brazo derecho toma impulso hacia atrás y descarga delante.
     if (this._actionTime > 0) {
       this._actionTime = Math.max(0, this._actionTime - dt);
-      const t = 1 - this._actionTime / this._actionDuration;
-      this.rightArm.rotation.x = Math.sin(t * Math.PI) * 1.7; // frente = -Z
-      this.rightArm.rotation.z = 0;
+      const u = 1 - this._actionTime / this._actionDuration;
+      const wind = u < 0.3 ? u / 0.3 : 1;
+      const strike = u < 0.3 ? 0 : Math.sin(((u - 0.3) / 0.7) * Math.PI);
+      this._armR.shoulder.rotation.set(-0.5 * (1 - strike) * wind + 1.9 * strike, 0, 0.1);
+      this._armR.elbow.rotation.x = 1.1 * (1 - strike) * wind + 0.15;
+      this.torso.rotation.y += -0.35 * wind * (1 - strike) + 0.3 * strike;
     }
 
-    // Mirar el reloj: el brazo izquierdo sube hacia delante y cruza hacia el centro.
+    // ---- Mirar el reloj: el brazo izquierdo sube por delante con el codo doblado.
     this._wrist += (this._wristTarget - this._wrist) * Math.min(1, dt * 9);
     if (this._wrist > 0.001) {
       const w = this._wrist * this._wrist * (3 - 2 * this._wrist);
-      const a = this.leftArm.rotation;
-      a.x += (1.38 - a.x) * w;
-      a.y += (-0.35 - a.y) * w;
-      a.z += (0.62 - a.z) * w;
-    } else {
-      this.leftArm.rotation.y = 0;
+      const a = this._armL.shoulder.rotation;
+      a.x += (1.05 - a.x) * w;
+      a.y += (-0.2 - a.y) * w;
+      a.z += (0.35 - a.z) * w;
+      this._armL.elbow.rotation.x += (1.25 - this._armL.elbow.rotation.x) * w;
+      this._armL.hand.rotation.z = -0.9 * w;
     }
 
-    // Combate: apuntar (los dos brazos al frente) o bloquear (escudo delante del pecho).
+    // ---- Combate: apuntar (tirachinas/arco al frente, la derecha tensa junto a la cara)
+    // o bloquear (escudo delante del pecho).
     if (this._combatPose === 'aim') {
-      this.leftArm.rotation.set(1.5 + s.headPitch, -0.15, 0);
-      this.rightArm.rotation.set(1.4 + s.headPitch, 0.4, 0);
+      const p = s.headPitch;
+      this._armL.shoulder.rotation.set(1.5 + p, -0.15, 0);
+      this._armL.elbow.rotation.x = 0.05;
+      this._armR.shoulder.rotation.set(1.35 + p, 0.55, 0);
+      this._armR.elbow.rotation.x = 1.6;
+      this.torso.rotation.y = 0.25;
     } else if (this._combatPose === 'block') {
-      this.leftArm.rotation.set(1.2, 0.55, 0);
+      this._armL.shoulder.rotation.set(1.1, 0.5, 0);
+      this._armL.elbow.rotation.x = 1.2;
     }
 
-    // Leve rebote del torso al caminar.
-    this.torso.position.y = 1.1 + Math.abs(Math.cos(this._walkPhase)) * 0.03 * moveFactor;
-
-    // Agachado (o esquivando): el cuerpo baja y las piernas se doblan hacia delante.
-    const c = Math.max(s.crouch ?? 0, s.dodging ? 0.55 : 0);
-    const drop = -0.4 * c;
-    this.torso.position.y += drop;
-    this.torso.rotation.x = -0.25 * c;
-    this.leftArm.position.y = this.rightArm.position.y = 1.36 + drop;
-    this.head.position.y = 1.4 + drop;
-    this.leftLeg.position.y = this.rightLeg.position.y = 0.8 + drop;
+    // ---- Agachado (o esquivando): caderas abajo, rodillas dobladas y el pie en el suelo.
+    const c = Math.max(s.crouch ?? 0, s.dodging ? 0.6 : 0);
     if (c > 0.01) {
-      this.leftLeg.rotation.x += (1.05 - this.leftLeg.rotation.x) * c;
-      this.rightLeg.rotation.x += (0.75 - this.rightLeg.rotation.x) * c;
+      const th = 0.95 * c;
+      for (const L of [this._legL, this._legR]) {
+        L.hip.rotation.x = L.hip.rotation.x * (1 - c) + th;
+        L.knee.rotation.x = L.knee.rotation.x * (1 - c) - th * 2;
+        L.ankle.rotation.x = th;
+      }
+      pelvisY -= (THIGH + SHIN) * (1 - Math.cos(th));
+      this.torso.rotation.x += 0.35 * c;
     }
+    this.pelvis.position.y = pelvisY;
 
+    // ---- Cabeza: mira hacia donde mira la cámara (compensando el giro del torso).
     this.head.rotation.order = 'YXZ';
-    this.head.rotation.y = s.headYaw;
-    this.head.rotation.x = s.headPitch;
+    this.head.rotation.y = s.headYaw - this.torso.rotation.y - this.pelvis.rotation.y;
+    this.head.rotation.x = s.headPitch - this.torso.rotation.x * 0.7;
+    // Parpadeo.
+    this._blink -= dt;
+    if (this._blink < 0) this._blink = 2.5 + Math.random() * 2.5;
+    const closed = this._blink < 0.12 ? 0.15 : 1;
+    for (const e of this._eyes) e.scale.y = closed;
   }
 }
 

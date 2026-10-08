@@ -24,6 +24,8 @@ const GLOW_LIGHT = 0xf4f1e2;
 const GLOW_ENGINE = 0x8fd8ff;
 const BATTERY = 0xf0c24a;
 const POD = 0xe8ecef;
+const CH = 0.55;     // bisel de las aristas de arriba del casco
+const CH_Y = 4.85;   // altura donde empieza el bisel
 
 const box = new THREE.BoxGeometry(1, 1, 1);
 const cyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
@@ -114,41 +116,150 @@ export class ShipModel {
     for (const side of [-1, 1]) {
       const x0 = side < 0 ? -W : I;
       const x1 = side < 0 ? -I : W;
-      slab(b, x0, x1, D.BOTTOM, winLow, D.FRONT, D.REAR, HULL);
-      slab(b, x0, x1, winHigh, D.ROOF, D.FRONT, D.REAR, HULL);
-      for (const z of bp.windows) slab(b, x0, x1, winLow, winHigh, z, Math.min(D.REAR, z + 0.6), HULL_ALT);
+      // Bisel también abajo (la panza se recoge hacia dentro).
+      b.add(box, {
+        position: [(x0 + x1) / 2, D.BOTTOM + 0.25, (D.FRONT + D.REAR) / 2],
+        scale: [x1 - x0, 0.5, D.REAR - D.FRONT],
+        color: HULL_ALT,
+        jitter: (i, v) => {
+          if (v.y < 0 && v.x * side > 0) v.x = side * (0.5 - 0.28 / (x1 - x0));
+        },
+      });
+      slab(b, x0, x1, D.BOTTOM + 0.5, winLow, D.FRONT, D.REAR, HULL);
+      slab(b, x0, x1, winHigh, CH_Y, D.FRONT, D.REAR, HULL);
+      // Arista de arriba biselada (el casco no es una caja).
+      b.add(box, {
+        position: [(x0 + x1) / 2 + side * 0, (CH_Y + D.ROOF) / 2, (D.FRONT + D.REAR) / 2],
+        scale: [x1 - x0, D.ROOF - CH_Y, D.REAR - D.FRONT],
+        color: HULL,
+        jitter: (i, v) => {
+          if (v.y > 0 && v.x * side > 0) v.x = side * (0.5 - CH / (x1 - x0));
+        },
+      });
+      // Líneas de paneles y una segunda franja oscura.
+      const xo = side < 0 ? -W - 0.012 : W;
+      for (let z = D.FRONT + 1.6; z < D.REAR - 0.5; z += 2.4) slab(b, xo, xo + 0.012, D.BOTTOM + 0.1, winLow - 0.15, z, z + 0.04, HULL_ALT);
+      slab(b, xo, xo + 0.012, 2.55, 2.68, D.FRONT, D.REAR, DARK);
+      // Ventanas sueltas (ojos de buey cuadrados), no una franja corrida.
+      const wins = [];
+      for (let z = D.FRONT + 1.2; z < D.REAR - 1.0; z += 2.3) wins.push(z);
+      let zc = D.FRONT;
+      for (const z of wins) {
+        slab(b, x0, x1, winLow, winHigh, zc, z, HULL);
+        zc = z + 0.85;
+        const xo = side < 0 ? -W - 0.03 : W;
+        slab(b, xo, xo + 0.03, winLow - 0.06, winLow, z - 0.06, zc + 0.06, DARK);
+        slab(b, xo, xo + 0.03, winHigh, winHigh + 0.06, z - 0.06, zc + 0.06, DARK);
+      }
+      slab(b, x0, x1, winLow, winHigh, zc, D.REAR, HULL);
       glass.add(box, { position: [(x0 + x1) / 2, (winLow + winHigh) / 2, (D.FRONT + D.REAR) / 2], scale: [0.06, winHigh - winLow, D.REAR - D.FRONT] });
       const xs = side < 0 ? -W - 0.02 : W;
       slab(b, xs, xs + 0.02, 2.75, 2.95, D.FRONT, D.REAR, ACCENT);
     }
-    // Trasera, parabrisas, techo con espina y luces.
-    slab(b, -W, W, D.BOTTOM, D.ROOF, D.REAR - 0.3, D.REAR, HULL);
+    // Trasera, parabrisas, techo con espina y luces (las esquinas de arriba, biseladas).
+    const chamfer = (y0, z0, z1, color = HULL) => b.add(box, {
+      position: [0, (y0 + D.ROOF) / 2, (z0 + z1) / 2],
+      scale: [2 * W, D.ROOF - y0, z1 - z0],
+      color,
+      jitter: (i, v) => {
+        if (v.y > 0) v.x = Math.sign(v.x) * (0.5 - CH / (2 * W));
+      },
+    });
+    slab(b, -W, W, D.BOTTOM, CH_Y, D.REAR - 0.3, D.REAR, HULL);
+    chamfer(CH_Y, D.REAR - 0.3, D.REAR);
     slab(b, -W, W, D.BOTTOM, 3.3, D.FRONT, D.FRONT + 0.3, HULL);
-    slab(b, -W, W, 4.7, D.ROOF, D.FRONT, D.FRONT + 0.3, HULL);
+    slab(b, -W, W, 4.7, CH_Y, D.FRONT, D.FRONT + 0.3, HULL);
+    chamfer(CH_Y, D.FRONT, D.FRONT + 0.3);
     for (const x of [-W, -0.15, W - 0.4]) slab(b, x, x + 0.4, 3.3, 4.7, D.FRONT, D.FRONT + 0.3, HULL_ALT);
     glass.add(box, { position: [0, 4.0, D.FRONT + 0.15], scale: [2 * W, 1.4, 0.06] });
-    slab(b, -W, W, D.CEILING, D.ROOF, D.FRONT, D.REAR, HULL);
+    slab(b, -(W - CH), W - CH, D.CEILING, D.ROOF, D.FRONT, D.REAR, HULL);
     slab(b, -I, I, D.CEILING - 0.04, D.CEILING, D.FRONT + 0.3, D.REAR - 0.3, WALL_IN);
     slab(b, -1.2, 1.2, D.ROOF, D.ROOF + 0.25, D.FRONT + 1, D.REAR - 1.1, HULL_ALT);
     slab(b, -0.3, 0.3, D.ROOF + 0.25, D.ROOF + 0.3, D.FRONT + 2, D.REAR - 2.1, ACCENT);
     for (const [x, y, z] of bp.lights) slab(g, x - 0.8, x + 0.8, D.CEILING - 0.06, D.CEILING - 0.04, z - 0.5, z + 0.5, GLOW_LIGHT);
-    // Morro en cuña.
-    b.add(box, {
-      position: [0, 3.5, (D.NOSE + D.FRONT) / 2],
-      scale: [W * 1.35, 2.6, D.FRONT - D.NOSE],
+    // Morro afilado bajo el parabrisas (como el capó de un caza), con una arista en el centro.
+    const tip = D.NOSE - 1.1;
+    b.add(new THREE.BoxGeometry(1, 1, 1, 2, 1, 1), {
+      position: [0, (D.BOTTOM + 3.3) / 2, (tip + D.FRONT) / 2],
+      scale: [2 * W, 3.3 - D.BOTTOM, D.FRONT - tip],
       color: HULL,
       jitter: (i, v) => {
-        if (v.z < 0) {
-          v.x *= 0.55;
-          if (v.y > 0) v.y = -0.05;
+        const front = v.z < 0;
+        if (front) {
+          v.x *= 0.1;
+          v.y = v.y > 0 ? 0.0 : -0.32;
+        }
+        if (v.y > 0 && Math.abs(v.x) < 0.01) v.y += 0.12; // arista
+      },
+    });
+    // Panza del morro (más oscura) y marco del parabrisas.
+    b.add(box, {
+      position: [0, D.BOTTOM + 0.05, (tip + D.FRONT) / 2 + 0.3],
+      scale: [2 * W * 0.9, 0.12, D.FRONT - tip - 0.6],
+      color: DARK,
+      jitter: (i, v) => {
+        if (v.z < 0) v.x *= 0.15;
+      },
+    });
+    for (const sx of [-1, 1]) slab(b, sx < 0 ? -W - 0.02 : W - 0.18, sx < 0 ? -W + 0.18 : W + 0.02, 3.25, 4.75, D.FRONT - 0.03, D.FRONT + 0.05, DARK);
+    slab(b, -W, W, 4.7, 4.82, D.FRONT - 0.03, D.FRONT + 0.05, DARK);
+    // Alerones cortos en los costados (nave pequeña) con luces de posición.
+    this._navLights = [];
+    if (!bp.wings) {
+      for (const side of [-1, 1]) {
+        b.add(box, {
+          position: [side * (W + 1.25), 3.05, 1.8],
+          scale: [2.5, 0.28, 4.4],
+          color: HULL,
+          jitter: (i, v) => {
+            if (v.x * side > 0) {
+              v.z = v.z * 0.4 + 0.3; // flecha: la punta retrasada y estrecha
+              v.y *= 0.5;
+            }
+          },
+        });
+        slab(b, side < 0 ? -W - 2.3 : W + 2.0, side < 0 ? -W - 2.0 : W + 2.3, 3.16, 3.2, 2.4, 3.6, ACCENT);
+        const nav = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: side < 0 ? 0xff3a3a : 0x3aff6a }));
+        nav.position.set(side * (W + 2.45), 3.08, 3.2);
+        this.root.add(nav);
+        this._navLights.push(nav);
+      }
+    }
+    // Deriva de cola sobre el techo (en flecha) con su luz blanca.
+    b.add(box, {
+      position: [0, D.ROOF + 0.8, D.REAR - 1.6],
+      scale: [0.2, 1.6, 3.4],
+      color: HULL,
+      jitter: (i, v) => {
+        if (v.y > 0) {
+          v.z = v.z * 0.45 + 0.28;
+          v.x *= 0.6;
         }
       },
     });
-    slab(b, -W * 0.47, W * 0.47, D.BOTTOM, 2.6, D.NOSE + 0.4, D.FRONT, HULL_ALT);
+    slab(b, -0.11, 0.11, D.ROOF + 1.05, D.ROOF + 1.25, D.REAR - 1.3, D.REAR - 0.2, ACCENT);
+    this._strobe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    this._strobe.position.set(0, D.ROOF + 1.65, D.REAR - 0.25);
+    this.root.add(this._strobe);
+    // Matrícula en los costados.
+    const plate = registrationTexture('MZ-0');
+    for (const side of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.45), new THREE.MeshBasicMaterial({ map: plate, transparent: true, depthWrite: false }));
+      m.position.set(side * (W + 0.02), 4.58, D.REAR - 2.6);
+      m.rotation.y = side * Math.PI / 2;
+      this.root.add(m);
+    }
     // Motores traseros.
+    // Motores traseros: carenado, anillo y tobera acampanada.
+    const bell = new THREE.CylinderGeometry(0.6, 0.42, 1, 14, 1, true);
+    const bellIn = new THREE.CylinderGeometry(0.56, 0.38, 1, 14, 1, true);
+    bellIn.scale(-1, 1, 1); // caras hacia dentro
     for (const e of bp.engines) {
-      b.add(cyl, { position: [e.x, e.y, D.REAR + 0.6], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2, 1.2, e.r * 2], color: METAL });
-      b.add(cyl, { position: [e.x, e.y, D.REAR + 0.15], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2.35, 0.3, e.r * 2.35], color: DARK });
+      b.add(cyl, { position: [e.x, e.y, D.REAR + 0.5], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2.2, 1.0, e.r * 2.2], color: METAL });
+      b.add(cyl, { position: [e.x, e.y, D.REAR + 0.05], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2.45, 0.2, e.r * 2.45], color: ACCENT });
+      b.add(cyl, { position: [e.x, e.y, D.REAR + 1.02], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2.3, 0.06, e.r * 2.3], color: DARK });
+      b.add(bell, { position: [e.x, e.y, D.REAR + 1.45], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2, 0.8, e.r * 2], color: 0x4a515c });
+      b.add(bellIn, { position: [e.x, e.y, D.REAR + 1.45], rotation: [Math.PI / 2, 0, 0], scale: [e.r * 2, 0.8, e.r * 2], color: 0x23272e });
     }
     // Alas con propulsores en las puntas (nave ampliada).
     if (bp.wings) {
@@ -397,12 +508,25 @@ export class ShipModel {
     this.legs = L.LEGS.map((l) => {
       const group = new THREE.Group();
       group.position.set(l.x, D.BOTTOM, l.z);
-      const strut = new THREE.Mesh(toColored(box, METAL), this._material);
-      const foot = new THREE.Mesh(toColored(new THREE.CylinderGeometry(0.42, 0.5, 0.18, 8), DARK), this._material);
+      // Pata telescópica: funda arriba, vástago que sale y pie ancho con cuatro dedos.
+      const strut = new THREE.Mesh(toColored(new THREE.CylinderGeometry(0.4, 0.4, 1, 10), 0xb7bec7), this._material);
+      const sleeve = new THREE.Mesh(toColored(new THREE.CylinderGeometry(0.26, 0.24, 0.7, 10), METAL), this._material);
+      sleeve.position.y = -0.35;
       const hinge = new THREE.Mesh(toColored(box, DARK), this._material);
-      hinge.scale.set(0.6, 0.3, 0.6);
-      hinge.position.y = -0.15;
-      group.add(strut, foot, hinge);
+      hinge.scale.set(0.62, 0.26, 0.62);
+      hinge.position.y = -0.1;
+      const foot = new THREE.Group();
+      const pad = new THREE.Mesh(toColored(new THREE.CylinderGeometry(0.42, 0.58, 0.16, 10), DARK), this._material);
+      foot.add(pad);
+      for (let k = 0; k < 4; k++) {
+        const toe = new THREE.Mesh(toColored(box, METAL), this._material);
+        const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
+        toe.scale.set(0.16, 0.1, 0.42);
+        toe.position.set(Math.sin(a) * 0.55, -0.02, Math.cos(a) * 0.55);
+        toe.rotation.y = a;
+        foot.add(toe);
+      }
+      group.add(strut, sleeve, foot, hinge);
       this.root.add(group);
       return { group, strut, foot };
     });
@@ -418,7 +542,7 @@ export class ShipModel {
 
     // Toberas (motores traseros y de las alas).
     const bp = L.blueprint;
-    const nozzles = bp.engines.map((en) => [en.x, en.y, D.REAR + 1.21, en.r * 0.8]);
+    const nozzles = bp.engines.map((en) => [en.x, en.y, D.REAR + 1.3, en.r * 0.85]);
     if (bp.wings?.thrusters) for (const side of [-1, 1]) nozzles.push([side * (bp.wings.span - 0.4), bp.wings.y, bp.wings.z1 + 1.76, 0.5]);
     for (const [x, y, z, r] of nozzles) {
       const glow = new THREE.Mesh(new THREE.CircleGeometry(r, 12), this._engineMaterial);
@@ -478,6 +602,9 @@ export class ShipModel {
       leg.foot.visible = (ship.legs ?? 1) > 0.15;
     });
     this._buttonMaterial.color.set((ship.hatch ?? 0) > 0.01 ? 0x4dff7a : 0xff4a3a);
+    // Luces de posición (fijas) y estroboscópica (destello cada segundo y medio).
+    if (this._strobe) this._strobe.visible = this._t % 1.5 < 0.12;
+    for (const n of this._navLights ?? []) n.visible = this._t % 2 < 1.6;
     this._engineMaterial.opacity = airborne ? 0.55 + 0.4 * thrust + Math.sin(this._t * 30) * 0.05 : 0.2;
     if (this.aiEye) this.aiEye.scale.setScalar(0.85 + Math.sin(this._t * 2.4) * 0.15);
     if (this.nodeCore) {
@@ -504,6 +631,24 @@ export class ShipModel {
     }
     this.root.updateMatrixWorld(true);
   }
+}
+
+/** Matrícula pintada (texto oscuro con borde naranja) para los costados. */
+function registrationTexture(text) {
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = '#e0782f';
+  x.fillRect(0, 6, 10, 52);
+  x.fillStyle = '#2f3540';
+  x.font = 'bold 46px sans-serif';
+  x.textBaseline = 'middle';
+  x.fillText(text, 22, 34);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function toColored(geometry, color) {

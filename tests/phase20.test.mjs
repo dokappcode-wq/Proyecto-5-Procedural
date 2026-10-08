@@ -60,7 +60,8 @@ test('cuevas: el suelo es continuo a lo largo del túnel (sin escalones en las u
           // Camino continuo a un lado del eje: en cada nodo, el lado medio de sus dos tramos.
           const sa = side(n, i);
           const sb = side(n, i + 1);
-          for (let t = 0; t < 1; t += 0.25 / len) {
+          const tEnd = i === n.length - 2 ? 1 - 0.8 / len : 1; // el fondo es pared
+          for (let t = 0; t < tEnd; t += 0.25 / len) {
             const r = a.r + (b.r - a.r) * t;
             const sx = sa.x + (sb.x - sa.x) * t;
             const sz = sa.z + (sb.z - sa.z) * t;

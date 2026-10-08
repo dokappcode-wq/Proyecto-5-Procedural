@@ -374,6 +374,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'drink' && kind !== 'place' && held.playAction(kind === 'chop' ? 0.42 : 0.3));
   events.on(GameEvents.EQUIPMENT_CHANGED, () => {
     held.setHandColor(player.model.handColor);
+    held.setSleeveColor?.(player.model.sleeveColor);
     held.setHeld(hotbar.selectedId ?? null, equipment.slots.OFFHAND ?? null);
   });
   events.on(GameEvents.PLAYER_BLOCKED, () => message('🛡️ ¡Bloqueado!', 'info'));

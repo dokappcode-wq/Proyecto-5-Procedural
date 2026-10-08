@@ -10,7 +10,7 @@ import { hash2D } from '../core/SeededRandom.js';
  * contra el suelo: queda un agujero (el terreno de ahí no se dibuja, TerrainMesher)
  * por el que se ve bajar el túnel. Unas rocas tapan el borde del agujero.
  */
-const RING = 14;
+const RING = 18;
 
 /*
  * El mar es un plano a nivel del mar que cruza las cuevas que bajan de esa cota. Para
@@ -85,7 +85,7 @@ function caveGeometry(cave, heightAt, colors) {
       const b = nodes[i + 1];
       const r = (a.r + b.r) / 2;
       const floor = (a.floor + b.floor) / 2;
-      rings.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, r, floor, y: floor + 0.7 * r, i: i + 0.5 });
+      rings.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, r, w: ((a.w ?? 1) + (b.w ?? 1)) / 2, floor, y: floor + 0.7 * r, i: i + 0.5 });
     }
   }
   const rock = new THREE.Color(colors.CAVE_ROCK ?? 0x6b665f);
@@ -112,7 +112,7 @@ function caveGeometry(cave, heightAt, colors) {
       // con la colisión), más en el techo.
       const low = Math.sin(a) < 0;
       const jit = low ? 0.96 + 0.08 * hash2D(cave.id * 131 + 7, k, j) : 1 + 0.12 * hash2D(cave.id * 131 + 7, k, j);
-      const rx = ring.r * jit;
+      const rx = ring.r * (ring.w ?? 1) * jit; // w: salas más anchas que altas
       let v = Math.sin(a) * ring.r * jit * (low ? 1 : 0.85); // techo algo aplastado (roca encima)
       const isFloor = v < -0.7 * ring.r;
       if (isFloor) v = -0.7 * ring.r + (hash2D(cave.id, k * 3, j) - 0.5) * 0.06;
