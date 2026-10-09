@@ -1294,6 +1294,10 @@ body.underwater #vignette {
   padding: 3px 10px; border-radius: 6px; background: rgba(8, 14, 24, 0.6); color: #eef3f8;
   font: 600 0.82rem ui-monospace, monospace; white-space: nowrap;
 }
+#spyglass-view {
+  position: fixed; inset: 0; pointer-events: none; z-index: 5;
+  background: radial-gradient(circle at 50% 50%, transparent 0 34vmin, rgba(0, 0, 0, 0.55) 36vmin, #000 41vmin);
+}
 
 /* ---- Historia (v1.18): reloj, transmisión, diálogos, brújula, cine ---- */
 :root { --watch-color: #4fb6ff; --watch-glow: #4fb6ff55; }

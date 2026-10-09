@@ -294,6 +294,7 @@ export class EnemySystem {
       if (e.type === 'SLIME' && !e.melting && !this._time.isNight && e.alive) this._melt(e);
       e.update(dt, this._env);
       if (e.type === 'SLIME' && e.alive) this._keepFromFire(e);
+      if (e.burn) this._burnTick(e, dt);
       if (!view) {
         view = createEnemyView(e);
         this._views.set(e.id, view);
@@ -303,6 +304,7 @@ export class EnemySystem {
       view.root.position.set(e.x, e.y, e.z);
       view.root.rotation.y = e.heading;
       view.update(e, this._t, dt);
+      this._flameView(view, e);
       view.bar.set(e.health / e.maxHealth, e.hittable && e.health < e.maxHealth);
       active++;
     }
@@ -453,6 +455,64 @@ export class EnemySystem {
     this._events.emit(GameEvents.ENEMY_KILLED, { enemy: e, drops });
     this._checkBase(e.group);
     return { killed: true, drops };
+  }
+
+  /** Flecha de fuego: el enemigo arde `time` s perdiendo `dps` por segundo (lo renueva otra flecha). */
+  ignite(e, dps, time) {
+    if (!e?.hittable || !(dps > 0) || !(time > 0)) return;
+    e.burn = { dps: Math.max(dps, e.burn?.dps ?? 0), time: Math.max(time, e.burn?.time ?? 0), acc: e.burn?.acc ?? 0 };
+  }
+
+  _burnTick(e, dt) {
+    const b = e.burn;
+    if (!b) return;
+    if (!e.hittable) {
+      e.burn = null;
+      return;
+    }
+    b.time -= dt;
+    b.acc += dt;
+    if (b.acc >= 1) {
+      // Un mordisco de fuego por segundo, sin empujón.
+      b.acc -= 1;
+      const { killed, drops } = this.hitAnimal(e, b.dps, e.x, e.z);
+      if (killed && drops && this._pickups) {
+        const y = this._world?.inCave?.(e.x, e.y + 1, e.z) ? e.y : null;
+        for (const [item, n] of Object.entries(drops)) this._pickups.drop(this._homeId, e.x, e.z, item, n, undefined, y);
+      }
+      if (killed) b.time = 0;
+    }
+    if (b.time <= 0) e.burn = null;
+  }
+
+  /** Llamas encima del enemigo mientras arde. */
+  _flameView(view, e) {
+    let f = view.root.userData.burnFx;
+    if (!e.burn) {
+      if (f) f.visible = false;
+      return;
+    }
+    if (!f) {
+      this._flameGeo ??= new THREE.ConeGeometry(0.16, 0.5, 6);
+      this._flameMats ??= [0xff7a1e, 0xffc23a].map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, depthWrite: false }));
+      f = new THREE.Group();
+      for (let i = 0; i < 5; i++) {
+        const m = new THREE.Mesh(this._flameGeo, this._flameMats[i % 2]);
+        const a = (i / 5) * Math.PI * 2;
+        m.position.set(Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25);
+        f.add(m);
+      }
+      view.root.add(f);
+      view.root.userData.burnFx = f;
+    }
+    f.visible = true;
+    const h = (e.def.HEIGHT ?? 1.4) * (e.scale ?? 1);
+    f.position.y = h * 0.55;
+    f.scale.setScalar(Math.max(0.6, h * 0.55));
+    f.children.forEach((m, i) => {
+      m.scale.y = 0.7 + Math.abs(Math.sin(this._t * (9 + i) + i)) * 0.8;
+      m.position.y = Math.sin(this._t * 7 + i * 2) * 0.08;
+    });
   }
 
   _checkBase(base) {

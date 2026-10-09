@@ -168,7 +168,7 @@ export class HeldItems {
     const block = this._poseK.block;
     const aim = this._poseK.aim;
     const fp = this._models.fp;
-    const ranged = fp && (fp.kind === 'slingshot' || fp.kind === 'bow');
+    const ranged = fp && (fp.kind === 'slingshot' || fp.kind === 'bow' || fp.kind === 'crossbow');
 
     // Golpe: con herramienta, toma impulso (arriba) y descarga hacia abajo; con el puño,
     // un directo hacia delante que vuelve.
@@ -259,6 +259,8 @@ function placeModel(m, where) {
     // El puño cierra en el origen; el antebrazo va por +Y de la mano. El arma sale del puño
     // perpendicular al antebrazo (hacia delante): con el codo doblado apunta al frente.
     if (m.kind === 'bow' || m.kind === 'slingshot') g.rotation.set(-0.35, 0, 0);
+    else if (m.kind === 'crossbow') g.rotation.set(0.1, 0, 0);
+    else if (m.kind === 'lantern') g.rotation.set(0, 0, 0);
     else if (m.kind === 'torch') g.rotation.set(-1.25, 0, 0);
     else if (m.kind === 'item') g.rotation.set(-1.3, 0, 0);
     else g.rotation.set(-1.45, 0, 0.08);
@@ -268,6 +270,10 @@ function placeModel(m, where) {
       // Escudo en el antebrazo, con la cara hacia fuera (delante con el codo doblado).
       g.rotation.set(-Math.PI / 2, 0, 0);
       g.position.set(-0.05, 0.12, -0.04);
+    } else if (m.kind === 'lantern') {
+      // Farol colgando del puño.
+      g.rotation.set(0, 0, 0);
+      g.position.set(0, -0.02, 0);
     } else g.rotation.set(-1.45, 0, 0);
   } else if (where === 'right1') {
     // Vista en 1ª persona: el mango sale de la mano hacia arriba, inclinado hacia dentro y adelante.
@@ -279,6 +285,10 @@ function placeModel(m, where) {
       g.position.set(-0.12, 0.08, -0.05);
     } else if (m.kind === 'slingshot') {
       g.rotation.set(-0.25, 0, 0.1);
+    } else if (m.kind === 'crossbow') {
+      g.scale.setScalar(0.7);
+      g.rotation.set(0, 0, 0);
+      g.position.set(-0.04, 0.06, -0.02);
     } else if (m.kind === 'torch') {
       g.rotation.set(-0.2, 0, 0.2);
     } else {

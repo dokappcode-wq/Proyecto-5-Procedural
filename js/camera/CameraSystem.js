@@ -6,6 +6,7 @@ export const CameraMode = Object.freeze({
   THIRD_PERSON: 'THIRD_PERSON',
 });
 
+const SPYGLASS_FOV = 14; // grados con el catalejo (unas 5× más cerca)
 const MODE_BLEND = { [CameraMode.FIRST_PERSON]: 0, [CameraMode.THIRD_PERSON]: 1 };
 const OCCLUSION_STEPS = 16;
 
@@ -118,12 +119,24 @@ export class CameraSystem {
     this._aimOn = !!on;
   }
 
+  /** Catalejo: mientras está activo, la vista se cierra a SPYGLASS_FOV grados. */
+  setSpyglass(on) {
+    this._spyOn = !!on;
+  }
+
+  /** Cuánto zoom hay ahora (1 = sin zoom): la sensibilidad del ratón se reduce con él. */
+  get zoomFactor() {
+    return this._baseFov ? this._camera.fov / this._baseFov : 1;
+  }
+
   update(dt) {
     const cfg = this._cfg;
     const input = this._input;
     this._baseFov ??= this._camera.fov;
     this._aim = (this._aim ?? 0) + ((this._aimOn && !this._vehicle ? 1 : 0) - (this._aim ?? 0)) * Math.min(1, dt * 10);
-    const fov = this._baseFov - this._aim * (this.mode === CameraMode.FIRST_PERSON ? 22 : 12);
+    this._spy = (this._spy ?? 0) + ((this._spyOn && !this._vehicle ? 1 : 0) - (this._spy ?? 0)) * Math.min(1, dt * 8);
+    let fov = this._baseFov - this._aim * (this.mode === CameraMode.FIRST_PERSON ? 22 : 12);
+    fov += (SPYGLASS_FOV - fov) * this._spy;
     if (Math.abs(fov - this._camera.fov) > 0.01) {
       this._camera.fov = fov;
       this._camera.updateProjectionMatrix();

@@ -47,7 +47,8 @@ export class PlayerController {
     this._mods = { canRun: true, canClimb: true, speedMultiplier: 1 };
     this.gravityScale = 1; // lunas: menos gravedad (se salta más y se cae más despacio)
     this.speedBonus = 1;   // niveles: velocidad (ProgressionSystem)
-    this.combatSpeed = 1;  // bloqueando o apuntando se camina más despacio (CombatSystem)
+    this.combatSpeed = 1;
+    this.lookScale = 1;    // con zoom (catalejo, apuntar) la vista gira más despacio  // bloqueando o apuntando se camina más despacio (CombatSystem)
     this._jumpBuffer = 0;
     this._coyote = 0;
     this._wish = new THREE.Vector3();
@@ -140,7 +141,7 @@ export class PlayerController {
 
     // ---- Mirada ----------------------------------------------------------
     const mouse = input.getMouseDelta();
-    const sens = this._lookSensitivity;
+    const sens = this._lookSensitivity * this.lookScale;
     p.yaw = wrapAngle(p.yaw - mouse.x * sens);
     p.pitch = THREE.MathUtils.clamp(p.pitch - mouse.y * sens * this._invertY, -cfg.PITCH_LIMIT, cfg.PITCH_LIMIT);
 

@@ -14,13 +14,19 @@ import { buildItemModel } from '../render/ItemModels.js';
  *   soltar se dispara (más tensado = más lejos y, con el arco, más daño). Cada
  *   disparo gasta munición (piedras / flechas) y 1 de aguante del arma. X cambia
  *   el tipo de flecha.
+ * - Ballesta (RANGED.DAMAGE_MULT): flechas más rápidas y con más daño; carga lenta.
+ * - Arrojadizas (RANGED.THROWN: lanza, bomba de slime): solo apuntando (clic dcho) el
+ *   clic las lanza; si no, la lanza golpea de cerca. Se lanza el propio objeto; la lanza
+ *   (RECOVER) se queda en el suelo para recogerla; la bomba (EXPLODE) estalla y daña a
+ *   todo lo que haya en el radio.
+ * - Flechas especiales: FIRE prende al enemigo (source.ignite) y PIERCE atraviesa a varios.
  * - Proyectiles con gravedad: dan a las criaturas (`creatures`: misma interfaz que
  *   AnimalSystem: getAnimalsNear, hitAnimal) o se clavan en el suelo.
  */
 const GRAVITY = 9.8;
 
 export class CombatSystem {
-  constructor({ input, items, inventory, hotbar, equipment, player, controller, camera, cameraSystem, held, scene, world, events, power = () => 1, creatures = [] }) {
+  constructor({ input, items, inventory, hotbar, equipment, player, controller, camera, cameraSystem, held, scene, world, events, power = () => 1, creatures = [], drop = null }) {
     this.name = 'combat';
     this._input = input;
     this._items = items;
@@ -36,6 +42,8 @@ export class CombatSystem {
     this._events = events;
     this._power = power;
     this.creatures = creatures;
+    this._drop = drop; // (x, y, z, id, n, dur): deja un objeto en el suelo (lanza recuperable)
+    this._blasts = [];
     this.blocking = false;
     this.aiming = false;
     this.pull = 0;          // 0..1 tensado
@@ -61,7 +69,8 @@ export class CombatSystem {
   }
 
   get shieldId() {
-    return this._eq.slots.OFFHAND ?? null;
+    const id = this._eq.slots.OFFHAND ?? null;
+    return id && this._items[id]?.SHIELD ? id : null; // el farol va en la misma ranura y no para golpes
   }
 
   /** Con lo seleccionado, ¿el clic derecho bloquea con el escudo? (puño, arma, herramienta) */
@@ -82,7 +91,9 @@ export class CombatSystem {
 
   /** El clic izquierdo no golpea (bloqueando o con un arma a distancia). */
   get suppressAttack() {
-    return this.blocking || !!this.ranged;
+    const r = this.ranged;
+    // La lanza sin apuntar es un arma de cerca: el clic golpea.
+    return this.blocking || (!!r && (!r.THROWN || this.aiming || this._drawing));
   }
 
   /** Munición elegida para el arma (y cuánta queda). @returns {{ id, count } | null} */
@@ -146,7 +157,9 @@ export class CombatSystem {
     if (ranged && input.wasPressed('AMMO_NEXT')) this.cycleAmmo();
     if (ranged && !busy) {
       const ammo = this.ammo();
-      if (input.isDown('ATTACK')) {
+      // Arrojadizas: solo se tensan apuntando (sin apuntar, la lanza golpea de cerca).
+      const canDraw = !ranged.THROWN || this.aiming || this._drawing;
+      if (canDraw && input.isDown('ATTACK')) {
         if (!this._drawing && input.wasPressed('ATTACK') && !ammo.count) {
           const a = this._items[ammo.id];
           this._events.emit(GameEvents.UI_MESSAGE, { text: `Sin munición: necesitas ${a.ICON} ${a.NAME.toLowerCase()}.`, type: 'warning' });
@@ -179,8 +192,18 @@ export class CombatSystem {
   _fire(R, ammo) {
     const weaponId = this._hotbar.selectedId;
     const idx = this._hotbar.selectedIndex;
-    if (!this._inv.removeItem(ammo.id, 1)) return;
-    this._inv.wearSlot(idx, 1);
+    let thrown = null;
+    if (R.THROWN) {
+      // Se lanza el propio objeto (con su aguante, para recuperarlo igual).
+      thrown = this._inv.slots[idx]?.id === ammo.id ? this._inv.takeFromSlot(idx, 1) : null;
+      if (!thrown) {
+        if (!this._inv.removeItem(ammo.id, 1)) return;
+        thrown = { id: ammo.id, count: 1 };
+      }
+    } else {
+      if (!this._inv.removeItem(ammo.id, 1)) return;
+      this._inv.wearSlot(idx, 1);
+    }
     // Dirección: desde los ojos hacia el punto al que apunta el centro de la pantalla.
     this._camera.updateMatrixWorld();
     this._camera.getWorldDirection(this._dir);
@@ -194,19 +217,30 @@ export class CombatSystem {
     const speed = R.SPEED * (0.35 + 0.65 * pull);
     const ammoDef = this._items[ammo.id];
     const base = R.DAMAGE ?? ammoDef.AMMO?.DAMAGE ?? 5;
-    const damage = base * (R.DAMAGE ? 1 : 0.4 + 0.6 * pull) * this._power();
+    const damage = base * (R.DAMAGE ? 1 : 0.4 + 0.6 * pull) * (R.DAMAGE_MULT ?? 1) * this._power();
+    const arrow = ammoDef.MODEL?.TYPE === 'arrow';
+    const spear = !!thrown && !!R.RECOVER;
     let mesh;
-    if (ammoDef.MODEL?.TYPE === 'arrow') {
+    if (arrow) {
       mesh = buildItemModel(ammo.id, this._items).group;
+    } else if (thrown) {
+      // La lanza vuela con la punta por delante (modelo a lo largo de +Y, centrado).
+      mesh = new THREE.Group();
+      const model = buildItemModel(ammo.id, this._items).group;
+      if (spear) model.position.y = -0.65;
+      mesh.add(model);
     } else {
       mesh = new THREE.Mesh(this._stoneGeo, this._stoneMat);
     }
     mesh.position.copy(origin);
     this._group.add(mesh);
+    const A = ammoDef.AMMO ?? {};
     this._projectiles.push({
       mesh, pos: origin.clone(), vel: dir.multiplyScalar(speed), damage, life: 8, stuck: 0,
-      arrow: ammoDef.MODEL?.TYPE === 'arrow', gravity: ammoDef.MODEL?.TYPE === 'arrow' ? GRAVITY * 0.55 : GRAVITY,
+      arrow: arrow || spear, gravity: arrow ? GRAVITY * 0.55 : spear ? GRAVITY * 0.7 : GRAVITY,
       from: { x: this._player.position.x, z: this._player.position.z },
+      fire: A.FIRE ?? null, pierce: A.PIERCE ?? 0, hits: new Set(),
+      explode: R.EXPLODE ?? 0, recover: spear ? thrown : null, spin: !arrow && !spear,
     });
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'shoot', weapon: weaponId });
   }
@@ -224,6 +258,8 @@ export class CombatSystem {
         // ¿Criatura?
         const hit = this._hitCreature(p);
         if (hit) {
+          if (p.explode) this._explode(p);
+          if (p.recover) this._recover(p);
           p.life = 0;
           break;
         }
@@ -236,13 +272,23 @@ export class CombatSystem {
           p.pos.y = ground + 0.02;
           p.stuck = 1;
           p.life = p.arrow ? 20 : 0.4;
-          this._events.emit(GameEvents.PROJECTILE_HIT, { x: p.pos.x, y: p.pos.y, z: p.pos.z });
+          if (p.explode) {
+            this._explode(p);
+            p.life = 0;
+          } else {
+            this._events.emit(GameEvents.PROJECTILE_HIT, { x: p.pos.x, y: p.pos.y, z: p.pos.z });
+          }
+          if (p.recover) {
+            this._recover(p);
+            p.life = 0;
+          }
         }
       }
       p.mesh.position.copy(p.pos);
       if (p.arrow && !p.stuck) p.mesh.quaternion.setFromUnitVectors(up, this._v.copy(p.vel).normalize());
-      else if (!p.arrow) p.mesh.rotation.x += dt * 12;
+      else if (p.spin) p.mesh.rotation.x += dt * 12;
     }
+    this._updateBlasts(dt);
     this._projectiles = this._projectiles.filter((p) => {
       if (p.life > 0) return true;
       this._group.remove(p.mesh);
@@ -259,13 +305,72 @@ export class CombatSystem {
         // Enemigos (con HEIGHT): cuenta todo el cuerpo, de los pies a la cabeza.
         const body = !!a.def?.HEIGHT && p.pos.y > a.y - 0.2 && p.pos.y < a.y + a.def.HEIGHT * a.scale && Math.hypot(a.x - p.pos.x, a.z - p.pos.z) < r;
         if (!body && Math.hypot(a.x - p.pos.x, cy - p.pos.y, a.z - p.pos.z) > r) continue;
+        if (p.hits.has(a)) continue; // ya atravesado
+        p.hits.add(a);
         const { killed, drops } = source.hitAnimal(a, p.damage, p.from.x, p.from.z);
         if (killed && drops) for (const [item, n] of Object.entries(drops)) this._inv.addItem(item, n);
+        if (!killed && p.fire) source.ignite?.(a, p.fire.DPS, p.fire.TIME);
         this._events.emit(GameEvents.PROJECTILE_HIT, { x: p.pos.x, y: p.pos.y, z: p.pos.z, target: a, killed });
+        // Flecha de cristal: sigue volando hasta atravesar PIERCE enemigos (pierde algo de fuerza).
+        if (p.hits.size <= p.pierce) {
+          p.damage *= 0.8;
+          continue;
+        }
         return true;
       }
     }
     return false;
+  }
+
+  /** Estallido (bomba de slime): daña a todo lo que esté en el radio, menos cuanto más lejos. */
+  _explode(p) {
+    const R = p.explode;
+    const { x, y, z } = p.pos;
+    for (const source of this.creatures) {
+      for (const a of source.getAnimalsNear(x, z, R + 1)) {
+        const cy = a.aimY ?? a.y + 0.8 * (a.scale ?? 1);
+        const d = Math.hypot(a.x - x, (cy - y) * 0.6, a.z - z);
+        if (d > R + (a.aimRadius ?? 0.5) || p.hits.has(a)) continue;
+        p.hits.add(a);
+        const k = 1 - 0.5 * Math.min(1, d / R);
+        const { killed, drops } = source.hitAnimal(a, p.damage * k, x, z);
+        if (killed && drops) for (const [item, n] of Object.entries(drops)) this._inv.addItem(item, n);
+      }
+    }
+    this._events.emit(GameEvents.PROJECTILE_HIT, { x, y, z, explosion: true, radius: R });
+    // Onda verde que crece y se desvanece.
+    const mesh = new THREE.Mesh(
+      this._blastGeo ??= new THREE.IcosahedronGeometry(1, 2),
+      new THREE.MeshBasicMaterial({ color: 0x8bff6a, transparent: true, opacity: 0.55, depthWrite: false }),
+    );
+    mesh.position.set(x, y + 0.3, z);
+    mesh.scale.setScalar(0.3);
+    this._group.add(mesh);
+    this._blasts.push({ mesh, t: 0, r: R });
+  }
+
+  _updateBlasts(dt) {
+    if (!this._blasts.length) return;
+    for (const b of this._blasts) {
+      b.t += dt;
+      const k = Math.min(1, b.t / 0.35);
+      b.mesh.scale.setScalar(0.3 + b.r * k);
+      b.mesh.material.opacity = 0.55 * (1 - k);
+    }
+    this._blasts = this._blasts.filter((b) => {
+      if (b.t < 0.35) return true;
+      this._group.remove(b.mesh);
+      b.mesh.material.dispose();
+      return false;
+    });
+  }
+
+  /** La lanza lanzada se queda en el suelo, para recogerla (con su aguante). */
+  _recover(p) {
+    const r = p.recover;
+    if (!r) return;
+    p.recover = null;
+    this._drop?.(p.pos.x, p.pos.y, p.pos.z, r.id, r.count ?? 1, r.dur);
   }
 
   _updateHud(ranged) {
@@ -275,7 +380,8 @@ export class CombatSystem {
       const a = this.ammo();
       const def = this._items[a.id];
       const multi = this._selected().def.RANGED.AMMO.length > 1;
-      text = `${def.ICON} ${def.NAME} ×${a.count}${multi ? ' · X cambiar' : ''}${this._drawing ? ` · ${'▮'.repeat(Math.round(this.pull * 8))}${'▯'.repeat(8 - Math.round(this.pull * 8))}` : ''}`;
+      const hint = ranged.THROWN && !this.aiming && !this._drawing ? ' · clic dcho: apuntar para lanzar' : '';
+      text = `${def.ICON} ${def.NAME} ×${a.count}${multi ? ' · X cambiar' : ''}${hint}${this._drawing ? ` · ${'▮'.repeat(Math.round(this.pull * 8))}${'▯'.repeat(8 - Math.round(this.pull * 8))}` : ''}`;
     } else if (this.blocking) {
       const max = this._items[this.shieldId]?.DURABILITY;
       text = `🛡️ Bloqueando${max ? ` · ${Math.ceil(this._eq.dur.OFFHAND ?? max)}/${max}` : ''}`;

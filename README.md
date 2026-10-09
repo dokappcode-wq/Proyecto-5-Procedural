@@ -267,6 +267,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Herramientas y armas por niveles (v1.26, P3)**:
+  - **Picos y hachas** de piedra, cobre, hierro y diamante: cada nivel tala y pica más deprisa y aguanta más.
+    El **hierro** pide un pico de cobre y el **diamante** uno de hierro (si no, el letrero dice cuál hace falta).
+  - **Pala** (más arena y setas), **hoz** (más trigo y bayas) y **martillo**: golpeando desmonta lo construido
+    al momento; con clic dcho / R arregla lo más gastado que lleves con 1 lingote de su material (+40 %).
+  - **Cubo**: mirando al agua se llena; bebido quita mucha sed. **Catalejo**: mantén el clic dcho para mirar
+    lejos. **Farol**: en la ranura del escudo, alumbra siempre con las manos libres.
+  - **Lanza**: de cerca golpea; apuntando (clic dcho) el clic la lanza y queda en el suelo para recogerla.
+    **Ballesta**: carga lenta, flechas más rápidas y con 1,5× daño. **Maza**: más del doble contra gólems.
+    **Bomba de slime**: se lanza apuntando y estalla dañando a todo lo cercano.
+  - **Flechas de fuego** (el enemigo arde 5 s) y **de cristal** (atraviesan 2 enemigos). **Equipo de diamante**:
+    espada y armadura completa en la mesa de elaboración.
 - **Cocina y comida (v1.25, P2)**:
   - **Comida silvestre** (E): bayas de los zarzales, setas en los bosques, trigo silvestre en las praderas y
     huevos en los nidos al pie de los árboles (zarzales y nidos vuelven a dar con el tiempo).

@@ -500,6 +500,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const combat = new CombatSystem({
     input, items: cfg.ITEMS, inventory, hotbar, equipment, player, controller, camera: render.camera, cameraSystem: camera, held,
     scene: render.scene, world, events, power: () => progression.damageMultiplier, creatures: interaction.creatures,
+    // La lanza lanzada se queda donde cae (en las cuevas, a su altura).
+    drop: (x, y, z, id, n, dur) => pickups.drop(worlds.activeId, x, z, id, n, dur, world.inCave?.(x, y + 1, z) ? y : null),
   });
   // Enemigos (Fase 4): gólems, slimes de noche, bases de goblins y equipos de exploración.
   const enemies = new EnemySystem({
@@ -656,7 +658,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     input,
     canvas: render.domElement,
   });
-  ui._hasShield = () => !!equipment.slots.OFFHAND;
+  ui._hasShield = () => !!cfg.ITEMS[equipment.slots.OFFHAND]?.SHIELD;
   const hudRoot = document.getElementById('hud');
   // Menú del reloj de pulsera: Tab = fabricación, I = inventario (mochila 9×3, barra, ropa) + "Tú".
   const playerMenu = new PlayerMenu({
@@ -763,6 +765,37 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       });
     },
   };
+  // Catalejo (mantener clic dcho: zoom con viñeta) y luz que lleva el jugador: el farol en
+  // la mano izquierda, o la antorcha en 1ª persona (el cuerpo con su luz está oculto).
+  const spyView = document.getElementById('spyglass-view');
+  const carryLight = new THREE.PointLight(0xffb45a, 0, 16, 1.6);
+  render.scene.add(carryLight);
+  let spyOn = false;
+  const gadgets = {
+    name: 'gadgets',
+    update: (dt, t) => {
+      const on = hotbar.selectedId === 'SPYGLASS' && input.isDown('USE') && !input.blocked && !ship.piloting;
+      camera.setSpyglass(on);
+      controller.lookScale = Math.max(0.15, Math.min(1, camera.zoomFactor));
+      if (on !== spyOn) {
+        spyOn = on;
+        spyView?.classList.toggle('hidden', !on);
+      }
+      const bodyShown = player.model.root.visible;
+      const lantern = equipment.slots.OFFHAND === 'LANTERN';
+      const torch = hotbar.selectedId === 'TORCH';
+      const want = !ship.piloting && (lantern || torch) && !bodyShown;
+      carryLight.visible = want;
+      if (!want) return;
+      player.getEyePosition(carryLight.position);
+      carryLight.position.y -= 0.35;
+      carryLight.position.x += Math.sin(player.yaw) * -0.3;
+      carryLight.position.z += Math.cos(player.yaw) * -0.3;
+      carryLight.distance = lantern ? 16 : 13;
+      carryLight.intensity = (lantern ? 2.6 : 2.2) * (0.9 + Math.sin(t * 13) * 0.05 + Math.sin(t * 5.3) * 0.05);
+    },
+  };
+
   // Cuevas: cuanto más hondo, más oscuro (solo alumbran antorchas y flores luminosas).
   let caveMsg = false;
   const caveDark = {
@@ -1546,7 +1579,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(storyKeys);
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
-  loop.add(torches);     // luz de las antorchas clavadas y de las flores luminosas
+  loop.add(torches);
+  loop.add(gadgets);     // catalejo y luz del farol     // luz de las antorchas clavadas y de las flores luminosas
   if (landmarks) loop.add(landmarks); // vapor de las termas, bruma de las cascadas
   loop.add(caveDark);    // oscuridad dentro de las cuevas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante

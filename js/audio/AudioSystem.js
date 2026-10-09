@@ -414,6 +414,10 @@ export class AudioSystem {
     }));
     on(E.FOOD_EATEN, () => this.play((S, o) => S.eat(o)));
     on(E.PLAYER_DRANK, () => this.play((S, o) => S.drink(o)));
+    on(E.ITEM_REPAIRED, () => this.play((S, o) => {
+      S.clang(o, 0.7);
+      S.clang(o, 0.5);
+    }));
     on(E.ITEM_CRAFTED, () => this._once('craft', 0.1) && this.play((S, o) => S.craft(o)));
     on(E.PICKUP_TAKEN, () => this._once('pickup', 0.06) && this.play((S, o) => S.pickup(o)));
     on(E.RESOURCE_HARVESTED, () => this._once('pickup', 0.06) && this.play((S, o) => S.pickup(o)));
@@ -480,9 +484,12 @@ export class AudioSystem {
         }
       });
     });
-    on(E.PROJECTILE_HIT, ({ x, z, target }) => {
+    on(E.PROJECTILE_HIT, ({ x, z, target, explosion }) => {
       this.playAt(x, z, (S, o) => {
-        if (target?.boss === 'crystal') {
+        if (explosion) {
+          S.boom(o, 0.8);
+          S.slime(o, 1.4);
+        } else if (target?.boss === 'crystal') {
           S.tone(o, { type: 'sine', f: 2100, d: 0.5, gain: 0.1 });
           S.tone(o, { type: 'sine', f: 3170, d: 0.35, gain: 0.05 });
         } else if (target?.boss || target?.type === 'GOLEM') S.impact(o, 'stone', 0.8);

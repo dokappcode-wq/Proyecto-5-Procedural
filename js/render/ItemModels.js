@@ -198,6 +198,110 @@ const BUILDERS = {
     layer(0.025, 0.08, 0xfff1b0, 0.04, 1);
     g.add(flame);
   },
+  shovel(g) {
+    handle(g, 0.66);
+    box(g, WOOD_DARK, 0.11, 0.03, 0.03, 0, 0.66, 0); // empuñadura en T arriba no: casquillo
+    // Hoja de metal con el filo redondeado (hacia −Z, en el extremo).
+    plate(g, 0x8f9499, [[-0.07, 0], [0.07, 0], [0.075, 0.16, 0.08, 0.1], [0, 0.23, 0.06, 0.22], [-0.075, 0.16, -0.06, 0.22], [-0.07, 0, -0.08, 0.1]], 0.02, [0, 0.62, -0.02], 0.004).rotation.x = -0.15;
+  },
+  sickle(g) {
+    handle(g, 0.2, 0.024);
+    // Hoja curva en media luna hacia delante.
+    tube(g, 0xb9bec4, [[0, 0.2, 0], [0, 0.32, -0.04], [0, 0.38, -0.14], [0, 0.34, -0.25], [0, 0.25, -0.29]], 0.012, 12, 4).scale.set(1, 1, 1);
+    box(g, 0x5c5f63, 0.035, 0.04, 0.035, 0, 0.2, 0);
+  },
+  hammer(g) {
+    handle(g, 0.42);
+    box(g, 0x5d6168, 0.07, 0.07, 0.2, 0, 0.44, -0.02);
+    box(g, 0x787d84, 0.075, 0.075, 0.03, 0, 0.44, -0.13); // cara de golpear
+    plate(g, 0x5d6168, [[0, 0.02], [0.08, 0.035], [0.12, -0.01], [0, -0.02]], 0.05, [0, 0.44, 0.08], 0.003).rotation.x = 0; // uña
+  },
+  bucket(g, water = false) {
+    // Cubo de metal con asa (el puño agarra el asa en el origen).
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.22, 12, 1, true), lambert(0x8f949a, { side: THREE.DoubleSide }));
+    body.position.set(0, -0.2, 0);
+    g.add(body);
+    cyl(g, 0x7b8086, 0.1, 0.1, 0.012, 0, -0.31, 0, 12);
+    for (const y of [-0.12, -0.27]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(y > -0.2 ? 0.13 : 0.105, 0.008, 4, 14), lambert(0x5d6168));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(0, y, 0);
+      g.add(ring);
+    }
+    tube(g, 0x5d6168, [[-0.13, -0.1, 0], [-0.09, 0.0, 0], [0, 0.03, 0], [0.09, 0.0, 0], [0.13, -0.1, 0]], 0.006, 10, 4);
+    if (water) cyl(g, 0x3a8fc0, 0.125, 0.125, 0.01, 0, -0.13, 0, 12);
+  },
+  spyglass(g) {
+    // Catalejo de latón en tres tramos (hacia −Z).
+    const tubeSeg = (r, len, z, color) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10), lambert(color));
+      m.rotation.x = Math.PI / 2;
+      m.position.set(0, 0.04, z);
+      g.add(m);
+    };
+    tubeSeg(0.035, 0.14, 0.02, 0x7a5232);
+    tubeSeg(0.03, 0.14, -0.11, 0xc9a24a);
+    tubeSeg(0.025, 0.12, -0.22, 0xd8b25a);
+    tubeSeg(0.04, 0.02, -0.06, 0xb08a3a);
+    tubeSeg(0.028, 0.012, -0.28, 0x6fb8d8);
+  },
+  lantern(g) {
+    // Farol colgando de la mano: asa, tapa, cristales con la llama y base.
+    tube(g, 0x3a3d42, [[-0.05, -0.04, 0], [0, 0.0, 0], [0.05, -0.04, 0]], 0.006, 8, 4);
+    cyl(g, 0x3a3d42, 0.03, 0.075, 0.05, 0, -0.07, 0, 6);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.13, 6), new THREE.MeshBasicMaterial({ color: 0xffd68a, transparent: true, opacity: 0.55 }));
+    glass.position.set(0, -0.165, 0);
+    g.add(glass);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      box(g, 0x3a3d42, 0.008, 0.13, 0.008, Math.cos(a) * 0.06, -0.165, Math.sin(a) * 0.06);
+    }
+    const flame = new THREE.Group();
+    flame.name = 'flame';
+    flame.position.set(0, -0.19, 0);
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 6), new THREE.MeshBasicMaterial({ color: 0xffc860 }));
+    f.position.y = 0.03;
+    flame.add(f);
+    g.add(flame);
+    cyl(g, 0x3a3d42, 0.07, 0.07, 0.02, 0, -0.24, 0, 6);
+  },
+  spear(g) {
+    handle(g, 1.25, 0.02);
+    // Punta de piedra tallada atada.
+    plate(g, 0x8d8a84, [[0.035, 0], [0, 0.2], [-0.035, 0]], 0.02, [0, 1.24, 0], 0.004);
+    box(g, ROPE, 0.045, 0.06, 0.045, 0, 1.25, 0);
+  },
+  crossbow(g) {
+    // Ballesta: culata hacia +Z, arco de hierro delante (−Z), carril y cuerda tensada.
+    box(g, WOOD, 0.05, 0.05, 0.55, 0, 0.04, -0.12);
+    box(g, WOOD_DARK, 0.04, 0.09, 0.08, 0, -0.03, 0.03);
+    tube(g, 0x6d7278, [[-0.26, 0.04, -0.3], [-0.12, 0.04, -0.36], [0, 0.04, -0.38], [0.12, 0.04, -0.36], [0.26, 0.04, -0.3]], 0.012, 12, 4);
+    const string = box(g, 0xe8e2d0, 0.5, 0.005, 0.005, 0, 0.065, -0.14);
+    string.name = 'string';
+    box(g, 0x55595e, 0.012, 0.015, 0.2, 0, 0.07, -0.25);
+  },
+  mace(g) {
+    handle(g, 0.5, 0.024);
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), lambert(0x6d7278));
+    head.position.set(0, 0.55, 0);
+    g.add(head);
+    for (let i = 0; i < 8; i++) {
+      const v = new THREE.Vector3(Math.cos(i * 2.4), Math.sin(i * 1.7) * 0.8, Math.sin(i * 2.4)).normalize();
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.07, 4), lambert(0x9aa0a6));
+      spike.position.set(v.x * 0.1, 0.55 + v.y * 0.1, v.z * 0.1);
+      spike.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
+      g.add(spike);
+    }
+  },
+  bomb(g) {
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.08, 1), lambert(0x62c24a, { transparent: true, opacity: 0.88 }));
+    b.position.set(0, 0.06, 0);
+    g.add(b);
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 0), lambert(0x26282b));
+    core.position.set(0, 0.06, 0);
+    g.add(core);
+    cyl(g, ROPE, 0.006, 0.006, 0.06, 0, 0.15, 0, 4);
+  },
   arrow(g, tip = STONE) {
     cyl(g, WOOD, 0.008, 0.008, 0.6, 0, 0.3, 0, 5);
     const head = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.08, 4), lambert(tip));
@@ -236,6 +340,9 @@ export function buildItemModel(itemId, items) {
     case 'arrow':
       BUILDERS.arrow(group, M.TIP);
       break;
+    case 'bucket':
+      BUILDERS.bucket(group, !!M.WATER);
+      break;
     default:
       BUILDERS[M.TYPE](group);
   }
@@ -243,12 +350,15 @@ export function buildItemModel(itemId, items) {
     if (o.isMesh) o.castShadow = true;
   });
   let light = null;
-  if (M.TYPE === 'torch') {
-    light = new THREE.PointLight(0xffa24a, 2.2, 14, 1.6);
+  if (M.TYPE === 'torch' || M.TYPE === 'lantern') {
+    light = new THREE.PointLight(0xffa24a, M.TYPE === 'lantern' ? 2.6 : 2.2, M.TYPE === 'lantern' ? 16 : 14, 1.6);
     light.position.set(0, 0.6, 0);
     group.add(light);
   }
-  const kind = { axe: 'tool', pickaxe: 'tool', sword: 'sword', shield: 'shield', slingshot: 'slingshot', bow: 'bow', torch: 'torch', arrow: 'item' }[M.TYPE];
+  const kind = {
+    axe: 'tool', pickaxe: 'tool', sword: 'sword', shield: 'shield', slingshot: 'slingshot', bow: 'bow', torch: 'torch', arrow: 'item',
+    shovel: 'tool', sickle: 'tool', hammer: 'tool', bucket: 'item', spyglass: 'item', lantern: 'lantern', spear: 'sword', crossbow: 'crossbow', mace: 'sword', bomb: 'item',
+  }[M.TYPE];
   return { group, kind, light };
 }
 

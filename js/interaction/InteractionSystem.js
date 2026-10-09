@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { GameEvents } from '../core/GameEvents.js';
 import { SHAPES } from '../construction/BuildRules.js';
 
+/** Qué pico hace falta para cada nivel de mena (BREAK.TIER). */
+const TIER_NAMES = { 2: 'un pico de cobre', 3: 'un pico de hierro', 4: 'un pico de diamante' };
+
 /**
  * InteractionSystem — qué señala el jugador y qué puede hacer con ello.
  *
@@ -94,6 +97,8 @@ export class InteractionSystem {
       const B = this._types[t.ref.type].BREAK;
       if (this._tired()) {
         // agotado: no golpea (aviso en _tired)
+      } else if (!t.hit && this._tool()?.[B.TOOL] && (B.TIER ?? 1) > (this._tool().TIER ?? 1)) {
+        if (this._input.wasPressed('ATTACK')) this._hint(`${this._types[t.ref.type].NAME}: este pico no puede con ella. Necesitas ${TIER_NAMES[B.TIER] ?? 'un pico mejor'}.`);
       } else if (t.hit || this._tool()?.[B.TOOL]) {
         if (this._swing <= 0) {
           this._swing = this._cfg.CHOP_SWING ?? 0.6;
@@ -148,6 +153,12 @@ export class InteractionSystem {
     const result = this._world.resources.harvest(node.id);
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'harvest' });
     if (!result) return;
+    // Pala (arena, setas) y hoz (trigo, bayas): sacan algo más de cada recogida.
+    const bonus = this._tool()?.HARVEST_BONUS?.[node.type] ?? 0;
+    if (bonus > 0) {
+      result.amount += bonus;
+      this._wearTool();
+    }
     this._inventory.addItem(result.item, result.amount);
     this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
   }
@@ -207,7 +218,8 @@ export class InteractionSystem {
     const C = this._construction;
     if (!C?.exists(piece)) return;
     const tool = this._tool();
-    const speed = tool?.CHOP_SPEED || tool?.MINE_SPEED ? 2 : 1;
+    // El martillo desmonta deprisa; hachas y picos, el doble que a mano.
+    const speed = tool?.DISMANTLE ?? (tool?.CHOP_SPEED || tool?.MINE_SPEED ? 2 : 1);
     if (speed > 1) this._wearTool();
     const key = `st-${piece.id}`;
     const work = this._chopProgress.get(key) ?? { progress: 0 };
@@ -265,7 +277,8 @@ export class InteractionSystem {
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'hit' });
     const weapon = this._weapon();
     if (weapon) this._wearTool();
-    const damage = (weapon?.DAMAGE ?? this._cfg.PLAYER_HIT_DAMAGE) * this._power();
+    // Algunas armas pegan más a ciertos enemigos (la maza a los gólems).
+    const damage = (weapon?.DAMAGE ?? this._cfg.PLAYER_HIT_DAMAGE) * this._power() * (weapon?.VS?.[animal.type] ?? 1);
     const { killed, drops } = source.hitAnimal(animal, damage, p.x, p.z);
     if (!killed) return;
     for (const [item, amount] of Object.entries(drops)) this._inventory.addItem(item, amount);
@@ -390,10 +403,12 @@ export class InteractionSystem {
     const B = def.BREAK;
     if (B && def.HARVEST.METHOD !== 'HIT') {
       // Roca: con pico se pica; sin pico, E coge piedras sueltas si quedan.
-      const hasTool = !!this._tool()?.[B.TOOL];
+      // (la mena dura —hierro, diamante— pide un pico de nivel suficiente)
+      const tier = B.TIER ?? 1;
+      const hasTool = !!this._tool()?.[B.TOOL] && tier <= (this._tool().TIER ?? 1);
       if (hasTool) return { ...t, breakable: true, label: def.NAME, action: B.VERB, key: 'Clic' };
       if (t.ref.remaining > 0) return { ...t, breakable: true, label: def.NAME, action: def.HARVEST.VERB, key: 'E' };
-      return { ...t, breakable: true, label: def.NAME, action: 'Necesitas un pico', key: '⛏️' };
+      return { ...t, breakable: true, label: def.NAME, action: tier > 1 ? `Necesitas ${TIER_NAMES[tier]}` : 'Necesitas un pico', key: '⛏️' };
     }
     if (t.ref.remaining <= 0) return { ...t, label: `${def.NAME} (sin fruto)`, action: null };
     if (def.HARVEST.METHOD === 'HIT') {

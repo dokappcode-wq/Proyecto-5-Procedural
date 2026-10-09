@@ -391,6 +391,7 @@ export class PlayerModel {
         break;
       case 'bow':
       case 'slingshot':
+      case 'crossbow':
         R.elbow.rotation.x = 0.45;
         break;
       default:

@@ -53,7 +53,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.25.0',
+    VERSION: '1.26.0',
   },
 
   RENDER: {
@@ -370,12 +370,12 @@ export const GameConfig = deepFreeze({
     IRON_ORE: {
       NAME: 'Mena de hierro', COLLISION_RADIUS: 0.55, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.85, CAVE: true,
       HARVEST: { ITEM: 'IRON_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
-      BREAK: { ITEM: 'IRON_ORE', AMOUNT: 2, TIME: 8, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar hierro' },
+      BREAK: { ITEM: 'IRON_ORE', AMOUNT: 2, TIME: 8, TOOL: 'MINE_SPEED', TIER: 2, FIST_DAMAGE: 6, VERB: 'Picar hierro' },
     },
     DIAMOND_ORE: {
       NAME: 'Veta de diamante', COLLISION_RADIUS: 0.45, SCALE: [0.7, 1.0], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.8, CAVE: true,
       HARVEST: { ITEM: 'DIAMOND_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
-      BREAK: { ITEM: 'DIAMOND_ORE', AMOUNT: 1, TIME: 12, TOOL: 'MINE_SPEED', FIST_DAMAGE: 6, VERB: 'Picar diamante' },
+      BREAK: { ITEM: 'DIAMOND_ORE', AMOUNT: 1, TIME: 12, TOOL: 'MINE_SPEED', TIER: 3, FIST_DAMAGE: 6, VERB: 'Picar diamante' },
     },
     GLOW_FLOWER: {
       NAME: 'Flor luminosa', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.6, CAVE: true, LIGHT: 0x7fffd0,
@@ -430,7 +430,7 @@ export const GameConfig = deepFreeze({
     IRON_SWORD: { NAME: 'Espada de hierro', ICON: '🔪', STACK: 1, DURABILITY: 400, WEAPON: { DAMAGE: 15 }, MODEL: { TYPE: 'sword', BLADE: 0xc8ccd2, GUARD: 0x3b3f45, LENGTH: 0.78 }, DESC: '15 de daño. Aguanta 400 golpes.' },
     // A distancia: clic derecho mantenido apunta, clic izquierdo mantenido tensa y al soltar dispara.
     SLINGSHOT: { NAME: 'Tirachinas', ICON: '🪃', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['STONE'], DAMAGE: 5, SPEED: 32, DRAW_TIME: 0.45 }, MODEL: { TYPE: 'slingshot' }, DESC: 'Dispara piedras (5 de daño). Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
-    BOW: { NAME: 'Arco', ICON: '🏹', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['ARROW', 'COPPER_ARROW', 'IRON_ARROW'], SPEED: 48, DRAW_TIME: 0.8 }, MODEL: { TYPE: 'bow' }, DESC: 'El daño depende de la flecha. X cambia de flecha. Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
+    BOW: { NAME: 'Arco', ICON: '🏹', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['ARROW', 'COPPER_ARROW', 'IRON_ARROW', 'FIRE_ARROW', 'CRYSTAL_ARROW'], SPEED: 48, DRAW_TIME: 0.8 }, MODEL: { TYPE: 'bow' }, DESC: 'El daño depende de la flecha. X cambia de flecha. Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
     ARROW: { NAME: 'Flecha', ICON: '➹', AMMO: { DAMAGE: 10 }, MODEL: { TYPE: 'arrow', TIP: 0x8d8f93 }, DESC: '10 de daño. Se gasta al dispararla.' },
     COPPER_ARROW: { NAME: 'Flecha de cobre', ICON: '➶', AMMO: { DAMAGE: 15 }, MODEL: { TYPE: 'arrow', TIP: 0xd08a4e }, DESC: '15 de daño (mesa de elaboración).' },
     IRON_ARROW: { NAME: 'Flecha de hierro', ICON: '➵', AMMO: { DAMAGE: 20 }, MODEL: { TYPE: 'arrow', TIP: 0xc8ccd2 }, DESC: '20 de daño (mesa de elaboración).' },
@@ -464,8 +464,31 @@ export const GameConfig = deepFreeze({
     //   DURABILITY: golpes que aguanta (cada golpe con ella a un tronco, roca o pieza gasta 1);
     //   al llegar a 0 se rompe. Un árbol con el hacha son ~10 golpes; una roca con el pico, ~10.
     // Hacha: un árbol en 3 s (15 s con el puño). Pico: una roca en 3 s. Aguantan 400 golpes.
-    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 400, TOOL: { MINE_SPEED: 2 }, MODEL: { TYPE: 'pickaxe' }, DESC: 'Selecciónalo en la barra para picar rocas (a puñetazos no se rompen y duele).' },
-    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 400, TOOL: { CHOP_SPEED: 5 }, MODEL: { TYPE: 'axe' }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
+    STONE_PICKAXE: { NAME: 'Pico de piedra', ICON: '⛏️', STACK: 1, DURABILITY: 400, TOOL: { MINE_SPEED: 2, TIER: 1 }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'pickaxe' }, DESC: 'Pica rocas, carbón y cobre. Para el hierro hace falta uno de cobre.' },
+    STONE_AXE: { NAME: 'Hacha de piedra', ICON: '🪓', STACK: 1, DURABILITY: 400, TOOL: { CHOP_SPEED: 5, TIER: 1 }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'axe' }, DESC: 'Selecciónala en la barra para talar: el árbol cae antes (da la misma madera).' },
+    // Herramientas por niveles (P3): cobre, hierro y diamante. TIER: qué menas pica (hierro: cobre; diamante: hierro).
+    COPPER_AXE: { NAME: 'Hacha de cobre', ICON: '🪓', STACK: 1, DURABILITY: 600, TOOL: { CHOP_SPEED: 7, TIER: 2 }, REPAIR: 'REFINED_COPPER', MODEL: { TYPE: 'axe', METAL: 0xc47a3e }, DESC: 'Tala más deprisa que la de piedra. 600 golpes.' },
+    COPPER_PICKAXE: { NAME: 'Pico de cobre', ICON: '⛏️', STACK: 1, DURABILITY: 600, TOOL: { MINE_SPEED: 3, TIER: 2 }, REPAIR: 'REFINED_COPPER', MODEL: { TYPE: 'pickaxe', METAL: 0xc47a3e }, DESC: 'Ya pica el hierro. 600 golpes.' },
+    IRON_AXE: { NAME: 'Hacha de hierro', ICON: '🪓', STACK: 1, DURABILITY: 900, TOOL: { CHOP_SPEED: 10, TIER: 3 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'axe', METAL: 0xb9bec4 }, DESC: 'Un árbol en dos golpes. 900 golpes.' },
+    IRON_PICKAXE: { NAME: 'Pico de hierro', ICON: '⛏️', STACK: 1, DURABILITY: 900, TOOL: { MINE_SPEED: 4.5, TIER: 3 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'pickaxe', METAL: 0xb9bec4 }, DESC: 'Ya pica el diamante. 900 golpes.' },
+    DIAMOND_AXE: { NAME: 'Hacha de diamante', ICON: '🪓', STACK: 1, DURABILITY: 1600, TOOL: { CHOP_SPEED: 15, TIER: 4 }, REPAIR: 'REFINED_DIAMOND', MODEL: { TYPE: 'axe', METAL: 0x8fe6f5 }, DESC: 'La mejor hacha. 1600 golpes.' },
+    DIAMOND_PICKAXE: { NAME: 'Pico de diamante', ICON: '⛏️', STACK: 1, DURABILITY: 1600, TOOL: { MINE_SPEED: 7, TIER: 4 }, REPAIR: 'REFINED_DIAMOND', MODEL: { TYPE: 'pickaxe', METAL: 0x8fe6f5 }, DESC: 'Pica cualquier cosa en un suspiro. 1600 golpes.' },
+    // Herramientas nuevas.
+    SHOVEL: { NAME: 'Pala', ICON: '🪏', STACK: 1, DURABILITY: 500, TOOL: { HARVEST_BONUS: { SAND_PILE: 2, MUSHROOM: 1 } }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'shovel' }, DESC: 'Seleccionada, saca más arena de los montones y más setas.' },
+    SICKLE: { NAME: 'Hoz', ICON: '🌙', STACK: 1, DURABILITY: 500, TOOL: { HARVEST_BONUS: { WILD_WHEAT: 2, BERRY_BUSH: 1 } }, REPAIR: 'REFINED_COPPER', MODEL: { TYPE: 'sickle' }, DESC: 'Seleccionada, siegas más trigo y coges más bayas.' },
+    HAMMER: { NAME: 'Martillo', ICON: '🔨', STACK: 1, DURABILITY: 600, USE: 'REPAIR', TOOL: { DISMANTLE: 12 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'hammer' }, DESC: 'Golpeando desmonta lo construido al momento (lo recuperas). Clic dcho / R: arregla la herramienta o arma más gastada que lleves con 1 lingote de su material.' },
+    BUCKET: { NAME: 'Cubo', ICON: '🪣', STACK: 1, USE: 'BUCKET', MODEL: { TYPE: 'bucket' }, DESC: 'Clic dcho / R mirando al agua: llenarlo.' },
+    BUCKET_WATER: { NAME: 'Cubo de agua', ICON: '🪣', STACK: 1, USE: 'BUCKET', MODEL: { TYPE: 'bucket', WATER: true }, DESC: 'Clic dcho / R: beber (quita mucha sed). Servirá para regar.' },
+    SPYGLASS: { NAME: 'Catalejo', ICON: '🔭', STACK: 1, USE: 'SPYGLASS', MODEL: { TYPE: 'spyglass' }, DESC: 'Mantén el clic dcho para mirar lejos.' },
+    LANTERN: { NAME: 'Farol', ICON: '🏮', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, LIGHT: true, MODEL: { TYPE: 'lantern' }, DESC: 'En la mano izquierda (ranura del escudo): ilumina siempre, con las manos libres.' },
+    // Armas nuevas. RANGED.THROWN: se lanza la propia arma (la lanza se recoge; la bomba estalla).
+    SPEAR: { NAME: 'Lanza', ICON: '🔱', STACK: 1, DURABILITY: 300, WEAPON: { DAMAGE: 13 }, RANGED: { AMMO: ['SPEAR'], THROWN: true, RECOVER: true, DAMAGE: 24, SPEED: 28, DRAW_TIME: 0.55 }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'spear' }, DESC: '13 de daño de cerca. Clic dcho apuntar + clic: lanzarla (24 de daño); luego hay que recogerla.' },
+    CROSSBOW: { NAME: 'Ballesta', ICON: '🏹', STACK: 1, DURABILITY: 500, RANGED: { AMMO: ['ARROW', 'COPPER_ARROW', 'IRON_ARROW', 'FIRE_ARROW', 'CRYSTAL_ARROW'], DAMAGE_MULT: 1.5, SPEED: 66, DRAW_TIME: 1.3 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'crossbow' }, DESC: 'Flechas a más velocidad y con 1,5 veces su daño, pero tarda en cargar.' },
+    MACE: { NAME: 'Maza', ICON: '🔨', STACK: 1, DURABILITY: 700, WEAPON: { DAMAGE: 16, VS: { GOLEM: 2.2 } }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'mace' }, DESC: '16 de daño; contra los gólems de roca, más del doble.' },
+    SLIME_BOMB: { NAME: 'Bomba de slime', ICON: '🟢', RANGED: { AMMO: ['SLIME_BOMB'], THROWN: true, DAMAGE: 26, EXPLODE: 3.8, SPEED: 19, DRAW_TIME: 0.4 }, MODEL: { TYPE: 'bomb' }, DESC: 'Clic dcho apuntar + clic: lanzarla. Estalla y daña a todo lo que esté cerca (26).' },
+    FIRE_ARROW: { NAME: 'Flecha de fuego', ICON: '🔥', AMMO: { DAMAGE: 12, FIRE: { DPS: 4, TIME: 5 } }, MODEL: { TYPE: 'arrow', TIP: 0xff6a2a }, DESC: '12 de daño y quema al enemigo (4 por segundo, 5 s).' },
+    CRYSTAL_ARROW: { NAME: 'Flecha de cristal', ICON: '💎', AMMO: { DAMAGE: 26, PIERCE: 2 }, MODEL: { TYPE: 'arrow', TIP: 0xb48cff }, DESC: '26 de daño y atraviesa hasta 2 enemigos.' },
+    DIAMOND_SWORD: { NAME: 'Espada de diamante', ICON: '🗡️', STACK: 1, DURABILITY: 1500, WEAPON: { DAMAGE: 22 }, REPAIR: 'REFINED_DIAMOND', MODEL: { TYPE: 'sword', BLADE: 0x8fe6f5, GUARD: 0x3b3f45, LENGTH: 0.84 }, DESC: '22 de daño. Aguanta 1500 golpes.' },
     LEATHER_CAP: { NAME: 'Gorro de cuero', ICON: '🧢', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.06, COLOR: 0x7a4a24, DESC: 'Abriga la cabeza.' },
     LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
     LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
@@ -482,6 +505,11 @@ export const GameConfig = deepFreeze({
     CHAIN_LEGS: { NAME: 'Calzas de malla', ICON: '🦿', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 6, COLD_PROTECTION: 0.04, COLOR: 0x7f868d, DESC: 'Defensa 6.' },
     CHAIN_BOOTS: { NAME: 'Botas de malla', ICON: '🥾', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.02, COLOR: 0x6f767d, DESC: 'Defensa 3.' },
     CHAIN_GLOVES: { NAME: 'Guantes de malla', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.01, COLOR: 0x9ea4aa, DESC: 'Defensa 2.' },
+    DIAMOND_HELMET: { NAME: 'Yelmo de diamante', ICON: '⛑️', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 4, COLD_PROTECTION: 0.04, COLOR: 0x8fe0f0, DESC: 'Defensa 4.' },
+    DIAMOND_CHEST: { NAME: 'Coraza de diamante', ICON: '🦺', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 12, COLD_PROTECTION: 0.06, COLOR: 0x7fd6ea, DESC: 'Defensa 12.' },
+    DIAMOND_LEGS: { NAME: 'Grebas de diamante', ICON: '🦿', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 8, COLD_PROTECTION: 0.05, COLOR: 0x72c8de, DESC: 'Defensa 8.' },
+    DIAMOND_BOOTS: { NAME: 'Botas de diamante', ICON: '🥾', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 4, COLD_PROTECTION: 0.03, COLOR: 0x66b8cc, DESC: 'Defensa 4.' },
+    DIAMOND_GLOVES: { NAME: 'Guanteletes de diamante', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.02, COLOR: 0x8fe0f0, DESC: 'Defensa 3.' },
     // Combustible de la nave: se colocan en el puesto de carga (ver SHIP.BATTERIES).
     PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋', USE: 'BATTERY' },
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
@@ -585,6 +613,31 @@ export const GameConfig = deepFreeze({
     CHAIN_BOOTS: { RESULT: 'CHAIN_BOOTS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 2 } },
     CHAIN_LEGS: { RESULT: 'CHAIN_LEGS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 16, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 4 } },
     CHAIN_CHEST: { RESULT: 'CHAIN_CHEST', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 20, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 5 } },
+    // Herramientas y armas por niveles (P3).
+    COPPER_AXE: { RESULT: 'COPPER_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 18, INGREDIENTS: { REFINED_WOOD: 2, REFINED_COPPER: 3, ROPE: 1 } },
+    COPPER_PICKAXE: { RESULT: 'COPPER_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 18, INGREDIENTS: { REFINED_WOOD: 2, REFINED_COPPER: 3, ROPE: 1 } },
+    IRON_AXE: { RESULT: 'IRON_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 22, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 3, ROPE: 1 } },
+    IRON_PICKAXE: { RESULT: 'IRON_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 22, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 3, ROPE: 1 } },
+    DIAMOND_AXE: { RESULT: 'DIAMOND_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 30, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_DIAMOND: 3, REFINED_IRON: 1 } },
+    DIAMOND_PICKAXE: { RESULT: 'DIAMOND_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 30, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_DIAMOND: 3, REFINED_IRON: 1 } },
+    SHOVEL: { RESULT: 'SHOVEL', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 10, INGREDIENTS: { REFINED_WOOD: 2, REFINED_STONE: 1, ROPE: 1 } },
+    SICKLE: { RESULT: 'SICKLE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 10, INGREDIENTS: { REFINED_WOOD: 1, REFINED_COPPER: 1 } },
+    HAMMER: { RESULT: 'HAMMER', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 12, INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 1 } },
+    BUCKET: { RESULT: 'BUCKET', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 10, INGREDIENTS: { REFINED_IRON: 2 } },
+    SPYGLASS: { RESULT: 'SPYGLASS', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 14, INGREDIENTS: { GLASS: 2, REFINED_COPPER: 2 } },
+    LANTERN: { RESULT: 'LANTERN', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 10, INGREDIENTS: { REFINED_IRON: 1, GLASS: 1, COAL: 2 } },
+    SPEAR: { RESULT: 'SPEAR', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 10, INGREDIENTS: { REFINED_WOOD: 2, REFINED_STONE: 1, ROPE: 1 } },
+    SLIME_BOMB: { RESULT: 'SLIME_BOMB', AMOUNT: 2, CATEGORY: 'WEAPONS', TIME: 6, INGREDIENTS: { SLIME: 3, COAL: 1 } },
+    FIRE_ARROW: { RESULT: 'FIRE_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, INGREDIENTS: { ARROW: 3, COAL: 1, SPIDER_SILK: 1 } },
+    CROSSBOW: { RESULT: 'CROSSBOW', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 22, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 4, REFINED_IRON: 2, ROPE: 3 } },
+    MACE: { RESULT: 'MACE', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 18, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 3 } },
+    CRYSTAL_ARROW: { RESULT: 'CRYSTAL_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 8, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, GLASS: 2, SPIDER_SILK: 3 } },
+    DIAMOND_SWORD: { RESULT: 'DIAMOND_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 30, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_DIAMOND: 3 } },
+    DIAMOND_HELMET: { RESULT: 'DIAMOND_HELMET', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 20, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 2, REFINED_IRON: 1 } },
+    DIAMOND_GLOVES: { RESULT: 'DIAMOND_GLOVES', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 14, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 1, REFINED_IRON: 1 } },
+    DIAMOND_BOOTS: { RESULT: 'DIAMOND_BOOTS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 20, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 2, REFINED_IRON: 1 } },
+    DIAMOND_LEGS: { RESULT: 'DIAMOND_LEGS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 26, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 4, REFINED_IRON: 1 } },
+    DIAMOND_CHEST: { RESULT: 'DIAMOND_CHEST', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 32, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 5, REFINED_IRON: 2 } },
     // Hoguera: asar.
     COOKED_MEAT: { RESULT: 'COOKED_MEAT', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 8, STATION: 'CAMPFIRE', INGREDIENTS: { MEAT: 1 } },
     ROASTED_MUSHROOM: { RESULT: 'ROASTED_MUSHROOM', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { MUSHROOM: 1 } },

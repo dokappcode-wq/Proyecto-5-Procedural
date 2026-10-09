@@ -9,9 +9,16 @@ import { GameEvents } from '../core/GameEvents.js';
  *   DRINK      → beber una unidad de agua       (agua del odre)
  *   WATERSKIN  → llenar mirando al agua / beber (odre)
  *   EQUIP      → EquipmentSystem.toggle()       (armadura de cuero)
+ *   REPAIR     → martillo: arregla lo más gastado con 1 lingote de su material
+ *   BUCKET     → cubo: llenarlo mirando al agua / beberse el cubo de agua
+ *   SPYGLASS   → catalejo (el zoom lo hace main mientras se mantiene el clic dcho)
  * (Las construcciones no son objetos: se colocan en el modo construcción, B.)
  */
 const USE_COOLDOWN = 0.35;
+/** Material con el que se arregla lo que no dice REPAIR (por el prefijo del id). */
+const REPAIR_BY_PREFIX = [['DIAMOND_', 'REFINED_DIAMOND'], ['IRON_', 'REFINED_IRON'], ['COPPER_', 'REFINED_COPPER'], ['STONE_', 'REFINED_STONE'], ['LEATHER_', 'REFINED_LEATHER']];
+const REPAIR_FRACTION = 0.4; // cada lingote devuelve el 40 % del aguante
+const BUCKET_DRINK = 3;      // un cubo de agua quita la sed de 3 tragos
 
 export class ItemUseSystem {
   constructor({ items, equipmentConfig, input, hotbar, inventory, nutrition, equipment, interaction, thirst, events, capturesUse = () => false }) {
@@ -88,13 +95,22 @@ export class ItemUseSystem {
         this._events.emit(GameEvents.BUILD_PIECE_REQUEST, { pieceId: def.BUILD_PIECE, once: !!def.HOLD }); // la antorcha: una y vuelve a la mano
         ok = true;
         break;
+      case 'REPAIR':
+        ok = this._repair();
+        break;
+      case 'BUCKET':
+        ok = this._bucket(itemId);
+        break;
+      case 'SPYGLASS':
+        ok = true;
+        break;
       case 'MAP':
         this._events.emit(GameEvents.MAP_OPEN_REQUEST, { itemId });
         ok = true;
         break;
       default:
         if (def.TOOL) this._message(`${def.NAME}: herramienta. Mantén el clic sobre ${def.TOOL.CHOP_SPEED ? 'un tronco para talar más deprisa' : 'una roca para picarla'}.`);
-        else if (def.WEAPON) this._message(`${def.NAME}: ${def.WEAPON.DAMAGE} de daño. Clic para golpear${this._equipment.slots.OFFHAND ? '' : ' (con un escudo puesto, clic dcho bloquea)'}.`);
+        else if (def.WEAPON) this._message(`${def.NAME}: ${def.WEAPON.DAMAGE} de daño. Clic para golpear${this._items[this._equipment.slots.OFFHAND]?.SHIELD ? '' : ' (con un escudo puesto, clic dcho bloquea)'}.`);
         else this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
     }
     if (ok) this._events.emit(GameEvents.ITEM_USED, { itemId, use: def.USE });
@@ -141,6 +157,88 @@ export class ItemUseSystem {
     }
     this._inventory.removeItem('WATER', 1);
     this._events.emit(GameEvents.PLAYER_DRANK, { source: 'WATERSKIN' });
+    return true;
+  }
+
+  // ---- Martillo ----------------------------------------------------------------
+
+  /** Material que arregla un objeto (REPAIR o, si no lo dice, el de su nombre). */
+  repairMaterial(id) {
+    const def = this._items[id];
+    if (!def?.DURABILITY) return null;
+    if (def.REPAIR) return def.REPAIR;
+    return REPAIR_BY_PREFIX.find(([pre]) => id.startsWith(pre))?.[1] ?? null;
+  }
+
+  /**
+   * Arregla lo más gastado (por proporción) de lo que se lleva o se tiene puesto y tenga
+   * material en el inventario: gasta 1 lingote y devuelve REPAIR_FRACTION del aguante.
+   */
+  _repair() {
+    const inv = this._inventory;
+    const cands = [];
+    inv.slots.forEach((st, i) => {
+      if (!st || st.dur == null) return;
+      const max = inv.maxDurability(st.id);
+      if (max && st.dur < max) cands.push({ id: st.id, ratio: st.dur / max, max, get: () => st.dur, set: (v) => { st.dur = v; } });
+    });
+    const eq = this._equipment;
+    for (const [slot, id] of Object.entries(eq?.slots ?? {})) {
+      const max = this._items[id]?.DURABILITY;
+      const dur = eq.dur?.[slot];
+      if (id && max && dur != null && dur < max) cands.push({ id, ratio: dur / max, max, get: () => eq.dur[slot], set: (v) => { eq.dur[slot] = v; } });
+    }
+    if (!cands.length) {
+      this._message('🔨 No llevas nada gastado que arreglar.');
+      return false;
+    }
+    cands.sort((a, b) => a.ratio - b.ratio);
+    const fix = cands.find((c) => {
+      const mat = this.repairMaterial(c.id);
+      return mat && inv.hasItem(mat);
+    });
+    if (!fix) {
+      const c = cands[0];
+      const mat = this._items[this.repairMaterial(c.id)];
+      this._message(`🔨 Para arreglar ${this._items[c.id].NAME.toLowerCase()} necesitas ${mat ? `${mat.ICON} ${mat.NAME.toLowerCase()}` : 'su material'}.`, 'warning');
+      return false;
+    }
+    const mat = this.repairMaterial(fix.id);
+    inv.removeItem(mat, 1);
+    const now = Math.min(fix.max, fix.get() + Math.ceil(fix.max * REPAIR_FRACTION));
+    fix.set(now);
+    inv._emit?.(fix.id, 0); // refrescar las barras de aguante
+    this._events.emit(GameEvents.ITEM_REPAIRED, { itemId: fix.id, dur: now, max: fix.max });
+    this._message(`🔨 ${this._items[fix.id].NAME} arreglado: ${now}/${fix.max}.`, 'pickup');
+    return true;
+  }
+
+  // ---- Cubo --------------------------------------------------------------------
+
+  _bucket(itemId) {
+    const idx = this._hotbar.selectedIndex;
+    const swap = (to) => {
+      const st = this._inventory.slots[idx];
+      if (st?.id === itemId) {
+        st.id = to;
+        this._inventory._emit?.(to, 0);
+      } else if (this._inventory.removeItem(itemId, 1)) this._inventory.addItem(to, 1);
+    };
+    if (itemId === 'BUCKET') {
+      if (this._interaction.target?.kind !== 'water') {
+        this._message('🪣 Mira al agua (lago, río o charca) para llenar el cubo.');
+        return false;
+      }
+      swap('BUCKET_WATER');
+      this._message('🪣 Has llenado el cubo.', 'pickup');
+      return true;
+    }
+    if (this._thirst.ratio >= 1) {
+      this._message('No tienes sed.');
+      return false;
+    }
+    swap('BUCKET');
+    this._events.emit(GameEvents.PLAYER_DRANK, { source: 'BUCKET', amount: (this._thirst.max ?? 100) * 0.12 * BUCKET_DRINK });
     return true;
   }
 
