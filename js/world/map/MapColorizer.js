@@ -10,7 +10,7 @@ import { SURFACE } from './MapLegend.js';
  * empinadas son roca con estratos; las hondonadas, algo más oscuras.
  * Firma igual que BiomeColorizer: colorize(ctx, out) con ctx.surface.
  */
-const PALETTE = {
+export const PALETTE = {
   [SURFACE.GRASS]: [0x7aab4a, 0x92b955, 0x6a9a40],
   [SURFACE.GRASS_LUSH]: [0x5a9a3c, 0x6cad47, 0x4f8c36],
   [SURFACE.FLOWERS]: [0x84b350, 0x98bf5c, 0xc9c27a],

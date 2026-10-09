@@ -49,7 +49,7 @@ export class CaveSystem {
    * @param {object[]} [p.avoid] zonas a evitar { x, z, r } (nave, cápsula…)
    * @param {Function} [p.isWater]
    */
-  generate({ seed, terrain, bounds, spawn, avoid = [], isWater = () => false, dungeon = null }) {
+  generate({ seed, terrain, bounds, spawn, avoid = [], isWater = () => false, dungeon = null, authored = null }) {
     const C = this._cfg;
     const rng = new SeededRandom(deriveSeed(seed, 'caves'));
     this.caves = [];
@@ -78,7 +78,18 @@ export class CaveSystem {
         mouths.push({ x: dungeon.x, z: dungeon.z });
       }
     }
-    for (const kind of ['UNDERGROUND', 'MOUNTAIN']) {
+    // Mapa diseñado: sus cuevas (con ramales y salas con nombre), ninguna al azar.
+    if (authored) {
+      for (const def of authored) {
+        for (const chain of def.chains) {
+          const nodes = chain.nodes.map((n) => ({ ...n, w: n.w ?? 1, y: n.floor + FLOOR_K * n.r }));
+          const cave = this._bounds({ kind: chain.branch ? 'BRANCH' : def.kind, nodes, mouth: { x: nodes[0].x, z: nodes[0].z, y: nodes[0].floor } });
+          Object.assign(cave, { id: this.caves.length, group: def.id, name: def.name, theme: def.theme, ores: def.ores, authored: true, capped: true, from: chain.from ?? null });
+          this.caves.push(cave);
+        }
+      }
+    }
+    for (const kind of authored ? [] : ['UNDERGROUND', 'MOUNTAIN']) {
       const want = kind === 'UNDERGROUND' ? C.UNDERGROUND : C.MOUNTAIN;
       let made = 0;
       for (let attempt = 0; attempt < want * 120 && made < want; attempt++) {
@@ -255,6 +266,11 @@ export class CaveSystem {
       if (!changed) break;
     }
     for (const n of nodes) n.y = n.floor + FLOOR_K * n.r;
+    return this._bounds({ kind, nodes, mouth: { x: nodes[0].x, z: nodes[0].z, y: nodes[0].floor } });
+  }
+
+  _bounds(cave) {
+    const nodes = cave.nodes;
     let minX = Infinity;
     let maxX = -Infinity;
     let minZ = Infinity;
@@ -265,7 +281,8 @@ export class CaveSystem {
       minZ = Math.min(minZ, n.z - n.r * (n.w ?? 1));
       maxZ = Math.max(maxZ, n.z + n.r * (n.w ?? 1));
     }
-    return { kind, nodes, mouth: { x: nodes[0].x, z: nodes[0].z, y: nodes[0].floor }, bbox: { minX, maxX, minZ, maxZ } };
+    cave.bbox = { minX, maxX, minZ, maxZ };
+    return cave;
   }
 
   /** Reparte los tramos en una rejilla para consultar rápido. */
@@ -335,7 +352,7 @@ export class CaveSystem {
     for (const s of this._segmentsAt(x, z)) {
       if (s.d > s.wr * WALK_K) continue;
       // El fondo de la cueva es una pared plana en el último nodo: no se pasa de ella.
-      if (s.i === s.cave.nodes.length - 2 && (s.tr - 1) * s.len > -END_GAP) continue;
+      if (!s.cave.capped && s.i === s.cave.nodes.length - 2 && (s.tr - 1) * s.len > -END_GAP) continue;
       const c = s.y + CEIL_K * s.r;
       if (feet < s.floor - 1.5 || feet > c - 0.4) continue;
       if (s.floor > feet + step) continue;
@@ -369,6 +386,7 @@ export class CaveSystem {
   /** ¿El terreno en (x, y=altura del terreno, z) queda abierto por la boca de una cueva? */
   holeAt(x, y, z) {
     for (const s of this._segmentsAt(x, z)) {
+      if (s.cave.kind === 'BRANCH') continue;
       if (s.i > 4 || (s.i === 0 && s.t <= 0) || s.d > s.r * 0.98) continue;
       if (y > s.floor - 0.4 && y < s.y + CEIL_K * s.r + 0.3) return true;
     }
@@ -382,6 +400,7 @@ export class CaveSystem {
    */
   openAt(x, y, z) {
     for (const s of this._segmentsAt(x, z)) {
+      if (s.cave.kind === 'BRANCH') continue;
       if (s.i > 4 || (s.i === 0 && s.t <= 0)) continue; // detrás de la boca no hay túnel
       const dy = y - s.y;
       if (dy < -FLOOR_K * s.r) continue;
@@ -392,9 +411,27 @@ export class CaveSystem {
     return false;
   }
 
+  /** Cueva (y sala con nombre) en la que está (x, y, z): { cave, room } o null. */
+  placeAt(x, y, z) {
+    let best = null;
+    for (const s of this._segmentsAt(x, z)) {
+      if (y < s.floor - 1 || y > s.y + CEIL_K * s.r + 1) continue;
+      if (!best || s.d < best.d) best = s;
+    }
+    if (!best) return null;
+    const cave = best.cave;
+    let room = null;
+    for (const c of this.caves) {
+      if ((c.group ?? c.id) !== (cave.group ?? cave.id)) continue;
+      for (const n of c.nodes) if (n.name && Math.hypot(n.x - x, n.z - z) < n.r * (n.w ?? 1) * 1.3) room = n.name;
+    }
+    return { cave: cave.name ?? null, room };
+  }
+
   /** ¿(x, z) está junto a la boca de una cueva (a menos de `pad` m del túnel)? Ahí no crecen árboles ni rocas. */
   nearMouth(x, z, pad = 4) {
     for (const c of this.caves) {
+      if (c.kind === 'BRANCH') continue;
       for (let i = 0; i < Math.min(4, c.nodes.length); i++) {
         const n = c.nodes[i];
         if (Math.hypot(n.x - x, n.z - z) < n.r + pad) return true;
@@ -406,6 +443,7 @@ export class CaveSystem {
   /** ¿Hay alguna cueva cuya boca esté cerca de (x, z)? (para trocear el terreno solo donde hace falta) */
   mouthNear(x0, z0, x1, z1) {
     return this.caves.some((c) => {
+      if (c.kind === 'BRANCH') return false;
       const m = c.nodes.slice(0, 6);
       return m.some((n) => n.x + n.r > x0 && n.x - n.r < x1 && n.z + n.r > z0 && n.z - n.r < z1);
     });
@@ -418,10 +456,15 @@ export class CaveSystem {
    * En la pared (a un lado del eje) y sobre el suelo.
    */
   _content(cave, rng) {
-    const C = this._cfg.CONTENT;
+    const C = cave.ores ? {
+      COAL: cave.kind === 'BRANCH' ? [0, 0] : [cave.ores.COAL, cave.ores.COAL + 1],
+      COPPER_PER_NODE: cave.ores.COPPER, IRON_PER_NODE: cave.ores.IRON, DIAMOND_PER_NODE: cave.ores.DIAMOND,
+      GLOW_FLOWERS: [cave.ores.FLOWERS, cave.ores.FLOWERS + 1],
+    } : this._cfg.CONTENT;
     const out = [];
     const n = cave.nodes.length;
     const along = (i, side, f = 0.7) => { // por defecto, metidas en la pared (no estorban al pasar)
+      if (i >= n - 1) i = n - 2; // el último nodo: en el tramo que llega a él
       const a = cave.nodes[i];
       const b = cave.nodes[Math.min(n - 1, i + 1)];
       const hx = b.x - a.x;
@@ -437,8 +480,8 @@ export class CaveSystem {
     // Carbón: en la boca (fuera y dentro de la entrada).
     const coal = Math.round(rng.range(C.COAL[0], C.COAL[1]));
     for (let k = 0; k < coal; k++) out.push({ type: 'COAL_ORE', ...along(Math.min(n - 2, Math.floor(rng.range(0, 4))), rng.next() < 0.5 ? -1 : 1) });
-    for (let i = 2; i < n - 1; i++) {
-      const deep = i / n;
+    for (let i = cave.kind === 'BRANCH' ? 1 : 2; i < n - (cave.capped ? 0 : 1); i++) {
+      const deep = cave.kind === 'BRANCH' ? 0.8 : i / n;
       const side = () => (rng.next() < 0.5 ? -1 : 1);
       if (rng.next() < C.COPPER_PER_NODE) out.push({ type: 'COPPER_ORE', ...along(i, side()) });
       if (deep > 0.3 && rng.next() < C.IRON_PER_NODE) out.push({ type: 'IRON_ORE', ...along(i, side()) });

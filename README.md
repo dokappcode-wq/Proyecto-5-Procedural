@@ -267,6 +267,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **El Edén diseñado (v1.23–1.24)**: la isla ya no es procedural: es un mapa fijo hecho con
+  `tools/map/bake.mjs` a partir de `maps/eden/design.mjs` (relieve esculpido y erosionado, ríos con
+  cascadas, lagos, termas, laguna, marisma, caminos, regiones con nombre y vegetación por zonas).
+  - **Cuevas con personalidad** (diseñadas una a una, con ramales y salas con nombre): Cueva del Rocío
+    (raíces), Mina Vieja (entibado, raíles, faroles, vagoneta), Gruta de Cristal (cristales que brillan),
+    Gruta de Hielo (carámbanos y cascada helada), Bosque de Setas (setas gigantes y un lago escondido) y
+    Cueva del Mar (algas, conchas y charcas; se llega nadando al pie del acantilado).
+  - **Lugares**: El Abuelo (árbol gigante), Ruinas del Viejo Jardín, Faro Roto, Arco del Mar, Puente de
+    Piedra, Cantera de los Gólems, Mirador del Poniente, termas que calientan y bruma en las cascadas.
+  - Al pisar un lugar por primera vez aparece su nombre en grande; el mapa del planeta muestra regiones,
+    lagos, ríos, caminos, lugares y cuevas. Se ve lejos: la isla entera detrás de la niebla.
+  - Rehacer el mapa tras cambiar el diseño: `node tools/map/bake.mjs eden`.
 - **Sonido (v1.22)**: todo se genera con WebAudio, sin archivos de audio. Empieza a sonar con el primer clic o tecla;
   `N` silencia o activa (se recuerda en el navegador).
   - **Efectos**: pasos según el suelo (hierba, piedra en cuevas y montañas, nieve, arena, madera de lo construido,

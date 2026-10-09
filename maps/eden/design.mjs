@@ -429,6 +429,95 @@ export const EDEN = {
     { id: 'PLAYA_FIORDO', name: 'Playa del Fiordo', x: -870, z: -1065, kind: 'cove' },
   ],
 
+  // ---- Cuevas ---------------------------------------------------------------------------
+  // Cada cueva: recorrido principal desde la boca (x, z, r: radio, d: metros que baja el
+  // suelo respecto a la boca, name: sala con nombre) y ramales que salen de un nodo
+  // (from). kind: UNDERGROUND (agujero en el suelo), MOUNTAIN (en una ladera), SEA (al
+  // pie de un acantilado). theme: el ambiente (colores, decoración, luz y menas).
+  caves: [
+    {
+      id: 'CUEVA_ROCIO', name: 'Cueva del Rocío', kind: 'UNDERGROUND', theme: 'roots',
+      ores: { COAL: 4, COPPER: 0.5, IRON: 0.12, DIAMOND: 0, FLOWERS: 3 },
+      path: [
+        { x: 210, z: 700, r: 3.4, d: 0 }, { x: 214, z: 689, r: 3.2, d: 2.4 }, { x: 220, z: 678, r: 3.1, d: 4.8 },
+        { x: 228, z: 666, r: 3, d: 7 }, { x: 238, z: 654, r: 3.4, d: 8.6 },
+        { x: 251, z: 640, r: 6.6, d: 9.4, name: 'Sala de las Raíces' },
+        { x: 264, z: 628, r: 5, d: 9.8 }, { x: 277, z: 619, r: 3, d: 10.6 }, { x: 291, z: 611, r: 3, d: 11.4 },
+        { x: 305, z: 603, r: 5.6, d: 12, name: 'Pozo del Rocío' },
+      ],
+      branches: [
+        { from: 5, path: [{ x: 241, z: 627, r: 2.9, d: 9.8 }, { x: 233, z: 613, r: 2.8, d: 10.2 }, { x: 226, z: 599, r: 4.2, d: 10.4, name: 'Gruta de las Luciérnagas' }] },
+      ],
+    },
+    {
+      id: 'MINA_VIEJA', name: 'Mina Vieja', kind: 'MOUNTAIN', theme: 'mine',
+      ores: { COAL: 5, COPPER: 0.55, IRON: 0.38, DIAMOND: 0, FLOWERS: 0 },
+      path: [
+        { x: 1116, z: -62, r: 3.2, d: 0 }, { x: 1128, z: -64, r: 3, d: 0.5 }, { x: 1141, z: -66, r: 3, d: 1 },
+        { x: 1155, z: -68, r: 3, d: 1.5 }, { x: 1170, z: -70, r: 5.6, d: 2, name: 'Sala de la Vagoneta' },
+        { x: 1186, z: -72, r: 3, d: 2.6 }, { x: 1202, z: -74, r: 3, d: 3.2 }, { x: 1218, z: -78, r: 3, d: 4 },
+        { x: 1234, z: -82, r: 6, d: 4.8, name: 'Pozo Maestro' },
+        { x: 1250, z: -86, r: 3, d: 5.6 }, { x: 1264, z: -90, r: 3, d: 6.4 },
+        { x: 1278, z: -94, r: 5, d: 7.2, name: 'Veta del Hierro' },
+      ],
+      branches: [
+        { from: 4, path: [{ x: 1172, z: -88, r: 2.8, d: 2.6 }, { x: 1176, z: -106, r: 2.8, d: 3.2 }, { x: 1182, z: -124, r: 2.8, d: 4 }, { x: 1190, z: -140, r: 4.5, d: 4.6, name: 'Galería Norte' }] },
+        { from: 8, path: [{ x: 1236, z: -64, r: 2.8, d: 5.4 }, { x: 1240, z: -48, r: 2.8, d: 6.2 }, { x: 1244, z: -32, r: 2.8, d: 7 }, { x: 1250, z: -18, r: 4.5, d: 7.6, name: 'El Derrumbe' }] },
+      ],
+    },
+    {
+      id: 'GRUTA_CRISTAL', name: 'Gruta de Cristal', kind: 'MOUNTAIN', theme: 'crystal',
+      ores: { COAL: 1, COPPER: 0.2, IRON: 0.25, DIAMOND: 0.22, FLOWERS: 0 },
+      path: [
+        { x: 1000, z: -760, r: 3.2, d: 0 }, { x: 1012, z: -752, r: 3, d: 0.6 }, { x: 1026, z: -744, r: 3, d: 1.4 },
+        { x: 1040, z: -736, r: 3.2, d: 2.4 }, { x: 1056, z: -726, r: 6.8, d: 3.4, name: 'Salón Amatista' },
+        { x: 1070, z: -716, r: 3, d: 4.2 }, { x: 1084, z: -706, r: 3, d: 5.2 }, { x: 1098, z: -698, r: 3.2, d: 6.4 },
+        { x: 1114, z: -688, r: 7.2, d: 7.6, name: 'Corazón de Cristal' },
+      ],
+      branches: [
+        { from: 4, path: [{ x: 1060, z: -742, r: 2.6, d: 3.8 }, { x: 1070, z: -756, r: 2.6, d: 4.4 }, { x: 1082, z: -768, r: 4.6, d: 5, name: 'Cámara del Eco' }] },
+      ],
+    },
+    {
+      id: 'GRUTA_HIELO', name: 'Gruta de Hielo', kind: 'MOUNTAIN', theme: 'ice',
+      ores: { COAL: 1, COPPER: 0.1, IRON: 0.4, DIAMOND: 0.1, FLOWERS: 0 },
+      path: [
+        { x: -556, z: -1098, r: 3.4, d: 0 }, { x: -556, z: -1112, r: 3.2, d: 0.5 }, { x: -554, z: -1126, r: 3.2, d: 1.2 },
+        { x: -552, z: -1140, r: 3.4, d: 2 }, { x: -548, z: -1158, r: 7.2, d: 2.8, name: 'Catedral de Hielo' },
+        { x: -544, z: -1176, r: 3, d: 3.6 }, { x: -542, z: -1192, r: 3, d: 4.4 },
+        { x: -540, z: -1208, r: 5.6, d: 5.2, name: 'Cascada Helada' },
+      ],
+      branches: [
+        { from: 4, path: [{ x: -566, z: -1162, r: 2.8, d: 3.2 }, { x: -582, z: -1168, r: 2.8, d: 3.8 }, { x: -598, z: -1176, r: 4.6, d: 4.4, name: 'Nido de Carámbanos' }] },
+      ],
+    },
+    {
+      id: 'BOSQUE_SETAS', name: 'Bosque de Setas', kind: 'UNDERGROUND', theme: 'mushroom',
+      ores: { COAL: 3, COPPER: 0.3, IRON: 0.1, DIAMOND: 0, FLOWERS: 6 },
+      path: [
+        { x: -605, z: 632, r: 3.4, d: 0 }, { x: -600, z: 645, r: 3.2, d: 2.4 }, { x: -594, z: 658, r: 3, d: 4.8 },
+        { x: -588, z: 672, r: 3.2, d: 7 }, { x: -580, z: 690, r: 7.6, d: 8.6, name: 'Bosque de Setas' },
+        { x: -571, z: 707, r: 3.2, d: 9.4 }, { x: -561, z: 721, r: 3.2, d: 10.2 },
+        { x: -550, z: 736, r: 6.2, d: 10.8, name: 'Lago Escondido' },
+      ],
+      branches: [
+        { from: 4, path: [{ x: -596, z: 702, r: 2.8, d: 9 }, { x: -610, z: 713, r: 2.8, d: 9.4 }, { x: -622, z: 724, r: 4.6, d: 9.8, name: 'Rincón de las Esporas' }] },
+      ],
+    },
+    {
+      id: 'CUEVA_MAR', name: 'Cueva del Mar', kind: 'SEA', theme: 'sea',
+      ores: { COAL: 1, COPPER: 0.25, IRON: 0.08, DIAMOND: 0, FLOWERS: 0 },
+      path: [
+        { x: -1680, z: 118, r: 3.8, d: 0 }, { x: -1660, z: 118, r: 3.8, d: 0 }, { x: -1640, z: 119, r: 3.8, d: 0 },
+        { x: -1622, z: 120, r: 3.8, d: 0 }, { x: -1606, z: 122, r: 4, d: 0 }, { x: -1592, z: 124, r: 4, d: 0 },
+        { x: -1576, z: 128, r: 6.6, d: 0, name: 'Gruta de las Mareas' },
+        { x: -1560, z: 132, r: 3.2, d: 0.2 }, { x: -1545, z: 136, r: 3.2, d: 0.4 },
+        { x: -1530, z: 140, r: 5, d: 0.6, name: 'Nido de Conchas' },
+      ],
+      branches: [],
+    },
+  ],
+
   // ---- Regiones ----------------------------------------------------------------------
   // Zonas con nombre: bioma, suelo y vegetación. Gana la primera que contiene el punto;
   // la costa (playas), los ríos y la nieve se deciden después por reglas.

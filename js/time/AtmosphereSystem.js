@@ -189,6 +189,12 @@ export class AtmosphereSystem {
     if (this._scene.background?.isColor) this._scene.background.copy(this._horizon);
   }
 
+  /** Distancia de la niebla (los mapas diseñados se ven más lejos: hay terreno lejano). */
+  setFogRange(near, far) {
+    this._fogNear = near;
+    this._fogFar = far;
+  }
+
   /** Sin atmósfera: cielo negro con estrellas, sol blanco y duro, sombras marcadas. */
   _applyAirless() {
     const P = this._P;

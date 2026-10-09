@@ -50,7 +50,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.23.0',
+    VERSION: '1.24.0',
   },
 
   RENDER: {
@@ -61,7 +61,7 @@ export const GameConfig = deepFreeze({
     SHADOW_AREA: 60,          // lado del área (m) cubierta por la sombra del sol, centrada en el jugador
     FOV: 70,
     NEAR: 0.1,
-    FAR: 900,
+    FAR: 1700,
     FOG_NEAR: 90,
     FOG_FAR: 250,             // ≈ VIEW_DISTANCE_CHUNKS × CHUNK_SIZE: oculta la aparición de chunks
     TONE_MAPPING_EXPOSURE: 1.0,

@@ -150,6 +150,9 @@ export const GameEvents = Object.freeze({
   HYPERSPACE_ARRIVED: 'hyperspace:arrived',     // { from } llegada tras un salto
   AI_PANEL_REQUEST: 'ai:panel',                     // {}
 
+  // Lugares con nombre (mapas diseñados)
+  PLACE_CHANGED: 'world:placeChanged',             // { name, kind: 'region'|'cave'|'room', first }
+
   // Jefe (sonido y efectos)
   BOSS_EVENT: 'boss:event',                         // { type, x?, y?, z? } golpe, láser, roca, grieta…
 

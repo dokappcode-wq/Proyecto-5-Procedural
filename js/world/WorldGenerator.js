@@ -16,6 +16,10 @@ import { buildCaveMeshes, markStencil, hideOverCaves } from './CaveMesher.js';
 import { planSites } from './WorldSites.js';
 import { AuthoredTerrain, AuthoredWater, buildWaterGeometry, createFreshWaterMaterial } from './map/AuthoredWorld.js';
 import { createMapColorizer } from './map/MapColorizer.js';
+import { caveSurfaceSteps } from './map/CaveSurfaceMesher.js';
+import { buildCaveDecor } from './map/CaveDecor.js';
+import { enhanceTerrainMaterial } from './map/TerrainDetail.js';
+import { buildFarTerrain } from './map/FarTerrain.js';
 import { FLORA_TABLE } from './map/MapLegend.js';
 import { hashString } from '../core/SeededRandom.js';
 
@@ -94,6 +98,7 @@ export class WorldGenerator {
 
     // ---- Capas de chunk -------------------------------------------------------
     this._material = markStencil(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading }), 0);
+    if (map) enhanceTerrainMaterial(this._material);
     this._propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this._grassMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     this._mesher = new TerrainMesher({ colorizer: () => {} });
@@ -143,7 +148,13 @@ export class WorldGenerator {
       ],
     });
 
-    if (map) this._freshMaterial = createFreshWaterMaterial(planet.WATER.COLOR);
+    if (map) {
+      this._freshMaterial = createFreshWaterMaterial(planet.WATER.COLOR);
+      // La isla entera en baja resolución: se ve a lo lejos.
+      const far = buildFarTerrain(map, { nearRadius: config.VIEW_DISTANCE_CHUNKS * config.CHUNK_SIZE - 25 });
+      markStencil(far.material, 0);
+      scene.add(far);
+    }
     this._pondGroup = new THREE.Group();
     this._pondGroup.name = 'Ponds';
     scene.add(this._pondGroup);
@@ -319,9 +330,30 @@ export class WorldGenerator {
         ],
         isWater: (x, z) => this.water.isWater(x, z, 8),
         dungeon: this._rules.DUNGEON?.(this.sites) ?? null,
+        authored: meta.caves ?? [],
       });
-      this._caveGroup = buildCaveMeshes(this.caves.caves, (x, z) => this.terrain.heightAt(x, z), this._propMesher._colors);
+      if (this.caves.dungeon) {
+        Object.assign(this.caves.dungeon, { capped: true, theme: 'dungeon', group: 'MAZMORRA', name: 'La Mazmorra' });
+        this.caves.dungeon.content = this.caves.dungeon.content ?? [];
+      }
+      // Mallas: una por cueva (con sus ramales), hechas cuando el jugador se acerca.
+      this._caveGroup = new THREE.Group();
+      this._caveGroup.name = 'Caves';
       this._scene.add(this._caveGroup);
+      const groups = new Map();
+      for (const c of this.caves.caves) {
+        const key = c.group ?? `cave${c.id}`;
+        if (!groups.has(key)) groups.set(key, { theme: c.theme ?? 'roots', chains: [], bbox: { ...c.bbox } });
+        const g = groups.get(key);
+        g.chains.push(c);
+        g.bbox.minX = Math.min(g.bbox.minX, c.bbox.minX);
+        g.bbox.maxX = Math.max(g.bbox.maxX, c.bbox.maxX);
+        g.bbox.minZ = Math.min(g.bbox.minZ, c.bbox.minZ);
+        g.bbox.maxZ = Math.max(g.bbox.maxZ, c.bbox.maxZ);
+      }
+      this._caveMeshes = [...groups.values()].map((g) => ({ ...g, mesh: null }));
+      this.caveLights = [];
+      this._caveMaterial ??= markStencil(new THREE.MeshLambertMaterial({ vertexColors: true }), 1);
     }
     this.resources = new ResourceSystem({
       config: this._planet.RESOURCES,
@@ -352,6 +384,59 @@ export class WorldGenerator {
     if (emitEvent) this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
   }
 
+  /**
+   * Construye las mallas de las cuevas a menos de 260 m del jugador, poco a poco (unos
+   * milisegundos por fotograma, sin tirones). `budget` = ms (Infinity: de una vez).
+   */
+  _buildNearCaves(budget = 5) {
+    const p = this._focus;
+    const t0 = performance.now();
+    for (const c of this._caveMeshes) {
+      if (c.mesh) continue;
+      const b = c.bbox;
+      const dx = Math.max(b.minX - p.x, 0, p.x - b.maxX);
+      const dz = Math.max(b.minZ - p.z, 0, p.z - b.maxZ);
+      if (Math.hypot(dx, dz) > 260 && !c.job) continue;
+      c.job ??= caveSurfaceSteps(c.chains.map((ch) => ({ nodes: ch.nodes })), (x, z) => this.terrain.heightAt(x, z), c.theme);
+      let r = c.job.next();
+      while (!r.done && performance.now() - t0 < budget) r = c.job.next();
+      if (!r.done) return;
+      c.job = null;
+      const geo = r.value;
+      c.mesh = geo ? new THREE.Mesh(geo, this._caveMaterial) : new THREE.Group();
+      c.mesh.receiveShadow = true;
+      c.mesh.renderOrder = -1;
+      this._caveGroup.add(c.mesh);
+      // Decoración del ambiente de la cueva y sus luces.
+      const decor = buildCaveDecor(c.chains.map((ch) => ({ nodes: ch.nodes, branch: ch.kind === 'BRANCH' })), c.theme, c.chains[0].group ?? '');
+      c.mesh.add(decor.group);
+      this.caveLights.push(...decor.lights);
+      return;
+    }
+  }
+
+  /** Construye ya todas las cuevas (herramientas y pruebas). */
+  buildAllCaves() {
+    if (!this._caveMeshes) return;
+    const f = this._focus;
+    for (const c of this._caveMeshes) {
+      this._focus = { x: (c.bbox.minX + c.bbox.maxX) / 2, z: (c.bbox.minZ + c.bbox.maxZ) / 2 };
+      while (!c.mesh) this._buildNearCaves(Infinity);
+    }
+    this._focus = f;
+  }
+
+  /** Luces de las cuevas (cristales, setas, faroles…) cerca de un punto: [{ x, y, z, color, distance, intensity, d }]. */
+  caveLightsNear(x, y, z, r = 40) {
+    if (!this.caveLights?.length) return [];
+    const out = [];
+    for (const l of this.caveLights) {
+      const d = Math.hypot(l.x - x, l.z - z, (l.y - y) * 2);
+      if (d < r) out.push({ ...l, d });
+    }
+    return out;
+  }
+
   /** Región con nombre en (x, z) (solo en mapas diseñados): { id, name, … } o null. */
   getRegionAt(x, z) {
     return this._map?.regionAt(x, z) ?? null;
@@ -377,6 +462,7 @@ export class WorldGenerator {
   update(dt = 0) {
     this.resources?.update(dt);
     if (this._freshMaterial) this._freshMaterial.userData.time.value += dt;
+    if (this._caveMeshes && this._focus) this._buildNearCaves();
     if (!this._focus || !this.terrain) return;
     const cs = this._cfg.CHUNK_SIZE;
     this._chunks.update((this._focus.x + this._half) / cs, (this._focus.z + this._half) / cs);

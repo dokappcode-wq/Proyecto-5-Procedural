@@ -101,6 +101,8 @@ import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 import { AudioSystem } from './audio/AudioSystem.js';
 import { MapData } from './world/map/MapData.js';
+import { PlaceTracker } from './world/map/PlaceTracker.js';
+import { Landmarks } from './world/map/Landmarks.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
   const cfg = GameConfig;
@@ -162,6 +164,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // (Se crean más abajo; estas funciones solo se llaman durante el bucle.)
   // Edificios de la historia (torre, arena del nodo, centro de investigación…).
   const storyColliders = new StaticColliders();
+  let landmarks = null; // lugares del mapa diseñado (se crean tras generar el mundo)
   const structureSources = () => (crashSite ? [construction, ship, crashSite, storyColliders] : [construction, ship, storyColliders]);
   const combinedStructures = {
     surfaceAt: (x, z, maxY) => {
@@ -219,6 +222,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   worlds.follow(player.position);
 
   const biomeTracker = new BiomeTracker({ world, target: player, events });
+  const placeTracker = new PlaceTracker({ world, player, events }); // regiones, cuevas y salas con nombre
 
   // ---- Mundo vivo: animales y descubrimientos ------------------------------
   const animals = new AnimalSystem({
@@ -552,7 +556,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         const a = construction.getShelterAt(x, y, z);
         const b = ship.getShelterAt(x, y, z);
         // El traje encendido y las burbujas con batería mantienen el calor.
-        const warm = lifeSupport.powered || bubbles.contains(worlds.activeId, x, y + 1, z);
+        const warm = lifeSupport.powered || bubbles.contains(worlds.activeId, x, y + 1, z) || (worlds.activeId === HOME && !!landmarks?.isWarmAt(x, y, z));
         return { factor: Math.max(a.factor, b.factor), heated: !!b.heated || warm };
       },
     },
@@ -560,6 +564,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   // Al congelarse se ve menos (la niebla se acerca poco a poco).
   events.on(GameEvents.TEMPERATURE_CHANGED, ({ visibility }) => atmosphere.setVisibility(visibility));
+  // Mapas diseñados: se ve lejos (la isla entera en baja resolución detrás de la niebla).
+  const applyFog = () => (worlds.active.map ? atmosphere.setFogRange(170, 1150) : atmosphere.setFogRange(cfg.RENDER.FOG_NEAR, cfg.RENDER.FOG_FAR));
+  applyFog();
+  events.on(GameEvents.BODY_CHANGED, applyFog);
 
   const needs = [hunger, thirst, energy, temperature, time, lifeSupport];
   const setNeedsPaused = (paused) => needs.forEach((n) => (n.paused = paused));
@@ -708,13 +716,18 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         const d = Math.hypot(n.x - p.x, n.z - p.z, (n.y - p.y) * 2);
         if (d < 40) list.push({ x: n.x, y: n.y + 0.7, z: n.z, d, torch: false });
       }
+      for (const c of world.caveLightsNear?.(p.x, p.y, p.z, 45) ?? []) list.push({ ...c, cave: true });
       list.sort((a, b) => a.d - b.d);
       torchLights.forEach((l, i) => {
         const e = list[i];
         l.visible = !!e;
         if (!e) return;
         l.position.set(e.x, e.y, e.z);
-        if (e.torch) {
+        if (e.cave) {
+          l.color.setHex(e.color);
+          l.distance = e.distance;
+          l.intensity = e.intensity * (0.92 + Math.sin(t * 2.1 + i) * 0.08);
+        } else if (e.torch) {
           l.color.setHex(0xffa24a);
           l.distance = 13;
           l.intensity = 2.2 * (0.88 + Math.sin(t * 13 + i) * 0.06 + Math.sin(t * 5.1 + i * 2) * 0.06);
@@ -787,7 +800,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     let t = planetTextures.get(id);
     if (!t || t.seed !== seed || (!t.withMap && withMap)) {
       const profile = system.profiles[id];
-      const c = createPlanetTextures({ width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: withMap ? map.canvas : null, planet: profile });
+      const c = createPlanetTextures({ width: cfg.SPACE.TEXTURE_WIDTH, seed, mapCanvas: withMap ? map.plainCanvas ?? map.canvas : null, planet: profile });
       const toTex = (canvas) => Object.assign(new THREE.CanvasTexture(canvas), { colorSpace: THREE.SRGBColorSpace });
       t = { seed, withMap, surface: toTex(c.surface), clouds: profile.BREATHABLE ? toTex(c.clouds) : null, atmosphere: profile.BREATHABLE };
       planetTextures.set(id, t);
@@ -1203,6 +1216,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Sonido: efectos, ambiente y música generados con WebAudio (N: silenciar).
   const audio = new AudioSystem({
     events, input, player, camera: render.camera, worlds, homeId: HOME, construction, ship, enemies, animals, time, story2: storyPart2, items: cfg.ITEMS,
+    waterfalls: () => landmarks?.waterfalls ?? [],
   });
   events.on(GameEvents.WATCH_SETTINGS_REQUEST, () => (campaign ? story.openWatchSettings() : message('El reloj de la campaña solo se configura en el Edén.', 'info')));
   const storyKeys = {
@@ -1220,6 +1234,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Generación inicial: después de crear los oyentes (UI, tracker) y antes de las
   // herramientas Admin, que leen los biomas del mundo generado.
   world.generate(String(system.seed));
+  // Lugares con nombre del mapa diseñado (árbol gigante, ruinas, faro, arco, puente…).
+  landmarks = worlds.home.map
+    ? new Landmarks({ map: worlds.home.map, heightAt: (x, z) => worlds.home.getHeightAt(x, z), colliders: storyColliders, root: worlds.rootOf(HOME), isEnabled: () => worlds.activeId === HOME })
+    : null;
 
   // ---- Menú de inicio: la cápsula en órbita y la caída al planeta ------------------
   let titleScene = null;
@@ -1333,6 +1351,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   saveGame.register('world', { save: () => worlds.home.resources.snapshot(), load: (d) => worlds.home.reloadResources(d) });
   saveGame.register('construction', { save: () => construction.snapshot(), load: (d) => construction.restore(d) });
+  saveGame.register('places', { save: () => placeTracker.snapshot(), load: (d) => placeTracker.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
   saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
@@ -1502,6 +1521,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
   loop.add(torches);     // luz de las antorchas clavadas y de las flores luminosas
+  if (landmarks) loop.add(landmarks); // vapor de las termas, bruma de las cascadas
   loop.add(caveDark);    // oscuridad dentro de las cuevas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante
   loop.add(shipBeacon);  // haz de luz sobre la nave hasta encontrarla
@@ -1517,6 +1537,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(nutrition);   // la dieta "olvida" poco a poco lo comido
   loop.add(sleep);
   loop.add(biomeTracker); // bioma actual del jugador
+  loop.add(placeTracker); // lugar con nombre (mapas diseñados)
   loop.add(discovery);   // agua y animales descubiertos
   loop.add(atmosphere);  // luz, cielo, estrellas y niebla según la hora
   loop.add(lighting);    // sombra centrada en el jugador

@@ -29,7 +29,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 export class AudioSystem {
-  constructor({ events, input = null, player, camera, worlds, homeId, construction = null, ship = null, enemies = null, animals = null, time = null, story2 = null, items = {} }) {
+  constructor({ events, input = null, player, camera, worlds, homeId, construction = null, ship = null, enemies = null, animals = null, time = null, story2 = null, items = {}, waterfalls = () => [] }) {
     this.name = 'audio';
     this._events = events;
     this._input = input;
@@ -44,6 +44,7 @@ export class AudioSystem {
     this._time = time;
     this._story2 = story2;
     this._items = items;
+    this._waterfalls = waterfalls;
     this.volumes = parseVolumes(readStore());
     this.ctx = null;
 
@@ -733,6 +734,13 @@ export class AudioSystem {
       const d = Math.hypot(p.x - c.x, p.z - c.z);
       env.falls = clamp01(1.2 - d / ((arena.len ?? 40) * 0.9));
     } else env.falls = 0;
+    // Cascadas del mapa (rugido al acercarse).
+    if (home && !env.cave) {
+      for (const f of this._waterfalls()) {
+        const d = Math.hypot(p.x - f.x, p.z - f.z);
+        env.falls = Math.max(env.falls, clamp01(1.15 - d / 80));
+      }
+    }
   }
 
   _ambientLoops() {

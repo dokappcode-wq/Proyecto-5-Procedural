@@ -312,6 +312,8 @@ for (const r of rivers) carveRiver(r, { valley: false });
 log('agua');
 
 despike(H.data, water.data);
+const caves = (D.caves ?? []).map((c) => prepCave(c));
+log(`cuevas: ${caves.length}`);
 // ---- 10. Pendiente, humedad y clasificación -------------------------------------------
 const slope = new Float32Array(N * N);
 for (let j = 1; j < N - 1; j++) {
@@ -329,6 +331,7 @@ const flowG = new Grid(N, D.half);
 for (let k = 0; k < N * N; k++) flowG.data[k] = Math.log1p(flow[k]);
 blur(flowG, 1, 1);
 const padAt = (x, z) => pads.find((p) => Math.hypot(x - p.x, z - p.z) < p.r + 1.5);
+const mouthAt = (x, z) => caves.some((c) => Math.hypot(x - c.mouth.x, z - c.mouth.z) < c.mouth.r + 5);
 
 const surface = new Grid(N, D.half, Uint8Array);
 const biome = new Grid(N, D.half, Uint8Array);
@@ -379,6 +382,8 @@ H.forAll((i, j, x, z, k) => {
   } else if (pad) {
     s = pad.kind === 'GOBLIN_BASE' ? SURFACE.DIRT : pad.kind === 'LANDING' ? (h > snowLine ? SURFACE.SNOW : SURFACE.SCREE) : pad.kind === 'SPAWN' ? SURFACE.SCORCHED : SURFACE.PAVED;
     if (pad.kind === 'HERMIT_TOWER' || pad.kind === 'NODE_ARENA') s = SURFACE.PAVED;
+  } else if (mouthAt(x, z)) {
+    s = reg.ground === 'sand' || h < 2 ? SURFACE.WET_SAND : SURFACE.SCREE;
   } else if (scarDist[k] < 0.5 + fine * 1.5) {
     s = SURFACE.SCORCHED;
   } else if (roadDist[k] < 0.3 + fine * 0.4) {
@@ -458,6 +463,7 @@ const meta = {
   lagoon: D.lagoon ? { id: D.lagoon.id, name: D.lagoon.name, points: D.lagoon.points } : null,
   islets: (D.islets ?? []).map((i) => ({ id: i.id, name: i.name, center: centroid(i.points) })),
   stacks: D.stacks ?? [],
+  caves: caves.map((c) => ({ id: c.id, name: c.name, kind: c.kind, theme: c.theme, ores: c.ores, mouth: c.mouth, chains: c.chains })),
 };
 fs.writeFileSync(path.join(OUT, `${id}.map.json`), JSON.stringify(meta));
 log(`guardado: ${(bin.length / 1048576).toFixed(2)} MB, alturas ${meta.heightRange.join('…')} m`);
@@ -724,6 +730,73 @@ function carveLake(l) {
   return { ...l, cx: c.x, cz: c.z, r };
 }
 
+// ---- Cuevas -------------------------------------------------------------------------
+
+/**
+ * Alturas del suelo de una cueva diseñada (d: metros bajo la boca) y comprobación de que
+ * siempre queda roca encima. En la boca, una explanada para entrar andando.
+ */
+function prepCave(c) {
+  let path = c.path.map((p) => ({ ...p }));
+  if (c.kind === 'SEA') {
+    // Cueva marina: empieza donde el pie del acantilado sale del agua.
+    while (path.length > 3 && H.sample(path[0].x, path[0].z) < 0.9) path.shift();
+  }
+  const m0 = path[0];
+  const mouthFloor = c.kind === 'SEA' ? 1.0 : H.sample(m0.x, m0.z);
+  // Explanada de la boca (las de ladera y mar: el suelo llega a ras del túnel).
+  if (c.kind !== 'UNDERGROUND') {
+    const r = m0.r + 3;
+    H.forBox({ minX: m0.x - r - 8, maxX: m0.x + r + 8, minZ: m0.z - r - 8, maxZ: m0.z + r + 8 }, (i, j, x, z, k) => {
+      const d = Math.hypot(x - m0.x, z - m0.z);
+      const t = 1 - smooth(r, r + 7, d);
+      if (t > 0) H.data[k] = lerp(H.data[k], mouthFloor, t);
+    });
+  }
+  const node = (p, floor) => ({ x: round(p.x), z: round(p.z), floor: round(floor), r: p.r, w: p.w ?? 1, chamber: !!p.name || p.r >= 5.5, ...(p.name ? { name: p.name } : {}) });
+  const check = (nodes, label) => {
+    nodes.forEach((n, i) => {
+      if (i < 3) return;
+      const roof = H.sample(n.x, n.z) - (n.floor + 1.55 * n.r);
+      if (roof < 3) console.warn(`  ⚠ ${c.id} ${label} nodo ${i}: solo ${roof.toFixed(1)} m de roca encima (terreno ${H.sample(n.x, n.z).toFixed(1)})`);
+    });
+  };
+  // El suelo baja lo que diga el diseño, y más si hace falta para que quede roca encima
+  // (al menos ROOF m); las rampas nunca pasan de MAX_GRADE.
+  const ROOF = 4;
+  const MAX_GRADE = 0.5;
+  const settle = (nodes, fixed, from = 2) => {
+    for (let i = fixed; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (i >= from) n.floor = Math.min(n.floor, H.sample(n.x, n.z) - 1.55 * n.r - ROOF);
+    }
+    for (let pass = 0; pass < 6; pass++) {
+      for (let i = Math.max(1, fixed); i < nodes.length; i++) {
+        const len = Math.hypot(nodes[i].x - nodes[i - 1].x, nodes[i].z - nodes[i - 1].z);
+        nodes[i].floor = Math.max(nodes[i].floor, nodes[i - 1].floor - len * MAX_GRADE);
+      }
+      for (let i = nodes.length - 2; i >= Math.max(1, fixed); i--) {
+        const len = Math.hypot(nodes[i + 1].x - nodes[i].x, nodes[i + 1].z - nodes[i].z);
+        nodes[i].floor = Math.min(nodes[i].floor, nodes[i + 1].floor + len * MAX_GRADE);
+      }
+    }
+    for (const n of nodes) n.floor = round(n.floor);
+  };
+  const main = path.map((p) => node(p, mouthFloor - (p.d ?? 0)));
+  settle(main, 1);
+  check(main, 'principal');
+  const chains = [{ nodes: main, branch: false }];
+  for (const b of c.branches ?? []) {
+    const nodes = [{ ...main[b.from] }, ...b.path.map((p) => node(p, mouthFloor - (p.d ?? 0)))];
+    settle(nodes, 1, 1);
+    nodes.forEach((n, i) => {
+      if (i && H.sample(n.x, n.z) - (n.floor + 1.55 * n.r) < 3) console.warn(`  ⚠ ${c.id} ramal ${b.from} nodo ${i}: poca roca`);
+    });
+    chains.push({ nodes, branch: true, from: b.from });
+  }
+  return { ...c, mouth: { x: main[0].x, z: main[0].z, y: main[0].floor, r: main[0].r }, chains };
+}
+
 // ---- Caminos -------------------------------------------------------------------------
 
 function prepRoad(r) {
@@ -810,7 +883,7 @@ function groundSurface(ground, { x, z, h, sl, patch, fine, wet, flow, dep, snowL
 }
 
 function floraCell(reg, s, { x, z, h, sl, pad, road, scar, wet, water, cd }) {
-  if (pad || road < 2.5 || scar < 6 || !Number.isNaN(water) || cd < 3) return 0;
+  if (pad || road < 2.5 || scar < 6 || !Number.isNaN(water) || cd < 3 || mouthAt(x, z)) return 0;
   if (s === SURFACE.SNOW || s === SURFACE.ICE || s === SURFACE.CLIFF || s === SURFACE.SEABED || s === SURFACE.PAVED || s === SURFACE.TRAVERTINE || s === SURFACE.WET_SAND) return 0;
   let type = FLORA_BY_NAME[reg.flora] ?? FLORA.MEADOW;
   if (s === SURFACE.SAND) type = FLORA.BEACH;

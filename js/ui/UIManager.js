@@ -136,10 +136,17 @@ export class UIManager {
       this.el.seed.textContent = `Seed: ${seed}`;
       if (this._started) this.showMessage(`Mundo generado · seed "${seed}"`);
     });
-    events.on(GameEvents.PLAYER_BIOME_CHANGED, ({ biome, first }) => {
-      this.el.biome.textContent = biome.name;
+    events.on(GameEvents.PLAYER_BIOME_CHANGED, ({ biome }) => {
       this.el.biome.dataset.biome = biome.id;
+      if (!this._place) this.el.biome.textContent = biome.name;
     });
+    // Mapas diseñados: el nombre del lugar (y en grande la primera vez que se pisa).
+    events.on(GameEvents.PLACE_CHANGED, ({ name, kind, first }) => {
+      this._place = name;
+      this.el.biome.textContent = name;
+      if (first) this._placeBanner(name, kind);
+    });
+    events.on(GameEvents.BODY_CHANGED, () => (this._place = null));
     // (Sin avisos de "Has entrado en…" ni "Has encontrado…": se descubre mirando.)
     events.on(GameEvents.INTERACTION_TARGET_CHANGED, ({ target }) => this._showTarget(target));
     events.on(GameEvents.PLAYER_ACTION, () => this._pulseCrosshair());
@@ -519,6 +526,22 @@ export class UIManager {
     const el = this.el.diet;
     el.dataset.state = state;
     el.querySelector('.diet-value').textContent = DIET_LABELS[state];
+  }
+
+  /** Rótulo grande con el nombre de un lugar nuevo (se desvanece solo). */
+  _placeBanner(name, kind) {
+    let el = document.getElementById('place-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'place-banner';
+      el.innerHTML = '<div class="kind"></div><div class="name"></div>';
+      document.getElementById('hud')?.appendChild(el) ?? document.body.appendChild(el);
+    }
+    el.querySelector('.kind').textContent = kind === 'cave' ? 'Cueva' : kind === 'room' ? '· · ·' : 'Has descubierto';
+    el.querySelector('.name').textContent = name;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   _pulseCrosshair() {
