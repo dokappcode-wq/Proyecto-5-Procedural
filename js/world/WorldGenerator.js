@@ -14,6 +14,10 @@ import { PropMesher } from './props/PropMesher.js';
 import { CaveSystem } from './CaveSystem.js';
 import { buildCaveMeshes, markStencil, hideOverCaves } from './CaveMesher.js';
 import { planSites } from './WorldSites.js';
+import { AuthoredTerrain, AuthoredWater, buildWaterGeometry, createFreshWaterMaterial } from './map/AuthoredWorld.js';
+import { createMapColorizer } from './map/MapColorizer.js';
+import { FLORA_TABLE } from './map/MapLegend.js';
+import { hashString } from '../core/SeededRandom.js';
 
 /**
  * WorldGenerator — mundo procedural finito generado a partir de una seed.
@@ -46,7 +50,18 @@ export class WorldGenerator {
    * @param {object} [p.rules] reglas del planeta de inicio de la campaña:
    *   { SPAWN_ANYWHERE: bool, LANDING_BIOME: 'FROZEN_MOUNTAINS', LANDING_DISTANCE: [min, max] m del inicio }
    */
-  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false, landing = null, rules = null }) {
+  constructor({ scene, config, planet, events, resourceTypes, propColors, flatShading = false, landing = null, rules = null, map = null }) {
+    // Mapa diseñado (MapData): el relieve, el agua y los lugares salen de él, no de la seed.
+    this._map = map;
+    if (map) {
+      const snow = map.meta.snowLine ?? planet.BIOMES.FROZEN_MOUNTAINS.SNOW_START_HEIGHT;
+      planet = {
+        ...planet,
+        BIOMES: { ...planet.BIOMES, FROZEN_MOUNTAINS: { ...planet.BIOMES.FROZEN_MOUNTAINS, SNOW_START_HEIGHT: snow } },
+        RESOURCES: { ...planet.RESOURCES, TREE_MAX_HEIGHT: snow + 6 },
+      };
+      flatShading = false;
+    }
     this.name = 'world';
     this._rules = rules;
     this._landingCfg = landing;
@@ -106,6 +121,19 @@ export class WorldGenerator {
             mesh.geometry.dispose();
           },
         },
+        ...(map ? [{
+          name: 'water',
+          viewDistance: config.VIEW_DISTANCE_CHUNKS,
+          build: (cx, cz) => {
+            const cs = config.CHUNK_SIZE;
+            const geo = buildWaterGeometry(this._map, -this._half + cx * cs, -this._half + cz * cs, cs, this._spacing);
+            if (!geo) return null;
+            const mesh = new THREE.Mesh(geo, this._freshMaterial);
+            mesh.renderOrder = 2;
+            return mesh;
+          },
+          dispose: (mesh) => mesh.geometry.dispose(),
+        }] : []),
         {
           name: 'props',
           viewDistance: Math.min(config.PROPS_VIEW_DISTANCE_CHUNKS, config.VIEW_DISTANCE_CHUNKS),
@@ -115,6 +143,7 @@ export class WorldGenerator {
       ],
     });
 
+    if (map) this._freshMaterial = createFreshWaterMaterial(planet.WATER.COLOR);
     this._pondGroup = new THREE.Group();
     this._pondGroup.name = 'Ponds';
     scene.add(this._pondGroup);
@@ -131,6 +160,7 @@ export class WorldGenerator {
    * `{ emitEvent: false }` (las lunas se generan en silencio: no reinician nada).
    */
   generate(seedInput, { emitEvent = true } = {}) {
+    if (this._map) return this._generateAuthored(seedInput, { emitEvent });
     const t0 = performance.now();
     this.seed = new WorldSeed(seedInput, this._cfg.SUB_SEEDS);
     this.biomes = new BiomeSystem({
@@ -242,8 +272,111 @@ export class WorldGenerator {
     if (emitEvent) this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
   }
 
+  /**
+   * Mundo de un mapa diseñado: siempre el mismo relieve, agua, lugares, cuevas y
+   * vegetación (la seed de la partida solo cambia lo que se mueve: animales, enemigos…).
+   */
+  _generateAuthored(seedInput, { emitEvent }) {
+    const t0 = performance.now();
+    const M = this._map;
+    const fixed = hashString(`map:${M.id}`);
+    this.seed = new WorldSeed(seedInput, this._cfg.SUB_SEEDS);
+    this.biomes = new BiomeSystem({ definitions: this._planet.BIOMES, distribution: this._planet.BIOME_DISTRIBUTION, seed: this.seed.sub.biome });
+    this.terrain = new AuthoredTerrain(M);
+    this._mesher.setColorizer(createMapColorizer({ seed: fixed }));
+    this._dataCache.clear();
+    this._chunks.clear();
+    this._stats.chunkDataGenerated = 0;
+    const meta = M.meta;
+    this._spawn = { x: meta.spawn.x, z: meta.spawn.z };
+    this._spawnYaw = meta.spawn.yaw ?? 0;
+    this._landing = meta.landing ? { x: meta.landing.x, z: meta.landing.z, yaw: meta.landing.yaw } : null;
+    this.sites = {};
+    const clearZones = [];
+    for (const s of meta.sites ?? []) {
+      const list = (this.sites[s.kind] ??= []);
+      list.push({ id: `${s.kind}:${list.length}`, kind: s.kind, x: s.x, z: s.z, radius: s.r, height: s.height, yaw: s.yaw ?? 0, seed: deriveSeed(fixed, `site:${s.kind}:${list.length}`) });
+      clearZones.push({ x: s.x, z: s.z, r: s.r + 2 });
+    }
+    if (this._landing) clearZones.push({ x: this._landing.x, z: this._landing.z, r: (this._landingCfg?.CLEAR_RADIUS ?? 11) + 4 });
+    this.water = new AuthoredWater(M);
+    this._buildPonds();
+
+    this._caveGroup?.parent?.remove(this._caveGroup);
+    this._caveGroup?.traverse((o) => o.geometry?.dispose?.());
+    this._caveGroup = null;
+    this.caves = null;
+    if (this._rules?.CAVES) {
+      this.caves = new CaveSystem({ config: this._rules.CAVES });
+      this.caves.generate({
+        seed: fixed,
+        terrain: { sample: (x, z) => this.terrain.sample(x, z), heightAt: (x, z) => this.terrain.heightAt(x, z) },
+        bounds: this.getBounds(),
+        spawn: this._spawn,
+        avoid: [
+          ...(this._landing ? [{ x: this._landing.x, z: this._landing.z, r: 80 }] : []),
+          ...Object.values(this.sites).flat().map((t) => ({ x: t.x, z: t.z, r: t.radius + 25 })),
+        ],
+        isWater: (x, z) => this.water.isWater(x, z, 8),
+        dungeon: this._rules.DUNGEON?.(this.sites) ?? null,
+      });
+      this._caveGroup = buildCaveMeshes(this.caves.caves, (x, z) => this.terrain.heightAt(x, z), this._propMesher._colors);
+      this._scene.add(this._caveGroup);
+    }
+    this.resources = new ResourceSystem({
+      config: this._planet.RESOURCES,
+      types: this._resourceTypes,
+      seed: deriveSeed(fixed, 'resources'),
+      world: {
+        chunkSize: this._cfg.CHUNK_SIZE,
+        half: this._half,
+        chunkCount: this._chunkCount,
+        seaLevel: this._cfg.SEA_LEVEL,
+        spawn: this._spawn,
+        clearZones,
+        heightAt: (x, z) => this.getHeightAt(x, z),
+        sample: (x, z) => this.terrain.sample(x, z),
+        isWater: (x, z, m) => this.water.isWater(x, z, m),
+        isHole: this.caves ? (x, z) => this.caves.nearMouth(x, z, 4) : null,
+        extraNodes: this.caves ? (cx, cz) => this.caves.nodesInChunk(cx, cz, this._cfg.CHUNK_SIZE, this._half) : null,
+        // Vegetación diseñada: qué crece en cada sitio y cuánta hierba hay.
+        floraAt: (x, z) => {
+          const f = M.floraInfo(x, z);
+          return f.type ? { table: FLORA_TABLE[f.type], density: f.density } : null;
+        },
+        grassAt: (x, z) => M.grassAt(x, z),
+      },
+    });
+    this.resources.onChunkChanged = (cx, cz) => this._chunks.rebuild(cx, cz);
+    this._stats.generationMs = performance.now() - t0;
+    if (emitEvent) this._events.emit(GameEvents.WORLD_GENERATED, { seed: this.seed.text, spawn: { ...this._spawn } });
+  }
+
+  /** Región con nombre en (x, z) (solo en mapas diseñados): { id, name, … } o null. */
+  getRegionAt(x, z) {
+    return this._map?.regionAt(x, z) ?? null;
+  }
+
+  /** Mapa diseñado del cuerpo (o null). */
+  get map() {
+    return this._map;
+  }
+
+  /** Nivel del agua dulce más cercana (para apuntar a ella al beber): el del mar si no hay mapa. */
+  freshLevelNear(x, z, r = 4) {
+    if (!this._map) return this._cfg.SEA_LEVEL;
+    let best = null;
+    for (let a = 0; a <= 8; a++) {
+      const d = a === 8 ? 0 : r;
+      const lv = this._map.waterAt(x + Math.cos((a / 8) * Math.PI * 2) * d, z + Math.sin((a / 8) * Math.PI * 2) * d);
+      if (lv !== null && (best === null || lv > best)) best = lv;
+    }
+    return best ?? this._cfg.SEA_LEVEL;
+  }
+
   update(dt = 0) {
     this.resources?.update(dt);
+    if (this._freshMaterial) this._freshMaterial.userData.time.value += dt;
     if (!this._focus || !this.terrain) return;
     const cs = this._cfg.CHUNK_SIZE;
     this._chunks.update((this._focus.x + this._half) / cs, (this._focus.z + this._half) / cs);
@@ -413,6 +546,7 @@ export class WorldGenerator {
   /** ¿Hay agua dulce (un río) en (x, z)? El mar no se bebe; los ríos y las charcas sí. */
   isFreshWaterAt(x, z) {
     if (this.water.isWater(x, z)) return true;
+    if (this._map) return false;
     return !!this.terrain?.sample(x, z).fresh && this.getHeightAt(x, z) < this._cfg.SEA_LEVEL;
   }
 
@@ -459,6 +593,7 @@ export class WorldGenerator {
     const biomeWeights = {};
     for (const id of this.biomes.ids) biomeWeights[id] = new Float32Array(s * s);
     const shore = new Float32Array(s * s);
+    const surface = this._map ? new Uint8Array(s * s) : null;
     for (let l = 0; l < s; l++) {
       for (let k = 0; k < s; k++) {
         const i = l * s + k;
@@ -468,9 +603,10 @@ export class WorldGenerator {
         heights[i] = sample.height;
         for (const id in biomeWeights) biomeWeights[id][i] = sample.biomes[id];
         shore[i] = this.water.shoreFactor(x, z);
+        if (surface) surface[i] = this._map.surfaceAt(x, z);
       }
     }
-    data = { cx, cz, res, spacing: sp, originX, originZ, heights, biomeWeights, shore };
+    data = { cx, cz, res, spacing: sp, originX, originZ, heights, biomeWeights, shore, surface };
     this._dataCache.set(key, data);
     this._stats.chunkDataGenerated++;
     return data;
@@ -499,6 +635,7 @@ export class WorldGenerator {
   _buildPonds() {
     for (const m of this._pondGroup.children) m.geometry.dispose();
     this._pondGroup.clear();
+    if (this._map) return; // el agua de los mapas diseñados se dibuja por chunks
     const W = this._planet.WATER;
     this._pondMaterial ??= new THREE.MeshPhongMaterial({
       color: W.COLOR,

@@ -329,6 +329,17 @@ export class ResourceSystem {
   }
 
   _pickType(x, z, roll) {
+    // Mapa diseñado: la vegetación de cada sitio (tipo y densidad) viene del mapa.
+    if (this._world.floraAt) {
+      const f = this._world.floraAt(x, z);
+      if (!f?.table) return null;
+      let acc = 0;
+      for (const type in f.table) {
+        acc += f.table[type] * f.density;
+        if (roll < acc) return type;
+      }
+      return null;
+    }
     const weights = this._world.sample(x, z).biomes;
     const probs = {};
     for (const biome in weights) {
@@ -375,9 +386,12 @@ export class ResourceSystem {
       const scale = 0.7 + rng.next() * 0.7;
       const rotation = rng.next() * Math.PI * 2;
       const tint = rng.next();
-      const bw = w.sample(x, z).biomes;
       let density = 0;
-      for (const b in bw) density += (perChunk[b] ?? 0) * bw[b];
+      if (w.grassAt) density = w.grassAt(x, z) * maxDensity;
+      else {
+        const bw = w.sample(x, z).biomes;
+        for (const b in bw) density += (perChunk[b] ?? 0) * bw[b];
+      }
       if (keep >= density / maxDensity) continue;
       const y = w.heightAt(x, z);
       if (y < w.seaLevel + 0.8 || w.isWater(x, z, 0.5) || w.isHole?.(x, z)) continue;

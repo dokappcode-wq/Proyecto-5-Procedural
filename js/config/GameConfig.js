@@ -50,7 +50,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.22.0',
+    VERSION: '1.23.0',
   },
 
   RENDER: {
@@ -215,6 +215,9 @@ export const GameConfig = deepFreeze({
   CAMPAIGN: {
     SYSTEM_FILE: 'jardin-del-eden',          // systems/<archivo>.system.json: el tutorial
     CATALOG_URL: 'systems/catalogo.json',    // sistemas a los que se salta con el nodo de velocidad-luz
+    // Mapas diseñados (maps/<id>/): cuerpo del sistema de la campaña → mapa. Solo los del
+    // juego; los sistemas importados siguen siendo procedurales.
+    MAPS: { 0: 'eden' },                     // índice del planeta en el sistema → mapa
   },
 
   // Supervivencia (Fase 6). Valores por segundo de juego.
@@ -1053,7 +1056,7 @@ export const GameConfig = deepFreeze({
 
   // Guardar partida (localStorage del navegador): manual desde el reloj y automática.
   SAVE: {
-    KEY: 'mundo0.save.v1',
+    KEY: 'mundo0.save.v2', // v2: el Edén es un mapa diseñado (las partidas de antes no valen)
     AUTOSAVE_SECONDS: 300,      // cada 5 min de juego en el planeta de inicio
   },
 

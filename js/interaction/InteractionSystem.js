@@ -342,7 +342,7 @@ export class InteractionSystem {
     }
 
     // Agua: punto donde la mira corta la lámina de la charca más cercana.
-    const water = this._world.water?.nearestPond(p.x, p.z);
+    const water = this._world.water?.authored ? null : this._world.water?.nearestPond(p.x, p.z);
     if (water && water.distance <= range + 1 && this._dir.y < -0.05) {
       const pond = water.pond;
       const t = (pond.level - this._origin.y) / this._dir.y;
@@ -357,7 +357,8 @@ export class InteractionSystem {
       }
     }
     // Ríos: donde la mira corta el nivel del agua, si ahí hay agua dulce (el mar no se bebe).
-    const sea = this._world.seaLevel;
+    // (En los mapas diseñados los ríos y lagos tienen su propio nivel.)
+    const sea = this._world.freshLevelNear?.(p.x, p.z, range + 1) ?? this._world.seaLevel;
     if (best?.kind !== 'water' && this._dir.y < -0.05 && typeof sea === 'number' && this._world.isFreshWaterAt && !this._world.inCave?.(p.x, p.y + 1, p.z)) {
       const t = (sea - this._origin.y) / this._dir.y;
       const hx = this._origin.x + this._dir.x * t;

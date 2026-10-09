@@ -34,7 +34,7 @@ export class TerrainMesher {
    *   los triángulos cuyo centro cae dentro no se dibujan.
    */
   build(chunk, holeTest = null) {
-    const { res, spacing, originX, originZ, heights, biomeWeights, shore } = chunk;
+    const { res, spacing, originX, originZ, heights, biomeWeights, shore, surface } = chunk;
     const stride = res + 3;
     const n = res + 1;
     const positions = new Float32Array(n * n * 3);
@@ -72,6 +72,7 @@ export class TerrainMesher {
         ctx.normalY = ny;
         ctx.concavity = (hL + hR + hD + hU) / 4 - h; // >0 hondonada, <0 cresta
         ctx.shore = shore ? shore[pi] : 0;
+        ctx.surface = surface ? surface[pi] : undefined;
         for (const id of ids) ctx.weights[id] = biomeWeights[id][pi];
         this._colorizer(ctx, c);
         colors[v] = c.r; colors[v + 1] = c.g; colors[v + 2] = c.b;

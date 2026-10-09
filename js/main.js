@@ -100,8 +100,9 @@ import { registerEnvironmentTools } from './admin/tools/EnvironmentTools.js';
 import { registerShipTools } from './admin/tools/ShipTools.js';
 import { registerLifeSupportTools } from './admin/tools/LifeSupportTools.js';
 import { AudioSystem } from './audio/AudioSystem.js';
+import { MapData } from './world/map/MapData.js';
 
-function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null } = {}) {
+function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
   const cfg = GameConfig;
   const events = new EventBus();
   const HOME = system.homeId;
@@ -132,6 +133,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     events,
     options: {
       config: cfg.WORLD,
+      maps: designMaps,
       resourceTypes: cfg.RESOURCE_TYPES,
       propColors: cfg.PROPS,
       flatShading: cfg.RENDER.TERRAIN_FLAT_SHADING,
@@ -1617,11 +1619,20 @@ async function loadCampaign() {
   for (const w of result.warnings) console.warn(`[sistema] ${w.path}: ${w.message}`);
   const catalog = catalogText ? parseSystemCatalog(catalogText) : { entries: [], errors: [] };
   for (const e of catalog.errors) console.warn(`[catálogo] ${e.path}: ${e.message}`);
-  return { system: new SolarSystem(result.system), file, catalog: catalog.entries, handoff: save ? null : takeHandoff(file), store, imported, save };
+  const solar = new SolarSystem(result.system);
+  // Mapas diseñados de la campaña (el Edén): relieve, agua y lugares fijos.
+  const maps = {};
+  if (campaign) {
+    for (const [index, mapId] of Object.entries(GameConfig.CAMPAIGN.MAPS ?? {})) {
+      const body = Number(index) === 0 ? solar.homeId : null;
+      if (body) maps[body] = await MapData.load(mapId);
+    }
+  }
+  return { system: solar, file, catalog: catalog.entries, handoff: save ? null : takeHandoff(file), store, imported, save, maps };
 }
 
 loadCampaign()
-  .then(({ system, file, catalog, handoff, store, imported, save }) => boot(system, { file, catalog, handoff, store, imported, save }))
+  .then(({ system, file, catalog, handoff, store, imported, save, maps }) => boot(system, { file, catalog, handoff, store, imported, save, maps }))
   .catch((err) => {
     console.error(err);
     const el = document.getElementById('fatal-error');

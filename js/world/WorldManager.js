@@ -127,7 +127,9 @@ export class WorldManager {
     const world = new WorldGenerator({
       ...o,
       // Cada cuerpo tiene el lado de su categoría de tamaño (0,5 a 20 km).
-      config: { ...o.config, WORLD_SIZE: regionSize(this._system.body(id)?.regionKm ?? 1, o.config.CHUNK_SIZE) },
+      // Con mapa diseñado, el lado es el del mapa.
+      config: { ...o.config, WORLD_SIZE: o.maps?.[id] ? o.maps[id].size : regionSize(this._system.body(id)?.regionKm ?? 1, o.config.CHUNK_SIZE) },
+      map: o.maps?.[id] ?? null,
       scene: root,
       planet,
       events: this._events,
