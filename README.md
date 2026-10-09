@@ -267,6 +267,19 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Materiales y estaciones (v1.27, P5)**:
+  - **Materiales nuevos**: arcilla (E en las orillas de lagos y marismas) → ladrillos en el horno; fibra (E en
+    cualquier arbusto, vuelve a crecer) → cuerda o tela; resina (sale al talar pinos); huesos (animales y
+    goblins); oro (vetas en las cuevas, pico de cobre) → lingotes; acero (forja); fragmentos de cristal (drusas
+    violetas que brillan en las cuevas, sobre todo en la Gruta de Cristal); flores silvestres en las praderas.
+  - **Telar** (tela; gorro, jersey, calzas y manoplas de lana), **curtidor** (cuero refinado que rinde más con
+    resina, botas de piel, mochilas), **mesa de alquimia** (pociones, polvo de diamante, manzana dorada) y
+    **forja** (acero, espada y escudo de acero, lingote de oro con 8 monedas goblin, fundición que rinde más;
+    da luz y calor como una hoguera).
+  - **Pociones** (se beben con clic dcho / R y devuelven el frasco): curación, fuerza, rapidez, calor (el frío casi
+    no afecta), visión nocturna, salto (y caídas suaves) y elixir dorado. Salen junto a las barras con su tiempo.
+  - **Mochila** y **mochila grande** (curtidor): al usarlas, la mochila gana 9 huecos cada una (para siempre).
+  - Otros usos: cola de slime (slime + resina), antorchas con resina, flechas de hueso.
 - **Herramientas y armas por niveles (v1.26, P3)**:
   - **Picos y hachas** de piedra, cobre, hierro y diamante: cada nivel tala y pica más deprisa y aguanta más.
     El **hierro** pide un pico de cobre y el **diamante** uno de hierro (si no, el letrero dice cuál hace falta).

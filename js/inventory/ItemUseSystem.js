@@ -12,6 +12,8 @@ import { GameEvents } from '../core/GameEvents.js';
  *   REPAIR     → martillo: arregla lo más gastado con 1 lingote de su material
  *   BUCKET     → cubo: llenarlo mirando al agua / beberse el cubo de agua
  *   SPYGLASS   → catalejo (el zoom lo hace main mientras se mantiene el clic dcho)
+ *   POTION     → se bebe (StatusEffects aplica sus estados; main cura HEAL) y deja el frasco
+ *   BACKPACK   → se cose a la espalda: la mochila gana una fila (para siempre)
  * (Las construcciones no son objetos: se colocan en el modo construcción, B.)
  */
 const USE_COOLDOWN = 0.35;
@@ -103,6 +105,15 @@ export class ItemUseSystem {
         break;
       case 'SPYGLASS':
         ok = true;
+        break;
+      case 'POTION':
+        this._inventory.removeItem(itemId, 1);
+        this._inventory.addItem('GLASS_BOTTLE', 1);
+        this._events.emit(GameEvents.POTION_DRUNK, { itemId });
+        ok = true;
+        break;
+      case 'BACKPACK':
+        ok = this._backpack(itemId, def);
         break;
       case 'MAP':
         this._events.emit(GameEvents.MAP_OPEN_REQUEST, { itemId });
@@ -210,6 +221,26 @@ export class ItemUseSystem {
     inv._emit?.(fix.id, 0); // refrescar las barras de aguante
     this._events.emit(GameEvents.ITEM_REPAIRED, { itemId: fix.id, dur: now, max: fix.max });
     this._message(`🔨 ${this._items[fix.id].NAME} arreglado: ${now}/${fix.max}.`, 'pickup');
+    return true;
+  }
+
+  // ---- Mochilas ----------------------------------------------------------------
+
+  _backpack(itemId, def) {
+    const inv = this._inventory;
+    const rows = def.ROWS ?? 1;
+    if (inv.extraRows >= rows) {
+      this._message(`🎒 Ya llevas ${rows > 1 ? 'la mochila grande' : 'mochila'}.`);
+      return false;
+    }
+    if (inv.extraRows < rows - 1) {
+      this._message('🎒 Primero cóse la mochila normal: la grande va encima.', 'warning');
+      return false;
+    }
+    inv.removeItem(itemId, 1);
+    inv.setExtraRows(rows);
+    this._message(`🎒 ${def.NAME} puesta: ahora llevas ${inv.mainSize + inv.extraRows * inv.columns} huecos en la mochila.`, 'pickup');
+    this._events.emit(GameEvents.INVENTORY_EXPANDED, { rows: inv.extraRows });
     return true;
   }
 

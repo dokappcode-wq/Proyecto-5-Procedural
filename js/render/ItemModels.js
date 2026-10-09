@@ -293,6 +293,18 @@ const BUILDERS = {
       g.add(spike);
     }
   },
+  // Poción (P5): frasco redondo de cristal con el líquido de color, cuello y tapón de corcho.
+  potion(g, color = 0xff4f7a) {
+    const liquid = new THREE.Mesh(new THREE.IcosahedronGeometry(0.058, 1), lambert(color, { emissive: color, emissiveIntensity: 0.25 }));
+    liquid.position.set(0, 0.07, 0);
+    liquid.scale.set(1, 0.85, 1);
+    g.add(liquid);
+    const glass = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 1), lambert(0xdff4ff, { transparent: true, opacity: 0.35 }));
+    glass.position.set(0, 0.08, 0);
+    g.add(glass);
+    cyl(g, 0xdff4ff, 0.022, 0.026, 0.07, 0, 0.17, 0, 8);
+    cyl(g, 0xa9784a, 0.02, 0.02, 0.035, 0, 0.215, 0, 8);
+  },
   bomb(g) {
     const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.08, 1), lambert(0x62c24a, { transparent: true, opacity: 0.88 }));
     b.position.set(0, 0.06, 0);
@@ -343,6 +355,9 @@ export function buildItemModel(itemId, items) {
     case 'bucket':
       BUILDERS.bucket(group, !!M.WATER);
       break;
+    case 'potion':
+      BUILDERS.potion(group, M.COLOR);
+      break;
     default:
       BUILDERS[M.TYPE](group);
   }
@@ -357,7 +372,7 @@ export function buildItemModel(itemId, items) {
   }
   const kind = {
     axe: 'tool', pickaxe: 'tool', sword: 'sword', shield: 'shield', slingshot: 'slingshot', bow: 'bow', torch: 'torch', arrow: 'item',
-    shovel: 'tool', sickle: 'tool', hammer: 'tool', bucket: 'item', spyglass: 'item', lantern: 'lantern', spear: 'sword', crossbow: 'crossbow', mace: 'sword', bomb: 'item',
+    shovel: 'tool', sickle: 'tool', hammer: 'tool', bucket: 'item', spyglass: 'item', lantern: 'lantern', spear: 'sword', crossbow: 'crossbow', mace: 'sword', bomb: 'item', potion: 'item',
   }[M.TYPE];
   return { group, kind, light };
 }

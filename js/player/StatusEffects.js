@@ -7,6 +7,8 @@ import { GameEvents } from '../core/GameEvents.js';
  *   WARM         comida caliente: se pierde calor mucho más despacio
  *   ENERGIZED    con energía: la energía se recupera mucho más deprisa
  *   INDIGESTION  indigestión (algo crudo): no se recupera vida y la energía, despacio
+ * Pociones (P5): REGENERATION, STRENGTH (daño), SWIFT (velocidad), WARMTH (frío),
+ *   NIGHT_VISION (oscuridad) y LEAP (salto y caídas). Llegan con POTION_DRUNK.
  *
  * Cada alimento dice qué estados da y cuánto duran (ITEMS.*.EFFECTS) y si crudo puede
  * sentar mal (RAW_RISK). Volver a comer alarga el estado (no se acumula). Los efectos los
@@ -24,6 +26,7 @@ export class StatusEffects {
     this.active = new Map(); // id → s que quedan
     this._tick = 0;
     events.on(GameEvents.FOOD_EATEN, ({ itemId }) => this._onFood(itemId));
+    events.on(GameEvents.POTION_DRUNK, ({ itemId }) => this._onFood(itemId));
     events.on(GameEvents.PLAYER_RESPAWNED, () => this.clear());
   }
 
@@ -51,7 +54,32 @@ export class StatusEffects {
   }
 
   get regenMultiplier() {
-    return this.has('WELL_FED') ? this._cfg.WELL_FED.REGEN : 1;
+    return this._k('WELL_FED', 'REGEN') * this._k('REGENERATION', 'REGEN');
+  }
+
+  /** Valor `key` del estado `id` si está activo; si no, 1. */
+  _k(id, key) {
+    return this.has(id) ? this._cfg[id]?.[key] ?? 1 : 1;
+  }
+
+  get damageMultiplier() {
+    return this._k('STRENGTH', 'DAMAGE');
+  }
+
+  get speedMultiplier() {
+    return this._k('SWIFT', 'SPEED');
+  }
+
+  get jumpMultiplier() {
+    return this._k('LEAP', 'JUMP');
+  }
+
+  get fallMultiplier() {
+    return this._k('LEAP', 'FALL');
+  }
+
+  get nightVision() {
+    return this.has('NIGHT_VISION');
   }
 
   get blocksRegen() {
@@ -59,7 +87,7 @@ export class StatusEffects {
   }
 
   get coldMultiplier() {
-    return this.has('WARM') ? this._cfg.WARM.COLD : 1;
+    return this._k('WARM', 'COLD') * this._k('WARMTH', 'COLD');
   }
 
   get energyMultiplier() {

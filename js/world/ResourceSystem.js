@@ -242,7 +242,8 @@ export class ResourceSystem {
         const def = this._types[type];
         const size = this._cfg.SIZE?.[type] ?? 1; // tamaño propio del sistema solar
         const scale = (def.SCALE[0] + (def.SCALE[1] - def.SCALE[0]) * rScale) * size;
-        const id = `${cx}:${cz}:${index++}`;
+        // Los tipos nuevos (CELL_ID) se numeran por celda: no desplazan los ids de los demás.
+        const id = def.CELL_ID ? `${cx}:${cz}:n${i}.${j}` : `${cx}:${cz}:${index++}`;
         nodes.push({
           id,
           type,

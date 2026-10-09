@@ -15,6 +15,7 @@ import { smoothstep, clamp01 } from '../core/MathUtils.js';
  * (`setVisibility`, lo alimenta TemperatureSystem por evento desde main.js).
  * No sabe nada de la hora "de reloj": solo de la posición del sol.
  */
+const NIGHT_VISION_TINT = new THREE.Color(0xb8f0c8);
 const CAVE_FOG = new THREE.Color(0x050506);
 
 export class AtmosphereSystem {
@@ -91,6 +92,13 @@ export class AtmosphereSystem {
     this.apply();
   }
 
+  /** Poción de visión nocturna (P5): la luz del cielo no baja de un mínimo y se ve lejos en la oscuridad. */
+  setNightVision(on) {
+    if (!!on === !!this._nightVision) return;
+    this._nightVision = !!on;
+    this.apply();
+  }
+
   /** Bajo el agua: niebla cercana del color del agua ({ color, visibility } o null). */
   setUnderwater(state) {
     this._underwater = state;
@@ -101,7 +109,18 @@ export class AtmosphereSystem {
     if (this.airless) this._applyAirless();
     else this._applyAir();
     this._applyCave();
+    this._applyNightVision();
     this._applyUnderwater();
+  }
+
+  _applyNightVision() {
+    if (!this._nightVision || this.airless) return;
+    const L = this._lighting;
+    L.hemi.intensity = Math.max(L.hemi.intensity, 1.1);
+    L.hemi.color.lerp(NIGHT_VISION_TINT, 0.5);
+    L.hemi.groundColor.lerp(NIGHT_VISION_TINT, 0.5);
+    const fog = this._scene.fog;
+    if (fog) fog.far = Math.max(fog.far, 140);
   }
 
   _applyCave() {

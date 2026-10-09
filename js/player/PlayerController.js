@@ -47,6 +47,8 @@ export class PlayerController {
     this._mods = { canRun: true, canClimb: true, speedMultiplier: 1 };
     this.gravityScale = 1; // lunas: menos gravedad (se salta más y se cae más despacio)
     this.speedBonus = 1;   // niveles: velocidad (ProgressionSystem)
+    this.effectSpeed = 1;  // pociones (P5): rapidez
+    this.jumpBonus = 1;    // pociones (P5): salto
     this.combatSpeed = 1;
     this.lookScale = 1;    // con zoom (catalejo, apuntar) la vista gira más despacio  // bloqueando o apuntando se camina más despacio (CombatSystem)
     this._jumpBuffer = 0;
@@ -217,7 +219,7 @@ export class PlayerController {
     if (this._updateClimbing(dt)) return;
 
     const crouchK = p.state.isCrouching ? cfg.CROUCH?.SPEED_MULTIPLIER ?? 0.5 : 1;
-    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus * crouchK * this.combatSpeed;
+    const speed = (p.state.isRunning ? cfg.RUN_SPEED : cfg.WALK_SPEED) * this._mods.speedMultiplier * this.speedBonus * this.effectSpeed * crouchK * this.combatSpeed;
     const accel = p.state.onGround ? cfg.GROUND_ACCELERATION : cfg.AIR_ACCELERATION;
     if (this._dodgeTime > 0) {
       // Esquivando: impulso fijo en la dirección elegida (sin control hasta que acaba).
@@ -234,7 +236,7 @@ export class PlayerController {
     this._coyote = p.state.onGround ? COYOTE_TIME : Math.max(0, this._coyote - dt);
 
     if (this._jumpBuffer > 0 && this._coyote > 0) {
-      v.y = cfg.JUMP_VELOCITY;
+      v.y = cfg.JUMP_VELOCITY * this.jumpBonus;
       this._jumpBuffer = 0;
       this._coyote = 0;
       p.state.onGround = false;

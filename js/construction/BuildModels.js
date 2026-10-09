@@ -430,6 +430,124 @@ export const BUILD_MODELS = {
     add(b, ico, [0.66, 1.12, -0.2], [0.1, 0.1, 0.1], 0xc8302a);
     return b.build();
   },
+  // ---- Estaciones de la P5 -------------------------------------------------------
+  LOOM() {
+    const b = new PartsBuilder();
+    const r = rnd(41);
+    // Telar de bastidor: patas, travesaños, rodillos, urdimbre tensada, tela tejida y lanzadera.
+    for (const x of [-0.82, 0.82]) {
+      post(b, x, -0.45, 0.1, 1.55, 0.1);
+      post(b, x, 0.45, 0.1, 0.95, 0.1);
+      add(b, box, [x, 0.92, 0], [0.09, 0.08, 1.0], WOOD_DARK);
+      add(b, box, [x, 0.15, 0], [0.08, 0.08, 1.0], WOOD_DARK);
+    }
+    add(b, cyl, [0, 1.48, -0.45], [0.09, 1.7, 0.09], pick(WOOD, r), [0, 0, Math.PI / 2]);
+    add(b, cyl, [0, 0.86, 0.45], [0.11, 1.7, 0.11], pick(WOOD, r), [0, 0, Math.PI / 2]);
+    add(b, cyl, [0, 0.86, 0.45], [0.16, 1.4, 0.16], 0x3f6aa8, [0, 0, Math.PI / 2]);
+    for (let i = 0; i < 22; i++) {
+      const x = -0.66 + i * (1.32 / 21);
+      add(b, box, [x, 1.17, 0], [0.008, 0.008, 1.0], 0xe8e2d0, [0.57, 0, 0]);
+    }
+    // Tela a medio tejer (franjas).
+    for (let k = 0; k < 5; k++) add(b, box, [0, 0.98 + k * 0.03, 0.25 - k * 0.05], [1.36, 0.028, 0.06], k % 2 ? 0x3f6aa8 : 0xd9c9a0, [0.57, 0, 0]);
+    add(b, box, [0, 1.1, 0.1], [1.5, 0.05, 0.05], WOOD_DARK, [0.57, 0, 0]);
+    add(b, box, [0.3, 1.06, 0.12], [0.3, 0.04, 0.06], 0x8a5a32, [0.57, 0, 0]);
+    // Ovillos y cesto.
+    add(b, cyl, [-0.55, 0.12, 0.35], [0.36, 0.24, 0.36], 0x8a6a42);
+    add(b, ico, [-0.6, 0.27, 0.35], [0.14, 0.13, 0.14], 0xb8433a);
+    add(b, ico, [-0.48, 0.27, 0.3], [0.12, 0.11, 0.12], 0xf1ece0);
+    return b.build();
+  },
+  TANNER() {
+    const b = new PartsBuilder();
+    const r = rnd(42);
+    // Cuba de curtir (duelas y aros), bastidor con una piel tensada y banco de raspar.
+    const cx = -0.5;
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2;
+      add(b, box, [cx + Math.cos(a) * 0.4, 0.38, Math.sin(a) * 0.4], [0.18, 0.76, 0.05], pick(WOOD, r), [0, -a + Math.PI / 2, 0]);
+    }
+    for (const y of [0.15, 0.62]) add(b, torus, [cx, y, 0], [0.86, 0.86, 0.6], IRON, [Math.PI / 2, 0, 0]);
+    add(b, cyl, [cx, 0.66, 0], [0.74, 0.02, 0.74], 0x6a4a2a);
+    add(b, box, [cx + 0.1, 0.8, 0.05], [0.04, 0.4, 0.04], WOOD_DARK, [0.3, 0, 0.4]);
+    // Bastidor.
+    const fx = 0.5;
+    for (const x of [fx - 0.42, fx + 0.42]) post(b, x, -0.4, 0.08, 1.45, 0.08);
+    for (const y of [0.35, 1.38]) add(b, box, [fx, y, -0.4], [0.92, 0.07, 0.07], WOOD_DARK);
+    add(b, box, [fx, 0.86, -0.4], [0.7, 0.9, 0.02], 0xa9784a, [0, 0, 0], (i, v) => { v.x *= 1 - Math.abs(v.y) * 0.25; });
+    for (let k = 0; k < 6; k++) {
+      const y = 0.45 + k * 0.17;
+      for (const s of [-1, 1]) add(b, box, [fx + s * 0.39, y, -0.4], [0.06, 0.01, 0.01], ROPE);
+    }
+    // Banco de raspar con cuchilla y pieles apiladas.
+    add(b, box, [fx, 0.3, 0.3], [0.9, 0.08, 0.35], pick(WOOD, r), [0, 0, 0.12]);
+    for (const x of [fx - 0.35, fx + 0.35]) post(b, x, 0.3, 0.07, x < fx ? 0.24 : 0.34, 0.07);
+    add(b, box, [fx + 0.05, 0.38, 0.3], [0.3, 0.02, 0.04], 0xb9bec4, [0, 0, 0.12]);
+    for (let k = 0; k < 3; k++) add(b, box, [0.75, 0.04 + k * 0.05, 0.45], [0.42 - k * 0.04, 0.04, 0.3], k % 2 ? 0x8b5a2b : 0x7a4a24);
+    return b.build();
+  },
+  ALCHEMY() {
+    const b = new PartsBuilder();
+    const r = rnd(43);
+    // Mesa de tablones sobre patas de ladrillo, alambique de cobre con serpentín, frascos,
+    // mortero, libro abierto y velas.
+    for (const x of [-0.8, 0.8]) for (let c = 0; c < 4; c++) add(b, box, [x, 0.11 + c * 0.22, 0], [0.26, 0.2, 0.9], c % 2 ? 0x9a5a3e : 0x8a4e36);
+    for (let i = 0; i < 4; i++) add(b, box, [0, 0.93, -0.36 + i * 0.24], [1.9, 0.1, 0.22], pick(WOOD, r));
+    add(b, box, [0, 0.4, 0], [1.4, 0.05, 0.8], WOOD_DARK);
+    for (let i = 0; i < 5; i++) add(b, cyl, [-0.55 + i * 0.27, 0.53, 0.1], [0.12, 0.2, 0.12], [0x9c7bff, 0xff4f7a, 0x62c24a, 0xff9a2a, 0x7fe0ff][i]);
+    // Alambique.
+    add(b, cyl, [-0.5, 1.05, -0.15], [0.3, 0.12, 0.3], 0x3e4348);
+    add(b, ico, [-0.5, 1.28, -0.15], [0.42, 0.38, 0.42], 0xb87333);
+    add(b, cone, [-0.5, 1.52, -0.15], [0.16, 0.22, 0.16], 0xb87333);
+    add(b, cyl, [-0.22, 1.52, -0.15], [0.03, 0.6, 0.03], 0xb87333, [0, 0, 1.3]);
+    add(b, torus, [0.1, 1.22, -0.15], [0.3, 0.3, 0.4], 0xc78a4a, [Math.PI / 2, 0, 0]);
+    add(b, torus, [0.1, 1.12, -0.15], [0.3, 0.3, 0.4], 0xc78a4a, [Math.PI / 2, 0, 0]);
+    add(b, ico, [0.1, 1.06, -0.15], [0.12, 0.1, 0.12], 0xff6a2a);
+    // Frascos en la mesa.
+    const vials = [[0.35, 0.2, 0xff4f7a], [0.5, 0.25, 0x62c24a], [0.62, 0.18, 0x9c7bff], [0.75, 0.22, 0xffd34a]];
+    for (const [x, h, c] of vials) {
+      add(b, cyl, [x, 0.98 + h / 2, 0.15], [0.09, h, 0.09], c);
+      add(b, cyl, [x, 1.0 + h, 0.15], [0.04, 0.06, 0.04], 0xdfe8ef);
+    }
+    // Mortero, libro y vela.
+    add(b, cyl, [0.6, 1.03, -0.25], [0.18, 0.1, 0.18], STONE[0]);
+    add(b, cyl, [0.63, 1.12, -0.25], [0.03, 0.18, 0.03], STONE_DARK, [0, 0, -0.5]);
+    add(b, box, [0.15, 0.99, 0.28], [0.36, 0.03, 0.26], 0xeee6d2, [0, 0.2, 0]);
+    add(b, box, [0.15, 0.975, 0.28], [0.38, 0.02, 0.28], 0x6b2a2a, [0, 0.2, 0]);
+    add(b, cyl, [-0.8, 1.05, 0.3], [0.05, 0.14, 0.05], 0xf1ece0);
+    add(b, cone, [-0.8, 1.16, 0.3], [0.03, 0.07, 0.03], 0xffd36a);
+    return b.build();
+  },
+  FORGE() {
+    const b = new PartsBuilder();
+    const r = rnd(44);
+    // Fragua de ladrillo con brasas y campana con chimenea, fuelle y yunque con martillo.
+    const brick = [0x9a5a3e, 0x8a4e36, 0xa5653f, 0x7f4730];
+    for (let c = 0; c < 4; c++) {
+      for (let k = 0; k < 4; k++) add(b, box, [-0.62 + k * 0.26 + (c % 2) * 0.05, 0.12 + c * 0.24, -0.3], [0.24, 0.22, 0.95], pick(brick, r));
+    }
+    add(b, box, [-0.6, 1.0, -0.3], [1.05, 0.06, 1.0], STONE_DARK);
+    add(b, box, [-0.6, 1.05, -0.3], [0.7, 0.06, 0.6], 0x1c1410);
+    add(b, ico, [-0.6, 1.1, -0.3], [0.5, 0.1, 0.4], 0xff6a1a);
+    add(b, ico, [-0.5, 1.13, -0.2], [0.25, 0.08, 0.2], 0xffb347);
+    // Campana y chimenea.
+    add(b, box, [-0.6, 1.62, -0.45], [0.9, 0.5, 0.6], 0x6a4a3a, [0, 0, 0], (i, v) => { if (v.y > 0) { v.x *= 0.45; v.z *= 0.45; } });
+    for (let c = 0; c < 3; c++) add(b, box, [-0.6, 1.95 + c * 0.1, -0.45], [0.36, 0.09, 0.36], pick(brick, r));
+    // Fuelle.
+    add(b, box, [-1.0, 0.75, 0.3], [0.2, 0.08, 0.45], 0x7a4a24, [0.25, 0, 0]);
+    add(b, box, [-1.0, 0.85, 0.3], [0.18, 0.04, 0.42], WOOD_DARK, [0.4, 0, 0]);
+    add(b, cyl, [-1.0, 0.82, 0.06], [0.04, 0.3, 0.04], IRON, [Math.PI / 2, 0, 0]);
+    // Yunque sobre tocón y martillo; tenazas y barras de acero.
+    add(b, cyl, [0.6, 0.3, 0.2], [0.5, 0.6, 0.5], 0x6b4a2f);
+    add(b, box, [0.6, 0.66, 0.2], [0.3, 0.12, 0.22], 0x3e4348);
+    add(b, box, [0.6, 0.75, 0.2], [0.18, 0.08, 0.14], 0x3e4348);
+    add(b, box, [0.6, 0.84, 0.2], [0.58, 0.1, 0.22], 0x4a4f55);
+    add(b, cone, [0.98, 0.84, 0.2], [0.16, 0.2, 0.16], 0x4a4f55, [0, 0, -Math.PI / 2]);
+    add(b, cyl, [0.5, 0.93, 0.35], [0.025, 0.3, 0.025], 0x6b4a2c, [Math.PI / 2, 0, 0.3]);
+    add(b, box, [0.5, 0.94, 0.2], [0.1, 0.07, 0.07], IRON);
+    for (let k = 0; k < 3; k++) add(b, box, [0.75, 0.04 + k * 0.05, -0.5], [0.5, 0.04, 0.08], k === 2 ? 0xff8a3a : 0xc7cdd4);
+    return b.build();
+  },
   CHARGING_STATION() {
     const b = new PartsBuilder();
     add(b, box, [0, 0.08, 0], [1.0, 0.16, 0.8], STONE_DARK);

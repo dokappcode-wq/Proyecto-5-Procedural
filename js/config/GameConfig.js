@@ -35,6 +35,12 @@ const BUILD_PIECES = {
   // Cocina (P2): la hoguera asa, da luz y calor y espanta a los slimes; la cocina guisa.
   CAMPFIRE: { NAME: 'Hoguera', ICON: '🔥', RECIPE: { WOOD: 3, STONE: 3 }, TIME: 4, STATION_PIECE: true, DESC: 'Asa carne, setas, huevos y manzanas (E). Da luz y calor, y los slimes no se acercan.' },
   KITCHEN: { NAME: 'Cocina con olla', ICON: '🍲', RECIPE: { REFINED_STONE: 6, REFINED_COPPER: 3 }, TIME: 15, STATION_PIECE: true, DESC: 'Fogón de piedra con olla de cobre: pan, estofado, sopa, mermelada y tarta (E).' },
+  // Materiales y estaciones (P5): telar (tela y ropa de abrigo), curtidor (cuero y mochilas),
+  // alquimia (pociones) y forja (acero, oro de las monedas, mejor fundición).
+  LOOM: { NAME: 'Telar', ICON: '🧶', RECIPE: { REFINED_WOOD: 6, ROPE: 3 }, TIME: 15, STATION_PIECE: true, DESC: 'Teje fibra y lana: tela y ropa de abrigo (E).' },
+  TANNER: { NAME: 'Curtidor', ICON: '🪣', RECIPE: { REFINED_WOOD: 4, REFINED_STONE: 2, RESIN: 2 }, TIME: 15, STATION_PIECE: true, DESC: 'Cuba y bastidor: cuero refinado con resina (más por piel), botas de piel y mochilas (E).' },
+  ALCHEMY: { NAME: 'Mesa de alquimia', ICON: '⚗️', RECIPE: { REFINED_WOOD: 3, GLASS: 4, BRICK: 4 }, TIME: 20, STATION_PIECE: true, DESC: 'Alambique y frascos: pociones, polvo de diamante y manzana dorada (E).' },
+  FORGE: { NAME: 'Forja', ICON: '⚒️', RECIPE: { BRICK: 12, REFINED_IRON: 4, REFINED_STONE: 4 }, TIME: 25, STATION_PIECE: true, DESC: 'Fragua de ladrillo con yunque: acero, oro de las monedas y fundición que rinde más (E). Da luz y calor.' },
   // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
   CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', RECIPE: { STONE: 4, MINERAL: 3 }, TIME: 8, BODIES: 'MOON' },
   OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', RECIPE: { STONE: 4, MINERAL: 4 }, TIME: 8, BODIES: 'MOON' },
@@ -53,7 +59,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.26.0',
+    VERSION: '1.27.0',
   },
 
   RENDER: {
@@ -301,6 +307,7 @@ export const GameConfig = deepFreeze({
     MAIN_ROWS: 3,
     MAIN_COLUMNS: 9,
     MAX_STACK: 100,           // unidades por hueco (ITEMS.*.STACK lo cambia; la ropa no se apila)
+    MAX_EXTRA_ROWS: 2,        // filas que añaden las mochilas (P5)
   },
 
   // Tipos de recurso: qué dan al recogerlos, colisión y tamaño.
@@ -318,7 +325,7 @@ export const GameConfig = deepFreeze({
     },
     PINE: {
       NAME: 'Pino', COLLISION_RADIUS: 0.22, SCALE_COLLISION: true, SCALE: [1.6, 2.5], AIM_HEIGHT: 0.6, AIM_RADIUS: 0.5,
-      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15 },
+      HARVEST: { ITEM: 'WOOD', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Talar (mantén el clic)', METHOD: 'HIT', CHOP_TIME: 15, BONUS: { RESIN: [1, 2] } },
     },
     APPLE_TREE: {
       NAME: 'Manzano', COLLISION_RADIUS: 0.3, SCALE: [0.85, 1.1], AIM_HEIGHT: 1.8, AIM_RADIUS: 1.3,
@@ -338,7 +345,21 @@ export const GameConfig = deepFreeze({
       HARVEST: { ITEM: 'SPIDER_SILK', AMOUNT: 5, AMOUNT_RANGE: [5, 10], REMOVE_WHEN_EMPTY: true, VERB: 'Recoger', METHOD: 'HIT', CHOP_TIME: 1.5, MATERIAL: 'web' },
       SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.0, MAX_GAP: 5.0, CHANCE: 0.06, HEIGHT: 1.7, MAX_SIZE: 1.5 },
     },
-    BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
+    // Arbusto: con E se arranca fibra (vuelve a crecer). P5.
+    BUSH: {
+      NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6,
+      HARVEST: { ITEM: 'FIBER', AMOUNT: 2, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 240, VERB: 'Arrancar fibra' },
+    },
+    // P5: arcilla en las orillas de lagos y marismas, flores en las praderas.
+    // CELL_ID: su identificador va por celda (no cambia el de los recursos que ya había).
+    CLAY_DEPOSIT: {
+      NAME: 'Arcilla', COLLISION_RADIUS: 0, SCALE: [0.8, 1.25], AIM_HEIGHT: 0.08, AIM_RADIUS: 0.75, CELL_ID: true,
+      HARVEST: { ITEM: 'CLAY', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Sacar arcilla' },
+    },
+    WILD_FLOWERS: {
+      NAME: 'Flores silvestres', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.25, AIM_RADIUS: 0.55, CELL_ID: true,
+      HARVEST: { ITEM: 'WILD_FLOWER', AMOUNT: 2, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 420, VERB: 'Coger flores' },
+    },
     // Comida silvestre (P2): bayas, setas, trigo y huevos de los nidos.
     BERRY_BUSH: {
       NAME: 'Zarzal', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.45, AIM_RADIUS: 0.75,
@@ -376,6 +397,16 @@ export const GameConfig = deepFreeze({
       NAME: 'Veta de diamante', COLLISION_RADIUS: 0.45, SCALE: [0.7, 1.0], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.8, CAVE: true,
       HARVEST: { ITEM: 'DIAMOND_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
       BREAK: { ITEM: 'DIAMOND_ORE', AMOUNT: 1, TIME: 12, TOOL: 'MINE_SPEED', TIER: 3, FIST_DAMAGE: 6, VERB: 'Picar diamante' },
+    },
+    GOLD_ORE: {
+      NAME: 'Veta de oro', COLLISION_RADIUS: 0.5, SCALE: [0.75, 1.05], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.8, CAVE: true,
+      HARVEST: { ITEM: 'GOLD_ORE', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
+      BREAK: { ITEM: 'GOLD_ORE', AMOUNT: 2, TIME: 8, TOOL: 'MINE_SPEED', TIER: 2, FIST_DAMAGE: 6, VERB: 'Picar oro' },
+    },
+    CRYSTAL_CLUSTER: {
+      NAME: 'Drusa de cristal', COLLISION_RADIUS: 0.45, SCALE: [0.8, 1.3], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.85, CAVE: true, LIGHT: 0xb48cff,
+      HARVEST: { ITEM: 'CRYSTAL_SHARD', AMOUNT: 0, REMOVE_WHEN_EMPTY: false, VERB: 'Coger' },
+      BREAK: { ITEM: 'CRYSTAL_SHARD', AMOUNT: 3, TIME: 7, TOOL: 'MINE_SPEED', TIER: 2, FIST_DAMAGE: 6, VERB: 'Picar cristales' },
     },
     GLOW_FLOWER: {
       NAME: 'Flor luminosa', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.6, CAVE: true, LIGHT: 0x7fffd0,
@@ -423,6 +454,21 @@ export const GameConfig = deepFreeze({
     REFINED_IRON: { NAME: 'Hierro refinado', ICON: '🔩', DESC: 'Lingote de hierro (horno).' },
     REFINED_DIAMOND: { NAME: 'Diamante tallado', ICON: '💠', DESC: 'Diamante pulido (horno).' },
     GLASS: { NAME: 'Cristal', ICON: '🧊', DESC: 'Arena fundida en el horno.' },
+    // Materiales (P5).
+    CLAY: { NAME: 'Arcilla', ICON: '🟤', DESC: 'En las orillas de lagos, charcas y marismas (E). En el horno se cuece en ladrillos.' },
+    BRICK: { NAME: 'Ladrillo', ICON: '🧱', DESC: 'Arcilla cocida (horno). Para la forja y la mesa de alquimia.' },
+    FIBER: { NAME: 'Fibra vegetal', ICON: '🌿', DESC: 'Se arranca de los arbustos (E). Con 4: una cuerda o tela en el telar.' },
+    CLOTH: { NAME: 'Tela', ICON: '🧵', DESC: 'Tejida en el telar (fibra o lana). Para la ropa de abrigo y las mochilas.' },
+    RESIN: { NAME: 'Resina', ICON: '🟠', DESC: 'Sale al talar pinos. Antorchas que duran, cola, curtidor y pociones.' },
+    BONE: { NAME: 'Hueso', ICON: '🦴', DESC: 'De los animales y los goblins. Flechas de hueso y poción de fuerza.' },
+    GOLD_ORE: { NAME: 'Oro en bruto', ICON: '🟡', DESC: 'Vetas de oro de las cuevas (pico de cobre o mejor). Se funde en el horno.' },
+    GOLD_INGOT: { NAME: 'Lingote de oro', ICON: '🥇', DESC: 'Del horno, o fundiendo 8 monedas goblin en la forja. Elixir dorado y manzana dorada.' },
+    STEEL: { NAME: 'Acero', ICON: '⛓️', DESC: 'Hierro y carbón en la forja. Espada y escudo de acero, mochila grande.' },
+    CRYSTAL_SHARD: { NAME: 'Fragmento de cristal', ICON: '🔮', DESC: 'De las drusas que brillan en las cuevas. Flechas de cristal y visión nocturna.' },
+    WILD_FLOWER: { NAME: 'Flores silvestres', ICON: '🌸', DESC: 'De las praderas floridas. Para las pociones.' },
+    GLUE: { NAME: 'Cola de slime', ICON: '🫙', DESC: 'Slime y resina: pega fuerte. Para las mochilas.' },
+    GLASS_BOTTLE: { NAME: 'Frasco', ICON: '🧪', DESC: 'Frasco de cristal (horno). Vuelve vacío al beber una poción.' },
+    DIAMOND_DUST: { NAME: 'Polvo de diamante', ICON: '✨', DESC: 'Diamante molido en la mesa de alquimia: fuerza y elixir dorado.' },
     NAV_PLATE: { NAME: 'Placa de navegación', ICON: '📟', STACK: 1, DESC: 'Placa base de navegación de la nave. Se fabrica en la mesa de elaboración.' },
     // Armas. WEAPON.DAMAGE: daño por golpe (con el nivel de daño). DURABILITY: golpes o disparos.
     STONE_SWORD: { NAME: 'Espada básica', ICON: '🗡️', STACK: 1, DURABILITY: 400, WEAPON: { DAMAGE: 10 }, MODEL: { TYPE: 'sword', BLADE: 0x9b9fa5, GUARD: 0x6b4a2f, LENGTH: 0.62 }, DESC: '10 de daño. Aguanta 400 golpes.' },
@@ -430,10 +476,13 @@ export const GameConfig = deepFreeze({
     IRON_SWORD: { NAME: 'Espada de hierro', ICON: '🔪', STACK: 1, DURABILITY: 400, WEAPON: { DAMAGE: 15 }, MODEL: { TYPE: 'sword', BLADE: 0xc8ccd2, GUARD: 0x3b3f45, LENGTH: 0.78 }, DESC: '15 de daño. Aguanta 400 golpes.' },
     // A distancia: clic derecho mantenido apunta, clic izquierdo mantenido tensa y al soltar dispara.
     SLINGSHOT: { NAME: 'Tirachinas', ICON: '🪃', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['STONE'], DAMAGE: 5, SPEED: 32, DRAW_TIME: 0.45 }, MODEL: { TYPE: 'slingshot' }, DESC: 'Dispara piedras (5 de daño). Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
-    BOW: { NAME: 'Arco', ICON: '🏹', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['ARROW', 'COPPER_ARROW', 'IRON_ARROW', 'FIRE_ARROW', 'CRYSTAL_ARROW'], SPEED: 48, DRAW_TIME: 0.8 }, MODEL: { TYPE: 'bow' }, DESC: 'El daño depende de la flecha. X cambia de flecha. Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
+    BOW: { NAME: 'Arco', ICON: '🏹', STACK: 1, DURABILITY: 400, RANGED: { AMMO: ['ARROW', 'BONE_ARROW', 'COPPER_ARROW', 'IRON_ARROW', 'FIRE_ARROW', 'CRYSTAL_ARROW'], SPEED: 48, DRAW_TIME: 0.8 }, MODEL: { TYPE: 'bow' }, DESC: 'El daño depende de la flecha. X cambia de flecha. Clic dcho apuntar · clic tensar y soltar. 400 disparos.' },
     ARROW: { NAME: 'Flecha', ICON: '➹', AMMO: { DAMAGE: 10 }, MODEL: { TYPE: 'arrow', TIP: 0x8d8f93 }, DESC: '10 de daño. Se gasta al dispararla.' },
     COPPER_ARROW: { NAME: 'Flecha de cobre', ICON: '➶', AMMO: { DAMAGE: 15 }, MODEL: { TYPE: 'arrow', TIP: 0xd08a4e }, DESC: '15 de daño (mesa de elaboración).' },
     IRON_ARROW: { NAME: 'Flecha de hierro', ICON: '➵', AMMO: { DAMAGE: 20 }, MODEL: { TYPE: 'arrow', TIP: 0xc8ccd2 }, DESC: '20 de daño (mesa de elaboración).' },
+    BONE_ARROW: { NAME: 'Flecha de hueso', ICON: '➴', AMMO: { DAMAGE: 13 }, MODEL: { TYPE: 'arrow', TIP: 0xece4cf }, DESC: '13 de daño. Con huesos, en el reloj.' },
+    STEEL_SWORD: { NAME: 'Espada de acero', ICON: '🗡️', STACK: 1, DURABILITY: 1000, WEAPON: { DAMAGE: 18 }, REPAIR: 'STEEL', MODEL: { TYPE: 'sword', BLADE: 0xdde3ea, GUARD: 0x2e3238, LENGTH: 0.82 }, DESC: '18 de daño. Aguanta 1000 golpes (forja).' },
+    STEEL_SHIELD: { NAME: 'Escudo de acero', ICON: '🛡️', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 170, SHIELD: true, REPAIR: 'STEEL', MODEL: { TYPE: 'shield', FACE: 0xc7cdd4, RIM: 0x3b4046 }, DESC: 'Clic dcho mantenido: bloquear. Aguanta 170 golpes (forja).' },
     // Escudos (mano izquierda, ranura ESCUDO): clic derecho mantenido para bloquear. Aguante = golpes parados.
     COPPER_SHIELD: { NAME: 'Escudo de cobre', ICON: '🛡️', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 50, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xb87333, RIM: 0x6e4a2a }, DESC: 'Clic dcho mantenido: bloquear (no se puede atacar a la vez). Aguanta 50 golpes.' },
     IRON_SHIELD: { NAME: 'Escudo de hierro', ICON: '🔰', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 100, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xa9aeb5, RIM: 0x4a4f55 }, DESC: 'Clic dcho mantenido: bloquear. Aguanta 100 golpes.' },
@@ -457,6 +506,16 @@ export const GameConfig = deepFreeze({
     MUSHROOM_SOUP: { NAME: 'Sopa de setas', ICON: '🥣', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 32, THIRST: 25, EFFECTS: { WARM: 300 }, DESC: 'Calienta y quita la sed.' },
     JAM: { NAME: 'Mermelada', ICON: '🍯', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 22, EFFECTS: { ENERGIZED: 180 }, DESC: 'La energía se recupera mucho más deprisa (3 min).' },
     APPLE_PIE: { NAME: 'Tarta de manzana', ICON: '🥧', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 60, EFFECTS: { WELL_FED: 480, ENERGIZED: 120 }, DESC: 'El mejor plato del Edén.' },
+    GOLDEN_APPLE: { NAME: 'Manzana dorada', ICON: '🌕', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 30, HEAL: 30, EFFECTS: { REGENERATION: 40 }, DESC: 'Cura 30 y regenera la vida un rato (mesa de alquimia).' },
+    // Pociones (P5, mesa de alquimia). USE 'POTION': se bebe y devuelve el frasco vacío.
+    // HEAL: vida al momento. EFFECTS: estados (STATUS_EFFECTS) y su duración en s.
+    HEALING_POTION: { NAME: 'Poción de curación', ICON: '💗', STACK: 10, USE: 'POTION', HEAL: 45, EFFECTS: { REGENERATION: 20 }, MODEL: { TYPE: 'potion', COLOR: 0xff4f7a }, DESC: 'Cura 45 de vida al momento y regenera 20 s.' },
+    STRENGTH_POTION: { NAME: 'Poción de fuerza', ICON: '💪', STACK: 10, USE: 'POTION', EFFECTS: { STRENGTH: 180 }, MODEL: { TYPE: 'potion', COLOR: 0xd0402a }, DESC: 'Golpes y disparos un 35 % más fuertes (3 min).' },
+    SWIFT_POTION: { NAME: 'Poción de rapidez', ICON: '💨', STACK: 10, USE: 'POTION', EFFECTS: { SWIFT: 180 }, MODEL: { TYPE: 'potion', COLOR: 0x7fe0ff }, DESC: 'Caminas y corres un 25 % más deprisa (3 min).' },
+    WARMTH_POTION: { NAME: 'Poción de calor', ICON: '🌡️', STACK: 10, USE: 'POTION', EFFECTS: { WARMTH: 300 }, MODEL: { TYPE: 'potion', COLOR: 0xff9a2a }, DESC: 'El frío casi no te afecta (5 min): para las montañas heladas.' },
+    NIGHT_VISION_POTION: { NAME: 'Poción de visión nocturna', ICON: '👁️', STACK: 10, USE: 'POTION', EFFECTS: { NIGHT_VISION: 240 }, MODEL: { TYPE: 'potion', COLOR: 0x9c7bff }, DESC: 'Ves en la oscuridad de las cuevas y de la noche (4 min).' },
+    LEAP_POTION: { NAME: 'Poción de salto', ICON: '🐸', STACK: 10, USE: 'POTION', EFFECTS: { LEAP: 150 }, MODEL: { TYPE: 'potion', COLOR: 0x62c24a }, DESC: 'Saltas mucho más alto y las caídas duelen la mitad (2,5 min).' },
+    GOLDEN_ELIXIR: { NAME: 'Elixir dorado', ICON: '🌟', STACK: 5, USE: 'POTION', HEAL: 100, EFFECTS: { REGENERATION: 60, STRENGTH: 90, SWIFT: 90, WARMTH: 90 }, MODEL: { TYPE: 'potion', COLOR: 0xffd34a }, DESC: 'Cura del todo y da fuerza, rapidez, calor y regeneración (1,5 min).' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
@@ -474,8 +533,8 @@ export const GameConfig = deepFreeze({
     DIAMOND_AXE: { NAME: 'Hacha de diamante', ICON: '🪓', STACK: 1, DURABILITY: 1600, TOOL: { CHOP_SPEED: 15, TIER: 4 }, REPAIR: 'REFINED_DIAMOND', MODEL: { TYPE: 'axe', METAL: 0x8fe6f5 }, DESC: 'La mejor hacha. 1600 golpes.' },
     DIAMOND_PICKAXE: { NAME: 'Pico de diamante', ICON: '⛏️', STACK: 1, DURABILITY: 1600, TOOL: { MINE_SPEED: 7, TIER: 4 }, REPAIR: 'REFINED_DIAMOND', MODEL: { TYPE: 'pickaxe', METAL: 0x8fe6f5 }, DESC: 'Pica cualquier cosa en un suspiro. 1600 golpes.' },
     // Herramientas nuevas.
-    SHOVEL: { NAME: 'Pala', ICON: '🪏', STACK: 1, DURABILITY: 500, TOOL: { HARVEST_BONUS: { SAND_PILE: 2, MUSHROOM: 1 } }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'shovel' }, DESC: 'Seleccionada, saca más arena de los montones y más setas.' },
-    SICKLE: { NAME: 'Hoz', ICON: '🌙', STACK: 1, DURABILITY: 500, TOOL: { HARVEST_BONUS: { WILD_WHEAT: 2, BERRY_BUSH: 1 } }, REPAIR: 'REFINED_COPPER', MODEL: { TYPE: 'sickle' }, DESC: 'Seleccionada, siegas más trigo y coges más bayas.' },
+    SHOVEL: { NAME: 'Pala', ICON: '🪏', STACK: 1, DURABILITY: 500, TOOL: { HARVEST_BONUS: { SAND_PILE: 2, MUSHROOM: 1, CLAY_DEPOSIT: 2 } }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'shovel' }, DESC: 'Seleccionada, saca más arena, arcilla y setas.' },
+    SICKLE: { NAME: 'Hoz', ICON: '🌙', STACK: 1, DURABILITY: 500, TOOL: { HARVEST_BONUS: { WILD_WHEAT: 2, BERRY_BUSH: 1, BUSH: 1, WILD_FLOWERS: 1 } }, REPAIR: 'REFINED_COPPER', MODEL: { TYPE: 'sickle' }, DESC: 'Seleccionada, siegas más trigo y fibra y coges más bayas y flores.' },
     HAMMER: { NAME: 'Martillo', ICON: '🔨', STACK: 1, DURABILITY: 600, USE: 'REPAIR', TOOL: { DISMANTLE: 12 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'hammer' }, DESC: 'Golpeando desmonta lo construido al momento (lo recuperas). Clic dcho / R: arregla la herramienta o arma más gastada que lleves con 1 lingote de su material.' },
     BUCKET: { NAME: 'Cubo', ICON: '🪣', STACK: 1, USE: 'BUCKET', MODEL: { TYPE: 'bucket' }, DESC: 'Clic dcho / R mirando al agua: llenarlo.' },
     BUCKET_WATER: { NAME: 'Cubo de agua', ICON: '🪣', STACK: 1, USE: 'BUCKET', MODEL: { TYPE: 'bucket', WATER: true }, DESC: 'Clic dcho / R: beber (quita mucha sed). Servirá para regar.' },
@@ -483,7 +542,7 @@ export const GameConfig = deepFreeze({
     LANTERN: { NAME: 'Farol', ICON: '🏮', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, LIGHT: true, MODEL: { TYPE: 'lantern' }, DESC: 'En la mano izquierda (ranura del escudo): ilumina siempre, con las manos libres.' },
     // Armas nuevas. RANGED.THROWN: se lanza la propia arma (la lanza se recoge; la bomba estalla).
     SPEAR: { NAME: 'Lanza', ICON: '🔱', STACK: 1, DURABILITY: 300, WEAPON: { DAMAGE: 13 }, RANGED: { AMMO: ['SPEAR'], THROWN: true, RECOVER: true, DAMAGE: 24, SPEED: 28, DRAW_TIME: 0.55 }, REPAIR: 'REFINED_STONE', MODEL: { TYPE: 'spear' }, DESC: '13 de daño de cerca. Clic dcho apuntar + clic: lanzarla (24 de daño); luego hay que recogerla.' },
-    CROSSBOW: { NAME: 'Ballesta', ICON: '🏹', STACK: 1, DURABILITY: 500, RANGED: { AMMO: ['ARROW', 'COPPER_ARROW', 'IRON_ARROW', 'FIRE_ARROW', 'CRYSTAL_ARROW'], DAMAGE_MULT: 1.5, SPEED: 66, DRAW_TIME: 1.3 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'crossbow' }, DESC: 'Flechas a más velocidad y con 1,5 veces su daño, pero tarda en cargar.' },
+    CROSSBOW: { NAME: 'Ballesta', ICON: '🏹', STACK: 1, DURABILITY: 500, RANGED: { AMMO: ['ARROW', 'BONE_ARROW', 'COPPER_ARROW', 'IRON_ARROW', 'FIRE_ARROW', 'CRYSTAL_ARROW'], DAMAGE_MULT: 1.5, SPEED: 66, DRAW_TIME: 1.3 }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'crossbow' }, DESC: 'Flechas a más velocidad y con 1,5 veces su daño, pero tarda en cargar.' },
     MACE: { NAME: 'Maza', ICON: '🔨', STACK: 1, DURABILITY: 700, WEAPON: { DAMAGE: 16, VS: { GOLEM: 2.2 } }, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'mace' }, DESC: '16 de daño; contra los gólems de roca, más del doble.' },
     SLIME_BOMB: { NAME: 'Bomba de slime', ICON: '🟢', RANGED: { AMMO: ['SLIME_BOMB'], THROWN: true, DAMAGE: 26, EXPLODE: 3.8, SPEED: 19, DRAW_TIME: 0.4 }, MODEL: { TYPE: 'bomb' }, DESC: 'Clic dcho apuntar + clic: lanzarla. Estalla y daña a todo lo que esté cerca (26).' },
     FIRE_ARROW: { NAME: 'Flecha de fuego', ICON: '🔥', AMMO: { DAMAGE: 12, FIRE: { DPS: 4, TIME: 5 } }, MODEL: { TYPE: 'arrow', TIP: 0xff6a2a }, DESC: '12 de daño y quema al enemigo (4 por segundo, 5 s).' },
@@ -493,6 +552,15 @@ export const GameConfig = deepFreeze({
     LEATHER_SHIRT: { NAME: 'Camiseta de cuero', ICON: '👕', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 3, COLD_PROTECTION: 0.12, COLOR: 0x8b5a2b, DESC: 'La prenda que más abriga.' },
     LEATHER_PANTS: { NAME: 'Pantalones de cuero', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.07, COLOR: 0x6b4423, DESC: 'Protegen las piernas del frío.' },
     LEATHER_SHOES: { NAME: 'Zapatillas de cuero', ICON: '👟', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.03, COLOR: 0x4a2f18, DESC: 'Pies calientes y secos.' },
+    // Ropa de abrigo (P5, telar y curtidor): abriga mucho más que el cuero, defiende poco.
+    WOOL_HAT: { NAME: 'Gorro de lana', ICON: '🧶', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 0, COLD_PROTECTION: 0.1, COLOR: 0xb8433a, DESC: 'Abriga mucho la cabeza.' },
+    WOOL_SWEATER: { NAME: 'Jersey de lana', ICON: '🧥', USE: 'EQUIP', SLOT: 'CHEST', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.22, COLOR: 0x3f6aa8, DESC: 'La prenda que más abriga.' },
+    WOOL_TROUSERS: { NAME: 'Calzas de lana', ICON: '👖', USE: 'EQUIP', SLOT: 'LEGS', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.13, COLOR: 0x5a4a6e, DESC: 'Piernas calientes.' },
+    WOOL_MITTENS: { NAME: 'Manoplas de lana', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 0, COLD_PROTECTION: 0.06, COLOR: 0xd9c9a0, DESC: 'Manos calientes.' },
+    FUR_BOOTS: { NAME: 'Botas de piel', ICON: '🥾', USE: 'EQUIP', SLOT: 'FEET', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.08, COLOR: 0x8a6a4a, DESC: 'Forradas de lana: pies calientes en la nieve.' },
+    // Mochilas (P5, curtidor): al usarlas se cosen a la espalda y amplían la mochila (+1 fila de 9).
+    BACKPACK: { NAME: 'Mochila', ICON: '🎒', STACK: 1, USE: 'BACKPACK', ROWS: 1, DESC: 'Úsala (clic dcho / R) para llevar 9 huecos más. Es para siempre.' },
+    LARGE_BACKPACK: { NAME: 'Mochila grande', ICON: '🎒', STACK: 1, USE: 'BACKPACK', ROWS: 2, DESC: 'Con la mochila ya puesta, úsala para llevar otros 9 huecos más (36 en total en la mochila).' },
     LEATHER_GLOVES: { NAME: 'Guantes de cuero', ICON: '🧤', USE: 'EQUIP', SLOT: 'HANDS', STACK: 1, DEFENSE: 1, COLD_PROTECTION: 0.02, COLOR: 0x5c3a1c, DESC: 'Manos protegidas.' },
     // Armaduras de metal (mesa de elaboración). DEFENSE: puntos de defensa.
     COPPER_HELMET: { NAME: 'Casco de cobre', ICON: '⛑️', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 2, COLD_PROTECTION: 0.03, COLOR: 0xb87333, DESC: 'Defensa 2.' },
@@ -542,6 +610,13 @@ export const GameConfig = deepFreeze({
     WELL_FED: { NAME: 'Bien alimentado', ICON: '🍽️', DESC: 'El hambre baja más despacio y la vida se recupera el doble.', HUNGER: 0.65, REGEN: 2 },
     WARM: { NAME: 'Comida caliente', ICON: '♨️', DESC: 'Se pierde calor mucho más despacio.', COLD: 0.45 },
     ENERGIZED: { NAME: 'Con energía', ICON: '⚡', DESC: 'La energía se recupera mucho más deprisa.', ENERGY: 1.9 },
+    // Pociones (P5).
+    REGENERATION: { NAME: 'Regeneración', ICON: '💗', DESC: 'La vida se recupera muy deprisa.', REGEN: 3 },
+    STRENGTH: { NAME: 'Fuerza', ICON: '💪', DESC: 'Golpes y disparos un 35 % más fuertes.', DAMAGE: 1.35 },
+    SWIFT: { NAME: 'Rapidez', ICON: '💨', DESC: 'Te mueves un 25 % más deprisa.', SPEED: 1.25 },
+    WARMTH: { NAME: 'Calor', ICON: '🌡️', DESC: 'El frío casi no te afecta.', COLD: 0.15 },
+    NIGHT_VISION: { NAME: 'Visión nocturna', ICON: '👁️', DESC: 'Ves en la oscuridad.', NIGHT: true },
+    LEAP: { NAME: 'Salto', ICON: '🐸', DESC: 'Saltas mucho más alto; las caídas duelen la mitad.', JUMP: 1.45, FALL: 0.5 },
     INDIGESTION: { NAME: 'Indigestión', ICON: '🤢', DESC: 'Algo crudo te ha sentado mal: no recuperas vida y te cansas.', ENERGY: 0.4, NO_REGEN: true, HUNGER_LOSS: 12, TIME: 75 },
   },
 
@@ -573,6 +648,10 @@ export const GameConfig = deepFreeze({
     REFINED_STONE: { RESULT: 'REFINED_STONE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 5, INGREDIENTS: { STONE: 4 } },
     REFINED_WOOD: { RESULT: 'REFINED_WOOD', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { WOOD: 2 } },
     ROPE: { RESULT: 'ROPE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { SPIDER_SILK: 5 } },
+    ROPE_FIBER: { RESULT: 'ROPE', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { FIBER: 4 } },
+    GLUE: { RESULT: 'GLUE', AMOUNT: 2, CATEGORY: 'MATERIALS', TIME: 4, INGREDIENTS: { SLIME: 1, RESIN: 1 } },
+    TORCH_RESIN: { RESULT: 'TORCH', AMOUNT: 2, CATEGORY: 'SURVIVAL', TIME: 3, INGREDIENTS: { WOOD: 1, RESIN: 1 } },
+    BONE_ARROW: { RESULT: 'BONE_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, INGREDIENTS: { WOOD: 2, BONE: 1, SPIDER_SILK: 2 } },
     STONE_AXE: { RESULT: 'STONE_AXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 3, REFINED_STONE: 2, ROPE: 2 } },
     STONE_PICKAXE: { RESULT: 'STONE_PICKAXE', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 15, INGREDIENTS: { REFINED_WOOD: 3, REFINED_STONE: 2, ROPE: 2 } },
     PIECE_REFINERY: { RESULT: 'REFINERY_KIT', AMOUNT: 1, CATEGORY: 'STATIONS', TIME: 15, INGREDIENTS: { REFINED_STONE: 4, REFINED_WOOD: 2 } },
@@ -595,6 +674,38 @@ export const GameConfig = deepFreeze({
     REFINED_IRON: { RESULT: 'REFINED_IRON', AMOUNT: 2, CATEGORY: 'MATERIALS', TIME: 12, STATION: 'FURNACE', INGREDIENTS: { IRON_ORE: 2, COAL: 1 } },
     REFINED_DIAMOND: { RESULT: 'REFINED_DIAMOND', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 15, STATION: 'FURNACE', INGREDIENTS: { DIAMOND_ORE: 1, COAL: 1 } },
     GLASS: { RESULT: 'GLASS', AMOUNT: 4, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'FURNACE', INGREDIENTS: { SAND: 4, COAL: 1 } },
+    BRICK: { RESULT: 'BRICK', AMOUNT: 4, CATEGORY: 'MATERIALS', TIME: 10, STATION: 'FURNACE', INGREDIENTS: { CLAY: 4, COAL: 1 } },
+    GOLD_INGOT: { RESULT: 'GOLD_INGOT', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 12, STATION: 'FURNACE', INGREDIENTS: { GOLD_ORE: 2, COAL: 1 } },
+    GLASS_BOTTLE: { RESULT: 'GLASS_BOTTLE', AMOUNT: 3, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'FURNACE', INGREDIENTS: { GLASS: 2 } },
+    // Telar.
+    CLOTH: { RESULT: 'CLOTH', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'LOOM', INGREDIENTS: { FIBER: 4 } },
+    CLOTH_WOOL: { RESULT: 'CLOTH', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'LOOM', INGREDIENTS: { WOOL: 2 } },
+    WOOL_HAT: { RESULT: 'WOOL_HAT', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 10, STATION: 'LOOM', INGREDIENTS: { CLOTH: 1, WOOL: 2 } },
+    WOOL_SWEATER: { RESULT: 'WOOL_SWEATER', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 18, STATION: 'LOOM', INGREDIENTS: { CLOTH: 2, WOOL: 4 } },
+    WOOL_TROUSERS: { RESULT: 'WOOL_TROUSERS', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 14, STATION: 'LOOM', INGREDIENTS: { CLOTH: 2, WOOL: 3 } },
+    WOOL_MITTENS: { RESULT: 'WOOL_MITTENS', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 8, STATION: 'LOOM', INGREDIENTS: { CLOTH: 1, WOOL: 2 } },
+    // Curtidor.
+    REFINED_LEATHER_TAN: { RESULT: 'REFINED_LEATHER', AMOUNT: 3, CATEGORY: 'MATERIALS', TIME: 10, STATION: 'TANNER', INGREDIENTS: { LEATHER: 2, RESIN: 1 } },
+    FUR_BOOTS: { RESULT: 'FUR_BOOTS', AMOUNT: 1, CATEGORY: 'CLOTHING', TIME: 12, STATION: 'TANNER', INGREDIENTS: { REFINED_LEATHER: 2, WOOL: 2 } },
+    BACKPACK: { RESULT: 'BACKPACK', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 20, STATION: 'TANNER', INGREDIENTS: { REFINED_LEATHER: 4, CLOTH: 2, ROPE: 2, GLUE: 1 } },
+    LARGE_BACKPACK: { RESULT: 'LARGE_BACKPACK', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 30, STATION: 'TANNER', INGREDIENTS: { REFINED_LEATHER: 6, CLOTH: 4, STEEL: 1, GLUE: 2 } },
+    // Mesa de alquimia.
+    DIAMOND_DUST: { RESULT: 'DIAMOND_DUST', AMOUNT: 3, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'ALCHEMY', INGREDIENTS: { REFINED_DIAMOND: 1 } },
+    HEALING_POTION: { RESULT: 'HEALING_POTION', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 10, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, BERRIES: 3, WILD_FLOWER: 2 } },
+    STRENGTH_POTION: { RESULT: 'STRENGTH_POTION', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 12, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, BONE: 2, DIAMOND_DUST: 1 } },
+    SWIFT_POTION: { RESULT: 'SWIFT_POTION', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 10, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, WILD_FLOWER: 3, SPIDER_SILK: 1 } },
+    WARMTH_POTION: { RESULT: 'WARMTH_POTION', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 10, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, COAL: 1, MUSHROOM: 2, RESIN: 1 } },
+    NIGHT_VISION_POTION: { RESULT: 'NIGHT_VISION_POTION', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 12, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, GLOW_FLOWER: 2, CRYSTAL_SHARD: 1 } },
+    LEAP_POTION: { RESULT: 'LEAP_POTION', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 10, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, SLIME: 3 } },
+    GOLDEN_ELIXIR: { RESULT: 'GOLDEN_ELIXIR', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 20, STATION: 'ALCHEMY', INGREDIENTS: { GLASS_BOTTLE: 1, GOLD_INGOT: 1, GLOW_FLOWER: 1, DIAMOND_DUST: 1 } },
+    GOLDEN_APPLE: { RESULT: 'GOLDEN_APPLE', AMOUNT: 1, CATEGORY: 'ALCHEMY', TIME: 10, STATION: 'ALCHEMY', INGREDIENTS: { APPLE: 1, GOLD_INGOT: 1 } },
+    // Forja.
+    STEEL: { RESULT: 'STEEL', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 14, STATION: 'FORGE', INGREDIENTS: { REFINED_IRON: 2, COAL: 2 } },
+    GOLD_FROM_COINS: { RESULT: 'GOLD_INGOT', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 8, STATION: 'FORGE', INGREDIENTS: { COIN: 8 } },
+    REFINED_IRON_FORGE: { RESULT: 'REFINED_IRON', AMOUNT: 4, CATEGORY: 'MATERIALS', TIME: 14, STATION: 'FORGE', INGREDIENTS: { IRON_ORE: 3, COAL: 1 } },
+    REFINED_COPPER_FORGE: { RESULT: 'REFINED_COPPER', AMOUNT: 4, CATEGORY: 'MATERIALS', TIME: 12, STATION: 'FORGE', INGREDIENTS: { COPPER_ORE: 3, COAL: 1 } },
+    STEEL_SWORD: { RESULT: 'STEEL_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 24, STATION: 'FORGE', INGREDIENTS: { REFINED_WOOD: 1, STEEL: 3 } },
+    STEEL_SHIELD: { RESULT: 'STEEL_SHIELD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 20, STATION: 'FORGE', INGREDIENTS: { REFINED_WOOD: 2, STEEL: 2 } },
     // Mesa de elaboración.
     NAV_PLATE: { RESULT: 'NAV_PLATE', AMOUNT: 1, CATEGORY: 'SURVIVAL', TIME: 30, STATION: 'WORKBENCH', INGREDIENTS: { GLASS: 20, REFINED_IRON: 5, REFINED_COPPER: 5 } },
     COPPER_SWORD: { RESULT: 'COPPER_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 15, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_COPPER: 2 } },
@@ -631,7 +742,7 @@ export const GameConfig = deepFreeze({
     FIRE_ARROW: { RESULT: 'FIRE_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, INGREDIENTS: { ARROW: 3, COAL: 1, SPIDER_SILK: 1 } },
     CROSSBOW: { RESULT: 'CROSSBOW', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 22, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 4, REFINED_IRON: 2, ROPE: 3 } },
     MACE: { RESULT: 'MACE', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 18, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 3 } },
-    CRYSTAL_ARROW: { RESULT: 'CRYSTAL_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 8, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, GLASS: 2, SPIDER_SILK: 3 } },
+    CRYSTAL_ARROW: { RESULT: 'CRYSTAL_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 8, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, CRYSTAL_SHARD: 1, SPIDER_SILK: 3 } },
     DIAMOND_SWORD: { RESULT: 'DIAMOND_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 30, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_DIAMOND: 3 } },
     DIAMOND_HELMET: { RESULT: 'DIAMOND_HELMET', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 20, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 2, REFINED_IRON: 1 } },
     DIAMOND_GLOVES: { RESULT: 'DIAMOND_GLOVES', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 14, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 1, REFINED_IRON: 1 } },
@@ -661,6 +772,10 @@ export const GameConfig = deepFreeze({
     WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰' },
     CAMPFIRE: { NAME: 'Hoguera', ICON: '🔥' },
     KITCHEN: { NAME: 'Cocina con olla', ICON: '🍲' },
+    LOOM: { NAME: 'Telar', ICON: '🧶' },
+    TANNER: { NAME: 'Curtidor', ICON: '🪣' },
+    ALCHEMY: { NAME: 'Mesa de alquimia', ICON: '⚗️' },
+    FORGE: { NAME: 'Forja', ICON: '⚒️' },
   },
   RECIPE_CATEGORIES: {
     MATERIALS: 'Materiales',
@@ -672,6 +787,7 @@ export const GameConfig = deepFreeze({
     ARMOR: 'Armaduras',
     SURVIVAL: 'Supervivencia',
     COOKING: 'Cocina',
+    ALCHEMY: 'Pociones',
   },
 
   // Construcción modular (Fase 9): el jugador construye pieza a pieza.
@@ -690,7 +806,7 @@ export const GameConfig = deepFreeze({
       type, { NAME: d.NAME, ICON: d.ICON, COST: { [pieceItemId(type)]: 1 }, ...(d.BODIES ? { BODIES: d.BODIES } : {}) },
     ])),
     // Piezas que no se pueden hacer en las lunas (BODIES: 'HOME').
-    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN'],
+    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN', 'LOOM', 'TANNER', 'ALCHEMY', 'FORGE'],
     CAMPFIRE_WARM_RADIUS: 5,   // m: cerca de una hoguera (o de la cocina) se está caliente
     CAMPFIRE_SLIME_RADIUS: 9,  // m: los slimes no se acercan a una hoguera
     CHEST_SLOTS: 27,
@@ -1047,7 +1163,7 @@ export const GameConfig = deepFreeze({
       GOLEM: {
         NAME: 'Gólem', HEALTH: 30, DAMAGE: 25, SPEED: 1.5, RANGE: 2.2, WINDUP: 1.3, COOLDOWN: 2.6, AGGRO: 24,
         WAKE_DISTANCE: 7, ASSEMBLE_TIME: 2.2, RADIUS: 0.65, HEIGHT: 2.4, KNOCKBACK: 0.15,
-        DROPS: { STONE: [3, 5] }, ORE_DROP: { CHANCE: 0.75, TYPES: { COPPER_ORE: 0.45, IRON_ORE: 0.3, COAL: 0.25 }, AMOUNT: [1, 2] },
+        DROPS: { STONE: [3, 5] }, ORE_DROP: { CHANCE: 0.75, TYPES: { COPPER_ORE: 0.4, IRON_ORE: 0.28, COAL: 0.22, GOLD_ORE: 0.1 }, AMOUNT: [1, 2] },
       },
       SLIME: {
         NAME: 'Slime', HEALTH: 10, DAMAGE: 10, SPEED: 2.6, RANGE: 1.5, WINDUP: 0.55, COOLDOWN: 1.7, AGGRO: 32,
@@ -1055,7 +1171,7 @@ export const GameConfig = deepFreeze({
       },
       GOBLIN: {
         NAME: 'Goblin', HEALTH: 20, DAMAGE: 20, SPEED: 4.3, RANGE: 1.9, WINDUP: 1.25, COOLDOWN: 2.4, AGGRO: 20,
-        RADIUS: 0.45, HEIGHT: 1.45, KNOCKBACK: 0.8, DROPS: { LEATHER: [1, 1], WOOD: [1, 2] }, COIN_CHANCE: 1 / 3,
+        RADIUS: 0.45, HEIGHT: 1.45, KNOCKBACK: 0.8, DROPS: { LEATHER: [1, 1], WOOD: [1, 2], BONE: [0, 1] }, COIN_CHANCE: 1 / 3,
       },
       GOBLIN_BOSS: {
         NAME: 'Jefe goblin', HEALTH: 40, DAMAGE: 30, SPEED: 4.3, RANGE: 2.1, WINDUP: 1.05, COOLDOWN: 2.2, AGGRO: 26,
@@ -1082,7 +1198,7 @@ export const GameConfig = deepFreeze({
       DEER: {
         NAME: 'Ciervo',            // "animal de pradera"
         NAME_PLURAL: 'Ciervos',
-        DROPS: { MEAT: 2 },
+        DROPS: { MEAT: 2, LEATHER: 1, BONE: 1 },
         HEALTH: 10,                 // animal genérico
         ATTACK_DAMAGE: 5,
         ATTACK_COOLDOWN: 1.2,
@@ -1100,7 +1216,7 @@ export const GameConfig = deepFreeze({
       GOAT: {
         NAME: 'Cabra',
         NAME_PLURAL: 'Cabras',
-        DROPS: { MEAT: 1, WOOL: 2 },
+        DROPS: { MEAT: 1, WOOL: 2, BONE: 1 },
         HEALTH: 14,
         ATTACK_DAMAGE: 6,
         ATTACK_COOLDOWN: 1.1,
@@ -1118,7 +1234,7 @@ export const GameConfig = deepFreeze({
       COW: {
         NAME: 'Vaca',
         NAME_PLURAL: 'Vacas',
-        DROPS: { MEAT: 3, LEATHER: 2 },
+        DROPS: { MEAT: 3, LEATHER: 2, BONE: 2 },
         HEALTH: 16,
         ATTACK_DAMAGE: 10,
         ATTACK_COOLDOWN: 1.6,
@@ -1165,6 +1281,8 @@ export const GameConfig = deepFreeze({
       IRON_PER_NODE: 0.22,       // menos que cobre, y más adentro
       DIAMOND_PER_NODE: 0.035,   // muy raro, al fondo
       GLOW_FLOWERS: [2, 4],      // por cámara
+      GOLD_PER_NODE: 0.05,       // P5: vetas de oro (pico de cobre)
+      CRYSTAL_PER_NODE: 0.04,    // P5: drusas de cristal que brillan, en las cámaras hondas
     },
     DARKNESS_DEPTH: 6,           // m bajo la superficie a partir de los que la cueva es negra
   },

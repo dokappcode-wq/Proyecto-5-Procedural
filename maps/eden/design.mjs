@@ -437,7 +437,7 @@ export const EDEN = {
   caves: [
     {
       id: 'CUEVA_ROCIO', name: 'Cueva del Rocío', kind: 'UNDERGROUND', theme: 'roots',
-      ores: { COAL: 4, COPPER: 0.5, IRON: 0.12, DIAMOND: 0, FLOWERS: 3 },
+      ores: { COAL: 4, COPPER: 0.5, IRON: 0.12, DIAMOND: 0, FLOWERS: 3, GOLD: 0.08, CRYSTAL: 0 },
       path: [
         { x: 210, z: 700, r: 3.4, d: 0 }, { x: 214, z: 689, r: 3.2, d: 2.4 }, { x: 220, z: 678, r: 3.1, d: 4.8 },
         { x: 228, z: 666, r: 3, d: 7 }, { x: 238, z: 654, r: 3.4, d: 8.6 },
@@ -451,7 +451,7 @@ export const EDEN = {
     },
     {
       id: 'MINA_VIEJA', name: 'Mina Vieja', kind: 'MOUNTAIN', theme: 'mine',
-      ores: { COAL: 5, COPPER: 0.55, IRON: 0.38, DIAMOND: 0, FLOWERS: 0 },
+      ores: { COAL: 5, COPPER: 0.55, IRON: 0.38, DIAMOND: 0, FLOWERS: 0, GOLD: 0.5, CRYSTAL: 0.05 },
       path: [
         { x: 1116, z: -62, r: 3.2, d: 0 }, { x: 1128, z: -64, r: 3, d: 0.5 }, { x: 1141, z: -66, r: 3, d: 1 },
         { x: 1155, z: -68, r: 3, d: 1.5 }, { x: 1170, z: -70, r: 5.6, d: 2, name: 'Sala de la Vagoneta' },
@@ -467,7 +467,7 @@ export const EDEN = {
     },
     {
       id: 'GRUTA_CRISTAL', name: 'Gruta de Cristal', kind: 'MOUNTAIN', theme: 'crystal',
-      ores: { COAL: 1, COPPER: 0.2, IRON: 0.25, DIAMOND: 0.22, FLOWERS: 0 },
+      ores: { COAL: 1, COPPER: 0.2, IRON: 0.25, DIAMOND: 0.22, FLOWERS: 0, GOLD: 0.12, CRYSTAL: 0.85 },
       path: [
         { x: 1000, z: -760, r: 3.2, d: 0 }, { x: 1012, z: -752, r: 3, d: 0.6 }, { x: 1026, z: -744, r: 3, d: 1.4 },
         { x: 1040, z: -736, r: 3.2, d: 2.4 }, { x: 1056, z: -726, r: 6.8, d: 3.4, name: 'Salón Amatista' },
@@ -480,7 +480,7 @@ export const EDEN = {
     },
     {
       id: 'GRUTA_HIELO', name: 'Gruta de Hielo', kind: 'MOUNTAIN', theme: 'ice',
-      ores: { COAL: 1, COPPER: 0.1, IRON: 0.4, DIAMOND: 0.1, FLOWERS: 0 },
+      ores: { COAL: 1, COPPER: 0.1, IRON: 0.4, DIAMOND: 0.1, FLOWERS: 0, GOLD: 0.15, CRYSTAL: 0.4 },
       path: [
         { x: -556, z: -1098, r: 3.4, d: 0 }, { x: -556, z: -1112, r: 3.2, d: 0.5 }, { x: -554, z: -1126, r: 3.2, d: 1.2 },
         { x: -552, z: -1140, r: 3.4, d: 2 }, { x: -548, z: -1158, r: 7.2, d: 2.8, name: 'Catedral de Hielo' },
@@ -493,7 +493,7 @@ export const EDEN = {
     },
     {
       id: 'BOSQUE_SETAS', name: 'Bosque de Setas', kind: 'UNDERGROUND', theme: 'mushroom',
-      ores: { COAL: 3, COPPER: 0.3, IRON: 0.1, DIAMOND: 0, FLOWERS: 6 },
+      ores: { COAL: 3, COPPER: 0.3, IRON: 0.1, DIAMOND: 0, FLOWERS: 6, GOLD: 0.06, CRYSTAL: 0.15 },
       path: [
         { x: -605, z: 632, r: 3.4, d: 0 }, { x: -600, z: 645, r: 3.2, d: 2.4 }, { x: -594, z: 658, r: 3, d: 4.8 },
         { x: -588, z: 672, r: 3.2, d: 7 }, { x: -580, z: 690, r: 7.6, d: 8.6, name: 'Bosque de Setas' },
@@ -506,7 +506,7 @@ export const EDEN = {
     },
     {
       id: 'CUEVA_MAR', name: 'Cueva del Mar', kind: 'SEA', theme: 'sea',
-      ores: { COAL: 1, COPPER: 0.25, IRON: 0.08, DIAMOND: 0, FLOWERS: 0 },
+      ores: { COAL: 1, COPPER: 0.25, IRON: 0.08, DIAMOND: 0, FLOWERS: 0, GOLD: 0.3, CRYSTAL: 0.08 },
       path: [
         { x: -1680, z: 118, r: 3.8, d: 0 }, { x: -1660, z: 118, r: 3.8, d: 0 }, { x: -1640, z: 119, r: 3.8, d: 0 },
         { x: -1622, z: 120, r: 3.8, d: 0 }, { x: -1606, z: 122, r: 4, d: 0 }, { x: -1592, z: 124, r: 4, d: 0 },

@@ -414,6 +414,10 @@ export class AudioSystem {
     }));
     on(E.FOOD_EATEN, () => this.play((S, o) => S.eat(o)));
     on(E.PLAYER_DRANK, () => this.play((S, o) => S.drink(o)));
+    on(E.POTION_DRUNK, () => this.play((S, o) => {
+      S.drink(o);
+      S.tone(o, { type: 'sine', f: 660, f2: 1320, d: 0.35, gain: 0.05 });
+    }));
     on(E.ITEM_REPAIRED, () => this.play((S, o) => {
       S.clang(o, 0.7);
       S.clang(o, 0.5);
@@ -745,7 +749,7 @@ export class AudioSystem {
     // Hogueras y cocinas: crepitar al acercarse.
     env.fire = 0;
     for (const pc of this._construction?.pieces ?? []) {
-      if (pc.type !== 'CAMPFIRE' && pc.type !== 'KITCHEN') continue;
+      if (pc.type !== 'CAMPFIRE' && pc.type !== 'KITCHEN' && pc.type !== 'FORGE') continue;
       const d = Math.hypot(p.x - pc.x, p.z - pc.z);
       const k = clamp01(1.1 - d / (pc.type === 'KITCHEN' ? 9 : 16));
       if (k > env.fire) {

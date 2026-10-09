@@ -100,6 +100,23 @@ export const SHAPES = {
     slot: 'FREE', half: [0.95, 0.65], top: 1.3, interact: 'CRAFT', station: 'KITCHEN',
     colliders: [{ x0: -0.95, x1: 0.95, z0: -0.65, z1: 0.65, y0: 0, y1: 1.0 }], surfaces: [],
   },
+  // Estaciones de la P5: telar, curtidor, mesa de alquimia y forja.
+  LOOM: {
+    slot: 'FREE', half: [0.9, 0.6], top: 1.6, interact: 'CRAFT', station: 'LOOM',
+    colliders: [{ x0: -0.9, x1: 0.9, z0: -0.6, z1: 0.6, y0: 0, y1: 1.6 }], surfaces: [],
+  },
+  TANNER: {
+    slot: 'FREE', half: [1.0, 0.65], top: 1.5, interact: 'CRAFT', station: 'TANNER',
+    colliders: [{ x0: -1.0, x1: 1.0, z0: -0.65, z1: 0.65, y0: 0, y1: 1.5 }], surfaces: [],
+  },
+  ALCHEMY: {
+    slot: 'FREE', half: [0.95, 0.55], top: 1.4, interact: 'CRAFT', station: 'ALCHEMY',
+    colliders: [{ x0: -0.95, x1: 0.95, z0: -0.55, z1: 0.55, y0: 0, y1: 1.0 }], surfaces: [],
+  },
+  FORGE: {
+    slot: 'FREE', half: [1.1, 0.8], top: 2.2, interact: 'CRAFT', station: 'FORGE',
+    colliders: [{ x0: -1.1, x1: 1.1, z0: -0.8, z1: 0.8, y0: 0, y1: 1.1 }, { x0: -1.1, x1: -0.1, z0: -0.8, z1: 0.0, y0: 1.1, y1: 2.2 }], surfaces: [],
+  },
   // Antorcha clavada en el suelo: ilumina (no estorba el paso).
   TORCH: {
     slot: 'FREE', half: [0.12, 0.12], top: 1.1,

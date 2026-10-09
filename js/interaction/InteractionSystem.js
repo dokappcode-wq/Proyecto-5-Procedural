@@ -195,6 +195,15 @@ export class InteractionSystem {
         this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
         done = result.removed;
       }
+      // Lo que sale además al caer (la resina de los pinos).
+      if (done) {
+        for (const [item, [lo, hi]] of Object.entries(def.HARVEST.BONUS ?? {})) {
+          const amount = lo + Math.floor(Math.random() * (hi - lo + 1));
+          if (amount <= 0) continue;
+          this._inventory.addItem(item, amount);
+          this._events.emit(GameEvents.RESOURCE_HARVESTED, { node, item, amount, depleted: true, removed: true, bonus: true });
+        }
+      }
     }
     if (done || node.removed) this._chopProgress.delete(node.id);
     else this._chopProgress.set(node.id, work);

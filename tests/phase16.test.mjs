@@ -131,7 +131,7 @@ test('la boca abre el terreno solo sobre el túnel (ni detrás de la boca ni lej
 });
 
 test('contenido: carbón en la entrada, cobre más que hierro, diamante raro y flores luminosas', async () => {
-  const total = { COAL_ORE: 0, COPPER_ORE: 0, IRON_ORE: 0, DIAMOND_ORE: 0, GLOW_FLOWER: 0 };
+  const total = { COAL_ORE: 0, COPPER_ORE: 0, IRON_ORE: 0, DIAMOND_ORE: 0, GLOW_FLOWER: 0, GOLD_ORE: 0, CRYSTAL_CLUSTER: 0 };
   for (const seed of ['42', '7']) {
     const w = await world(seed);
     for (const c of w.caves.caves) {
@@ -158,6 +158,8 @@ test('contenido: carbón en la entrada, cobre más que hierro, diamante raro y f
   assert.ok(total.COPPER_ORE > total.IRON_ORE * 1.5, `cobre ${total.COPPER_ORE} > hierro ${total.IRON_ORE}`);
   assert.ok(total.IRON_ORE > total.DIAMOND_ORE * 4, `hierro ${total.IRON_ORE} > diamante ${total.DIAMOND_ORE}`);
   assert.ok(total.DIAMOND_ORE >= 1);
+  assert.ok(total.GOLD_ORE >= 1 && total.CRYSTAL_CLUSTER >= 1, `oro ${total.GOLD_ORE}, cristal ${total.CRYSTAL_CLUSTER} (P5)`);
+  assert.ok(total.GOLD_ORE < total.COPPER_ORE, 'el oro es más raro que el cobre');
   assert.ok(total.GLOW_FLOWER > 40);
 });
 

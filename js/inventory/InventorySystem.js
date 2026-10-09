@@ -4,7 +4,8 @@ import { GameEvents } from '../core/GameEvents.js';
  * InventorySystem — inventario por huecos.
  *
  *   Huecos 0–8:   barra rápida (teclas 1–9).
- *   Huecos 9–35:  mochila (9 × 3).
+ *   Huecos 9–35:  mochila (9 × 3); las mochilas (P5) añaden filas de 9 al final
+ *   (extraRows, como mucho MAX_EXTRA_ROWS).
  *   Cada hueco: null o { id, count, dur? }. Como mucho MAX_STACK unidades por hueco
  *   (100 por defecto; ITEMS.*.STACK lo cambia, p. ej. la ropa no se apila).
  *   Las herramientas (ITEMS.*.DURABILITY) llevan su aguante en `dur`: cada uso lo
@@ -31,12 +32,29 @@ export class InventorySystem {
     this._defs = items;
     this._events = events;
     this.hotbarSize = config.HOTBAR_SLOTS ?? HOTBAR_SIZE;
-    this.mainSize = (config.MAIN_ROWS ?? 3) * (config.MAIN_COLUMNS ?? 9);
+    this.columns = config.MAIN_COLUMNS ?? 9;
+    this.mainSize = (config.MAIN_ROWS ?? 3) * this.columns;
+    this.maxExtraRows = config.MAX_EXTRA_ROWS ?? 2;
+    this.extraRows = 0;
     this.maxStack = config.MAX_STACK ?? 100;
     this.slots = new Array(this.hotbarSize + this.mainSize).fill(null);
     this.cursor = null; // pila que se lleva con el ratón en el panel
     this._equipment = null;
     this.container = null; // cofre abierto: { slots } (huecos 'c:0', 'c:1'…)
+  }
+
+  /**
+   * Mochila (P5): amplía la mochila hasta `rows` filas extra (nunca la encoge).
+   * @returns {boolean} si ha crecido
+   */
+  setExtraRows(rows) {
+    const n = Math.max(0, Math.min(this.maxExtraRows, Math.floor(rows)));
+    if (n <= this.extraRows) return false;
+    this.extraRows = n;
+    const size = this.hotbarSize + this.mainSize + n * this.columns;
+    while (this.slots.length < size) this.slots.push(null);
+    this._emit(null, 0);
+    return true;
   }
 
   /** Cofre abierto en el panel (o null al cerrarlo). Sus huecos entran en los clics como 'c:N'. */
@@ -168,6 +186,10 @@ export class InventorySystem {
 
   /** Restaura huecos guardados (datos no fiables: se comprueba todo). */
   restore(list) {
+    // Una partida con mochila trae más huecos: se recuperan sus filas.
+    if (Array.isArray(list) && list.length > this.slots.length) {
+      this.setExtraRows(Math.ceil((list.length - this.hotbarSize - this.mainSize) / this.columns));
+    }
     this.slots.fill(null);
     this.cursor = null;
     (Array.isArray(list) ? list.slice(0, this.slots.length) : []).forEach((e, i) => {

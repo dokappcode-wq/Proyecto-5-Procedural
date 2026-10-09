@@ -170,7 +170,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // ¿Hay una hoguera (o una cocina) encendida a menos de r m? (calor, luz, slimes)
   const nearFire = (x, y, z, r) => {
     for (const pc of construction?.pieces ?? []) {
-      if ((pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN') && Math.abs(pc.x - x) < r && Math.abs(pc.z - z) < r && Math.hypot(pc.x - x, pc.z - z) < r && (y === null || Math.abs(pc.y - y) < 4)) return true;
+      if ((pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN' || pc.type === 'FORGE') && Math.abs(pc.x - x) < r && Math.abs(pc.z - z) < r && Math.hypot(pc.x - x, pc.z - z) < r && (y === null || Math.abs(pc.y - y) < 4)) return true;
     }
     return false;
   };
@@ -422,7 +422,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     tool: () => cfg.ITEMS[hotbar.selectedId]?.TOOL ?? null, // herramienta seleccionada (hacha: tala más rápido)
     canWork: () => energy.canWork, // sin energía no se golpea
     wearTool: () => hotbar.selectedIndex !== null && inventory.wearSlot(hotbar.selectedIndex, 1), // aguante de la herramienta
-    power: () => progression.damageMultiplier, // nivel: más daño y más rapidez al talar/picar/romper
+    power: () => progression.damageMultiplier * statusEffects.damageMultiplier, // nivel (y poción de fuerza): más daño y más rapidez al talar/picar/romper
     weapon: () => cfg.ITEMS[hotbar.selectedId]?.WEAPON ?? null, // espada seleccionada: su daño
     suppressAttack: () => combat.suppressAttack, // bloqueando o con arco/tirachinas el clic no golpea
   });
@@ -435,6 +435,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const energy = new EnergySystem({ config: S, events, player, hunger, thirst });
   // Estados por la comida (P2): bien alimentado, comida caliente, con energía, indigestión.
   const statusEffects = new StatusEffects({ config: cfg.STATUS_EFFECTS, items: cfg.ITEMS, events, hunger, thirst });
+  // Pociones y manzana dorada (P5): HEAL cura al momento (los estados los pone StatusEffects).
+  const healFrom = ({ itemId }) => {
+    const heal = cfg.ITEMS[itemId]?.HEAL;
+    if (heal > 0) health.heal(heal);
+  };
+  events.on(GameEvents.FOOD_EATEN, healFrom);
+  events.on(GameEvents.POTION_DRUNK, healFrom);
   const health = new HealthSystem({
     config: S,
     events,
@@ -453,6 +460,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Daño de los ataques: esquivando no alcanza; la armadura quita una parte.
   health.modifier = (d) => {
     const attack = d.fromX !== undefined || d.attack;
+    if (d.source === 'FALL') return d.amount * statusEffects.fallMultiplier; // poción de salto
     if (!attack) return d.amount;
     if (player.state.dodging > 0) return 0;
     if (combat.blockHit(d)) return 0; // el escudo lo para (de frente)
@@ -481,6 +489,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       hunger.decayMultiplier = (nutrition.isUnbalanced ? cfg.NUTRITION.UNBALANCED_HUNGER_DECAY_MULTIPLIER : 1) * statusEffects.hungerMultiplier;
       health.regenMultiplier = statusEffects.regenMultiplier;
       energy.regenMultiplier = statusEffects.energyMultiplier;
+      controller.effectSpeed = statusEffects.speedMultiplier;
+      controller.jumpBonus = statusEffects.jumpMultiplier;
+      atmosphere.setNightVision(statusEffects.nightVision);
     },
   };
   const itemUse = new ItemUseSystem({
@@ -499,7 +510,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Combate: escudo (bloquear) y armas a distancia (apuntar, tensar, disparar).
   const combat = new CombatSystem({
     input, items: cfg.ITEMS, inventory, hotbar, equipment, player, controller, camera: render.camera, cameraSystem: camera, held,
-    scene: render.scene, world, events, power: () => progression.damageMultiplier, creatures: interaction.creatures,
+    scene: render.scene, world, events, power: () => progression.damageMultiplier * statusEffects.damageMultiplier, creatures: interaction.creatures,
     // La lanza lanzada se queda donde cae (en las cuevas, a su altura).
     drop: (x, y, z, id, n, dur) => pickups.drop(worlds.activeId, x, z, id, n, dur, world.inCave?.(x, y + 1, z) ? y : null),
   });
@@ -507,7 +518,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const enemies = new EnemySystem({
     config: cfg.ENEMIES, safeRadius: cfg.SITES.SAFE_RADIUS, scene: render.scene, worlds, homeId: HOME, player, events, time,
     obstacles: combinedStructures, pickups, isSheltered: () => ship.isAboard(),
-    fires: () => construction.pieces.filter((pc) => pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN'), fireRadius: cfg.BUILD.CAMPFIRE_SLIME_RADIUS,
+    fires: () => construction.pieces.filter((pc) => pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN' || pc.type === 'FORGE'), fireRadius: cfg.BUILD.CAMPFIRE_SLIME_RADIUS,
   });
   enemies.playerAlive = () => !health.dead;
   interaction.creatures.push(enemies); // (CombatSystem comparte la lista)
@@ -729,16 +740,18 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       const p = player.position;
       const list = [];
       for (const pc of construction.pieces) {
-        const fire = pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN';
+        const fire = pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN' || pc.type === 'FORGE';
         if (pc.type !== 'TORCH' && !fire) continue;
         const d = Math.hypot(pc.x - p.x, pc.z - p.z, (pc.y - p.y) * 2);
-        if (d < 70 && fire) list.push({ x: pc.x, y: pc.y + (pc.type === 'KITCHEN' ? 0.6 : 0.9), z: pc.z, d, cave: true, color: 0xff8a3a, distance: pc.type === 'KITCHEN' ? 8 : 17, intensity: pc.type === 'KITCHEN' ? 1.2 : 2.8, fire: true });
+        const small = pc.type !== 'CAMPFIRE'; // cocina y forja: brasas tapadas, luz más corta
+        if (d < 70 && fire) list.push({ x: pc.x, y: pc.y + (pc.type === 'KITCHEN' ? 0.6 : pc.type === 'FORGE' ? 1.3 : 0.9), z: pc.z, d, cave: true, color: 0xff8a3a, distance: small ? 9 : 17, intensity: small ? 1.4 : 2.8, fire: true });
         else if (d < 60) list.push({ x: pc.x, y: pc.y + 1.15, z: pc.z, d, torch: true });
       }
       for (const n of world.resources?.getNodesNear(p.x, p.z, 36) ?? []) {
-        if (n.type !== 'GLOW_FLOWER' || n.removed) continue;
+        const glow = cfg.RESOURCE_TYPES[n.type]?.LIGHT;
+        if (!glow || n.removed) continue;
         const d = Math.hypot(n.x - p.x, n.z - p.z, (n.y - p.y) * 2);
-        if (d < 40) list.push({ x: n.x, y: n.y + 0.7, z: n.z, d, torch: false });
+        if (d < 40) list.push(n.type === 'GLOW_FLOWER' ? { x: n.x, y: n.y + 0.7, z: n.z, d, torch: false } : { x: n.x, y: n.y + 0.8, z: n.z, d, cave: true, color: glow, distance: 8, intensity: 1.3 });
       }
       for (const c of world.caveLightsNear?.(p.x, p.y, p.z, 45) ?? []) list.push({ ...c, cave: true });
       list.sort((a, b) => a.d - b.d);

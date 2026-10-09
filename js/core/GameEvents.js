@@ -58,6 +58,8 @@ export const GameEvents = Object.freeze({
   TOOL_BROKEN: 'inventory:toolBroken',              // { itemId, index } una herramienta se ha gastado del todo
   ITEM_USED: 'inventory:itemUsed',                  // { itemId, use }
   ITEM_REPAIRED: 'inventory:itemRepaired',          // { itemId, dur, max } (martillo)
+  INVENTORY_EXPANDED: 'inventory:expanded',         // { rows } mochila puesta (P5)
+  POTION_DRUNK: 'player:potionDrunk',               // { itemId } (P5)
   EQUIPMENT_CHANGED: 'inventory:equipmentChanged',  // { slot, itemId|null, slots }
 
   // Alimentación

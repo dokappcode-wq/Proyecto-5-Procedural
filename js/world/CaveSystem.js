@@ -117,7 +117,16 @@ export class CaveSystem {
       }
     }
     for (const cave of this.caves) this._index(cave);
-    for (const cave of this.caves) cave.content = cave.kind === 'DUNGEON' ? [] : this._content(cave, new SeededRandom(deriveSeed(seed, `caveContent:${cave.id}`)));
+    for (const cave of this.caves) {
+      if (cave.kind === 'DUNGEON') {
+        cave.content = [];
+        continue;
+      }
+      cave.content = this._content(cave, new SeededRandom(deriveSeed(seed, `caveContent:${cave.id}`)));
+      // P5 (oro y drusas de cristal): con su propio azar y al final de la lista, así lo que
+      // ya había en cada cueva (y lo picado en partidas guardadas) no cambia.
+      cave.content.push(...this._contentP5(cave, new SeededRandom(deriveSeed(seed, `caveContentP5:${cave.id}`))));
+    }
     return this.caves;
   }
 
@@ -490,6 +499,36 @@ export class CaveSystem {
         const flowers = Math.round(rng.range(C.GLOW_FLOWERS[0], C.GLOW_FLOWERS[1]));
         for (let k = 0; k < flowers; k++) out.push({ type: 'GLOW_FLOWER', ...along(i, side(), rng.range(0.15, 0.55)) });
       }
+    }
+    return out;
+  }
+
+  /** Vetas de oro (en la pared, de la mitad hacia dentro) y drusas de cristal (en el suelo de las cámaras hondas). */
+  _contentP5(cave, rng) {
+    const D = this._cfg.CONTENT ?? {};
+    const gold = cave.ores ? cave.ores.GOLD ?? 0 : D.GOLD_PER_NODE ?? 0;
+    const crystal = cave.ores ? cave.ores.CRYSTAL ?? 0 : D.CRYSTAL_PER_NODE ?? 0;
+    const out = [];
+    const n = cave.nodes.length;
+    if (n < 3 || !(gold > 0 || crystal > 0)) return out;
+    const at = (i, side, f) => {
+      if (i >= n - 1) i = n - 2;
+      const a = cave.nodes[i];
+      const b = cave.nodes[i + 1];
+      const hx = b.x - a.x;
+      const hz = b.z - a.z;
+      const len = Math.hypot(hx, hz) || 1;
+      const t = rng.next();
+      const r = a.r + (b.r - a.r) * t;
+      const off = side * r * f;
+      return { x: a.x + hx * t - (hz / len) * off, z: a.z + hz * t + (hx / len) * off, y: a.floor + (b.floor - a.floor) * t };
+    };
+    for (let i = cave.kind === 'BRANCH' ? 1 : 2; i < n - (cave.capped ? 0 : 1); i++) {
+      const deep = cave.kind === 'BRANCH' ? 0.8 : i / n;
+      const side = rng.next() < 0.5 ? -1 : 1;
+      if (deep > 0.3 && rng.next() < gold) out.push({ type: 'GOLD_ORE', ...at(i, side, 0.7) });
+      const chamber = cave.nodes[i].chamber;
+      if (rng.next() < crystal * (chamber ? 2.5 : 1) && deep > 0.35) out.push({ type: 'CRYSTAL_CLUSTER', ...at(i, -side, chamber ? 0.5 : 0.66) });
     }
     return out;
   }

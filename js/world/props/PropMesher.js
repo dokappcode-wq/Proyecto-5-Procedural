@@ -24,7 +24,7 @@ export class PropMesher {
       nodes.map((n) => ({
         template: this._pick(n.depleted && this._templates[`${n.type}_EMPTY`] ? `${n.type}_EMPTY` : n.type, n.variant),
         x: n.x,
-        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave || n.type === 'MUSHROOM' || n.type === 'BIRD_NEST' ? 0 : 0.12),
+        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave || n.type === 'MUSHROOM' || n.type === 'BIRD_NEST' || n.type === 'CLAY_DEPOSIT' || n.type === 'WILD_FLOWERS' ? 0 : 0.12),
         z: n.z,
         scale: n.scale,
         rotation: n.rotation,
@@ -192,10 +192,69 @@ export class PropMesher {
       return b.build();
     };
 
-    const bush = (variant) => {
+    const stemBox = new THREE.BoxGeometry(1, 1, 1);
+    // Arbusto (con E da fibra; recién arrancado queda más ralo y bajo).
+    const bush = (variant, full = true) => {
       const b = new PartsBuilder();
-      b.add(ico, { position: [0, 0.4, 0], scale: [0.7, 0.55, 0.7], color: C.BUSH, jitter: lumpy(90 + variant, 0.3) });
-      b.add(ico, { position: [0.45, 0.3, 0.15], scale: 0.42, color: shade(C.BUSH, 1.1), jitter: lumpy(95 + variant, 0.3) });
+      const k = full ? 1 : 0.62;
+      b.add(ico, { position: [0, 0.4 * k, 0], scale: [0.7 * k, 0.55 * k, 0.7 * k], color: full ? C.BUSH : shade(C.BUSH, 0.8), jitter: lumpy(90 + variant, 0.3) });
+      b.add(ico, { position: [0.45 * k, 0.3 * k, 0.15], scale: 0.42 * k, color: shade(C.BUSH, full ? 1.1 : 0.9), jitter: lumpy(95 + variant, 0.3) });
+      if (!full) for (let i = 0; i < 4; i++) b.add(ico, { position: [Math.cos(i * 1.6) * 0.3, 0.06, Math.sin(i * 1.6) * 0.3], scale: [0.03, 0.12, 0.03], color: 0x6b5232 });
+      return b.build();
+    };
+
+    // P5: arcilla (barro rojizo húmedo, a ras de suelo, con grietas).
+    const clay = (variant) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(700 + variant);
+      b.add(ico, { position: [0, 0.02, 0], scale: [0.95, 0.12, 0.8], color: 0xa86a4a, jitter: lumpy(710 + variant, 0.35) });
+      for (let i = 0; i < 4; i++) {
+        const a = rng.next() * Math.PI * 2;
+        const r = 0.2 + rng.next() * 0.35;
+        b.add(ico, { position: [Math.cos(a) * r, 0.08, Math.sin(a) * r], scale: [0.2, 0.1, 0.17], color: i % 2 ? 0xb97a55 : 0x94593c, jitter: lumpy(720 + i, 0.3) });
+      }
+      for (let i = 0; i < 3; i++) b.add(stemBox, { position: [(rng.next() - 0.5) * 0.6, 0.1, (rng.next() - 0.5) * 0.5], rotation: [0, rng.next() * 3, 0], scale: [0.4, 0.008, 0.015], color: 0x5e3826 });
+      return b.build();
+    };
+    // P5: flores silvestres (un corro de tallos con flores de colores).
+    const FLOWER_COLORS = [[0xf2f2f2, 0xffd84a, 0xd84a9a], [0xa66cff, 0xffffff, 0xff6a4a], [0xffe25a, 0xff8ac0, 0x6aa8ff]];
+    const wildFlowers = (variant, bloom = true) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(800 + variant);
+      const cols = FLOWER_COLORS[variant % FLOWER_COLORS.length];
+      for (let i = 0; i < 12; i++) {
+        const a = rng.next() * Math.PI * 2;
+        const r = rng.next() * 0.38;
+        const h = 0.18 + rng.next() * 0.22;
+        const x = Math.cos(a) * r;
+        const z = Math.sin(a) * r;
+        b.add(stemBox, { position: [x, h / 2, z], rotation: [Math.cos(a) * 0.15, 0, Math.sin(a) * 0.15], scale: [0.015, h, 0.015], color: 0x4f8a3a });
+        if (bloom) {
+          const c = cols[i % cols.length];
+          b.add(octa, { position: [x, h + 0.02, z], rotation: [0, rng.next() * 3, 0], scale: [0.07, 0.03, 0.07], color: c });
+          b.add(ico, { position: [x, h + 0.04, z], scale: 0.02, color: 0xffe066 });
+        }
+      }
+      b.add(ico, { position: [0, 0.03, 0], scale: [0.4, 0.05, 0.4], color: shade(C.BUSH, 1.15), jitter: lumpy(820 + variant, 0.3) });
+      return b.build();
+    };
+    // P5: drusa de cristal (cristales violetas que brillan; la luz la pone el juego).
+    const crystalCluster = (variant) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(900 + variant);
+      b.add(ico, { position: [0, 0.12, 0], scale: [0.6, 0.25, 0.55], color: C.CAVE_ROCK ?? shade(C.ROCK, 0.7), jitter: lumpy(910 + variant, 0.4) });
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + rng.next() * 0.5;
+        const r = i === 0 ? 0 : 0.12 + rng.next() * 0.22;
+        const tilt = i === 0 ? 0 : 0.35 + rng.next() * 0.35;
+        const h = i === 0 ? 0.9 : 0.35 + rng.next() * 0.45;
+        b.add(octa, {
+          position: [Math.cos(a) * r, 0.18 + h * 0.4, Math.sin(a) * r],
+          rotation: [Math.sin(a) * tilt, a, -Math.cos(a) * tilt],
+          scale: [0.08 + rng.next() * 0.04, h * 0.5, 0.08 + rng.next() * 0.04], // octaedro de radio 1: mide 2·escala
+          color: i % 3 === 0 ? 0xd9c2ff : i % 3 === 1 ? 0xb48cff : 0x8f6ae8,
+        });
+      }
       return b.build();
     };
 
@@ -226,7 +285,6 @@ export class PropMesher {
     };
 
     // Flor luminosa de las cuevas: tallo, hojas y un bulbo que brilla (la luz la pone el juego).
-    const stemBox = new THREE.BoxGeometry(1, 1, 1);
     const glowFlower = (variant) => {
       const b = new PartsBuilder();
       for (let i = 0; i < 3; i++) {
@@ -340,6 +398,12 @@ export class PropMesher {
       ROCK: [rock(0), rock(1), rock(2)],
       MINERAL_ROCK: [mineralRock(0), mineralRock(1)],
       BUSH: [bush(0), bush(1)],
+      BUSH_EMPTY: [bush(0, false), bush(1, false)],
+      CLAY_DEPOSIT: [clay(0), clay(1)],
+      WILD_FLOWERS: [wildFlowers(0), wildFlowers(1), wildFlowers(2)],
+      WILD_FLOWERS_EMPTY: [wildFlowers(0, false), wildFlowers(1, false), wildFlowers(2, false)],
+      GOLD_ORE: [ore(0, C.GOLD ?? 0xf2c230, 'chunks'), ore(1, C.GOLD ?? 0xf2c230, 'chunks')],
+      CRYSTAL_CLUSTER: [crystalCluster(0), crystalCluster(1)],
       SAND_PILE: [sandPile(0), sandPile(1)],
       COAL_ORE: [ore(0, C.COAL ?? 0x26282b, 'chunks'), ore(1, C.COAL ?? 0x26282b, 'chunks')],
       COPPER_ORE: [ore(0, C.COPPER ?? 0xd0803e, 'chunks'), ore(1, C.COPPER ?? 0xd0803e, 'chunks')],

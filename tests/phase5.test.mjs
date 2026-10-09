@@ -154,7 +154,7 @@ test('muerte: al agotar la vida muere, suelta recursos y desaparece', () => {
   for (let i = 0; i < CFG.SPECIES.COW.HEALTH; i++) result = a.takeHit(1, 3, 0, CFG, 3);
   assert.ok(result.killed);
   assert.equal(a.state, AnimalState.DEAD);
-  assert.deepEqual(a.drops, { MEAT: 3, LEATHER: 2 });
+  assert.deepEqual(a.drops, { MEAT: 3, LEATHER: 2, BONE: 2 });
   run(a, makeEnv({ x: 3, z: 0 }), CFG.DEATH_TIME + 0.1);
   assert.ok(a.removed);
 });

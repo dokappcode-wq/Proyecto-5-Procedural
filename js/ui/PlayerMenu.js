@@ -209,6 +209,7 @@ export class PlayerMenu extends ModalPanel {
     // Inventario: mochila + barra.
     this._invSection = el('section', 'pm-inventory');
     const grid = el('div', 'pm-grid pm-bag');
+    this._bagGrid = grid;
     this._mainSlots = [];
     for (let i = this._inv.hotbarSize; i < this._inv.slots.length; i++) {
       const s = this._slotEl(i);
@@ -403,6 +404,12 @@ export class PlayerMenu extends ModalPanel {
     };
     if (this.tab === MenuTab.CHEST && inv.container) this._chestSlots.forEach((s, k) => paint(s, inv.container.slots[k]));
     if (this.tab === MenuTab.INVENTORY || this.tab === MenuTab.CHEST) {
+      // La mochila (P5) añade filas: se crean sus huecos la primera vez que se ven.
+      while (this._bagGrid && this._mainSlots.length < inv.slots.length - inv.hotbarSize) {
+        const s = this._slotEl(inv.hotbarSize + this._mainSlots.length);
+        this._mainSlots.push(s);
+        this._bagGrid.append(s);
+      }
       this._mainSlots.forEach((s, k) => paint(s, inv.slots[inv.hotbarSize + k]));
       this._barSlots.forEach((s, i) => {
         paint(s, inv.slots[i]);
