@@ -103,6 +103,8 @@ import { AudioSystem } from './audio/AudioSystem.js';
 import { MapData } from './world/map/MapData.js';
 import { PlaceTracker } from './world/map/PlaceTracker.js';
 import { Landmarks } from './world/map/Landmarks.js';
+import { StatusEffects } from './player/StatusEffects.js';
+import { StatusEffectsHUD } from './ui/StatusEffectsHUD.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
   const cfg = GameConfig;
@@ -165,6 +167,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Edificios de la historia (torre, arena del nodo, centro de investigación…).
   const storyColliders = new StaticColliders();
   let landmarks = null; // lugares del mapa diseñado (se crean tras generar el mundo)
+  // ¿Hay una hoguera (o una cocina) encendida a menos de r m? (calor, luz, slimes)
+  const nearFire = (x, y, z, r) => {
+    for (const pc of construction?.pieces ?? []) {
+      if ((pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN') && Math.abs(pc.x - x) < r && Math.abs(pc.z - z) < r && Math.hypot(pc.x - x, pc.z - z) < r && (y === null || Math.abs(pc.y - y) < 4)) return true;
+    }
+    return false;
+  };
   const structureSources = () => (crashSite ? [construction, ship, crashSite, storyColliders] : [construction, ship, storyColliders]);
   const combinedStructures = {
     surfaceAt: (x, z, maxY) => {
@@ -424,6 +433,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const hunger = new HungerSystem({ config: S, events });
   const thirst = new ThirstSystem({ config: S, events });
   const energy = new EnergySystem({ config: S, events, player, hunger, thirst });
+  // Estados por la comida (P2): bien alimentado, comida caliente, con energía, indigestión.
+  const statusEffects = new StatusEffects({ config: cfg.STATUS_EFFECTS, items: cfg.ITEMS, events, hunger, thirst });
   const health = new HealthSystem({
     config: S,
     events,
@@ -431,7 +442,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     canRegenerate: () =>
       hunger.ratio >= S.HEALTH_REGEN_MIN_RATIO &&
       thirst.ratio >= S.HEALTH_REGEN_MIN_RATIO &&
-      !(cfg.NUTRITION.UNBALANCED_BLOCKS_REGEN && nutrition.isUnbalanced),
+      !(cfg.NUTRITION.UNBALANCED_BLOCKS_REGEN && nutrition.isUnbalanced) &&
+      !statusEffects.blocksRegen,
   });
 
   // Niveles: XP por recoger, talar, picar, fabricar y cazar; puntos para subir estadísticas.
@@ -462,9 +474,15 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
 
   // ---- Alimentación, uso de objetos y sueño (Fases 7–9) ----------------------
   const nutrition = new NutritionSystem({ config: cfg.NUTRITION, items: cfg.ITEMS, hunger, events });
-  events.on(GameEvents.DIET_CHANGED, () => {
-    hunger.decayMultiplier = nutrition.isUnbalanced ? cfg.NUTRITION.UNBALANCED_HUNGER_DECAY_MULTIPLIER : 1;
-  });
+  // Hambre, curación y energía según la dieta y los estados por la comida.
+  const effectsApply = {
+    name: 'effectsApply',
+    update: () => {
+      hunger.decayMultiplier = (nutrition.isUnbalanced ? cfg.NUTRITION.UNBALANCED_HUNGER_DECAY_MULTIPLIER : 1) * statusEffects.hungerMultiplier;
+      health.regenMultiplier = statusEffects.regenMultiplier;
+      energy.regenMultiplier = statusEffects.energyMultiplier;
+    },
+  };
   const itemUse = new ItemUseSystem({
     items: cfg.ITEMS,
     equipmentConfig: cfg.EQUIPMENT,
@@ -487,6 +505,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const enemies = new EnemySystem({
     config: cfg.ENEMIES, safeRadius: cfg.SITES.SAFE_RADIUS, scene: render.scene, worlds, homeId: HOME, player, events, time,
     obstacles: combinedStructures, pickups, isSheltered: () => ship.isAboard(),
+    fires: () => construction.pieces.filter((pc) => pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN'), fireRadius: cfg.BUILD.CAMPFIRE_SLIME_RADIUS,
   });
   enemies.playerAlive = () => !health.dead;
   interaction.creatures.push(enemies); // (CombatSystem comparte la lista)
@@ -550,13 +569,14 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     world,
     time,
     player,
-    equipment,
+    // La comida caliente abriga (se pierde calor más despacio).
+    equipment: { getColdLossMultiplier: () => equipment.getColdLossMultiplier() * statusEffects.coldMultiplier },
     shelter: {
       getShelterAt: (x, y, z) => {
         const a = construction.getShelterAt(x, y, z);
         const b = ship.getShelterAt(x, y, z);
         // El traje encendido y las burbujas con batería mantienen el calor.
-        const warm = lifeSupport.powered || bubbles.contains(worlds.activeId, x, y + 1, z) || (worlds.activeId === HOME && !!landmarks?.isWarmAt(x, y, z));
+        const warm = lifeSupport.powered || bubbles.contains(worlds.activeId, x, y + 1, z) || (worlds.activeId === HOME && !!landmarks?.isWarmAt(x, y, z)) || nearFire(x, y, z, cfg.BUILD.CAMPFIRE_WARM_RADIUS);
         return { factor: Math.max(a.factor, b.factor), heated: !!b.heated || warm };
       },
     },
@@ -707,9 +727,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       const p = player.position;
       const list = [];
       for (const pc of construction.pieces) {
-        if (pc.type !== 'TORCH') continue;
+        const fire = pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN';
+        if (pc.type !== 'TORCH' && !fire) continue;
         const d = Math.hypot(pc.x - p.x, pc.z - p.z, (pc.y - p.y) * 2);
-        if (d < 60) list.push({ x: pc.x, y: pc.y + 1.15, z: pc.z, d, torch: true });
+        if (d < 70 && fire) list.push({ x: pc.x, y: pc.y + (pc.type === 'KITCHEN' ? 0.6 : 0.9), z: pc.z, d, cave: true, color: 0xff8a3a, distance: pc.type === 'KITCHEN' ? 8 : 17, intensity: pc.type === 'KITCHEN' ? 1.2 : 2.8, fire: true });
+        else if (d < 60) list.push({ x: pc.x, y: pc.y + 1.15, z: pc.z, d, torch: true });
       }
       for (const n of world.resources?.getNodesNear(p.x, p.z, 36) ?? []) {
         if (n.type !== 'GLOW_FLOWER' || n.removed) continue;
@@ -726,7 +748,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         if (e.cave) {
           l.color.setHex(e.color);
           l.distance = e.distance;
-          l.intensity = e.intensity * (0.92 + Math.sin(t * 2.1 + i) * 0.08);
+          l.intensity = e.fire
+            ? e.intensity * (0.82 + Math.sin(t * 11 + i) * 0.08 + Math.sin(t * 4.3 + i * 2) * 0.07 + Math.sin(t * 23) * 0.03)
+            : e.intensity * (0.92 + Math.sin(t * 2.1 + i) * 0.08);
         } else if (e.torch) {
           l.color.setHex(0xffa24a);
           l.distance = 13;
@@ -764,6 +788,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     camera.setPortraitView(open);
   });
   new LifeSupportHUD({ container: document.getElementById('stats'), events, lowRatio: cfg.LIFE_SUPPORT.LOW_RATIO });
+  new StatusEffectsHUD({ container: document.getElementById('stats'), events });
 
   // Tecnologías de la nave: mapa (y mapa planetario) y puesto de carga; mandos de vuelo.
   // Resolución del mapa según el tamaño de la región (160 px para 1 km, hasta 320 px).
@@ -1352,6 +1377,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('world', { save: () => worlds.home.resources.snapshot(), load: (d) => worlds.home.reloadResources(d) });
   saveGame.register('construction', { save: () => construction.snapshot(), load: (d) => construction.restore(d) });
   saveGame.register('places', { save: () => placeTracker.snapshot(), load: (d) => placeTracker.restore(d) });
+  saveGame.register('effects', { save: () => statusEffects.snapshot(), load: (d) => statusEffects.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
   saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
@@ -1535,6 +1561,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(stations);    // estaciones de carga y de oxígeno construidas
   loop.add(health);      // curación, cuenta atrás de reaparición
   loop.add(nutrition);   // la dieta "olvida" poco a poco lo comido
+  loop.add(statusEffects); // estados por la comida (duración)
+  loop.add(effectsApply);
   loop.add(sleep);
   loop.add(biomeTracker); // bioma actual del jugador
   loop.add(placeTracker); // lugar con nombre (mapas diseñados)

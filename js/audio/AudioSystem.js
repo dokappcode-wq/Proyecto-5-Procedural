@@ -49,7 +49,7 @@ export class AudioSystem {
     this.ctx = null;
 
     this._listener = { x: 0, y: 0, z: 0, fx: 0, fz: -1 };
-    this._env = { cave: false, water: 0, sea: 0, falls: 0, altitude: 0, snow: false, breathable: true, biome: '', aboard: false, outdoors: true };
+    this._env = { fire: 0, fireX: 0, fireZ: 0, cave: false, water: 0, sea: 0, falls: 0, altitude: 0, snow: false, breathable: true, biome: '', aboard: false, outdoors: true };
     this._weather = { rain: 0, wind: 0 };
     this._envT = 0;
     this._last = null;     // última posición (pasos)
@@ -196,6 +196,7 @@ export class AudioSystem {
       falls: this._loop(S.white, { type: 'lowpass', f: 1600, q: 0.3 }),
       cave: this._loop(S.brown, { type: 'lowpass', f: 160, q: 0.8 }),
       rain: this._loop(S.white, { type: 'bandpass', f: 4200, q: 0.4 }),
+      fire: this._loop(S.brown, { type: 'lowpass', f: 700, q: 0.6, amp: [0.7, 0.5] }),
     };
     this._engine = this._engineLoop();
     this._laser = this._laserLoop();
@@ -734,6 +735,18 @@ export class AudioSystem {
       const d = Math.hypot(p.x - c.x, p.z - c.z);
       env.falls = clamp01(1.2 - d / ((arena.len ?? 40) * 0.9));
     } else env.falls = 0;
+    // Hogueras y cocinas: crepitar al acercarse.
+    env.fire = 0;
+    for (const pc of this._construction?.pieces ?? []) {
+      if (pc.type !== 'CAMPFIRE' && pc.type !== 'KITCHEN') continue;
+      const d = Math.hypot(p.x - pc.x, p.z - pc.z);
+      const k = clamp01(1.1 - d / (pc.type === 'KITCHEN' ? 9 : 16));
+      if (k > env.fire) {
+        env.fire = k;
+        env.fireX = pc.x;
+        env.fireZ = pc.z;
+      }
+    }
     // Cascadas del mapa (rugido al acercarse).
     if (home && !env.cave) {
       for (const f of this._waterfalls()) {
@@ -759,6 +772,7 @@ export class AudioSystem {
     set(L.falls, env.falls * 0.22, 0.5);
     set(L.cave, env.cave ? 0.18 : 0, 1.2);
     set(L.rain, air && !env.cave ? this._weather.rain * 0.22 * shelter : 0, 1.5);
+    set(L.fire, env.fire * 0.12, 0.4);
     this._caveSend.gain.setTargetAtTime(env.cave ? 0.32 : 0, t, 0.4);
   }
 
@@ -796,6 +810,10 @@ export class AudioSystem {
       T.drip = rand(1.2, 4.5);
       const [x, z] = around(2, 12);
       this.playAt(x, z, (S, o) => S.drip(o), { ref: 6, max: 25 });
+    }
+    if (env.fire > 0.05 && (T.crackle = (T.crackle ?? 0) - dt) <= 0) {
+      T.crackle = rand(0.08, 0.5);
+      this.playAt(env.fireX, env.fireZ, (S, o) => S.crackle(o, 0.8), { ref: 4, max: 20 });
     }
     if (this._underwater && (T.bubble -= dt) <= 0) {
       T.bubble = rand(1.5, 4);

@@ -32,6 +32,9 @@ const BUILD_PIECES = {
   FURNACE: { NAME: 'Horno', ICON: '🔥', RECIPE: { REFINED_STONE: 10, REFINED_WOOD: 2 }, TIME: 15, STATION_PIECE: true, DESC: 'Funde menas, diamante y arena con carbón (E para usarlo).' },
   WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰', RECIPE: { REFINED_IRON: 5, REFINED_COPPER: 5 }, TIME: 20, STATION_PIECE: true, LOCK: 'WORKBENCH', DESC: 'Recetas avanzadas: placa de navegación, armas y armaduras de metal (E para usarla).' },
   TORCH: { NAME: 'Antorcha', ICON: '🔥', ITEM: 'TORCH' },
+  // Cocina (P2): la hoguera asa, da luz y calor y espanta a los slimes; la cocina guisa.
+  CAMPFIRE: { NAME: 'Hoguera', ICON: '🔥', RECIPE: { WOOD: 3, STONE: 3 }, TIME: 4, STATION_PIECE: true, DESC: 'Asa carne, setas, huevos y manzanas (E). Da luz y calor, y los slimes no se acercan.' },
+  KITCHEN: { NAME: 'Cocina con olla', ICON: '🍲', RECIPE: { REFINED_STONE: 6, REFINED_COPPER: 3 }, TIME: 15, STATION_PIECE: true, DESC: 'Fogón de piedra con olla de cobre: pan, estofado, sopa, mermelada y tarta (E).' },
   // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
   CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', RECIPE: { STONE: 4, MINERAL: 3 }, TIME: 8, BODIES: 'MOON' },
   OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', RECIPE: { STONE: 4, MINERAL: 4 }, TIME: 8, BODIES: 'MOON' },
@@ -50,7 +53,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.24.0',
+    VERSION: '1.25.0',
   },
 
   RENDER: {
@@ -336,6 +339,23 @@ export const GameConfig = deepFreeze({
       SPAWN: { BETWEEN: ['TREE', 'PINE'], MIN_GAP: 2.0, MAX_GAP: 5.0, CHANCE: 0.06, HEIGHT: 1.7, MAX_SIZE: 1.5 },
     },
     BUSH: { NAME: 'Arbusto', COLLISION_RADIUS: 0, SCALE: [0.7, 1.3], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.6, HARVEST: null },
+    // Comida silvestre (P2): bayas, setas, trigo y huevos de los nidos.
+    BERRY_BUSH: {
+      NAME: 'Zarzal', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.45, AIM_RADIUS: 0.75,
+      HARVEST: { ITEM: 'BERRIES', AMOUNT: 3, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 300, VERB: 'Coger bayas' },
+    },
+    MUSHROOM: {
+      NAME: 'Setas', COLLISION_RADIUS: 0, SCALE: [0.9, 1.4], AIM_HEIGHT: 0.12, AIM_RADIUS: 0.5,
+      HARVEST: { ITEM: 'MUSHROOM', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Coger setas' },
+    },
+    WILD_WHEAT: {
+      NAME: 'Trigo silvestre', COLLISION_RADIUS: 0, SCALE: [0.85, 1.2], AIM_HEIGHT: 0.5, AIM_RADIUS: 0.6,
+      HARVEST: { ITEM: 'WHEAT', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Segar trigo' },
+    },
+    BIRD_NEST: {
+      NAME: 'Nido', COLLISION_RADIUS: 0, SCALE: [0.9, 1.2], AIM_HEIGHT: 0.1, AIM_RADIUS: 0.45,
+      HARVEST: { ITEM: 'EGG', AMOUNT: 2, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 600, VERB: 'Coger huevos' },
+    },
     // Cuevas: vetas que solo se rompen con pico (como las rocas) y flores luminosas (E).
     COAL_ORE: {
       NAME: 'Veta de carbón', COLLISION_RADIUS: 0.5, SCALE: [0.8, 1.1], AIM_HEIGHT: 0.4, AIM_RADIUS: 0.8, CAVE: true,
@@ -419,8 +439,24 @@ export const GameConfig = deepFreeze({
     IRON_SHIELD: { NAME: 'Escudo de hierro', ICON: '🔰', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 100, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xa9aeb5, RIM: 0x4a4f55 }, DESC: 'Clic dcho mantenido: bloquear. Aguanta 100 golpes.' },
     TORCH: { NAME: 'Antorcha', ICON: '🔥', USE: 'BUILD', BUILD_PIECE: 'TORCH', HOLD: true, MODEL: { TYPE: 'torch' }, DESC: 'En la mano ilumina. Clic dcho / R para clavarla en el suelo.' },
     ...PIECE_ITEMS,
-    MEAT: { NAME: 'Carne', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION' },
+    // Comida. NUTRITION: hambre que quita (o la clave de NUTRITION). FOOD: ANIMAL, PLANT o MIXED.
+    // EFFECTS: estados al comerla (s). RAW_RISK: probabilidad de indigestión (crudo). THIRST: sed que quita.
+    MEAT: { NAME: 'Carne cruda', ICON: '🥩', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION', RAW_RISK: 0.45, DESC: 'Cruda puede sentar mal (indigestión). Ásala en una hoguera.' },
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
+    COOKED_MEAT: { NAME: 'Carne asada', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 42, EFFECTS: { WARM: 180 }, DESC: 'Alimenta más que cruda y da calor (comida caliente, 3 min).' },
+    BERRIES: { NAME: 'Bayas', ICON: '🫐', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 7, DESC: 'De los zarzales. Con 6 se hace mermelada.' },
+    MUSHROOM: { NAME: 'Setas', ICON: '🍄', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 6, RAW_RISK: 0.2, DESC: 'Mejor asadas o en sopa.' },
+    ROASTED_MUSHROOM: { NAME: 'Setas asadas', ICON: '🍢', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 15, EFFECTS: { WARM: 90 } },
+    EGG: { NAME: 'Huevo', ICON: '🥚', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 8, RAW_RISK: 0.35, DESC: 'De los nidos al pie de los árboles.' },
+    FRIED_EGG: { NAME: 'Huevo frito', ICON: '🍳', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 18, EFFECTS: { WARM: 90 } },
+    BAKED_APPLE: { NAME: 'Manzana asada', ICON: '🍏', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 20, EFFECTS: { WARM: 90 } },
+    SKEWER: { NAME: 'Brocheta', ICON: '🍡', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 46, EFFECTS: { WARM: 180 }, DESC: 'Carne y setas al fuego: de todo un poco.' },
+    WHEAT: { NAME: 'Trigo', ICON: '🌾', DESC: 'Trigo silvestre de las praderas. Para el pan y la tarta (cocina).' },
+    BREAD: { NAME: 'Pan', ICON: '🍞', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 30, EFFECTS: { WELL_FED: 240 } },
+    STEW: { NAME: 'Estofado', ICON: '🍲', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 56, EFFECTS: { WELL_FED: 360, WARM: 300 }, DESC: 'Bien alimentado y caliente durante un buen rato.' },
+    MUSHROOM_SOUP: { NAME: 'Sopa de setas', ICON: '🥣', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 32, THIRST: 25, EFFECTS: { WARM: 300 }, DESC: 'Calienta y quita la sed.' },
+    JAM: { NAME: 'Mermelada', ICON: '🍯', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 22, EFFECTS: { ENERGIZED: 180 }, DESC: 'La energía se recupera mucho más deprisa (3 min).' },
+    APPLE_PIE: { NAME: 'Tarta de manzana', ICON: '🥧', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 60, EFFECTS: { WELL_FED: 480, ENERGIZED: 120 }, DESC: 'El mejor plato del Edén.' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
@@ -471,6 +507,14 @@ export const GameConfig = deepFreeze({
     MIN_INTAKE_TO_JUDGE: 40,   // nutrición reciente mínima antes de juzgar la dieta
     UNBALANCED_HUNGER_DECAY_MULTIPLIER: 1.4, // el hambre baja más rápido con dieta desequilibrada
     UNBALANCED_BLOCKS_REGEN: true,          // sin dieta equilibrada no se regenera vida
+  },
+
+  // Estados por la comida (P2): duración en s la da cada alimento (ITEMS.*.EFFECTS).
+  STATUS_EFFECTS: {
+    WELL_FED: { NAME: 'Bien alimentado', ICON: '🍽️', DESC: 'El hambre baja más despacio y la vida se recupera el doble.', HUNGER: 0.65, REGEN: 2 },
+    WARM: { NAME: 'Comida caliente', ICON: '♨️', DESC: 'Se pierde calor mucho más despacio.', COLD: 0.45 },
+    ENERGIZED: { NAME: 'Con energía', ICON: '⚡', DESC: 'La energía se recupera mucho más deprisa.', ENERGY: 1.9 },
+    INDIGESTION: { NAME: 'Indigestión', ICON: '🤢', DESC: 'Algo crudo te ha sentado mal: no recuperas vida y te cansas.', ENERGY: 0.4, NO_REGEN: true, HUNGER_LOSS: 12, TIME: 75 },
   },
 
   // Equipamiento sencillo (Fase 8).
@@ -541,6 +585,19 @@ export const GameConfig = deepFreeze({
     CHAIN_BOOTS: { RESULT: 'CHAIN_BOOTS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 2 } },
     CHAIN_LEGS: { RESULT: 'CHAIN_LEGS', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 16, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 4 } },
     CHAIN_CHEST: { RESULT: 'CHAIN_CHEST', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 20, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_IRON: 5 } },
+    // Hoguera: asar.
+    COOKED_MEAT: { RESULT: 'COOKED_MEAT', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 8, STATION: 'CAMPFIRE', INGREDIENTS: { MEAT: 1 } },
+    ROASTED_MUSHROOM: { RESULT: 'ROASTED_MUSHROOM', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { MUSHROOM: 1 } },
+    FRIED_EGG: { RESULT: 'FRIED_EGG', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { EGG: 1 } },
+    BAKED_APPLE: { RESULT: 'BAKED_APPLE', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { APPLE: 1 } },
+    SKEWER: { RESULT: 'SKEWER', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 10, STATION: 'CAMPFIRE', INGREDIENTS: { MEAT: 1, MUSHROOM: 2 } },
+    // Cocina con olla: guisar y hornear.
+    BREAD: { RESULT: 'BREAD', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 12, STATION: 'KITCHEN', INGREDIENTS: { WHEAT: 3 } },
+    STEW: { RESULT: 'STEW', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 18, STATION: 'KITCHEN', INGREDIENTS: { MEAT: 1, MUSHROOM: 2, WHEAT: 1 } },
+    MUSHROOM_SOUP: { RESULT: 'MUSHROOM_SOUP', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 12, STATION: 'KITCHEN', INGREDIENTS: { MUSHROOM: 3 } },
+    JAM: { RESULT: 'JAM', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 10, STATION: 'KITCHEN', INGREDIENTS: { BERRIES: 6 } },
+    APPLE_PIE: { RESULT: 'APPLE_PIE', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 20, STATION: 'KITCHEN', INGREDIENTS: { APPLE: 3, WHEAT: 2, EGG: 1 } },
+    COOKED_MEAT_POT: { RESULT: 'COOKED_MEAT', AMOUNT: 2, CATEGORY: 'COOKING', TIME: 12, STATION: 'KITCHEN', INGREDIENTS: { MEAT: 2 } },
     // Piezas de construcción (estaciones incluidas).
     ...PIECE_RECIPES,
   },
@@ -549,6 +606,8 @@ export const GameConfig = deepFreeze({
     REFINERY: { NAME: 'Mesa de refinería', ICON: '🛠️' },
     FURNACE: { NAME: 'Horno', ICON: '🔥' },
     WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰' },
+    CAMPFIRE: { NAME: 'Hoguera', ICON: '🔥' },
+    KITCHEN: { NAME: 'Cocina con olla', ICON: '🍲' },
   },
   RECIPE_CATEGORIES: {
     MATERIALS: 'Materiales',
@@ -559,6 +618,7 @@ export const GameConfig = deepFreeze({
     CLOTHING: 'Ropa',
     ARMOR: 'Armaduras',
     SURVIVAL: 'Supervivencia',
+    COOKING: 'Cocina',
   },
 
   // Construcción modular (Fase 9): el jugador construye pieza a pieza.
@@ -577,7 +637,9 @@ export const GameConfig = deepFreeze({
       type, { NAME: d.NAME, ICON: d.ICON, COST: { [pieceItemId(type)]: 1 }, ...(d.BODIES ? { BODIES: d.BODIES } : {}) },
     ])),
     // Piezas que no se pueden hacer en las lunas (BODIES: 'HOME').
-    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY'],
+    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN'],
+    CAMPFIRE_WARM_RADIUS: 5,   // m: cerca de una hoguera (o de la cocina) se está caliente
+    CAMPFIRE_SLIME_RADIUS: 9,  // m: los slimes no se acercan a una hoguera
     CHEST_SLOTS: 27,
     TORCH_LIGHTS: 6,        // antorchas clavadas que iluminan a la vez (las más cercanas)
   },

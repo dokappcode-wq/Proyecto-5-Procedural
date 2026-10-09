@@ -82,7 +82,7 @@ export class EnergySystem extends VitalStat {
       if (this._restTimer >= c.ENERGY_REGEN_DELAY && this.value < this.max) {
         const low = (st) => st && st.ratio < c.LOW_RATIO;
         const k = low(this._hunger) || low(this._thirst) ? c.ENERGY_REGEN_HUNGRY : 1;
-        this.add(c.ENERGY_REGEN * k * dt);
+        this.add(c.ENERGY_REGEN * k * (this.regenMultiplier ?? 1) * dt);
       }
     }
     this._checkExhausted();

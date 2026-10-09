@@ -57,7 +57,7 @@ export class NutritionSystem {
   /** ¿Se puede comer este objeto? */
   isFood(itemId) {
     const def = this._items[itemId];
-    return !!def?.FOOD && !!def.NUTRITION;
+    return !!def?.FOOD && (typeof def.NUTRITION === 'number' || !!def.NUTRITION);
   }
 
   /**
@@ -68,13 +68,23 @@ export class NutritionSystem {
     if (!this.isFood(itemId)) return { ok: false, reason: 'not-food' };
     if (this._hunger.ratio >= 1) return { ok: false, reason: 'full' };
     const def = this._items[itemId];
-    const value = this._cfg[def.NUTRITION];
+    const value = this.valueOf(itemId);
     const gained = this._hunger.eat(value);
+    // Platos mixtos (estofado, tarta): mitad animal, mitad vegetal.
     if (def.FOOD === 'ANIMAL') this.animal += value;
-    else this.plant += value;
+    else if (def.FOOD === 'MIXED') {
+      this.animal += value / 2;
+      this.plant += value / 2;
+    } else this.plant += value;
     this._events.emit(GameEvents.FOOD_EATEN, { itemId, foodType: def.FOOD, hunger: gained });
     this._evaluate();
     return { ok: true, hunger: gained };
+  }
+
+  /** Hambre que quita un alimento (número o clave de NUTRITION). */
+  valueOf(itemId) {
+    const n = this._items[itemId]?.NUTRITION;
+    return typeof n === 'number' ? n : this._cfg[n] ?? 0;
   }
 
   reset() {

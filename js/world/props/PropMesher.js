@@ -22,9 +22,9 @@ export class PropMesher {
     const nodes = chunk.nodes.filter((n) => !n.removed);
     const props = this._merge(
       nodes.map((n) => ({
-        template: this._pick(n.type === 'APPLE_TREE' && n.depleted ? 'APPLE_TREE_EMPTY' : n.type, n.variant),
+        template: this._pick(n.depleted && this._templates[`${n.type}_EMPTY`] ? `${n.type}_EMPTY` : n.type, n.variant),
         x: n.x,
-        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave ? 0 : 0.12),
+        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave || n.type === 'MUSHROOM' || n.type === 'BIRD_NEST' ? 0 : 0.12),
         z: n.z,
         scale: n.scale,
         rotation: n.rotation,
@@ -262,7 +262,76 @@ export class PropMesher {
       return b.build();
     };
 
+    // Zarzal de bayas (con fruto o ya recogido).
+    const berryBush = (variant, ripe = true) => {
+      const b = new PartsBuilder();
+      const leaf = shade(C.BUSH, 0.85);
+      b.add(ico, { position: [0, 0.45, 0], scale: [0.75, 0.55, 0.75], color: leaf, jitter: lumpy(300 + variant, 0.35) });
+      b.add(ico, { position: [0.42, 0.32, -0.2], scale: 0.45, color: shade(leaf, 1.1), jitter: lumpy(310 + variant, 0.3) });
+      b.add(ico, { position: [-0.38, 0.3, 0.25], scale: 0.42, color: shade(leaf, 0.95), jitter: lumpy(320 + variant, 0.3) });
+      if (ripe) {
+        const rng = new SeededRandom(330 + variant);
+        for (let i = 0; i < 16; i++) {
+          const a = rng.next() * Math.PI * 2;
+          const y = 0.25 + rng.next() * 0.55;
+          const r = 0.55 + rng.next() * 0.3;
+          b.add(ico, { position: [Math.cos(a) * r, y, Math.sin(a) * r], scale: 0.075, color: i % 3 ? (C.BERRY ?? 0xc0253a) : (C.BERRY_ALT ?? 0x5a2a7a) });
+        }
+      }
+      return b.build();
+    };
+    // Setas: un corro de tres a cinco, sombrero rojo con motas o pardo.
+    const mushrooms = (variant) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(400 + variant);
+      const cap = variant === 1 ? 0xb5763a : 0xc8352c;
+      const n = 3 + Math.floor(rng.next() * 3);
+      for (let i = 0; i < n; i++) {
+        const a = rng.next() * Math.PI * 2;
+        const r = i ? 0.12 + rng.next() * 0.22 : 0;
+        const h = 0.12 + rng.next() * 0.16;
+        const s = 0.07 + rng.next() * 0.08;
+        b.add(trunk, { position: [Math.cos(a) * r, h / 2, Math.sin(a) * r], scale: [s * 0.45, h, s * 0.45], color: 0xeee6d2 });
+        b.add(cone, { position: [Math.cos(a) * r, h + s * 0.25, Math.sin(a) * r], scale: [s * 1.5, s * 0.8, s * 1.5], color: cap });
+        if (variant !== 1) b.add(ico, { position: [Math.cos(a) * r + s * 0.4, h + s * 0.45, Math.sin(a) * r], scale: s * 0.18, color: 0xffffff });
+      }
+      return b.build();
+    };
+    // Trigo silvestre: un manojo de tallos dorados con espigas.
+    const stem = new THREE.BoxGeometry(1, 1, 1);
+    const wheat = (variant) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(500 + variant);
+      for (let i = 0; i < 14; i++) {
+        const a = rng.next() * Math.PI * 2;
+        const r = rng.next() * 0.35;
+        const h = 0.7 + rng.next() * 0.45;
+        const lean = [Math.cos(a) * 0.15, 0, Math.sin(a) * 0.15];
+        b.add(stem, { position: [Math.cos(a) * r, h / 2, Math.sin(a) * r], rotation: lean, scale: [0.025, h, 0.025], color: 0xc7b36a });
+        b.add(octa, { position: [Math.cos(a) * r + lean[0] * h * 0.5, h + 0.08, Math.sin(a) * r + lean[2] * h * 0.5], rotation: lean, scale: [0.04, 0.12, 0.04], color: i % 2 ? 0xe2c873 : 0xd4b25a });
+      }
+      return b.build();
+    };
+    // Nido en el suelo (al pie de los árboles), con o sin huevos.
+    const nest = (variant, eggs = true) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(600 + variant);
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2;
+        b.add(stem, { position: [Math.cos(a) * 0.22, 0.07 + (i % 2) * 0.03, Math.sin(a) * 0.22], rotation: [rng.next() * 0.4, -a, rng.next() * 0.3], scale: [0.03, 0.03, 0.2], color: i % 3 ? 0x8a6a42 : 0x6e5232 });
+      }
+      b.add(cone, { position: [0, 0.05, 0], rotation: [Math.PI, 0, 0], scale: [0.2, 0.08, 0.2], color: 0x6e5232 });
+      if (eggs) for (let i = 0; i < 3; i++) b.add(ico, { position: [Math.cos(i * 2.1) * 0.07, 0.12, Math.sin(i * 2.1) * 0.07], scale: [0.055, 0.07, 0.055], color: i === 1 ? 0xd8e8f0 : 0xf1ead8 });
+      return b.build();
+    };
+
     return {
+      BERRY_BUSH: [berryBush(0), berryBush(1)],
+      BERRY_BUSH_EMPTY: [berryBush(0, false), berryBush(1, false)],
+      MUSHROOM: [mushrooms(0), mushrooms(1), mushrooms(2)],
+      WILD_WHEAT: [wheat(0), wheat(1)],
+      BIRD_NEST: [nest(0), nest(1)],
+      BIRD_NEST_EMPTY: [nest(0, false), nest(1, false)],
       COBWEB: [cobweb()],
       TREE: [tree(0), tree(1), tree(2)],
       PINE: [pine(0), pine(1)],

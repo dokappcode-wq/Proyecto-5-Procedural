@@ -391,6 +391,13 @@ export class Synth {
     for (let i = 0; i < 3; i++) this.tone(out, { t: t + i * 0.045, type: 'sine', f, a: 0.003, d: 0.025, gain: 0.045 });
   }
 
+  /** Chasquidos del fuego. */
+  crackle(out, k = 1) {
+    const t = this.now;
+    const n = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) this.noise(out, { t: t + Math.random() * 0.12, d: 0.015 + Math.random() * 0.03, gain: (0.12 + Math.random() * 0.2) * k, f: 1500 + Math.random() * 3500, q: 1.2 });
+  }
+
   /** Búho: dos ululatos. */
   owl(out) {
     const t = this.now;

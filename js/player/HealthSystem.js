@@ -82,7 +82,7 @@ export class HealthSystem extends VitalStat {
     }
     this._sinceDamage += dt;
     if (this._sinceDamage >= this._cfg.HEALTH_REGEN_DELAY && this.ratio < 1 && this._canRegenerate()) {
-      this.add(this._cfg.HEALTH_REGEN * dt);
+      this.add(this._cfg.HEALTH_REGEN * (this.regenMultiplier ?? 1) * dt);
     }
   }
 

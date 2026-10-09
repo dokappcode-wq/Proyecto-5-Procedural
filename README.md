@@ -267,6 +267,17 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Cocina y comida (v1.25, P2)**:
+  - **Comida silvestre** (E): bayas de los zarzales, setas en los bosques, trigo silvestre en las praderas y
+    huevos en los nidos al pie de los árboles (zarzales y nidos vuelven a dar con el tiempo).
+  - **Hoguera** (3 madera + 3 piedra): asa carne, setas, huevos, manzanas y brochetas (E). Da luz y calor
+    (no te congelas a su lado) y los slimes no se acercan ni aparecen junto a ella; crepita.
+  - **Cocina con olla** (6 piedra refinada + 3 cobre refinado): pan, estofado, sopa de setas (quita la sed),
+    mermelada y tarta de manzana.
+  - **Crudo o cocinado**: la carne cruda (y huevos y setas) puede dar **indigestión** (no te curas, te cansas,
+    algo de hambre); cocinada alimenta más y no sienta mal.
+  - **Estados** junto a las barras, con el tiempo que queda: 🍽️ bien alimentado (menos hambre, se cura el
+    doble), ♨️ comida caliente (se pierde menos calor), ⚡ con energía, 🤢 indigestión. Se guardan en la partida.
 - **El Edén diseñado (v1.23–1.24)**: la isla ya no es procedural: es un mapa fijo hecho con
   `tools/map/bake.mjs` a partir de `maps/eden/design.mjs` (relieve esculpido y erosionado, ríos con
   cascadas, lagos, termas, laguna, marisma, caminos, regiones con nombre y vegetación por zonas).

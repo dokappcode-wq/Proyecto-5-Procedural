@@ -62,6 +62,7 @@ export const GameEvents = Object.freeze({
   // Alimentación
   FOOD_EATEN: 'nutrition:foodEaten',                // { itemId, foodType, hunger }
   DIET_CHANGED: 'nutrition:dietChanged',            // { state: 'UNKNOWN'|'BALANCED'|'TOO_MUCH_ANIMAL'|'TOO_MUCH_PLANT', share }
+  STATUS_EFFECTS_CHANGED: 'player:statusEffects',   // { effects: [{ id, name, icon, desc, left, bad }] }
 
   // Fabricación, construcción y sueño
   CRAFT_REQUEST: 'crafting:request',                // { recipeId }

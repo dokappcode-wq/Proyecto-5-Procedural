@@ -20,7 +20,7 @@ import { createEnemyView, buildGoblinBase, mulberry } from './EnemyViews.js';
  * SAFE_RADIUS del inicio. Los muertos y las bases limpias se guardan con la partida.
  */
 export class EnemySystem {
-  constructor({ config, safeRadius = 0, scene, worlds, homeId, player, events, time, obstacles = null, pickups = null, isSheltered = () => false }) {
+  constructor({ config, safeRadius = 0, scene, worlds, homeId, player, events, time, obstacles = null, pickups = null, isSheltered = () => false, fires = () => [], fireRadius = 9 }) {
     this.name = 'enemies';
     this._cfg = config;
     this._safe = safeRadius;
@@ -32,6 +32,8 @@ export class EnemySystem {
     this._obstacles = obstacles;
     this._pickups = pickups;
     this._isSheltered = isSheltered;
+    this._fires = fires;       // hogueras: los slimes no se acercan
+    this._fireRadius = fireRadius;
     this.root = new THREE.Group();
     this.root.name = 'enemies';
     scene.add(this.root);
@@ -291,6 +293,7 @@ export class EnemySystem {
       }
       if (e.type === 'SLIME' && !e.melting && !this._time.isNight && e.alive) this._melt(e);
       e.update(dt, this._env);
+      if (e.type === 'SLIME' && e.alive) this._keepFromFire(e);
       if (!view) {
         view = createEnemyView(e);
         this._views.set(e.id, view);
@@ -388,6 +391,19 @@ export class EnemySystem {
     }
   }
 
+  /** Un slime no entra en el círculo de luz de una hoguera: se queda en el borde. */
+  _keepFromFire(e) {
+    const R = this._fireRadius;
+    for (const f of this._fires()) {
+      const dx = e.x - f.x;
+      const dz = e.z - f.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= R || d < 1e-3) continue;
+      e.x = f.x + (dx / d) * R;
+      e.z = f.z + (dz / d) * R;
+    }
+  }
+
   _spawnSlimes(dt, p) {
     const S = this._cfg.SLIMES;
     if (!this._time.isNight) return;
@@ -399,6 +415,7 @@ export class EnemySystem {
     const sp = w.getSpawnPoint();
     if (Math.hypot(p.x - sp.x, p.z - sp.z) < this._safe) return; // cerca del inicio, nada
     if (w.inCave?.(p.x, p.y + 1, p.z) || this._isSheltered()) return;
+    if (this._fires().some((f) => Math.hypot(f.x - p.x, f.z - p.z) < this._fireRadius * 2)) return; // junto a una hoguera no salen
     const count = this.enemies.filter((e) => e.type === 'SLIME' && e.alive).length;
     if (count >= S.MAX) return;
     for (let i = 0; i < 8; i++) {

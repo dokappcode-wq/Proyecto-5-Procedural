@@ -390,6 +390,46 @@ export const BUILD_MODELS = {
     add(b, cone, [0, 1.08, 0], [0.1, 0.14, 0.1], 0xffd36a);
     return b.build();
   },
+  CAMPFIRE() {
+    const b = new PartsBuilder();
+    const r = rnd(31);
+    // Anillo de piedras, ceniza, troncos cruzados y llamas en capas.
+    for (let k = 0; k < 11; k++) {
+      const a = (k / 11) * Math.PI * 2;
+      add(b, ico, [Math.cos(a) * 0.62, 0.12, Math.sin(a) * 0.62], [0.26 + r() * 0.08, 0.2 + r() * 0.06, 0.24], pick(STONE, r), [r() * 2, r() * 3, 0]);
+    }
+    add(b, cyl, [0, 0.03, 0], [0.95, 0.04, 0.95], 0x2b2522);
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2 + 0.4;
+      add(b, cyl, [Math.cos(a) * 0.2, 0.2, Math.sin(a) * 0.2], [0.12, 0.85, 0.12], k % 2 ? 0x5e3b1f : 0x4a2f19, [Math.sin(a) * 1.1, 0, -Math.cos(a) * 1.1]);
+    }
+    add(b, ico, [0, 0.18, 0], [0.3, 0.12, 0.3], 0xff5a1a);
+    add(b, cone, [0, 0.5, 0], [0.42, 0.65, 0.42], 0xff7a22, [0, 0.3, 0]);
+    add(b, cone, [0.08, 0.45, -0.05], [0.26, 0.5, 0.26], 0xffb240, [0.1, 0.9, 0]);
+    add(b, cone, [-0.05, 0.42, 0.06], [0.16, 0.42, 0.16], 0xffe08a);
+    return b.build();
+  },
+  KITCHEN() {
+    const b = new PartsBuilder();
+    const r = rnd(32);
+    // Fogón de piedra con boca encendida, encimera, olla de cobre con tapa y cucharón.
+    for (let c = 0; c < 3; c++) {
+      for (let k = 0; k < 4; k++) add(b, box, [-0.7 + k * 0.47, 0.15 + c * 0.3, 0], [0.45, 0.28, 1.25], pick(STONE, r));
+    }
+    add(b, box, [0, 0.33, 0.63], [0.6, 0.42, 0.04], 0x1c1410);
+    add(b, box, [0, 0.2, 0.6], [0.48, 0.1, 0.06], 0xff7a2a);
+    add(b, ico, [0, 0.27, 0.58], [0.18, 0.1, 0.06], 0xffc060);
+    add(b, box, [0, 0.95, 0], [1.9, 0.1, 1.3], STONE_DARK);
+    add(b, cyl, [-0.35, 1.18, 0], [0.62, 0.42, 0.62], 0xb87333, [0, 0, 0], (i, v) => { v.x *= 1 + (0.5 - Math.abs(v.y)) * 0.15; v.z *= 1 + (0.5 - Math.abs(v.y)) * 0.15; });
+    add(b, cyl, [-0.35, 1.41, 0], [0.64, 0.05, 0.64], 0x8f5a2a);
+    add(b, ico, [-0.35, 1.47, 0], [0.08, 0.05, 0.08], 0x5a3a1c);
+    for (const s of [-1, 1]) add(b, box, [-0.35 + s * 0.36, 1.25, 0], [0.08, 0.05, 0.14], 0x8f5a2a);
+    add(b, cyl, [0.25, 1.32, 0.12], [0.03, 0.55, 0.03], 0x6b4a2c, [0, 0, -0.5]);
+    add(b, box, [0.55, 1.04, -0.25], [0.5, 0.06, 0.35], 0x8a5a32);
+    add(b, ico, [0.5, 1.12, -0.25], [0.12, 0.08, 0.1], 0xd4b25a);
+    add(b, ico, [0.66, 1.12, -0.2], [0.1, 0.1, 0.1], 0xc8302a);
+    return b.build();
+  },
   CHARGING_STATION() {
     const b = new PartsBuilder();
     add(b, box, [0, 0.08, 0], [1.0, 0.16, 0.8], STONE_DARK);

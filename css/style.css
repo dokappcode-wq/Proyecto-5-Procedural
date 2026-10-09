@@ -1396,3 +1396,16 @@ body:has(.cine-bars.on) #hud > :not(.story-ui) { opacity: 0; transition: opacity
   75% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -4px); }
 }
+
+/* Estados por la comida (P2) */
+.status-effects { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.status-effects:empty { display: none; }
+.status-chip {
+  display: flex; align-items: center; gap: 4px; padding: 2px 8px 2px 5px; border-radius: 12px;
+  background: rgba(20, 28, 22, 0.62); border: 1px solid rgba(190, 230, 160, 0.45); color: #eef6e6;
+  font-size: 12px; pointer-events: auto;
+}
+.status-chip .icon { font-size: 15px; }
+.status-chip.bad { border-color: rgba(255, 120, 110, 0.7); background: rgba(60, 20, 18, 0.62); }
+.status-chip.ending { animation: chipBlink 1s ease-in-out infinite; }
+@keyframes chipBlink { 50% { opacity: 0.45; } }

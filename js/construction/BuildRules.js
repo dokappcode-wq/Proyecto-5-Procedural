@@ -91,6 +91,15 @@ export const SHAPES = {
     slot: 'FREE', half: [0.5, 0.35], top: 0.7, interact: 'STORAGE',
     colliders: [{ x0: -0.5, x1: 0.5, z0: -0.35, z1: 0.35, y0: 0, y1: 0.7 }], surfaces: [{ kind: 'flat', y: 0.7, bottom: 0 }],
   },
+  // Hoguera (asar) y cocina con olla (guisar): estaciones de cocina que dan luz y calor.
+  CAMPFIRE: {
+    slot: 'FREE', half: [0.75, 0.75], top: 0.5, interact: 'CRAFT', station: 'CAMPFIRE',
+    colliders: [{ x0: -0.6, x1: 0.6, z0: -0.6, z1: 0.6, y0: 0, y1: 0.45 }], surfaces: [],
+  },
+  KITCHEN: {
+    slot: 'FREE', half: [0.95, 0.65], top: 1.3, interact: 'CRAFT', station: 'KITCHEN',
+    colliders: [{ x0: -0.95, x1: 0.95, z0: -0.65, z1: 0.65, y0: 0, y1: 1.0 }], surfaces: [],
+  },
   // Antorcha clavada en el suelo: ilumina (no estorba el paso).
   TORCH: {
     slot: 'FREE', half: [0.12, 0.12], top: 1.1,
