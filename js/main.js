@@ -1476,7 +1476,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     });
   }
 
-  const loop = new GameLoop({ maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render() });
+  const loop = new GameLoop({
+    maxDelta: cfg.RENDER.MAX_DELTA, render: () => render.render(),
+    // Un fallo en una parte del juego no lo congela: se avisa y lo demás sigue.
+    onError: (name, err) => message(`⚠️ Error en «${name}»: ${err?.message ?? err}. El juego sigue; avísame con este texto.`, 'warning'),
+  });
   const admin = new AdminSystem({ config: cfg.ADMIN, input, events, container: document.body });
   registerWorldTools(admin, { world, player, controller });
   admin.registerTool({ category: 'Mundo', label: 'Importar sistema solar…', run: () => events.emit(GameEvents.IMPORT_PANEL_REQUEST, {}) });

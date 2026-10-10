@@ -292,7 +292,9 @@ export class CombatSystem {
     this._projectiles = this._projectiles.filter((p) => {
       if (p.life > 0) return true;
       this._group.remove(p.mesh);
-      if (!p.arrow) p.mesh.geometry !== this._stoneGeo && p.mesh.geometry.dispose();
+      // Solo las piedras sueltas tienen geometría propia que liberar (las flechas, la lanza y
+      // la bomba son grupos de piezas compartidas).
+      if (p.mesh.isMesh && p.mesh.geometry && p.mesh.geometry !== this._stoneGeo) p.mesh.geometry.dispose();
       return false;
     });
   }

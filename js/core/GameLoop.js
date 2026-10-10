@@ -5,9 +5,14 @@
  * frame. El orden de registro es el orden de actualización. Después llama a
  * `render()` y, por último, a `lateUpdate()` de los sistemas que lo tengan
  * (útil para limpiar estado por frame, p. ej. deltas del ratón).
+ *
+ * Un error en un sistema no congela el juego: se avisa (una vez por sistema, onError)
+ * y los demás siguen funcionando en ese fotograma y en los siguientes.
  */
 export class GameLoop {
-  constructor({ maxDelta = 0.1, render }) {
+  constructor({ maxDelta = 0.1, render, onError = null }) {
+    this._onError = onError;
+    this._failed = new Set();
     this._systems = [];
     this._maxDelta = maxDelta;
     this._render = render;
@@ -59,10 +64,29 @@ export class GameLoop {
       this._fpsTime = 0;
     }
 
-    for (const s of this._systems) if (s.enabled !== false) s.update?.(dt, this._elapsed);
-    this._render();
-    for (const s of this._systems) s.lateUpdate?.(dt, this._elapsed);
-
+    // El siguiente fotograma se pide antes: pase lo que pase en este, el juego sigue.
     requestAnimationFrame(this._frame);
+    for (const s of this._systems) if (s.enabled !== false) this._safe(s, 'update', dt);
+    try {
+      this._render();
+    } catch (err) {
+      this._report({ name: 'render' }, err);
+    }
+    for (const s of this._systems) if (s.lateUpdate) this._safe(s, 'lateUpdate', dt);
+  }
+
+  _safe(s, method, dt) {
+    try {
+      s[method]?.(dt, this._elapsed);
+    } catch (err) {
+      this._report(s, err);
+    }
+  }
+
+  _report(s, err) {
+    if (this._failed.has(s.name)) return;
+    this._failed.add(s.name);
+    console.error(`[GameLoop] Error en "${s.name}":`, err);
+    this._onError?.(s.name, err);
   }
 }

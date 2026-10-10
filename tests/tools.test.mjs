@@ -236,3 +236,19 @@ test('quemadura: daño por segundo hasta que se apaga; el botín cae al suelo', 
   assert.equal(weak.burn, null);
   assert.deepEqual(dropped[0].slice(0, 5), ['HOME', 1, 1, 'STONE', 2]);
 });
+
+test('bomba de slime lanzada: vuela, estalla al caer y desaparece sin romper nada', () => {
+  const src = dummySource([{ id: 'a', x: 0, y: 0, z: -6 }]);
+  const k = combat([src]);
+  k.inventory.addItem('SLIME_BOMB', 2);
+  k.hotbar.select('SLIME_BOMB');
+  k.keys.add('USE');
+  k.cs.update(0.016);
+  k.cs.pull = 1;
+  k.cs._fire(C.ITEMS.SLIME_BOMB.RANGED, k.cs.ammo());
+  assert.equal(k.inventory.getItemCount('SLIME_BOMB'), 1);
+  for (let i = 0; i < 300; i++) k.cs.update(0.05); // también la onda de la explosión
+  assert.equal(k.cs._projectiles.length, 0);
+  assert.equal(k.cs._blasts.length, 0);
+  assert.ok(src.hits.length >= 1, 'la explosión alcanza al enemigo cercano');
+});
