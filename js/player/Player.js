@@ -90,7 +90,7 @@ export class Player {
       horizontalSpeed,
       maxSpeed: this._cfg.RUN_SPEED,
       onGround: this.state.onGround || this.state.isFlying,
-      climbing: this.state.isClimbing,
+      climbing: this.state.isClimbing || !!this.state.onLadder,
       swimming: this.state.isSwimming,
       crouch: this.crouch,
       dodging: this.state.dodging > 0,

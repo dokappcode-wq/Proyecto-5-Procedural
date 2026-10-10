@@ -3,7 +3,7 @@ import { GameEvents } from '../core/GameEvents.js';
 import { BUILD_MODELS, toGeometry } from './BuildModels.js';
 import {
   SHAPES, snapXZ, slotKey, terrainBaseY, isSupported, worldColliders, footprint, surfaceAt,
-  pushOutOfBox, circleOverlapsBox, boxesOverlap, shelterAt,
+  pushOutOfBox, circleOverlapsBox, boxesOverlap, shelterAt, ladderAt,
 } from './BuildRules.js';
 
 /**
@@ -67,7 +67,12 @@ export class ConstructionSystem {
     this._material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this._geometries = {};
     for (const type of Object.keys(SHAPES)) this._geometries[type] = toGeometry(BUILD_MODELS[type]());
-    this._geometries.DOOR_LEAF = toGeometry(BUILD_MODELS.DOOR_LEAF());
+    // Hojas que se abren (puerta, puerta de valla, trampilla) y cristales (ventanal).
+    for (const [type, shape] of Object.entries(SHAPES)) {
+      if (shape.leaf && BUILD_MODELS[`${type}_LEAF`]) this._geometries[`${type}_LEAF`] = toGeometry(BUILD_MODELS[`${type}_LEAF`]());
+      if (shape.glass && BUILD_MODELS[`${type}_GLASS`]) this._geometries[`${type}_GLASS`] = toGeometry(BUILD_MODELS[`${type}_GLASS`]());
+    }
+    this._glassMaterial = new THREE.MeshLambertMaterial({ color: 0xbfe6f5, transparent: true, opacity: 0.32, depthWrite: false });
 
     this._ghostMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 0.42, depthWrite: false });
     this._ghost = new THREE.Mesh(this._geometries.FLOOR, this._ghostMaterial);
@@ -163,6 +168,12 @@ export class ConstructionSystem {
     this._events.emit(GameEvents.BUILD_SELECTION_CHANGED, { pieceId });
   }
 
+  /** Piezas del modo B (teclas 1–0): las que llevas encima (con construcción libre, todas). Como mucho 10. */
+  buildList() {
+    const list = this.freeBuild ? this.pieceIds : this.pieceIds.filter((id) => this.canAfford(id));
+    return list.slice(0, 10);
+  }
+
   canAfford(pieceId) {
     if (this.freeBuild) return true;
     return Object.entries(this.costOf(pieceId)).every(([item, n]) => this._inventory.hasItem(item, n));
@@ -186,8 +197,9 @@ export class ConstructionSystem {
 
     // Con B se elige la pieza con los números; colocando un objeto de la barra, los números son la barra.
     if (!this.itemMode) {
+      const list = this.buildList();
       for (let i = 1; i <= 10; i++) {
-        if (input.wasPressed(`HOTBAR_${i}`) && this.pieceIds[i - 1]) this.select(this.pieceIds[i - 1]);
+        if (input.wasPressed(`HOTBAR_${i}`) && list[i - 1]) this.select(list[i - 1]);
       }
     }
     if (input.wasPressed('ROTATE')) this._rotSteps++;
@@ -258,7 +270,8 @@ export class ConstructionSystem {
   /** Añade una pieza ya validada (también la usan las herramientas Admin). */
   addPiece({ type, x, y, z, rotation, slot, cost = null }) {
     const piece = { id: this._nextId++, type, x, y, z, rotation, slot, open: false, def: this._cfg.PIECES[type], cost, body: this._bodyId };
-    if (type === 'CHEST') piece.data = { slots: new Array(this._cfg.CHEST_SLOTS ?? 27).fill(null) };
+    const shape = SHAPES[type];
+    if (shape.storage) piece.data = { slots: new Array(type === 'CHEST' ? this._cfg.CHEST_SLOTS ?? shape.storage : shape.storage).fill(null) };
     piece.key = slotKey(slot, y);
     const root = new THREE.Group();
     root.position.set(x, y, z);
@@ -266,12 +279,17 @@ export class ConstructionSystem {
     const mesh = new THREE.Mesh(this._geometries[type], this._material);
     mesh.castShadow = mesh.receiveShadow = true;
     root.add(mesh);
-    if (type === 'DOOR') {
-      const leaf = new THREE.Mesh(this._geometries.DOOR_LEAF, this._material);
-      leaf.position.x = -0.5;
+    if (shape.leaf && this._geometries[`${type}_LEAF`]) {
+      const leaf = new THREE.Mesh(this._geometries[`${type}_LEAF`], this._material);
+      leaf.position.set(...shape.leaf.hinge);
       leaf.castShadow = leaf.receiveShadow = true;
       root.add(leaf);
       piece.leaf = leaf;
+    }
+    if (shape.glass && this._geometries[`${type}_GLASS`]) {
+      const glass = new THREE.Mesh(this._geometries[`${type}_GLASS`], this._glassMaterial);
+      glass.renderOrder = 2;
+      root.add(glass);
     }
     root.traverse((o) => (o.userData.pieceId = piece.id));
     root.name = `piece_${type}_${piece.id}`;
@@ -368,15 +386,17 @@ export class ConstructionSystem {
     if (!this.exists(piece)) return;
     const kind = SHAPES[piece.type].interact;
     if (kind === 'DOOR') {
-      if (piece.open) {
+      const shape = SHAPES[piece.type];
+      if (piece.open && shape.leafCollider) {
         // No cerrar la puerta encima del jugador.
         const p = this._player.position;
         const leaf = worldColliders({ ...piece, open: false }).at(-1);
-        if (circleOverlapsBox(p.x, p.z, 0.35, leaf)) return;
+        if (circleOverlapsBox(p.x, p.z, 0.35, leaf) && p.y < leaf.maxY && p.y + 1.7 > leaf.minY) return;
       }
       piece.open = !piece.open;
-      piece.leaf.rotation.y = piece.open ? -Math.PI / 2 : 0;
+      if (piece.leaf) piece.leaf.rotation[shape.leaf?.axis ?? 'y'] = piece.open ? shape.leaf?.angle ?? -Math.PI / 2 : 0;
       piece.object.updateMatrixWorld(true);
+      this._events.emit(GameEvents.STRUCTURE_INTERACT_DONE, { structure: piece });
     } else if (kind === 'SLEEP') {
       this._events.emit(GameEvents.SLEEP_REQUEST, { bed: piece });
     } else if (kind === 'CRAFT') {
@@ -601,6 +621,11 @@ export class ConstructionSystem {
       }
     }
     return hit;
+  }
+
+  /** Escalera de mano que se puede trepar en (x, y, z) (P6), o null. */
+  ladderAt(x, y, z) {
+    return ladderAt(this._near(x, z, 2), x, y, z);
   }
 
   getShelterAt(x, y, z) {

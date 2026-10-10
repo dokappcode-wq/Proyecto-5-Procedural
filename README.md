@@ -271,6 +271,19 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Construcción y decoración (v1.29, P6)**: todo se fabrica en el reloj (Tab → *Construcción* o *Muebles y hogar*)
+  y se coloca seleccionándolo en la barra.
+  - **Piedra y ladrillo**: paredes, suelos de losas y de baldosas, tejado de tejas, escalera, columna y murete.
+    Aguantan muchos más golpes que la madera.
+  - **Piezas nuevas**: media pared, hastial (el triángulo bajo el tejado a dos aguas, encima de una pared),
+    ventanal con cristal, puerta de valla (E), barandilla, **escalera de mano** (avanza contra ella para subir;
+    atrás baja; Espacio se suelta; arriba pasas a la plataforma) y **trampilla** (E: se abre y deja el hueco).
+  - **Muebles**: mesa, silla, banco, estantería, armario (18 huecos), barril (9), alfombra, lámpara de aceite
+    (da luz) y maceta. **Giro libre**: Q gira los muebles de 15 en 15°.
+  - **Útiles**: **pozo** (agua sin fin: E bebe, llena el cubo o el odre), **recolector de lluvia** (se va
+    llenando; luego, con lluvia, más deprisa), **secadero** (cecina, pescado seco y fruta seca) y **maniquí**
+    (E: te cambias la armadura con él y la luce).
+  - En el modo B la barra solo muestra las piezas que llevas.
 - **Granja, pesca y animales (v1.28, P4)**:
   - **Huerto**: fabrica una 🌱 *parcela de cultivo* (2 madera + 2 fibra) y colócala. Con E y en la mano:
     semillas de trigo (del trigo, en el reloj), una zanahoria, una patata o pipas de calabaza → sembrar;

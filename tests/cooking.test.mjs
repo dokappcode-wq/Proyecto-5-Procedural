@@ -21,7 +21,7 @@ test('recetas de cocina: ingredientes y resultados existen, cada una en su estac
   assert.ok(cooking.length >= 10);
   for (const [id, r] of cooking) {
     assert.ok(C.ITEMS[r.RESULT], id);
-    assert.ok(['CAMPFIRE', 'KITCHEN'].includes(r.STATION), id);
+    assert.ok(['CAMPFIRE', 'KITCHEN', 'DRYING_RACK'].includes(r.STATION), id);
     for (const it of Object.keys(r.INGREDIENTS)) assert.ok(C.ITEMS[it], `${id}: ${it}`);
   }
   for (const piece of ['CAMPFIRE', 'KITCHEN']) {

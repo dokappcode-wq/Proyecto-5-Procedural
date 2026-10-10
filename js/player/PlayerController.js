@@ -216,6 +216,7 @@ export class PlayerController {
       return;
     }
     this._setSwimming(false, false, surface);
+    if (this._updateLadder(dt)) return;
     if (this._updateClimbing(dt)) return;
 
     const crouchK = p.state.isCrouching ? cfg.CROUCH?.SPEED_MULTIPLIER ?? 0.5 : 1;
@@ -462,6 +463,80 @@ export class PlayerController {
       return true;
     }
     return this._setClimbing(false);
+  }
+
+  /**
+   * Escalera de mano (P6): avanzar contra ella sube, atrás baja, Espacio suelta. Arriba,
+   * seguir avanzando pasa a la superficie más cercana a esa altura (piso, plataforma).
+   * @returns {boolean} true si se ha encargado del movimiento este frame
+   */
+  _updateLadder(dt) {
+    const p = this._player;
+    const pos = p.position;
+    const L = this._structures?.ladderAt?.(pos.x, pos.y, pos.z) ?? null;
+    if (!L) return this._setLadder(false);
+    const toward = -(this._wish.x * L.nx + this._wish.z * L.nz); // > 0: hacia la escalera
+    if (!p.state.onLadder && toward < 0.5) return false;
+    if (this._input.wasPressed('JUMP')) {
+      p.velocity.set(L.nx * 3, this._cfg.JUMP_VELOCITY * 0.4, L.nz * 3);
+      p.state.onGround = false;
+      return this._setLadder(false);
+    }
+    const speed = (this._cfg.LADDER_SPEED ?? 2.2) * dt;
+    p.velocity.set(0, 0, 0);
+    if (toward > 0.3) pos.y += speed;
+    else if (toward < -0.3) pos.y -= speed;
+    // Pegado a la escalera, un poco por delante.
+    const d = (pos.x - L.piece.x) * L.nx + (pos.z - L.piece.z) * L.nz;
+    const k = Math.min(1, dt * 10) * (0.3 - d);
+    pos.x += L.nx * k;
+    pos.z += L.nz * k;
+    const ground = this._groundHeight(pos.x, pos.z);
+    if (pos.y <= ground && toward <= 0.3) {
+      pos.y = ground;
+      p.state.onGround = true;
+      return this._setLadder(false); // abajo: a andar
+    }
+    if (pos.y >= L.top - 0.05) {
+      pos.y = L.top;
+      if (toward > 0.3) {
+        const exit = this._ladderExit(L);
+        if (exit) {
+          pos.set(exit.x, exit.y, exit.z);
+          p.state.onGround = true;
+          return this._setLadder(false);
+        }
+      }
+    }
+    p.state.onGround = true;
+    this._setLadder(true);
+    return true;
+  }
+
+  /** Sitio donde bajarse arriba de la escalera: una superficie a esa altura, detrás o a los lados. */
+  _ladderExit(L) {
+    const st = this._structures;
+    const dirs = [[-L.nx, -L.nz], [L.nz, -L.nx], [-L.nz, L.nx], [L.nx, L.nz]];
+    for (const dist of [0.6, 0.9, 1.2]) {
+      for (const [dx, dz] of dirs) {
+        const x = L.piece.x + dx * dist;
+        const z = L.piece.z + dz * dist;
+        const top = Math.max(st?.surfaceAt?.(x, z, L.top + 0.6) ?? -Infinity, this._terrain.getHeightAt(x, z));
+        if (top < L.top - 0.5 || top > L.top + 0.6) continue;
+        if (st?.blocksAt?.(x, z, this._cfg.RADIUS, top + 0.1, top + this._cfg.HEIGHT)) continue;
+        return { x, y: top, z };
+      }
+    }
+    return null;
+  }
+
+  _setLadder(on) {
+    const s = this._player.state;
+    if (!!s.onLadder !== on) {
+      s.onLadder = on;
+      this._events.emit(GameEvents.PLAYER_CLIMB_CHANGED, { climbing: on || !!s.isClimbing, ladder: on });
+    }
+    return on;
   }
 
   /** @returns {boolean} el mismo valor (para usarlo en `return`) */

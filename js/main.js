@@ -106,6 +106,8 @@ import { Landmarks } from './world/map/Landmarks.js';
 import { StatusEffects } from './player/StatusEffects.js';
 import { StatusEffectsHUD } from './ui/StatusEffectsHUD.js';
 import { FarmSystem } from './farming/FarmSystem.js';
+import { HomeSystem } from './construction/HomeSystem.js';
+import { SHAPES } from './construction/BuildRules.js';
 import { RanchSystem } from './animals/RanchSystem.js';
 import { FishingSystem, FishingUI } from './fishing/FishingSystem.js';
 
@@ -198,6 +200,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       const hits = structureSources().map((s) => s.raycastDistance(o, d, max)).filter((v) => v !== null);
       return hits.length ? Math.min(...hits) : null;
     },
+    ladderAt: (x, y, z) => construction?.ladderAt(x, y, z) ?? null, // escaleras de mano (P6)
   };
 
   // ---- Jugador y cámara ----------------------------------------------------
@@ -429,7 +432,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     weapon: () => cfg.ITEMS[hotbar.selectedId]?.WEAPON ?? null, // espada seleccionada: su daño
     suppressAttack: () => combat.suppressAttack || fishing.busy, // bloqueando, con arco/tirachinas o pescando el clic no golpea
     // Granja (P4): letrero de las parcelas y E sobre los animales (dar de comer, ordeñar, esquilar).
-    structureAction: (piece) => (piece.type === 'FARM_PLOT' ? farm.actionText(piece) : null),
+    structureAction: (piece) => (piece.type === 'FARM_PLOT' ? farm.actionText(piece) : home.actionText(piece)), // huerto, pozo, recolector, maniquí
     animalAction: (animal, source) => ranch.actionText(animal, source),
     animalInteract: (animal, source) => ranch.interact(animal, source),
   });
@@ -530,6 +533,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   enemies.playerAlive = () => !health.dead;
   // Granja, corral y pesca (P4).
   const farm = new FarmSystem({ config: cfg.FARM, items: cfg.ITEMS, construction, inventory, hotbar, events, hourSeconds: (cfg.TIME.DAY_LENGTH_MINUTES * 60) / 24 });
+  // Útiles de casa (P6): pozo, recolector de lluvia y maniquí.
+  const home = new HomeSystem({
+    config: cfg.BUILD.RAIN_COLLECTOR, items: cfg.ITEMS, construction, inventory, hotbar, equipment, thirst, events, waterPerSkin: cfg.EQUIPMENT.WATER_CAPACITY,
+  });
   const ranch = new RanchSystem({
     config: cfg.RANCH, items: cfg.ITEMS, animals, inventory, hotbar, events, pickups, homeId: HOME, isHome: () => worlds.activeId === HOME,
   });
@@ -733,9 +740,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   // Partida cargada: el contenido de los cofres se comprueba (solo objetos que existen).
   events.on(GameEvents.STRUCTURE_RESTORED, ({ structure }) => {
-    if (structure.type !== 'CHEST') return;
+    if (!SHAPES[structure.type]?.storage) return; // cofres, armarios y barriles
     const slots = Array.isArray(structure.data?.slots) ? structure.data.slots : [];
-    const n = cfg.BUILD.CHEST_SLOTS;
+    const n = structure.type === 'CHEST' ? cfg.BUILD.CHEST_SLOTS : SHAPES[structure.type].storage;
     structure.data = {
       slots: Array.from({ length: n }, (_, i) => {
         const st = slots[i];
@@ -764,6 +771,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         const small = pc.type !== 'CAMPFIRE'; // cocina y forja: brasas tapadas, luz más corta
         if (d < 70 && fire) list.push({ x: pc.x, y: pc.y + (pc.type === 'KITCHEN' ? 0.6 : pc.type === 'FORGE' ? 1.3 : 0.9), z: pc.z, d, cave: true, color: 0xff8a3a, distance: small ? 9 : 17, intensity: small ? 1.4 : 2.8, fire: true });
         else if (d < 60) list.push({ x: pc.x, y: pc.y + 1.15, z: pc.z, d, torch: true });
+      }
+      // Lámparas de la casa (P6).
+      for (const pc of construction.pieces) {
+        const L = SHAPES[pc.type]?.light;
+        if (!L) continue;
+        const d = Math.hypot(pc.x - p.x, pc.z - p.z, (pc.y - p.y) * 2);
+        if (d < 50) list.push({ x: pc.x, y: pc.y + L.y, z: pc.z, d, cave: true, color: L.color, distance: L.distance, intensity: L.intensity, fire: true });
       }
       for (const n of world.resources?.getNodesNear(p.x, p.z, 36) ?? []) {
         const glow = cfg.RESOURCE_TYPES[n.type]?.LIGHT;
@@ -1613,6 +1627,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(ranch);       // animales domesticados: atraer con comida, huevos (antes que los animales)
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(farm);        // huerto: crecer y dibujar los cultivos
+  loop.add(home);        // recolector de lluvia y maniquíes
   loop.add(enemies);     // gólems, slimes, goblins
   loop.add(story);       // la historia: escenas, Nova, brújula, tutorial
   loop.add(storyKeys);

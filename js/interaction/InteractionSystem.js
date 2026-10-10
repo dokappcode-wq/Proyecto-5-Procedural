@@ -238,7 +238,9 @@ export class InteractionSystem {
     if (speed > 1) this._wearTool();
     const key = `st-${piece.id}`;
     const work = this._chopProgress.get(key) ?? { progress: 0 };
-    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed * this._power()) / (C._cfg.BREAK_TIME ?? 3));
+    // La piedra y el ladrillo (PIECES.*.HARD) aguantan más golpes que la madera.
+    const hard = piece.def?.HARD ?? 1;
+    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed * this._power()) / ((C._cfg.BREAK_TIME ?? 3) * hard));
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
     const stone = Object.keys(piece.cost ?? C.costOf(piece.type) ?? {}).some((k) => k === 'STONE' || k === 'MINERAL');
     const done = work.progress >= 1;

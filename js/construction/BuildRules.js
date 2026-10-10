@@ -12,7 +12,7 @@
  *   CELL    ocupa una casilla de la rejilla (suelo, cimiento, escalera, tejado)
  *   EDGE    borde entre casillas (pared, puerta, ventana, valla)
  *   CORNER  esquina de la rejilla (pilar)
- *   FREE    posición libre cada 0,25 m (cama y futuros muebles)
+ *   FREE    posición libre cada 0,25 m (cama y muebles); Q gira 15° (giro libre, P6)
  *
  * Cada forma declara:
  *   half        semiejes [x, z] de la huella
@@ -20,8 +20,18 @@
  *   colliders   cajas locales {x0,x1,z0,z1,y0,y1} que bloquean el paso
  *   surfaces    superficies caminables: flat {y, bottom} o ramp {rise, y0, bottom}
  *   groundTolerance  hueco máximo con el terreno para considerarse apoyada
+ * y, opcionales (P6):
+ *   leaf        hoja que se abre con E: { hinge [x,y,z], axis 'y'|'x', angle } (geometría <TIPO>_LEAF)
+ *   leafCollider caja que solo bloquea con la hoja cerrada
+ *   openSurfaces superficies con la hoja abierta (trampilla: el hueco)
+ *   storage     huecos para guardar objetos (cofre, armario, barril)
+ *   ladder      se trepa (zona delante de la cara +Z)
+ *   glass       tiene un cristal aparte (geometría <TIPO>_GLASS, transparente)
+ *   light       da luz: { y, color, distance, intensity }
+ * Con giro libre las cajas de colisión se toman alineadas con los ejes (un poco más grandes).
  */
 const H = 2.4; // altura de pared (un piso)
+const DOOR_LEAF = { hinge: [-0.5, 0, 0], axis: 'y', angle: -Math.PI / 2 };
 
 export const SHAPES = {
   FOUNDATION: {
@@ -44,6 +54,7 @@ export const SHAPES = {
       { x0: -0.5, x1: 0.5, z0: -0.1, z1: 0.1, y0: 2.0, y1: H },
     ],
     // Hoja de la puerta: solo bloquea cerrada.
+    leaf: DOOR_LEAF,
     leafCollider: { x0: -0.5, x1: 0.5, z0: -0.06, z1: 0.06, y0: 0, y1: 2.0 },
     surfaces: [],
   },
@@ -88,7 +99,7 @@ export const SHAPES = {
   },
   // Cofre: guarda objetos (E para abrirlo).
   CHEST: {
-    slot: 'FREE', half: [0.5, 0.35], top: 0.7, interact: 'STORAGE',
+    slot: 'FREE', half: [0.5, 0.35], top: 0.7, interact: 'STORAGE', storage: 27,
     colliders: [{ x0: -0.5, x1: 0.5, z0: -0.35, z1: 0.35, y0: 0, y1: 0.7 }], surfaces: [{ kind: 'flat', y: 0.7, bottom: 0 }],
   },
   // Hoguera (asar) y cocina con olla (guisar): estaciones de cocina que dan luz y calor.
@@ -122,6 +133,102 @@ export const SHAPES = {
     slot: 'FREE', half: [1, 1], top: 0.25, interact: 'FARM',
     colliders: [], surfaces: [{ kind: 'flat', y: 0.2, bottom: 0 }],
   },
+  // ---- P6: piedra y ladrillo (misma forma que las de madera) -------------------------------
+  // (se rellenan abajo: STONE_WALL, BRICK_WALL, STONE_FLOOR, BRICK_FLOOR, TILE_ROOF, STONE_STAIRS, STONE_PILLAR)
+  HALF_WALL: {
+    slot: 'EDGE', half: [1, 0.1], top: 1.2,
+    colliders: [{ x0: -1, x1: 1, z0: -0.1, z1: 0.1, y0: 0, y1: 1.2 }], surfaces: [],
+  },
+  // Hastial: triángulo sobre una pared (cierra el hueco bajo el tejado). Colisión en escalones.
+  GABLE: {
+    slot: 'EDGE', half: [1, 0.1], top: 1.2,
+    colliders: [
+      { x0: -1, x1: 1, z0: -0.1, z1: 0.1, y0: 0, y1: 0.4 },
+      { x0: -0.66, x1: 0.66, z0: -0.1, z1: 0.1, y0: 0.4, y1: 0.8 },
+      { x0: -0.33, x1: 0.33, z0: -0.1, z1: 0.1, y0: 0.8, y1: 1.2 },
+    ],
+    surfaces: [],
+  },
+  BIG_WINDOW: {
+    slot: 'EDGE', half: [1, 0.1], top: H, glass: true,
+    colliders: [{ x0: -1, x1: 1, z0: -0.1, z1: 0.1, y0: 0, y1: H }], surfaces: [],
+  },
+  FENCE_GATE: {
+    slot: 'EDGE', half: [1, 0.06], top: 1.1, interact: 'DOOR',
+    colliders: [{ x0: -1, x1: -0.92, z0: -0.07, z1: 0.07, y0: 0, y1: 1.2 }, { x0: 0.92, x1: 1, z0: -0.07, z1: 0.07, y0: 0, y1: 1.2 }],
+    leaf: { hinge: [-0.9, 0, 0], axis: 'y', angle: -Math.PI / 2 },
+    leafCollider: { x0: -0.92, x1: 0.92, z0: -0.05, z1: 0.05, y0: 0, y1: 1.05 },
+    surfaces: [],
+  },
+  RAILING: {
+    slot: 'EDGE', half: [1, 0.05], top: 1.0,
+    colliders: [{ x0: -1, x1: 1, z0: -0.05, z1: 0.05, y0: 0, y1: 1.0 }], surfaces: [],
+  },
+  // Escalera de mano: no choca; se trepa desde delante (+Z).
+  LADDER: {
+    slot: 'FREE', half: [0.45, 0.1], top: H, ladder: true,
+    colliders: [], surfaces: [],
+  },
+  // Trampilla: un suelo con una hoja que se levanta (E); abierta, se cae por el hueco.
+  TRAPDOOR: {
+    slot: 'CELL', half: [1, 1], top: 0.2, bottom: 0, interact: 'DOOR',
+    leaf: { hinge: [0, 0.2, -0.85], axis: 'x', angle: Math.PI / 2 },
+    colliders: [], surfaces: [{ kind: 'flat', y: 0.2, bottom: 0 }], openSurfaces: [],
+  },
+  // ---- P6: muebles ----------------------------------------------------------------------
+  TABLE: {
+    slot: 'FREE', half: [0.8, 0.5], top: 0.8,
+    colliders: [{ x0: -0.8, x1: 0.8, z0: -0.5, z1: 0.5, y0: 0, y1: 0.8 }], surfaces: [{ kind: 'flat', y: 0.8, bottom: 0.72 }],
+  },
+  CHAIR: {
+    slot: 'FREE', half: [0.27, 0.27], top: 0.48,
+    colliders: [{ x0: -0.27, x1: 0.27, z0: -0.27, z1: 0.27, y0: 0, y1: 0.48 }], surfaces: [{ kind: 'flat', y: 0.48, bottom: 0.4 }],
+  },
+  BENCH: {
+    slot: 'FREE', half: [0.8, 0.22], top: 0.46,
+    colliders: [{ x0: -0.8, x1: 0.8, z0: -0.22, z1: 0.22, y0: 0, y1: 0.46 }], surfaces: [{ kind: 'flat', y: 0.46, bottom: 0.38 }],
+  },
+  BOOKSHELF: {
+    slot: 'FREE', half: [0.6, 0.18], top: 1.9,
+    colliders: [{ x0: -0.6, x1: 0.6, z0: -0.18, z1: 0.18, y0: 0, y1: 1.9 }], surfaces: [{ kind: 'flat', y: 1.9, bottom: 1.85 }],
+  },
+  WARDROBE: {
+    slot: 'FREE', half: [0.6, 0.32], top: 2.0, interact: 'STORAGE', storage: 18,
+    colliders: [{ x0: -0.6, x1: 0.6, z0: -0.32, z1: 0.32, y0: 0, y1: 2.0 }], surfaces: [],
+  },
+  BARREL: {
+    slot: 'FREE', half: [0.33, 0.33], top: 0.95, interact: 'STORAGE', storage: 9,
+    colliders: [{ x0: -0.33, x1: 0.33, z0: -0.33, z1: 0.33, y0: 0, y1: 0.95 }], surfaces: [{ kind: 'flat', y: 0.95, bottom: 0.9 }],
+  },
+  RUG: {
+    slot: 'FREE', half: [1, 0.7], top: 0.02,
+    colliders: [], surfaces: [],
+  },
+  LAMP: {
+    slot: 'FREE', half: [0.13, 0.13], top: 0.55, light: { y: 0.42, color: 0xffc070, distance: 11, intensity: 1.6 },
+    colliders: [{ x0: -0.13, x1: 0.13, z0: -0.13, z1: 0.13, y0: 0, y1: 0.55 }], surfaces: [],
+  },
+  FLOWER_POT: {
+    slot: 'FREE', half: [0.18, 0.18], top: 0.6,
+    colliders: [{ x0: -0.18, x1: 0.18, z0: -0.18, z1: 0.18, y0: 0, y1: 0.35 }], surfaces: [],
+  },
+  // ---- P6: útiles de casa -----------------------------------------------------------------
+  WELL: {
+    slot: 'FREE', half: [0.85, 0.85], top: 2.3, interact: 'WELL',
+    colliders: [{ x0: -0.85, x1: 0.85, z0: -0.85, z1: 0.85, y0: 0, y1: 0.85 }], surfaces: [],
+  },
+  RAIN_COLLECTOR: {
+    slot: 'FREE', half: [0.6, 0.6], top: 1.9, interact: 'COLLECTOR',
+    colliders: [{ x0: -0.38, x1: 0.38, z0: -0.38, z1: 0.38, y0: 0, y1: 0.9 }], surfaces: [],
+  },
+  DRYING_RACK: {
+    slot: 'FREE', half: [0.9, 0.35], top: 1.6, interact: 'CRAFT', station: 'DRYING_RACK',
+    colliders: [{ x0: -0.9, x1: 0.9, z0: -0.35, z1: 0.35, y0: 0, y1: 1.6 }], surfaces: [],
+  },
+  MANNEQUIN: {
+    slot: 'FREE', half: [0.3, 0.25], top: 1.9, interact: 'MANNEQUIN',
+    colliders: [{ x0: -0.3, x1: 0.3, z0: -0.25, z1: 0.25, y0: 0, y1: 1.9 }], surfaces: [],
+  },
   // Antorcha clavada en el suelo: ilumina (no estorba el paso).
   TORCH: {
     slot: 'FREE', half: [0.12, 0.12], top: 1.1,
@@ -138,7 +245,15 @@ export const SHAPES = {
   },
 };
 
+// Piedra y ladrillo: la misma forma que su versión de madera.
+for (const [type, base] of [['STONE_WALL', 'WALL'], ['BRICK_WALL', 'WALL'], ['STONE_FLOOR', 'FLOOR'], ['BRICK_FLOOR', 'FLOOR'], ['TILE_ROOF', 'ROOF'], ['STONE_STAIRS', 'STAIRS'], ['STONE_PILLAR', 'PILLAR'], ['STONE_HALF_WALL', 'HALF_WALL']]) {
+  SHAPES[type] = SHAPES[base];
+}
+/** Piezas que cuentan como pared para el refugio. */
+const WALLISH = ['WALL', 'DOOR', 'WINDOW', 'STONE_WALL', 'BRICK_WALL', 'BIG_WINDOW'];
+
 const HALF_PI = Math.PI / 2;
+const FREE_STEP = Math.PI / 12; // giro libre de los muebles: 15°
 const snapQuarter = (a) => Math.round(a / HALF_PI) * HALF_PI;
 
 // ---- Transformaciones -----------------------------------------------------------
@@ -197,12 +312,13 @@ export function footprintSamples(piece) {
  */
 export function surfaceAt(piece, x, z) {
   const shape = SHAPES[piece.type];
-  if (!shape.surfaces.length) return null;
+  const surfaces = piece.open && shape.openSurfaces ? shape.openSurfaces : shape.surfaces;
+  if (!surfaces.length) return null;
   const [lx, lz] = toLocal(piece, x, z);
   const [hx, hz] = shape.half;
   if (Math.abs(lx) > hx + 1e-6 || Math.abs(lz) > hz + 1e-6) return null;
   let best = null;
-  for (const s of shape.surfaces) {
+  for (const s of surfaces) {
     let top;
     if (s.kind === 'flat') top = piece.y + s.y;
     else {
@@ -289,8 +405,9 @@ export function snapXZ(type, x, z, { grid, yaw, rotSteps }) {
     const iz = Math.round(z / grid);
     return { x: ix * grid, z: iz * grid, rotation: 0, slot: `CORNER:${ix}:${iz}` };
   }
-  // Libre cada 0,25 m: permite arrimar muebles a las paredes.
-  return { x: Math.round(x * 4) / 4, z: Math.round(z * 4) / 4, rotation: facing, slot: null };
+  // Libre cada 0,25 m (arrimar muebles a las paredes) y giro libre: Q gira 15°.
+  const free = snapQuarter(yaw) + rotSteps * FREE_STEP;
+  return { x: Math.round(x * 4) / 4, z: Math.round(z * 4) / 4, rotation: free, slot: null };
 }
 
 /** Clave de hueco con altura: dos piezas no pueden compartirla. */
@@ -329,7 +446,7 @@ export function isSupported(piece, others, heightAt, grid) {
 
 // ---- Refugio (Fase 10) -------------------------------------------------------------------
 
-const WALL_TYPES = new Set(['WALL', 'DOOR', 'WINDOW']);
+const WALL_TYPES = new Set(WALLISH);
 const SHELTER_RAY = 8; // m
 
 /**
@@ -361,4 +478,21 @@ export function shelterAt(pieces, x, y, z, headHeight = 1.8) {
     }
   }
   return { roofed, walls, factor: Math.min(1, (roofed ? 0.5 : 0) + walls * 0.125) };
+}
+
+// ---- Escalera de mano (P6) -----------------------------------------------------------------
+
+/**
+ * Si (x, y, z) está en la zona para trepar una escalera de mano: { piece, top, nx, nz }
+ * (nx, nz: hacia dónde mira la escalera, hacia el jugador). Si no, null.
+ */
+export function ladderAt(pieces, x, y, z) {
+  for (const p of pieces) {
+    if (!SHAPES[p.type]?.ladder) continue;
+    if (y < p.y - 0.3 || y > p.y + SHAPES[p.type].top + 0.1) continue;
+    const [lx, lz] = toLocal(p, x, z);
+    if (Math.abs(lx) > 0.55 || lz < -0.15 || lz > 0.7) continue;
+    return { piece: p, top: p.y + SHAPES[p.type].top, nx: Math.sin(p.rotation), nz: Math.cos(p.rotation) };
+  }
+  return null;
 }

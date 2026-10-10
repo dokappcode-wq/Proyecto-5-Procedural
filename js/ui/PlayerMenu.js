@@ -242,7 +242,7 @@ export class PlayerMenu extends ModalPanel {
       this._chestSlots.push(s);
       cgrid.append(s);
     }
-    this._chestSection.append(el('h3', 'pm-sub', 'Cofre · Shift+clic mueve entre el cofre y tu inventario'), cgrid);
+    this._chestSection.append(el('h3', 'pm-sub', 'Guardado · Shift+clic mueve entre el mueble y tu inventario'), cgrid);
 
     // Fabricación: rejilla de recetas.
     this._craftSection = el('section', 'pm-crafting');
@@ -402,7 +402,14 @@ export class PlayerMenu extends ModalPanel {
       s.querySelector('.dur')?.remove();
       if (stack?.dur != null && def?.DURABILITY) s.append(durabilityBar(stack.dur / def.DURABILITY));
     };
-    if (this.tab === MenuTab.CHEST && inv.container) this._chestSlots.forEach((s, k) => paint(s, inv.container.slots[k]));
+    if (this.tab === MenuTab.CHEST && inv.container) {
+      // Cofre 27 huecos, armario 18, barril 9 (P6): solo se ven los que tiene.
+      const n = inv.container.slots.length;
+      this._chestSlots.forEach((s, k) => {
+        s.style.display = k < n ? '' : 'none';
+        if (k < n) paint(s, inv.container.slots[k]);
+      });
+    }
     if (this.tab === MenuTab.INVENTORY || this.tab === MenuTab.CHEST) {
       // La mochila (P5) añade filas: se crean sus huecos la primera vez que se ven.
       while (this._bagGrid && this._mainSlots.length < inv.slots.length - inv.hotbarSize) {

@@ -519,6 +519,7 @@ export class AudioSystem {
       this._animalVoice(S, o, animal.species, 1);
       S.craft(o);
     }));
+    on(E.WELL_USE, ({ piece }) => piece && this.playAt(piece.x, piece.z, (S, o) => S.splash(o, 0.4)));
     on(E.FARM_CHANGED, ({ action }) => this.play((S, o) => {
       if (action === 'water') S.splash(o, 0.45);
       else if (action === 'harvest') S.pickup(o);
@@ -539,6 +540,8 @@ export class AudioSystem {
   }
 
   _stony(piece) {
+    // Piedra y ladrillo suenan a piedra (por el tipo de pieza: su coste es la pieza en sí).
+    if (/STONE|BRICK|TILE|FOUNDATION|FURNACE|FORGE|WELL|KITCHEN|CAMPFIRE/.test(piece.type ?? '')) return true;
     const cost = piece.cost ?? this._construction?.costOf?.(piece.type) ?? {};
     return Object.keys(cost).some((k) => k === 'STONE' || k === 'MINERAL' || k.includes('BRICK'));
   }

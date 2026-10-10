@@ -60,6 +60,8 @@ export const GameEvents = Object.freeze({
   ITEM_REPAIRED: 'inventory:itemRepaired',          // { itemId, dur, max } (martillo)
   INVENTORY_EXPANDED: 'inventory:expanded',         // { rows } mochila puesta (P5)
   POTION_DRUNK: 'player:potionDrunk',               // { itemId } (P5)
+  STRUCTURE_INTERACT_DONE: 'construction:interactDone', // { structure } puerta/trampilla abierta o cerrada (P6)
+  WELL_USE: 'construction:wellUse',                 // { piece, source: 'WELL' | 'COLLECTOR' } (P6)
   FARM_CHANGED: 'farm:changed',                     // { piece, action: plant|water|fert|harvest } (P4)
   ANIMAL_TAMED: 'animal:tamed',                     // { animal } (P4)
   ANIMAL_CARE: 'animal:care',                       // { animal, action: feed|milk|shear|egg } (P4)

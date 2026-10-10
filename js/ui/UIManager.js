@@ -433,7 +433,15 @@ export class UIManager {
 
   /** Modo construcción: barra de piezas con tecla, icono y coste. */
   _drawBuildBar(bar) {
-    this._pieceList().forEach((def, i) => {
+    // Solo las piezas que llevas encima (como mucho 10: teclas 1–0), como ConstructionSystem.buildList.
+    const owned = this._pieceList().filter((def) => this._canAfford(def)).slice(0, 10);
+    if (!owned.length) {
+      const empty = document.createElement('div');
+      empty.className = 'build-empty';
+      empty.textContent = 'No llevas piezas: fabrícalas en el reloj (Tab → Construcción o Muebles y hogar).';
+      bar.appendChild(empty);
+    }
+    owned.forEach((def, i) => {
       const id = def.id;
       const slot = document.createElement('div');
       slot.className = 'inv-slot build-slot';
@@ -471,7 +479,7 @@ export class UIManager {
       const def = this._pieceList().find((p) => p.id === this._buildPiece) ?? this._build.PIECES[this._buildPiece];
       const invalid = pl?.active && !pl.valid;
       el.textContent = `${def.ICON} ${def.NAME} (${this._costText(def)}) — ` +
-        (invalid ? pl.reason : '[Clic] Colocar · [Clic dcho] Quitar · [Q] Girar · [B] Salir');
+        (invalid ? pl.reason : '[Clic] Colocar · [Clic dcho] Quitar · [Q] Girar (muebles: 15°) · [B] Salir');
       el.classList.toggle('invalid', !!invalid);
       el.classList.remove('hidden');
       return;
@@ -494,7 +502,7 @@ export class UIManager {
       }
       case 'EQUIP': text = `${key} Ponerse (se cambia por lo que lleves) · [I] Inventario`; break;
       case 'WATCH': text = `${key} Ver dónde está la nave`; break;
-      case 'BUILD': text = def.HOLD ? `Ilumina en la mano · ${key} Clavarla en el suelo` : '[Clic] Colocar · [Q] Girar'; break;
+      case 'BUILD': text = def.HOLD ? `Ilumina en la mano · ${key} Clavarla en el suelo` : '[Clic] Colocar · [Q] Girar (muebles: 15°)'; break;
       default:
         if (def.RANGED) {
           text = `[Mantén clic dcho] Apuntar · [Mantén clic] Tensar y suelta para disparar${def.RANGED.AMMO.length > 1 ? ' · [X] Flecha' : ''}`;

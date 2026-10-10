@@ -43,6 +43,37 @@ const BUILD_PIECES = {
   FORGE: { NAME: 'Forja', ICON: '⚒️', RECIPE: { BRICK: 12, REFINED_IRON: 4, REFINED_STONE: 4 }, TIME: 25, STATION_PIECE: true, DESC: 'Fragua de ladrillo con yunque: acero, oro de las monedas y fundición que rinde más (E). Da luz y calor.' },
   // Granja (P4): parcela de tierra labrada con borde de troncos. E con semillas para sembrar.
   FARM_PLOT: { NAME: 'Parcela de cultivo', ICON: '🌱', RECIPE: { WOOD: 2, FIBER: 2 }, TIME: 4, DESC: 'Tierra para sembrar (2×2 m). E con semillas: sembrar · con el cubo de agua: regar · con harina de hueso: abonar · madura: cosechar.' },
+  // Construcción (P6). HARD: aguante al romperla a golpes (× BUILD.BREAK_TIME).
+  STONE_WALL: { NAME: 'Pared de piedra', ICON: '🪨', RECIPE: { REFINED_STONE: 3 }, TIME: 5, HARD: 2.5, DESC: 'Sillares de piedra: aguanta mucho más que la madera.' },
+  BRICK_WALL: { NAME: 'Pared de ladrillo', ICON: '🧱', RECIPE: { BRICK: 6 }, TIME: 5, HARD: 2, DESC: 'Ladrillo rojo con llagas de mortero.' },
+  STONE_FLOOR: { NAME: 'Suelo de losas', ICON: '⬜', RECIPE: { REFINED_STONE: 2 }, TIME: 3, HARD: 2 },
+  BRICK_FLOOR: { NAME: 'Suelo de baldosas', ICON: '🟥', RECIPE: { BRICK: 4 }, TIME: 3, HARD: 2, DESC: 'Baldosas de barro cocido en espiga.' },
+  TILE_ROOF: { NAME: 'Tejado de tejas', ICON: '🔻', RECIPE: { BRICK: 4 }, TIME: 4, HARD: 1.5, DESC: 'Tejas curvas de barro cocido.' },
+  STONE_STAIRS: { NAME: 'Escalera de piedra', ICON: '🪜', RECIPE: { REFINED_STONE: 4 }, TIME: 5, HARD: 2 },
+  STONE_PILLAR: { NAME: 'Columna de piedra', ICON: '🏛️', RECIPE: { REFINED_STONE: 1 }, TIME: 2, HARD: 2.5 },
+  HALF_WALL: { NAME: 'Media pared', ICON: '▭', RECIPE: { WOOD: 2 }, TIME: 2, DESC: 'Pared hasta la cintura: barras, porches y corrales.' },
+  STONE_HALF_WALL: { NAME: 'Murete de piedra', ICON: '▭', RECIPE: { REFINED_STONE: 2 }, TIME: 3, HARD: 2.5 },
+  GABLE: { NAME: 'Hastial', ICON: '🔺', RECIPE: { WOOD: 2 }, TIME: 2, DESC: 'Pared triangular encima de una pared: cierra el hueco bajo el tejado a dos aguas.' },
+  BIG_WINDOW: { NAME: 'Ventanal', ICON: '🪟', RECIPE: { WOOD: 2, GLASS: 4 }, TIME: 5, DESC: 'Pared con un gran cristal: mucha luz y buenas vistas.' },
+  FENCE_GATE: { NAME: 'Puerta de valla', ICON: '🚧', RECIPE: { WOOD: 2 }, TIME: 2, DESC: 'Se abre y se cierra (E): para corrales y huertos.' },
+  RAILING: { NAME: 'Barandilla', ICON: '〰️', RECIPE: { WOOD: 1 }, TIME: 1, DESC: 'Para balcones, escaleras y pisos altos.' },
+  LADDER: { NAME: 'Escalera de mano', ICON: '🪜', RECIPE: { WOOD: 3 }, TIME: 2, DESC: 'Avanza contra ella para subir (atrás: bajar, Espacio: soltarse).' },
+  TRAPDOOR: { NAME: 'Trampilla', ICON: '🟫', RECIPE: { WOOD: 3 }, TIME: 3, DESC: 'Suelo que se abre (E): con una escalera de mano debajo se baja al piso de abajo.' },
+  // Muebles (P6).
+  TABLE: { NAME: 'Mesa', ICON: '🪑', RECIPE: { REFINED_WOOD: 3 }, TIME: 5, CATEGORY: 'FURNITURE', DESC: 'Encima se pueden poner lámparas, macetas…' },
+  CHAIR: { NAME: 'Silla', ICON: '🪑', RECIPE: { REFINED_WOOD: 2 }, TIME: 4, CATEGORY: 'FURNITURE' },
+  BENCH: { NAME: 'Banco', ICON: '🪵', RECIPE: { REFINED_WOOD: 2 }, TIME: 4, CATEGORY: 'FURNITURE' },
+  BOOKSHELF: { NAME: 'Estantería', ICON: '📚', RECIPE: { REFINED_WOOD: 4, CLOTH: 1 }, TIME: 6, CATEGORY: 'FURNITURE' },
+  WARDROBE: { NAME: 'Armario', ICON: '🚪', RECIPE: { REFINED_WOOD: 6 }, TIME: 8, CATEGORY: 'FURNITURE', DESC: 'Guarda objetos (18 huecos): E para abrirlo.' },
+  BARREL: { NAME: 'Barril', ICON: '🛢️', RECIPE: { WOOD: 4, ROPE: 1 }, TIME: 4, CATEGORY: 'FURNITURE', DESC: 'Guarda objetos (9 huecos): E para abrirlo.' },
+  RUG: { NAME: 'Alfombra', ICON: '🟥', RECIPE: { CLOTH: 3 }, TIME: 4, CATEGORY: 'FURNITURE', DESC: 'Se pone primero y encima los muebles.' },
+  LAMP: { NAME: 'Lámpara de aceite', ICON: '🪔', RECIPE: { REFINED_IRON: 1, GLASS: 1, RESIN: 1 }, TIME: 4, CATEGORY: 'FURNITURE', DESC: 'Luz cálida para la casa (en el suelo, en una mesa o en una estantería).' },
+  FLOWER_POT: { NAME: 'Maceta con flores', ICON: '🪴', RECIPE: { CLAY: 2, WILD_FLOWER: 2 }, TIME: 3, CATEGORY: 'FURNITURE' },
+  // Útiles de casa (P6).
+  WELL: { NAME: 'Pozo', ICON: '⛲', RECIPE: { REFINED_STONE: 8, ROPE: 2, BUCKET: 1 }, TIME: 15, CATEGORY: 'FURNITURE', DESC: 'Agua para siempre junto a casa: E para beber, llenar el cubo o el odre.' },
+  RAIN_COLLECTOR: { NAME: 'Recolector de lluvia', ICON: '🌧️', RECIPE: { REFINED_WOOD: 4, CLOTH: 2 }, TIME: 8, CATEGORY: 'FURNITURE', DESC: 'Un toldo que recoge agua en un barril (más si llueve). E: beber o llenar.' },
+  DRYING_RACK: { NAME: 'Secadero', ICON: '🥓', RECIPE: { WOOD: 4, ROPE: 2 }, TIME: 6, STATION_PIECE: true, DESC: 'Cecina, pescado seco y fruta seca: comida que alimenta y no sienta mal (E).' },
+  MANNEQUIN: { NAME: 'Maniquí', ICON: '🧍', RECIPE: { WOOD: 3, FIBER: 2 }, TIME: 4, CATEGORY: 'FURNITURE', DESC: 'E: te cambias la armadura con la suya (guárdala vistosa).' },
   // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
   CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', RECIPE: { STONE: 4, MINERAL: 3 }, TIME: 8, BODIES: 'MOON' },
   OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', RECIPE: { STONE: 4, MINERAL: 4 }, TIME: 8, BODIES: 'MOON' },
@@ -55,13 +86,13 @@ const PIECE_ITEMS = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([, d
 ]));
 const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([, d]) => d.RECIPE).map(([type, d]) => [
   `PIECE_${type}`,
-  { RESULT: pieceItemId(type), AMOUNT: 1, CATEGORY: d.STATION_PIECE ? 'STATIONS' : 'CONSTRUCTION', TIME: d.TIME ?? 3, INGREDIENTS: d.RECIPE, ...(d.LOCK ? { LOCK: d.LOCK } : {}) },
+  { RESULT: pieceItemId(type), AMOUNT: 1, CATEGORY: d.STATION_PIECE ? 'STATIONS' : d.CATEGORY ?? 'CONSTRUCTION', TIME: d.TIME ?? 3, INGREDIENTS: d.RECIPE, ...(d.LOCK ? { LOCK: d.LOCK } : {}) },
 ]));
 
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.28.0',
+    VERSION: '1.29.0',
   },
 
   RENDER: {
@@ -538,6 +569,9 @@ export const GameConfig = deepFreeze({
     PUMPKIN: { NAME: 'Calabaza', ICON: '🎃', DESC: 'Para la tarta de calabaza y semillas (reloj).' },
     PUMPKIN_SEEDS: { NAME: 'Pipas de calabaza', ICON: '🫘', SEED: 'PUMPKIN', DESC: 'Con E sobre una parcela: sembrar calabaza.' },
     BONE_MEAL: { NAME: 'Harina de hueso', ICON: '🦴', FERTILIZER: true, DESC: 'Abono: con E sobre una parcela sembrada, crece más deprisa y da más.' },
+    JERKY: { NAME: 'Cecina', ICON: '🥓', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 30, DESC: 'Carne curada al aire (secadero): no sienta mal.' },
+    DRIED_FISH: { NAME: 'Pescado seco', ICON: '🐟', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 24 },
+    DRIED_FRUIT: { NAME: 'Fruta seca', ICON: '🍇', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 22, EFFECTS: { ENERGIZED: 90 } },
     BAKED_POTATO: { NAME: 'Patata asada', ICON: '🥔', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 20, EFFECTS: { WARM: 120 } },
     PUMPKIN_PIE: { NAME: 'Tarta de calabaza', ICON: '🥧', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 55, EFFECTS: { WELL_FED: 420 } },
     VEGETABLE_STEW: { NAME: 'Guiso de verduras', ICON: '🍲', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 44, EFFECTS: { WELL_FED: 300, WARM: 240 } },
@@ -731,6 +765,11 @@ export const GameConfig = deepFreeze({
     VEGETABLE_STEW: { RESULT: 'VEGETABLE_STEW', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 16, STATION: 'KITCHEN', INGREDIENTS: { CARROT: 2, POTATO: 2, MUSHROOM: 1 } },
     FISH_SOUP: { RESULT: 'FISH_SOUP', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 16, STATION: 'KITCHEN', INGREDIENTS: { FISH: 1, POTATO: 1, CARROT: 1 } },
     CHEESE: { RESULT: 'CHEESE', AMOUNT: 3, CATEGORY: 'COOKING', TIME: 20, STATION: 'KITCHEN', INGREDIENTS: { BUCKET_MILK: 1 }, RETURNS: { BUCKET: 1 } },
+    // Secadero (P6): lento, pero lo curado alimenta bien y no sienta mal.
+    JERKY: { RESULT: 'JERKY', AMOUNT: 2, CATEGORY: 'COOKING', TIME: 60, STATION: 'DRYING_RACK', INGREDIENTS: { MEAT: 2, RESIN: 1 } },
+    DRIED_FISH: { RESULT: 'DRIED_FISH', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 45, STATION: 'DRYING_RACK', INGREDIENTS: { FISH: 1 } },
+    DRIED_FISH_SMALL: { RESULT: 'DRIED_FISH', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 45, STATION: 'DRYING_RACK', INGREDIENTS: { SMALL_FISH: 2 } },
+    DRIED_FRUIT: { RESULT: 'DRIED_FRUIT', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 50, STATION: 'DRYING_RACK', INGREDIENTS: { APPLE: 1, BERRIES: 3 } },
     // Telar.
     CLOTH: { RESULT: 'CLOTH', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'LOOM', INGREDIENTS: { FIBER: 4 } },
     CLOTH_WOOL: { RESULT: 'CLOTH', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'LOOM', INGREDIENTS: { WOOL: 2 } },
@@ -826,6 +865,7 @@ export const GameConfig = deepFreeze({
     WORKBENCH: { NAME: 'Mesa de elaboración', ICON: '🧰' },
     CAMPFIRE: { NAME: 'Hoguera', ICON: '🔥' },
     KITCHEN: { NAME: 'Cocina con olla', ICON: '🍲' },
+    DRYING_RACK: { NAME: 'Secadero', ICON: '🥓' },
     LOOM: { NAME: 'Telar', ICON: '🧶' },
     TANNER: { NAME: 'Curtidor', ICON: '🪣' },
     ALCHEMY: { NAME: 'Mesa de alquimia', ICON: '⚗️' },
@@ -843,6 +883,7 @@ export const GameConfig = deepFreeze({
     COOKING: 'Cocina',
     ALCHEMY: 'Pociones',
     FARMING: 'Granja',
+    FURNITURE: 'Muebles y hogar',
   },
 
   // Construcción modular (Fase 9): el jugador construye pieza a pieza.
@@ -858,10 +899,12 @@ export const GameConfig = deepFreeze({
     BREAK_TIME: 3,          // s de golpes (manteniendo el clic) para romper una pieza fuera del modo construcción; un hacha o un pico lo reducen a la mitad
     // Coste de cada pieza = su objeto (ver BUILD_PIECES arriba).
     PIECES: Object.fromEntries(Object.entries(BUILD_PIECES).map(([type, d]) => [
-      type, { NAME: d.NAME, ICON: d.ICON, COST: { [pieceItemId(type)]: 1 }, ...(d.BODIES ? { BODIES: d.BODIES } : {}) },
+      type, { NAME: d.NAME, ICON: d.ICON, COST: { [pieceItemId(type)]: 1 }, ...(d.BODIES ? { BODIES: d.BODIES } : {}), ...(d.HARD ? { HARD: d.HARD } : {}) },
     ])),
     // Piezas que no se pueden hacer en las lunas (BODIES: 'HOME').
-    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN', 'LOOM', 'TANNER', 'ALCHEMY', 'FORGE', 'FARM_PLOT'],
+    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN', 'LOOM', 'TANNER', 'ALCHEMY', 'FORGE', 'FARM_PLOT',
+      'TABLE', 'CHAIR', 'BENCH', 'BOOKSHELF', 'WARDROBE', 'BARREL', 'RUG', 'LAMP', 'FLOWER_POT', 'WELL', 'RAIN_COLLECTOR', 'DRYING_RACK', 'MANNEQUIN'],
+    RAIN_COLLECTOR: { CAPACITY: 4, EVERY: 150, RAIN_EVERY: 25 }, // unidades de agua; s por unidad (con lluvia, más deprisa)
     CAMPFIRE_WARM_RADIUS: 5,   // m: cerca de una hoguera (o de la cocina) se está caliente
     CAMPFIRE_SLIME_RADIUS: 9,  // m: los slimes no se acercan a una hoguera
     CHEST_SLOTS: 27,

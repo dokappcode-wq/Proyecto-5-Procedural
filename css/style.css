@@ -1436,3 +1436,4 @@ body:has(.cine-bars.on) #hud > :not(.story-ui) { opacity: 0; transition: opacity
 #fishing-ui .fish-icon { position: absolute; left: 0; right: 0; text-align: center; font-size: 18px; line-height: 20px; }
 #fishing-ui .fish-meter { position: relative; width: 10px; border-radius: 5px; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden; }
 #fishing-ui .fish-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#ffd34a, #62c24a); }
+.build-empty { padding: 8px 12px; border-radius: 8px; background: rgba(8, 14, 24, 0.7); color: #eef3f8; font-size: 0.85rem; }
