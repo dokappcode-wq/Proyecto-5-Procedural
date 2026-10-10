@@ -1732,6 +1732,10 @@ loadCampaign()
   .catch((err) => {
     console.error(err);
     const el = document.getElementById('fatal-error');
-    el.textContent = `No se pudo iniciar ${GameConfig.GAME.TITLE}: ${err.message}.${err.dataError ? '' : ' ¿Tu navegador soporta WebGL?'}`;
+    // "x is not a function" casi siempre es una mezcla de archivos nuevos y viejos guardados
+    // por el navegador (tras actualizar): se arregla recargando sin caché.
+    const stale = err instanceof TypeError && /is not a function|is not a constructor|does not provide an export/.test(err.message);
+    const hint = err.dataError ? '' : stale ? ' Recarga sin caché (Ctrl+F5) o arranca con «python serve.py 8003».' : ' ¿Tu navegador soporta WebGL?';
+    el.textContent = `No se pudo iniciar ${GameConfig.GAME.TITLE}: ${err.message}.${hint}`;
     el.classList.remove('hidden');
   });

@@ -43,10 +43,14 @@ Nombre provisional del juego: **Mundo Cero**. El planeta de la campaña es **El 
 Los módulos ES no se cargan desde `file://`, así que hace falta un servidor estático local:
 
 ```bash
-npm start                        # usa npx http-server en http://localhost:8080
+python serve.py 8080             # recomendado: servidor sin caché (siempre carga lo último)
 # o bien
-python3 -m http.server 8080
+npm start                        # usa npx http-server (sin caché) en http://localhost:8080
 ```
+
+No uses `python -m http.server`: el navegador guarda los módulos y, tras un `git pull`, puede
+mezclar archivos viejos con nuevos (el juego falla al arrancar con «… is not a function»). Si
+pasa, recarga sin caché con **Ctrl+F5**.
 
 Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 
