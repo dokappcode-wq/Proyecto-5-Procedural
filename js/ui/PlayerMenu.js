@@ -16,7 +16,9 @@ import { durabilityBar } from './UIManager.js';
  * muñeca (main.js escucha UI_PANEL_TOGGLED de 'player-menu').
  *
  * Ratón en los huecos: clic coger/dejar · clic derecho la mitad/una · Shift+clic
- * mover rápido o ponerse la ropa. Recetas: clic selecciona, doble clic fabrica.
+ * mover rápido o ponerse la ropa. Recetas: clic selecciona, doble clic fabrica, clic
+ * derecho marca favorita (salen primero). Con un cofre: ordenar, guardar iguales y coger
+ * todo (P9); en el detalle se elige cuántas fabricar.
  * Tirar: dejar lo que se lleva con el ratón en la zona «Tirar al suelo» o hacer
  * clic fuera del menú (clic derecho: solo una unidad). Cae al suelo en una bolsa.
  * Solo vista: inventario, ropa y fabricación viven en sus sistemas. Todo el
@@ -53,6 +55,8 @@ export class PlayerMenu extends ModalPanel {
     this._category = 'ALL';
     this._keyRequest = null;
     this._statTimer = 0;
+    this.favorites = new Set(); // recetas favoritas (P9; se guardan con la partida)
+    this._qty = 1;              // cuántas fabricar de la receta seleccionada
     this._build();
 
     // Con el menú abierto la entrada de juego está bloqueada: Tab / I llegan aquí.
@@ -194,7 +198,7 @@ export class PlayerMenu extends ModalPanel {
     });
     const cat = document.createElement('select');
     cat.className = 'pm-category';
-    for (const [k, label] of [['ALL', 'Todos los objetos'], ...Object.entries(this._categories), ['READY', 'Se pueden fabricar ya']]) {
+    for (const [k, label] of [['ALL', 'Todos los objetos'], ['FAV', '★ Favoritas'], ...Object.entries(this._categories), ['READY', 'Se pueden fabricar ya']]) {
       const o = document.createElement('option');
       o.value = k;
       o.textContent = label;
@@ -231,7 +235,12 @@ export class PlayerMenu extends ModalPanel {
       this._dropCursor(e.button === 2 ? 1 : Infinity);
     });
     drop.addEventListener('contextmenu', (e) => e.preventDefault());
-    this._invSection.append(el('h3', 'pm-sub', 'Mochila'), grid, el('h3', 'pm-sub', 'Barra rápida · 1–9'), bar, drop);
+    const bagHead = el('div', 'pm-sub-row');
+    const sortBag = button('↕ Ordenar', 'pm-mini');
+    sortBag.title = 'Ordenar la mochila (la barra rápida no se toca)';
+    sortBag.addEventListener('click', () => this._inv.sortBag());
+    bagHead.append(el('h3', 'pm-sub', 'Mochila'), sortBag);
+    this._invSection.append(bagHead, grid, el('h3', 'pm-sub', 'Barra rápida · 1–9'), bar, drop);
 
     // Cofre abierto: sus huecos ('c:N') encima de la mochila.
     this._chestSection = el('section', 'pm-chest hidden');
@@ -242,7 +251,22 @@ export class PlayerMenu extends ModalPanel {
       this._chestSlots.push(s);
       cgrid.append(s);
     }
-    this._chestSection.append(el('h3', 'pm-sub', 'Guardado · Shift+clic mueve entre el mueble y tu inventario'), cgrid);
+    const chestHead = el('div', 'pm-sub-row');
+    const sortChest = button('↕ Ordenar', 'pm-mini');
+    sortChest.addEventListener('click', () => this._inv.sortContainer());
+    const stack = button('⇪ Guardar iguales', 'pm-mini');
+    stack.title = 'Mete en el mueble lo de tu mochila que ya hay dentro';
+    stack.addEventListener('click', () => {
+      const n = this._inv.quickStack();
+      this._events.emit(GameEvents.UI_MESSAGE, { text: n ? `📦 Guardado: ${n} ${n === 1 ? 'objeto' : 'objetos'}.` : 'No llevas nada de lo que hay en el mueble.', type: n ? 'pickup' : 'info' });
+    });
+    const takeAll = button('⇩ Coger todo', 'pm-mini');
+    takeAll.addEventListener('click', () => {
+      const n = this._inv.takeAll();
+      if (this._inv.container?.slots.some(Boolean)) this._events.emit(GameEvents.UI_MESSAGE, { text: n ? '🎒 No te cabe todo.' : '🎒 No tienes sitio en la mochila.', type: 'warning' });
+    });
+    chestHead.append(el('h3', 'pm-sub', 'Guardado · Shift+clic mueve entre el mueble y tu inventario'), sortChest, stack, takeAll);
+    this._chestSection.append(chestHead, cgrid);
 
     // Fabricación: rejilla de recetas.
     this._craftSection = el('section', 'pm-crafting');
@@ -284,7 +308,13 @@ export class PlayerMenu extends ModalPanel {
       this._events.emit(GameEvents.WATCH_SETTINGS_REQUEST, {});
     });
     this._watchBtn = watchBtn;
-    you.append(gear, this._clock, this._statList, save, this._saveInfo, watchBtn);
+    const settingsBtn = el('button', 'pm-save pm-watch', '⚙️ Ajustes (P)');
+    settingsBtn.type = 'button';
+    settingsBtn.addEventListener('click', () => {
+      this.setOpen(false);
+      this._events.emit(GameEvents.SETTINGS_OPEN_REQUEST, {});
+    });
+    you.append(gear, this._clock, this._statList, save, this._saveInfo, watchBtn, settingsBtn);
     this._events.on(GameEvents.GAME_SAVED, ({ at }) => {
       const d = new Date(at);
       this._saveInfo.textContent = `Guardada a las ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -442,12 +472,23 @@ export class PlayerMenu extends ModalPanel {
   _recipeList() {
     // En la pestaña de la estación, sus recetas; en Fabricación, todas (las de estación, bloqueadas).
     const atStation = this.tab === MenuTab.STATION;
-    return this._crafting.getRecipes().filter((r) => {
+    const fav = this.favorites;
+    const list = this._crafting.getRecipes().filter((r) => {
       if (atStation && r.station !== this.station) return false;
       if (this._category === 'READY' && !r.canCraft) return false;
-      if (this._category !== 'ALL' && this._category !== 'READY' && r.category !== this._category) return false;
+      if (this._category === 'FAV' && !fav.has(r.id)) return false;
+      if (!['ALL', 'READY', 'FAV'].includes(this._category) && r.category !== this._category) return false;
       return !this._query || r.name.toLowerCase().includes(this._query);
     });
+    // Las favoritas, primero (el orden de siempre dentro de cada grupo).
+    return [...list.filter((r) => fav.has(r.id)), ...list.filter((r) => !fav.has(r.id))];
+  }
+
+  /** Marca o desmarca una receta como favorita. */
+  toggleFavorite(id) {
+    if (this.favorites.has(id)) this.favorites.delete(id);
+    else if (this.favorites.size < 60) this.favorites.add(id);
+    if (this.isOpen) this._renderRecipes();
   }
 
   _renderRecipes() {
@@ -459,9 +500,16 @@ export class PlayerMenu extends ModalPanel {
       const locked = this._locked(r);
       const tile = el('div', `pm-slot pm-recipe${r.canCraft && !locked ? ' ready' : ''}${locked ? ' locked' : ''}${r.id === this._recipe ? ' selected' : ''}`);
       tile.append(el('span', 'icon', r.icon), el('span', 'pm-recipe-name', r.name));
+      if (this.favorites.has(r.id)) tile.append(el('span', 'pm-fav', '★'));
+      tile.title = 'Clic: ver · doble clic: fabricar · clic dcho: favorita';
+      tile.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this.toggleFavorite(r.id);
+      });
       if (locked) tile.append(el('span', 'pm-badge pm-lock', this._stations[r.station]?.ICON ?? '🔒'));
       else if (r.canCraft) tile.append(el('span', 'pm-badge', `×${r.max}`));
       tile.addEventListener('click', () => {
+        if (this._recipe !== r.id) this._qty = 1;
         this._recipe = r.id;
         this._renderRecipes();
         this._renderDetail();
@@ -496,12 +544,22 @@ export class PlayerMenu extends ModalPanel {
     box.classList.toggle('hidden', !q.length);
     if (!q.length) return;
     box.append(el('span', 'pm-sub', 'Fabricando'));
-    q.forEach((entry, i) => {
-      const r = this._crafting.getRecipes().find((x) => x.id === entry.recipeId);
+    // Las seguidas de la misma receta van juntas (×N); clic cancela una (la última).
+    const groups = [];
+    for (const entry of q) {
+      const g = groups.at(-1);
+      if (g && g.recipeId === entry.recipeId) g.entries.push(entry);
+      else groups.push({ recipeId: entry.recipeId, entries: [entry] });
+    }
+    const recipes = this._crafting.getRecipes();
+    groups.forEach((g, i) => {
+      const entry = g.entries[0];
+      const r = recipes.find((x) => x.id === g.recipeId);
       const item = el('button', `pm-queue-item${i === 0 ? ' active' : ''}`);
       item.type = 'button';
-      item.title = 'Clic: cancelar (se devuelven los materiales)';
+      item.title = g.entries.length > 1 ? `${g.entries.length} en cola · clic: cancelar una (se devuelven los materiales)` : 'Clic: cancelar (se devuelven los materiales)';
       item.append(el('span', 'icon', r?.icon ?? '?'));
+      if (g.entries.length > 1) item.append(el('span', 'pm-queue-n', `×${g.entries.length}`));
       if (i === 0) {
         const bar = el('span', 'pm-queue-bar');
         const fill = el('span');
@@ -509,7 +567,7 @@ export class PlayerMenu extends ModalPanel {
         bar.append(fill);
         item.append(bar, el('span', 'pm-queue-time', `${Math.ceil(Math.max(0, entry.left))} s`));
       }
-      item.addEventListener('click', () => this._crafting.cancel(entry.uid));
+      item.addEventListener('click', () => this._crafting.cancel(g.entries.at(-1).uid));
       box.append(item);
     });
   }
@@ -551,7 +609,12 @@ export class PlayerMenu extends ModalPanel {
     const def = this._items[r.result];
     d.append(el('span', 'pm-detail-icon', r.icon));
     const info = el('div', 'pm-detail-info');
-    info.append(el('b', null, `${r.name}${r.amount > 1 ? ` ×${r.amount}` : ''}`));
+    const title = el('b', null, `${r.name}${r.amount > 1 ? ` ×${r.amount}` : ''} `);
+    const star = button(this.favorites.has(r.id) ? '★' : '☆', 'pm-star');
+    star.title = this.favorites.has(r.id) ? 'Quitar de favoritas' : 'Marcar como favorita';
+    star.addEventListener('click', () => this.toggleFavorite(r.id));
+    title.append(star);
+    info.append(title);
     if (def?.DESC) info.append(el('span', null, def.DESC));
     const ing = el('ul', 'pm-ingredients');
     for (const i of r.ingredients) {
@@ -560,15 +623,31 @@ export class PlayerMenu extends ModalPanel {
     info.append(ing);
     const locked = this._locked(r);
     info.append(el('span', 'pm-time', `⏱ ${r.time} s${locked ? ` · se fabrica en: ${this._stations[r.station]?.ICON ?? ''} ${this._stations[r.station]?.NAME ?? r.station}` : ''}`));
+    // Cuántas: − n + · Máx · Fabricar (P9).
     const actions = el('div', 'pm-actions');
-    const one = button('Fabricar', 'pm-craft');
-    one.disabled = !r.canCraft || locked;
-    one.addEventListener('click', () => this._craft(r.id, 1));
-    const five = button(`×${Math.min(5, Math.max(1, r.max))}`, 'pm-craft');
-    five.disabled = !r.canCraft || locked;
-    five.title = 'Fabricar varios';
-    five.addEventListener('click', () => this._craft(r.id, Math.min(5, r.max)));
-    actions.append(one, five);
+    const max = Math.max(1, Math.min(r.max, this._crafting.queueRoom?.() ?? r.max));
+    this._qty = Math.max(1, Math.min(this._qty, max));
+    const qty = el('span', 'pm-qty', String(this._qty));
+    const step = (d) => {
+      this._qty = Math.max(1, Math.min(max, d === Infinity ? max : this._qty + d));
+      this._renderDetail();
+    };
+    const minus = button('−', 'pm-step');
+    minus.disabled = this._qty <= 1;
+    minus.addEventListener('click', () => step(-1));
+    const plus = button('+', 'pm-step');
+    plus.disabled = !r.canCraft || this._qty >= max;
+    plus.addEventListener('click', () => step(1));
+    const all = button('Máx', 'pm-step');
+    all.disabled = !r.canCraft || this._qty >= max;
+    all.addEventListener('click', () => step(Infinity));
+    const go = button(this._qty > 1 ? `Fabricar ×${this._qty}` : 'Fabricar', 'pm-craft');
+    go.disabled = !r.canCraft || locked;
+    go.addEventListener('click', () => {
+      this._craft(r.id, this._qty);
+      this._qty = 1;
+    });
+    actions.append(minus, qty, plus, all, go);
     d.append(info, actions);
   }
 

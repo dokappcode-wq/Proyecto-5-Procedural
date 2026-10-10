@@ -124,6 +124,11 @@ export class CameraSystem {
     this._spyOn = !!on;
   }
 
+  /** Campo de visión normal (ajustes, P9); apuntar y el catalejo lo cierran a partir de él. */
+  setBaseFov(fov) {
+    if (Number.isFinite(fov)) this._baseFov = fov;
+  }
+
   /** Cuánto zoom hay ahora (1 = sin zoom): la sensibilidad del ratón se reduce con él. */
   get zoomFactor() {
     return this._baseFov ? this._camera.fov / this._baseFov : 1;

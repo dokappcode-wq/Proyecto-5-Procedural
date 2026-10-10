@@ -117,6 +117,9 @@ import { buildMerchantStall, buildMerchant } from './trade/MerchantModels.js';
 import { AchievementSystem } from './progress/AchievementSystem.js';
 import { JournalPanel } from './ui/JournalPanel.js';
 import { WeatherSystem } from './world/WeatherSystem.js';
+import { Settings, QUALITY } from './settings/Settings.js';
+import { SettingsPanel } from './ui/SettingsPanel.js';
+import { MapMarkers } from './world/MapMarkers.js';
 import { AmbientLife } from './world/AmbientLife.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
@@ -212,10 +215,13 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   };
 
   // ---- Jugador y cámara ----------------------------------------------------
+  // Ajustes del jugador (P9): calidad, campo de visión, sensibilidad e invertir Y.
+  const settings = new Settings({ defaults: { fov: cfg.RENDER.FOV, invertY: cfg.INPUT.INVERT_Y } });
+  const look = { sensitivity: cfg.INPUT.MOUSE_SENSITIVITY, invertY: cfg.INPUT.INVERT_Y }; // lo comparten a pie y en el paseo espacial
   const player = new Player({ config: cfg.PLAYER, scene: render.scene });
   const controller = new PlayerController({
     config: cfg.PLAYER,
-    look: { sensitivity: cfg.INPUT.MOUSE_SENSITIVITY, invertY: cfg.INPUT.INVERT_Y },
+    look,
     input,
     player,
     terrain: world,
@@ -243,6 +249,17 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   lighting.follow(player.position);
   worlds.follow(player.position);
+  // Aplica los ajustes ahora y en cada cambio (panel de ajustes, P9).
+  const applySettings = (v) => {
+    const q = QUALITY[v.quality] ?? QUALITY.HIGH;
+    render.setResolutionScale(q.PIXEL_RATIO);
+    lighting.setShadows(q.SHADOWS, q.SHADOW_MAP);
+    camera.setBaseFov(v.fov);
+    look.sensitivity = cfg.INPUT.MOUSE_SENSITIVITY * v.sensitivity;
+    look.invertY = v.invertY;
+  };
+  applySettings(settings.values);
+  settings.onChange(applySettings);
 
   const biomeTracker = new BiomeTracker({ world, target: player, events });
   const placeTracker = new PlaceTracker({ world, player, events }); // regiones, cuevas y salas con nombre
@@ -687,9 +704,22 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     if (stat === 'ENERGY') controller.setMovementModifiers(energy.getMovementModifiers());
   });
   // Muerte y reaparición.
+  let deathBagLeft = false;
   events.on(GameEvents.PLAYER_DIED, () => {
     input.setBlocked('dead', true);
     setNeedsPaused(true);
+    // Bolsa al morir (P9): lo que llevas se queda donde caíste (no en el espacio ni en la nave).
+    deathBagLeft = false;
+    if (S.DEATH_BAG && worlds.activeId !== 'SPACE' && !ship.isAboard()) {
+      const keep = new Set(S.DEATH_KEEP ?? []);
+      const contents = inventory.takeEverything((id) => keep.has(id));
+      if (contents.length) {
+        const p = player.position;
+        const ground = worlds.active.getHeightAt?.(p.x, p.z) ?? p.y;
+        pickups.deathBag(worlds.activeId, p.x, p.z, contents, p.y < ground - 2 ? p.y : null); // en cuevas, a su altura
+        deathBagLeft = true;
+      }
+    }
   });
   events.on(GameEvents.PLAYER_RESPAWNED, () => {
     if (worlds.activeId !== HOME) {
@@ -714,6 +744,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     if (!S.KEEP_INVENTORY_ON_DEATH) inventory.clear();
     setNeedsPaused(false);
     input.setBlocked('dead', false);
+    if (deathBagLeft) message('💀 Tus cosas se quedaron en una bolsa donde caíste: búscala por el haz rojo (también sale en el mapa).', 'warning');
   });
 
   // Sin entrada de juego ni desgaste hasta pulsar "Entrar".
@@ -1012,6 +1043,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     mapTexture.needsUpdate = true;
     ship.model.setMapTexture(mapTexture);
   };
+  // Marcas del jugador en el mapa (P9): haz de luz de su color en el mundo.
+  const mapMarkers = new MapMarkers({ scene: render.scene, worlds });
   const shipMapPanel = new ShipMapPanel({
     container: hudRoot,
     input,
@@ -1034,6 +1067,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       getCatalog: () => celestial.catalog,
       getBed: () => (respawnBed && !respawnBed.ship && construction.exists(respawnBed) ? respawnBed : null),
       getMarkers: () => pickups.markers(worlds.activeId),
+      userMarkers: mapMarkers,
+      bodyId: () => worlds.activeId,
       spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED,
       hasSpaceNode: () => ship.hasSpaceNode,
     },
@@ -1099,6 +1134,16 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     shipMapPanel.showTab('PLANET');
     shipMapPanel.setOpen(true);
   });
+  // M a pie (P9): el reloj de pulsera muestra el mapa de la región (para poner marcas).
+  const mapKey = {
+    name: 'mapKey',
+    update: () => {
+      if (!input.wasPressed('STAR_MAP') || ship.piloting || worlds.activeId === 'SPACE' || eva?.active) return;
+      if (!hasWatch) return message('⌚ El mapa está en tu reloj de pulsera: recógelo primero.', 'warning');
+      shipMapPanel.showTab('PLANET');
+      shipMapPanel.setOpen(true);
+    },
+  };
   events.on(GameEvents.SHIP_PANEL_REQUEST, ({ panel }) => {
     if (panel === 'MAP') shipMapPanel.setOpen(true);
     else if (panel === 'CHARGER') shipChargerPanel.setOpen(true);
@@ -1147,7 +1192,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   eva = new EVASystem({
     config: cfg.SPACE.EVA,
     input,
-    look: { sensitivity: cfg.INPUT.MOUSE_SENSITIVITY, invertY: cfg.INPUT.INVERT_Y },
+    look,
     player,
     controller,
     cameraSystem: camera,
@@ -1369,6 +1414,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     events, input, player, camera: render.camera, worlds, homeId: HOME, construction, ship, enemies, animals, time, story2: storyPart2, items: cfg.ITEMS,
     waterfalls: () => landmarks?.waterfalls ?? [],
   });
+  const settingsPanel = new SettingsPanel({ container: hudRoot, input, events, settings, audio });
+  events.on(GameEvents.SETTINGS_OPEN_REQUEST, () => settingsPanel.setOpen(true));
   events.on(GameEvents.WATCH_SETTINGS_REQUEST, () => (campaign ? story.openWatchSettings() : message('El reloj de la campaña solo se configura en el Edén.', 'info')));
   const storyKeys = {
     name: 'storyKeys',
@@ -1550,6 +1597,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('effects', { save: () => statusEffects.snapshot(), load: (d) => statusEffects.restore(d) });
   saveGame.register('ranch', { save: () => ranch.snapshot(), load: (d) => ranch.restore(d) });
   saveGame.register('weather', { save: () => weather.snapshot(), load: (d) => weather.restore(d) });
+  saveGame.register('markers', { save: () => mapMarkers.snapshot(), load: (d) => mapMarkers.restore(d) });
+  saveGame.register('favorites', {
+    save: () => [...playerMenu.favorites],
+    load: (d) => (playerMenu.favorites = new Set((Array.isArray(d) ? d : []).filter((id) => typeof id === 'string' && Object.hasOwn(cfg.RECIPES, id)).slice(0, 60))),
+  });
   saveGame.register('trade', { save: () => trade.snapshot(), load: (d) => trade.restore(d) });
   saveGame.register('treasure', { save: () => treasure.snapshot(), load: (d) => treasure.restore(d) });
   saveGame.register('achievements', { save: () => achievements.snapshot(), load: (d) => achievements.restore(d) });
@@ -1730,6 +1782,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(farm);        // huerto: crecer y dibujar los cultivos
   loop.add(weather);     // clima: cielo, lluvia/nieve, rayos y viento (P7)
   loop.add(life);        // pájaros, mariposas, luciérnagas y peces
+  loop.add(mapMarkers);  // marcas del mapa (P9)
+  loop.add(mapKey);
+  loop.add(settingsPanel);
   loop.add(wetness);     // mojado bajo la lluvia
   loop.add(home);        // recolector de lluvia y maniquíes
   loop.add(trade);       // mercader: existencias y encargos del día
@@ -1811,7 +1866,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, combat, audio, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, get hasWatch() { return hasWatch; },
   };
 }
 

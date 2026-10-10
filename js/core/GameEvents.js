@@ -142,6 +142,7 @@ export const GameEvents = Object.freeze({
   // Objetos del mundo (nodo espacial, cofres…)
   PICKUP_TAKEN: 'pickup:taken',                     // { id, body, contents }
   MAP_OPEN_REQUEST: 'map:open',                     // {}  (usar un mapa de papel)
+  SETTINGS_OPEN_REQUEST: 'settings:open',          // {}  (botón del reloj; P9)
 
   // Soporte vital (traje, oxígeno, burbujas, estaciones)
   LIFE_SUPPORT_CHANGED: 'life:state',               // { wearing, powered, breathable, lungs, oxygen, battery }

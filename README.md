@@ -94,6 +94,8 @@ Abre `http://localhost:8080` y pulsa **Entrar en el Jardín del Edén**.
 | Rueda | Distancia de cámara en 3ª persona |
 | `H` | Mostrar/ocultar ayuda |
 | `N` | Silenciar / activar el sonido |
+| `P` | Ajustes (gráficos, vista, ratón y sonido) |
+| `K` · `M` | Diario · mapa de la región (a pie, con el reloj: clic pone o quita marcas) |
 | `a` `d` `m` `i` `n` | Modo Admin (secuencia, máx. 2 s entre teclas) |
 
 Todas las teclas se configuran en `js/config/GameConfig.js` → `INPUT.KEYBINDINGS`.
@@ -271,6 +273,18 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Calidad de vida (v1.32, P9)**:
+  - **Ajustes (P)** (o botón ⚙️ del reloj): calidad gráfica (baja, media, alta: resolución y sombras), campo de
+    visión, sensibilidad del ratón, invertir eje Y y volúmenes (general, efectos, ambiente, música). Se guardan en el
+    navegador.
+  - **Cofres y muebles**: botones para ordenar, «guardar iguales» (mete lo de tu mochila que ya hay dentro; la barra
+    rápida no se toca) y «coger todo». La mochila también tiene «ordenar».
+  - **Fabricación**: clic derecho en una receta (o ☆ en el detalle) la marca como **favorita** (salen primero y
+    tienen su filtro); en el detalle se elige **cuántas** fabricar (− + Máx) y en la cola las iguales salen juntas (×N).
+  - **Al morir** lo que llevas se queda en una **bolsa** donde caíste, con un haz rojo y marca en el mapa (E: recuperar).
+    La ropa puesta y los objetos de la historia no se pierden.
+  - **Marcas en el mapa**: `M` a pie (con el reloj) abre el mapa de la región; clic pone una marca (un haz de luz de
+    su color en el mundo) y clic encima la quita. Se guardan con la partida.
 - **Clima y mundo vivo (v1.31, P7)**:
   - **Clima**: despejado, nublado, lluvia, tormenta y niebla, que cambian poco a poco cada pocos minutos. Con
     nubes el cielo se pone gris y hay menos luz; con niebla se ve más cerca; en la tormenta caen rayos lejanos

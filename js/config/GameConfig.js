@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.31.0',
+    VERSION: '1.32.0',
   },
 
   RENDER: {
@@ -149,6 +149,7 @@ export const GameConfig = deepFreeze({
       TOGGLE_CAMERA: ['KeyV'],
       TOGGLE_HELP: ['KeyH'],
       JOURNAL: ['KeyK'],                // diario: encargos, tesoros, habilidades y logros (P8)
+      SETTINGS: ['KeyP'],               // ajustes: gráficos, vista, ratón y sonido (P9)
       INTERACT: ['KeyE'],               // recoger / interactuar
       ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
       USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado · en modo construcción: quitar pieza
@@ -163,7 +164,7 @@ export const GameConfig = deepFreeze({
       SHIP_HATCH: ['KeyG'],             // nave: abrir / cerrar la compuerta
       SHIP_LEGS: ['KeyL'],              // nave: recoger / sacar las patas de aterrizaje
       SHIP_ORBIT: ['KeyO'],             // nave: salir al espacio (en vuelo, a bastante altura)
-      STAR_MAP: ['KeyM'],               // a los mandos: mapa estelar 3D
+      STAR_MAP: ['KeyM'],               // a los mandos: mapa estelar 3D · a pie: mapa de la región (P9)
       MUTE: ['KeyN'],                   // silenciar / activar el sonido
       HOTBAR_1: ['Digit1'], HOTBAR_2: ['Digit2'], HOTBAR_3: ['Digit3'],
       HOTBAR_4: ['Digit4'], HOTBAR_5: ['Digit5'], HOTBAR_6: ['Digit6'],
@@ -309,6 +310,10 @@ export const GameConfig = deepFreeze({
     RESPAWN_DELAY: 3,               // s antes de poder reaparecer
     RESPAWN_VALUES: { HEALTH: 100, HUNGER: 70, THIRST: 70, ENERGY: 70 },
     KEEP_INVENTORY_ON_DEATH: true,
+    // Al morir (P9) lo que llevas se queda en una bolsa donde caíste (haz rojo y marca en el
+    // mapa); la ropa puesta y los objetos de la historia no se pierden.
+    DEATH_BAG: true,
+    DEATH_KEEP: ['SHIP_WATCH', 'SPACE_NODE', 'NODE_MAP', 'GALACTIC_NODE', 'THRUSTER'],
   },
 
   // Niveles: la experiencia (XP) se gana recogiendo, talando, picando, fabricando y cazando.

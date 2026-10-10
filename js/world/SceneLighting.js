@@ -31,6 +31,17 @@ export class SceneLighting {
     scene.add(this.sun.target);
 
     this._focus = new THREE.Vector3();
+    this._shadowsAllowed = renderConfig.SHADOWS;
+  }
+
+  /** Sombras del sol (ajustes, P9): encendidas o no y tamaño del mapa de sombras. */
+  setShadows(on, mapSize = 2048) {
+    this.sun.castShadow = !!on && this._shadowsAllowed;
+    if (on && mapSize && this.sun.shadow.mapSize.x !== mapSize) {
+      this.sun.shadow.mapSize.set(mapSize, mapSize);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
   }
 
   /** Vector (por referencia) que debe quedar dentro del área de sombras: normalmente el jugador. */

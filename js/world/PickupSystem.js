@@ -54,7 +54,7 @@ export class PickupSystem {
    */
   drop(body, x, z, item, count, dur, y = null) {
     for (const p of this._list.values()) {
-      if (p.model !== 'BAG' || p.taken || p.body !== body || Math.hypot(p.x - x, p.z - z) > 3) continue;
+      if (p.model !== 'BAG' || p.death || p.taken || p.body !== body || Math.hypot(p.x - x, p.z - z) > 3) continue;
       if (y !== null && p.y !== null && Math.abs(p.y - y) > 3) continue; // otra bolsa, pero en otra altura (cueva)
       // Las herramientas usadas van aparte: cada una conserva su aguante.
       const same = dur == null && p.contents.find((c) => c.item === item && c.dur == null);
@@ -72,10 +72,24 @@ export class PickupSystem {
     return bag;
   }
 
+  /**
+   * Bolsa al morir (P9): todo lo que llevabas, con haz rojo y marca en el mapa.
+   * @param {Array<{ item, count, dur? }>} contents
+   */
+  deathBag(body, x, z, contents, y = null) {
+    this._deathSeq = (this._deathSeq ?? 0) + 1;
+    const bag = this.add({
+      id: `DEATH_${this._deathSeq}`, body, x, z, model: 'BAG', death: true, label: this._bagLabel(contents, true), action: 'Recuperar',
+      beacon: true, contents: contents.map((c) => ({ ...c })), mapLabel: '💀 Tus cosas', mapColor: '#ff6b6b',
+    });
+    if (y !== null) bag.y = y;
+    return bag;
+  }
+
   /** "🎒 Bolsa · 🪵×12 🪨×3" (como mucho 4 tipos). */
-  _bagLabel(contents) {
+  _bagLabel(contents, death = false) {
     const list = contents.slice(0, 4).map((c) => `${this._items[c.item]?.ICON ?? ''}×${c.count}`).join(' ');
-    return `🎒 Bolsa · ${list}${contents.length > 4 ? ' …' : ''}`;
+    return `${death ? '💀 Tus cosas' : '🎒 Bolsa'} · ${list}${contents.length > 4 ? ' …' : ''}`;
   }
 
   clear(body = null) {
@@ -92,7 +106,7 @@ export class PickupSystem {
     const bags = [];
     for (const p of this._list.values()) {
       if (p.model === 'BAG') {
-        if (!p.taken && p.contents.length) bags.push({ body: p.body, x: p.x, z: p.z, y: p.y, contents: p.contents.map((c) => ({ ...c })) });
+        if (!p.taken && p.contents.length) bags.push({ body: p.body, x: p.x, z: p.z, y: p.y, contents: p.contents.map((c) => ({ ...c })), ...(p.death ? { death: true } : {}) });
       } else if (p.taken) taken.push(p.id);
     }
     return { taken, bags };
@@ -106,6 +120,12 @@ export class PickupSystem {
     }
     for (const b of Array.isArray(snap.bags) ? snap.bags : []) {
       if (!b || typeof b.body !== 'string' || !Number.isFinite(b.x) || !Number.isFinite(b.z) || !Array.isArray(b.contents)) continue;
+      if (b.death === true) {
+        const contents = b.contents.slice(0, 200).filter((c) => isItem(c?.item) && Math.floor(c.count) > 0)
+          .map((c) => ({ item: c.item, count: Math.min(Math.floor(c.count), 10000), ...(Number.isFinite(c.dur) ? { dur: c.dur } : {}) }));
+        if (contents.length) this.deathBag(b.body, b.x, b.z, contents, Number.isFinite(b.y) ? b.y : null);
+        continue;
+      }
       for (const c of b.contents) {
         const count = Math.floor(c?.count);
         if (isItem(c?.item) && count > 0) this.drop(b.body, b.x, b.z, c.item, Math.min(count, 10000), Number.isFinite(c.dur) ? c.dur : undefined, Number.isFinite(b.y) ? b.y : null);
@@ -180,7 +200,7 @@ export class PickupSystem {
     if (got.length) this._events.emit(GameEvents.UI_MESSAGE, { text: `Has cogido: ${got.join(', ')}`, type: 'biome' });
     if (left.length) {
       p.contents = left;
-      if (p.model === 'BAG') p.label = this._bagLabel(left);
+      if (p.model === 'BAG') p.label = this._bagLabel(left, p.death);
       this._events.emit(GameEvents.UI_MESSAGE, { text: '🎒 No te cabe todo: haz hueco en el inventario (I) y vuelve a cogerlo.', type: 'warning' });
       return got.length > 0;
     }
@@ -260,7 +280,7 @@ function buildModel(p) {
     const beam = new THREE.Mesh(
       new THREE.CylinderGeometry(0.35, 0.9, 90, 10, 1, true),
       new THREE.MeshBasicMaterial({
-        color: p.model === 'GALACTIC_NODE' ? 0xc07bff : p.model === 'CHEST' ? 0xffd27a : 0x6fdcff,
+        color: p.model === 'GALACTIC_NODE' ? 0xc07bff : p.model === 'CHEST' ? 0xffd27a : p.death ? 0xff5050 : 0x6fdcff,
         transparent: true, opacity: 0.14, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
       }),
     );

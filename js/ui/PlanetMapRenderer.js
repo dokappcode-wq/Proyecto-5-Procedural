@@ -50,6 +50,11 @@ export class PlanetMapRenderer {
     return [x / this._size + 0.5, z / this._size + 0.5];
   }
 
+  /** Inverso de toMap: (u, v) del mapa → (x, z) del mundo. */
+  fromMap(u, v) {
+    return [(u - 0.5) * this._size, (v - 0.5) * this._size];
+  }
+
   /** Genera `rows` filas más. @returns {boolean} true al terminar */
   step(rows = 10) {
     const w = this._world;

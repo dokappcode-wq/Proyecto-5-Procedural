@@ -31,8 +31,7 @@ export class PlayerController {
   constructor({ config, look, input, player, terrain, obstacles = null, structures = null, events }) {
     this.name = 'playerController';
     this._cfg = config;
-    this._lookSensitivity = look.sensitivity;
-    this._invertY = look.invertY ? -1 : 1;
+    this._look = look; // { sensitivity, invertY }: lo cambian los ajustes (P9) en vivo
     this._input = input;
     this._player = player;
     this._terrain = terrain;
@@ -143,9 +142,9 @@ export class PlayerController {
 
     // ---- Mirada ----------------------------------------------------------
     const mouse = input.getMouseDelta();
-    const sens = this._lookSensitivity * this.lookScale;
+    const sens = this._look.sensitivity * this.lookScale;
     p.yaw = wrapAngle(p.yaw - mouse.x * sens);
-    p.pitch = THREE.MathUtils.clamp(p.pitch - mouse.y * sens * this._invertY, -cfg.PITCH_LIMIT, cfg.PITCH_LIMIT);
+    p.pitch = THREE.MathUtils.clamp(p.pitch - mouse.y * sens * (this._look.invertY ? -1 : 1), -cfg.PITCH_LIMIT, cfg.PITCH_LIMIT);
 
     // ---- Intención de movimiento ------------------------------------------
     const fwd = (input.isDown('FORWARD') ? 1 : 0) - (input.isDown('BACKWARD') ? 1 : 0);

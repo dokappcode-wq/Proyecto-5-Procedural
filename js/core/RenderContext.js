@@ -49,6 +49,13 @@ export class RenderContext {
     return this.renderer.domElement;
   }
 
+  /** Calidad (ajustes, P9): fracción de la resolución nativa (1 = la de siempre). */
+  setResolutionScale(k) {
+    const scale = Math.max(0.3, Math.min(1, Number(k) || 1));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._cfg.MAX_PIXEL_RATIO) * scale);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
   /** Registra otra cámara (se ajusta al redimensionar la ventana). */
   addCamera(camera) {
     this._cameras.push(camera);

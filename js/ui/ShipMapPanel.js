@@ -11,7 +11,9 @@ import { orbitPosition } from '../celestial/CelestialCatalog.js';
  *   posiciones según la hora del TimeSystem). Las lunas no se pueden visitar:
  *   falta el "nodo espacial".
  *
- * Solo vista: lee estado (consultas de solo lectura) y no modifica nada.
+ * Marcas del jugador (P9, sources.userMarkers): clic en el mapa de la región pone una marca
+ * (haz de luz en el mundo) y clic sobre una marca la quita; también se quitan en la lista.
+ * Por lo demás solo vista: lee estado y no modifica nada.
  */
 const SIZE = 520;
 
@@ -38,6 +40,26 @@ export class ShipMapPanel extends ModalPanel {
     this._side = this.body.querySelector('.map-side');
     this.body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => this.showTab(b.dataset.tab)));
     this._timer = 0;
+    this._canvas.addEventListener('mousedown', (e) => this._onMapClick(e));
+    this._canvas.style.cursor = 'crosshair';
+  }
+
+  /** Clic en el mapa de la región: marca nueva, o quita la que haya debajo. */
+  _onMapClick(e) {
+    const M = this._src.userMarkers;
+    const map = this._src.map;
+    if (!M || this.tab !== 'PLANET' || !map?.ready || !map.fromMap) return;
+    e.preventDefault();
+    const r = this._canvas.getBoundingClientRect();
+    const u = (e.clientX - r.left) / r.width;
+    const v = (e.clientY - r.top) / r.height;
+    const [x, z] = map.fromMap(u, v);
+    const [x2] = map.fromMap(u + 10 / SIZE, v); // 10 px del mapa, en metros
+    const body = this._src.bodyId();
+    const hit = M.near(body, x, z, Math.abs(x2 - x));
+    if (hit) M.remove(hit.id);
+    else if (!M.add(body, x, z)) this._events.emit(GameEvents.UI_MESSAGE, { text: '📍 Ya tienes demasiadas marcas: quita alguna.', type: 'warning' });
+    this.render();
   }
 
   showTab(tab) {
@@ -120,6 +142,13 @@ export class ShipMapPanel extends ModalPanel {
       marker(ctx, mx, mz, m.color, m.label);
     }
 
+    // Marcas del jugador: banderita de su color.
+    for (const m of this._src.userMarkers?.of(this._src.bodyId()) ?? []) {
+      const [fx, fz] = at(m.x, m.z);
+      flag(ctx, fx, fz, m.color);
+      label(ctx, fx, fz - 20, m.label, m.color);
+    }
+
     const s = ship.ship;
     const [shx, shz] = at(s.x, s.z);
     arrow(ctx, shx, shz, s.yaw, '#ff9a4a', 9);
@@ -148,7 +177,44 @@ export class ShipMapPanel extends ModalPanel {
         <li><span class="mk" style="color:#ff9ecf">●</span>Cama (reaparición)</li>
         ${(this._src.getMarkers?.() ?? []).map((m) => `<li><span class="mk" style="color:${m.color}">◎</span>${escapeHtml(m.label)}</li>`).join('')}
       </ul>
+      <div class="user-markers"></div>
       <p class="muted small">${this._src.hasSpaceNode?.() ? 'Con el nodo espacial la nave puede salir al espacio (a los mandos, vuela alto y pulsa O).' : 'Instala el nodo espacial en una ranura libre de la nave para poder salir al espacio.'}</p>`;
+    this._renderUserMarkers(this._side.querySelector('.user-markers'));
+  }
+
+  /** Lista de marcas del jugador (textContent): distancia y botón para quitarla. */
+  _renderUserMarkers(box) {
+    const M = this._src.userMarkers;
+    if (!M || !box) return;
+    const list = M.of(this._src.bodyId());
+    const h = document.createElement('h4');
+    h.textContent = '📍 Tus marcas';
+    const hint = document.createElement('p');
+    hint.className = 'muted small';
+    hint.textContent = list.length ? 'Clic sobre una marca del mapa para quitarla. En el mundo se ve un haz de su color.' : 'Haz clic en el mapa para poner una marca: en el mundo verás un haz de luz de su color.';
+    box.append(h, hint);
+    const p = this._src.player.position;
+    const ul = document.createElement('ul');
+    ul.className = 'legend markers';
+    for (const m of list) {
+      const li = document.createElement('li');
+      const mk = document.createElement('span');
+      mk.className = 'mk';
+      mk.style.color = m.color;
+      mk.textContent = '⚑';
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'mk-del';
+      del.textContent = '✕';
+      del.title = 'Quitar la marca';
+      del.addEventListener('click', () => {
+        M.remove(m.id);
+        this.render();
+      });
+      li.append(mk, `${m.label} · ${Math.round(Math.hypot(m.x - p.x, m.z - p.z))} m `, del);
+      ul.append(li);
+    }
+    box.append(ul);
   }
 
   // ---- Mapa planetario -----------------------------------------------------------
@@ -291,6 +357,25 @@ function arrow(ctx, x, y, yaw, color, size) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
+
+/** Banderita (marca del jugador) con el mástil en (x, y). */
+function flag(ctx, x, y, color) {
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y - 16);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y - 16);
+  ctx.lineTo(x + 11, y - 12);
+  ctx.lineTo(x, y - 8);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 function marker(ctx, x, y, color, text) {

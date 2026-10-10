@@ -408,6 +408,125 @@ export class InventorySystem {
     return true;
   }
 
+  // ---- Ordenar y guardar (P9) ---------------------------------------------------
+
+  /**
+   * Ordena los huecos [from, to) de `arr`: junta pilas iguales (sin aguante) y las coloca
+   * por tipo de objeto (orden de ITEMS) y de más a menos; los huecos vacíos al final.
+   */
+  _sortRange(arr, from, to) {
+    const order = this._order ??= new Map(Object.keys(this._defs).map((id, i) => [id, i]));
+    const stacks = [];
+    for (let i = from; i < to; i++) {
+      const st = arr[i];
+      if (!st) continue;
+      const lim = this.stackLimit(st.id);
+      let left = st.count;
+      if (st.dur == null) {
+        for (const t of stacks) {
+          if (left === 0) break;
+          if (t.id !== st.id || t.dur != null || t.count >= lim) continue;
+          const move = Math.min(left, lim - t.count);
+          t.count += move;
+          left -= move;
+        }
+      }
+      if (left > 0) stacks.push({ ...st, count: left });
+    }
+    stacks.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9) || b.count - a.count || (b.dur ?? 0) - (a.dur ?? 0));
+    for (let i = from; i < to; i++) arr[i] = stacks[i - from] ?? null;
+  }
+
+  /** Ordena la mochila (la barra rápida no se toca). */
+  sortBag() {
+    this.returnCursor();
+    this._sortRange(this.slots, this.hotbarSize, this.slots.length);
+    this._emit(null, 0);
+    return true;
+  }
+
+  /** Ordena el cofre abierto. */
+  sortContainer() {
+    if (!this.container) return false;
+    this.returnCursor();
+    this._sortRange(this.container.slots, 0, this.container.slots.length);
+    this._emit(null, 0);
+    return true;
+  }
+
+  /**
+   * Guardar iguales: lo de la mochila que ya hay en el cofre abierto se mete en él
+   * (completa sus pilas y luego huecos vacíos). La barra rápida no se toca.
+   * @returns {number} unidades guardadas
+   */
+  quickStack() {
+    const box = this.container?.slots;
+    if (!box) return 0;
+    const ids = new Set(box.filter(Boolean).map((t) => t.id));
+    let moved = 0;
+    for (let i = this.hotbarSize; i < this.slots.length; i++) {
+      const here = this.slots[i];
+      if (!here || !ids.has(here.id)) continue;
+      moved += this._moveInto(here, box);
+      if (here.count === 0) this.slots[i] = null;
+    }
+    if (moved) this._emit(null, 0);
+    return moved;
+  }
+
+  /** Coger todo lo del cofre abierto (lo que quepa). @returns {number} unidades cogidas */
+  takeAll() {
+    const box = this.container?.slots;
+    if (!box) return 0;
+    let moved = 0;
+    for (let i = 0; i < box.length; i++) {
+      const here = box[i];
+      if (!here) continue;
+      moved += this._moveInto(here, this.slots);
+      if (here.count === 0) box[i] = null;
+    }
+    if (moved) this._emit(null, 0);
+    return moved;
+  }
+
+  /** Mueve la pila `here` a `to` (completa pilas iguales y luego huecos vacíos). */
+  _moveInto(here, to) {
+    const lim = this.stackLimit(here.id);
+    const start = here.count;
+    for (const pass of ['merge', 'empty']) {
+      for (let k = 0; k < to.length && here.count > 0; k++) {
+        const t = to[k];
+        if (pass === 'merge' && t?.id === here.id && t.count < lim && here.dur == null && t.dur == null) {
+          const move = Math.min(here.count, lim - t.count);
+          t.count += move;
+          here.count -= move;
+        } else if (pass === 'empty' && !t) {
+          to[k] = { ...here };
+          here.count = 0;
+        }
+      }
+    }
+    return start - here.count;
+  }
+
+  /**
+   * Vacía mochila, barra y lo que se lleva con el ratón (bolsa al morir, P9).
+   * @param {(id: string) => boolean} [keep] objetos que se quedan (los de la historia)
+   * @returns {Array<{ item, count, dur? }>}
+   */
+  takeEverything(keep = () => false) {
+    this.returnCursor();
+    const out = [];
+    for (let i = 0; i < this.slots.length; i++) {
+      const st = this.slots[i];
+      if (!st || keep(st.id)) continue;
+      out.push(st.dur == null ? { item: st.id, count: st.count } : { item: st.id, count: st.count, dur: st.dur });
+      this.slots[i] = null;
+    }
+    if (out.length) this._emit(null, 0);
+    return out;
+  }
+
   /** [array, índice] de un hueco: número = inventario; 'c:N' = cofre abierto. */
   _loc(ref) {
     if (typeof ref === 'number') return ref >= 0 && ref < this.slots.length ? [this.slots, ref] : null;

@@ -12,7 +12,7 @@ import { GameEvents } from '../core/GameEvents.js';
  * La UI pide fabricar con craft() o emitiendo CRAFT_REQUEST; al terminar cada objeto se
  * emite ITEM_CRAFTED, y CRAFT_QUEUE_CHANGED cuando cambia la cola.
  */
-export const MAX_QUEUE = 20;
+export const MAX_QUEUE = 40;
 
 export class CraftingSystem {
   constructor({ recipes, items, inventory, events }) {
@@ -120,6 +120,11 @@ export class CraftingSystem {
     this._changed();
     if (time === 0) this.update(0);
     return true;
+  }
+
+  /** Huecos libres en la cola. */
+  queueRoom() {
+    return Math.max(0, MAX_QUEUE - this.queue.length);
   }
 
   /** Cancela una entrada de la cola y devuelve los ingredientes. */
