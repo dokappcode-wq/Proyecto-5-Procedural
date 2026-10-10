@@ -87,7 +87,7 @@ export class StatusEffects {
   }
 
   get coldMultiplier() {
-    return this._k('WARM', 'COLD') * this._k('WARMTH', 'COLD');
+    return this._k('WARM', 'COLD') * this._k('WARMTH', 'COLD') * this._k('WET', 'COLD');
   }
 
   get energyMultiplier() {
@@ -105,7 +105,8 @@ export class StatusEffects {
       if (left <= 0) {
         this.active.delete(id);
         ended = true;
-        this._events.emit(GameEvents.UI_MESSAGE, { text: `${this._cfg[id].ICON} Se te ha pasado: ${this._cfg[id].NAME.toLowerCase()}.`, type: 'info' });
+        const text = id === 'WET' ? '🔥 Ya estás seco.' : `${this._cfg[id].ICON} Se te ha pasado: ${this._cfg[id].NAME.toLowerCase()}.`;
+        this._events.emit(GameEvents.UI_MESSAGE, { text, type: 'info' });
       } else this.active.set(id, left);
     }
     this._tick -= dt;
@@ -117,7 +118,7 @@ export class StatusEffects {
 
   /** Lista para la interfaz: [{ id, name, icon, desc, left }]. */
   list() {
-    return [...this.active].map(([id, left]) => ({ id, name: this._cfg[id].NAME, icon: this._cfg[id].ICON, desc: this._cfg[id].DESC, left, bad: id === 'INDIGESTION' }));
+    return [...this.active].map(([id, left]) => ({ id, name: this._cfg[id].NAME, icon: this._cfg[id].ICON, desc: this._cfg[id].DESC, left, bad: id === 'INDIGESTION' || !!this._cfg[id].BAD }));
   }
 
   snapshot() {

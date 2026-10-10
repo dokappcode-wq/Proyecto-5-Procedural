@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.30.0',
+    VERSION: '1.31.0',
   },
 
   RENDER: {
@@ -698,6 +698,7 @@ export const GameConfig = deepFreeze({
     SWIFT: { NAME: 'Rapidez', ICON: '💨', DESC: 'Te mueves un 25 % más deprisa.', SPEED: 1.25 },
     WARMTH: { NAME: 'Calor', ICON: '🌡️', DESC: 'El frío casi no te afecta.', COLD: 0.15 },
     NIGHT_VISION: { NAME: 'Visión nocturna', ICON: '👁️', DESC: 'Ves en la oscuridad.', NIGHT: true },
+    WET: { NAME: 'Mojado', ICON: '💧', DESC: 'La ropa empapada: pierdes calor mucho más deprisa. Sécate junto al fuego o bajo techo.', COLD: 1.8, BAD: true },
     LEAP: { NAME: 'Salto', ICON: '🐸', DESC: 'Saltas mucho más alto; las caídas duelen la mitad.', JUMP: 1.45, FALL: 0.5 },
     INDIGESTION: { NAME: 'Indigestión', ICON: '🤢', DESC: 'Algo crudo te ha sentado mal: no recuperas vida y te cansas.', ENERGY: 0.4, NO_REGEN: true, HUNGER_LOSS: 12, TIME: 75 },
   },
@@ -1517,6 +1518,24 @@ export const GameConfig = deepFreeze({
     LEVEL_10: { NAME: 'Veterano', ICON: '⭐', DESC: 'Llega al nivel 10.', XP: 0 },
     BACKPACK: { NAME: 'Bien equipado', ICON: '🎒', DESC: 'Cósete una mochila.', XP: 30 },
     SURVIVOR: { NAME: 'Superviviente', ICON: '🌅', DESC: 'Sobrevive 10 días.', XP: 100 },
+  },
+
+  // Clima (P7). Cada estado dura TIME s (al azar entre los dos) y luego se pasa a otro según
+  // su peso (W). CLOUD/RAIN/FOG/WIND: 0..1. STORM: rayos. En el frío, la lluvia es nieve.
+  WEATHER: {
+    STATES: {
+      CLEAR: { NAME: 'Despejado', W: 4, TIME: [420, 900], CLOUD: 0, RAIN: 0, FOG: 0, WIND: 0.15 },
+      CLOUDY: { NAME: 'Nublado', W: 3, TIME: [240, 600], CLOUD: 0.55, RAIN: 0, FOG: 0.05, WIND: 0.35 },
+      RAIN: { NAME: 'Lluvia', W: 2, TIME: [180, 420], CLOUD: 0.8, RAIN: 0.7, FOG: 0.25, WIND: 0.45 },
+      STORM: { NAME: 'Tormenta', W: 0.8, TIME: [120, 260], CLOUD: 1, RAIN: 1, FOG: 0.35, WIND: 0.95, STORM: true },
+      FOG: { NAME: 'Niebla', W: 1.2, TIME: [150, 360], CLOUD: 0.35, RAIN: 0, FOG: 0.85, WIND: 0.05 },
+    },
+    START: 'CLEAR',
+    BLEND: 25,                // s para pasar de un estado a otro
+    DROPS: 2200,              // gotas de lluvia alrededor de la cámara
+    FLAKES: 1600,             // copos de nieve
+    LIGHTNING_EVERY: [6, 18], // s entre rayos en la tormenta
+    WET_TIME: 150,            // s que se sigue mojado al salir de la lluvia (menos junto al fuego)
   },
 
   ADMIN: {

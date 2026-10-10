@@ -271,6 +271,17 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Clima y mundo vivo (v1.31, P7)**:
+  - **Clima**: despejado, nublado, lluvia, tormenta y niebla, que cambian poco a poco cada pocos minutos. Con
+    nubes el cielo se pone gris y hay menos luz; con niebla se ve más cerca; en la tormenta caen rayos lejanos
+    (destello y el trueno llega después: cuanto más tarda, más lejos). En las montañas heladas, en vez de
+    lluvia, nieva. Bajo techo, en cuevas y en la nave no llueve.
+  - **Mojado**: bajo la lluvia sin techo (o al nadar) te mojas y pasas más frío; te secas solo, antes junto al
+    fuego o bajo techo.
+  - La lluvia **riega el huerto** y llena antes el recolector de lluvia.
+  - **Viento**: árboles, arbustos y hierba se mecen, más fuerte con tormenta.
+  - **Vida**: bandadas de pájaros de día, mariposas en praderas y bosques con buen tiempo, luciérnagas de noche y
+    peces en ríos y lagos.
 - **Comercio, misiones y progresión (v1.30, P8)**:
   - **Tomás el buhonero** tiene su puesto junto al Camino Real, a unos 120 m de donde llegas. E: su tienda
     (comprar y vender con monedas goblin; las existencias se reponen cada día) y sus **encargos** (tres a la

@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { PartsBuilder } from '../../render/PartsBuilder.js';
 import { SeededRandom } from '../../core/SeededRandom.js';
 
+/** Lo que no se mece con el viento (P7). */
+const RIGID = new Set(['ROCK', 'MINERAL_ROCK', 'SAND_PILE', 'CLAY_DEPOSIT', 'COAL_ORE', 'COPPER_ORE', 'IRON_ORE', 'DIAMOND_ORE', 'GOLD_ORE', 'CRYSTAL_CLUSTER', 'BIRD_NEST']);
+
 /**
  * PropMesher — geometría de los recursos del mundo en estilo low-poly.
  *
@@ -29,6 +32,7 @@ export class PropMesher {
         scale: n.scale,
         rotation: n.rotation,
         tint: n.tint,
+        sway: !RIGID.has(n.type) && !n.cave, // rocas, menas y montones: quietos
       })),
     );
     const grass = this._merge(
@@ -53,6 +57,7 @@ export class PropMesher {
     for (const it of items) total += it.template.positions.length;
     const positions = new Float32Array(total);
     const colors = new Float32Array(total);
+    const sway = new Float32Array(total / 3); // P7: altura sobre la base (viento); 0 en lo rígido
     const jitter = this._colors.COLOR_JITTER;
 
     let o = 0;
@@ -62,7 +67,9 @@ export class PropMesher {
       const sin = Math.sin(it.rotation);
       const s = it.scale;
       const shade = 1 + (it.tint - 0.5) * jitter * 2;
+      const soft = it.sway !== false;
       for (let i = 0; i < tp.length; i += 3) {
+        sway[(o + i) / 3] = soft ? Math.max(0, tp[i + 1] * s) : 0;
         const lx = tp[i] * s;
         const ly = tp[i + 1] * s;
         const lz = tp[i + 2] * s;
@@ -79,6 +86,7 @@ export class PropMesher {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('sway', new THREE.BufferAttribute(sway, 1));
     geo.computeBoundingSphere();
     return geo;
   }

@@ -73,7 +73,8 @@ export class FarmSystem {
         const k = (d.fert ? C.FERT_SPEED : 1) / C.CROPS[d.crop].GROW;
         d.growth = Math.min(1, d.growth + (wet + (seconds - wet) * C.DRY_SPEED) * k);
       }
-      d.water = Math.max(0, d.water - seconds);
+      // La lluvia riega todas las parcelas al aire libre (P7).
+      d.water = this.isRaining?.() ? C.WATER_TIME : Math.max(0, d.water - seconds);
     }
   }
 

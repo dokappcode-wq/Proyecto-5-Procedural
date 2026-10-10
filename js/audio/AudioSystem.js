@@ -532,6 +532,8 @@ export class AudioSystem {
     on(E.ACHIEVEMENT_UNLOCKED, () => this.play((S, o) => {
       for (let i = 0; i < 3; i++) S.tone(o, { t: S.now + i * 0.12, type: 'sine', f: [660, 880, 1320][i], d: 0.35, gain: 0.08 });
     }));
+    // Clima (P7): trueno más suave cuanto más lejos cae el rayo.
+    on(E.THUNDER, ({ distance = 0 }) => this.play((S, o) => S.thunder(o, Math.max(0.15, Math.min(1, 1.3 - distance / 1200)))));
     on(E.WELL_USE, ({ piece }) => piece && this.playAt(piece.x, piece.z, (S, o) => S.splash(o, 0.4)));
     on(E.FARM_CHANGED, ({ action }) => this.play((S, o) => {
       if (action === 'water') S.splash(o, 0.45);

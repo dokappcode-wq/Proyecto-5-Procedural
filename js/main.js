@@ -116,6 +116,8 @@ import { TreasureSystem } from './trade/TreasureSystem.js';
 import { buildMerchantStall, buildMerchant } from './trade/MerchantModels.js';
 import { AchievementSystem } from './progress/AchievementSystem.js';
 import { JournalPanel } from './ui/JournalPanel.js';
+import { WeatherSystem } from './world/WeatherSystem.js';
+import { AmbientLife } from './world/AmbientLife.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
   const cfg = GameConfig;
@@ -546,6 +548,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Útiles de casa (P6): pozo, recolector de lluvia y maniquí.
   const home = new HomeSystem({
     config: cfg.BUILD.RAIN_COLLECTOR, items: cfg.ITEMS, construction, inventory, hotbar, equipment, thirst, events, waterPerSkin: cfg.EQUIPMENT.WATER_CAPACITY,
+    isRaining: () => weather.raining, // con lluvia el recolector se llena antes (P7)
   });
   const ranch = new RanchSystem({
     config: cfg.RANCH, items: cfg.ITEMS, animals, inventory, hotbar, events, pickups, homeId: HOME, isHome: () => worlds.activeId === HOME,
@@ -1387,6 +1390,35 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     ? new Landmarks({ map: worlds.home.map, heightAt: (x, z) => worlds.home.getHeightAt(x, z), colliders: storyColliders, root: worlds.rootOf(HOME), isEnabled: () => worlds.activeId === HOME })
     : null;
 
+  // ---- Clima y mundo vivo (P7) -------------------------------------------------------
+  const outdoors = () => worlds.activeId === HOME && !ship.isAboard() && !world.inCave?.(player.position.x, player.position.y + 1, player.position.z);
+  const snowLine = worlds.home.map?.meta?.snowLine ?? Infinity;
+  const weather = new WeatherSystem({
+    config: cfg.WEATHER, scene: render.scene, camera: render.camera, events, atmosphere, audio,
+    isActive: () => worlds.activeId === HOME && !spaceTravel?.inSpace,
+    coldAt: (x, y, z) => y > snowLine - 6 || world.getBiomeAt?.(x, z)?.id === 'FROZEN_MOUNTAINS',
+    sheltered: () => !outdoors() || construction.getShelterAt(player.position.x, player.position.y, player.position.z).roofed,
+  });
+  farm.isRaining = () => weather.raining;
+  const life = new AmbientLife({ scene: render.scene, player, time, world, weather, isActive: () => worlds.activeId === HOME && !ship.isAboard() });
+  // Mojado: bajo la lluvia (sin techo) o al nadar; junto al fuego o a cubierto se seca antes.
+  const wetness = {
+    name: 'wetness',
+    update: (dt) => {
+      const p = player.position;
+      const roofed = construction.getShelterAt(p.x, p.y, p.z).roofed;
+      if ((weather.raining && outdoors() && !roofed && !weather.snowing) || player.state.isSwimming) statusEffects.apply('WET', cfg.WEATHER.WET_TIME);
+      else if (statusEffects.has('WET') && (nearFire(p.x, p.y, p.z, cfg.BUILD.CAMPFIRE_WARM_RADIUS) || roofed)) {
+        statusEffects.active.set('WET', Math.max(0.01, statusEffects.active.get('WET') - dt * 8));
+      }
+    },
+  };
+  const WEATHER_TEXT = { RAIN: '🌧️ Empieza a llover.', STORM: '⛈️ Se acerca una tormenta…', FOG: '🌫️ Baja la niebla.', CLEAR: '☀️ Se despeja el cielo.' };
+  events.on(GameEvents.WEATHER_CHANGED, ({ state }) => {
+    if (worlds.activeId !== HOME || !WEATHER_TEXT[state]) return;
+    message(state === 'RAIN' && weather.snowing ? '🌨️ Empieza a nevar.' : WEATHER_TEXT[state], 'info');
+  });
+
   // Puesto del mercader (P8) y ruinas con tesoro: en el mundo de casa, una vez generado.
   const merchantSite = worlds.home.getSites('MERCHANT')[0];
   if (merchantSite) {
@@ -1517,6 +1549,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('places', { save: () => placeTracker.snapshot(), load: (d) => placeTracker.restore(d) });
   saveGame.register('effects', { save: () => statusEffects.snapshot(), load: (d) => statusEffects.restore(d) });
   saveGame.register('ranch', { save: () => ranch.snapshot(), load: (d) => ranch.restore(d) });
+  saveGame.register('weather', { save: () => weather.snapshot(), load: (d) => weather.restore(d) });
   saveGame.register('trade', { save: () => trade.snapshot(), load: (d) => trade.restore(d) });
   saveGame.register('treasure', { save: () => treasure.snapshot(), load: (d) => treasure.restore(d) });
   saveGame.register('achievements', { save: () => achievements.snapshot(), load: (d) => achievements.restore(d) });
@@ -1601,6 +1634,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   registerSurvivalTools(admin, { health, hunger, thirst, energy, events });
   registerCraftTools(admin, { nutrition, equipment, construction, inventory, events });
   registerEnvironmentTools(admin, { time, temperature });
+  // Clima (P7): ver y cambiar el tiempo.
+  admin.registerTool({ category: 'Tiempo', type: 'info', label: 'Clima', read: () => `${weather.name_}${weather.snowing ? ' (nieve)' : ''} · lluvia ${Math.round(weather.rain * 100)} %` });
+  for (const id of Object.keys(cfg.WEATHER.STATES)) {
+    admin.registerTool({ category: 'Tiempo', label: `Clima: ${cfg.WEATHER.STATES[id].NAME}`, run: () => weather.set(id) });
+  }
   registerShipTools(admin, { ship, player, controller, inventory, world, events });
   registerSpaceTools(admin, { system, hasLightspeed, celestial, travel: spaceTravel, starMap, ship, time, player, events, worlds, controller, installSpaceNode, pickups, meteors, lifeSupport, inventory });
   registerLifeSupportTools(admin, { lifeSupport, inventory, bubbles, worlds });
@@ -1690,6 +1728,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(ranch);       // animales domesticados: atraer con comida, huevos (antes que los animales)
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(farm);        // huerto: crecer y dibujar los cultivos
+  loop.add(weather);     // clima: cielo, lluvia/nieve, rayos y viento (P7)
+  loop.add(life);        // pájaros, mariposas, luciérnagas y peces
+  loop.add(wetness);     // mojado bajo la lluvia
   loop.add(home);        // recolector de lluvia y maniquíes
   loop.add(trade);       // mercader: existencias y encargos del día
   loop.add(treasure);    // X de los tesoros marcados

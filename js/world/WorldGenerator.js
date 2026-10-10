@@ -11,6 +11,7 @@ import { BiomeSystem } from './BiomeSystem.js';
 import { WaterSystem } from './WaterSystem.js';
 import { ResourceSystem } from './ResourceSystem.js';
 import { PropMesher } from './props/PropMesher.js';
+import { applyWind } from './Wind.js';
 import { CaveSystem } from './CaveSystem.js';
 import { buildCaveMeshes, markStencil, hideOverCaves } from './CaveMesher.js';
 import { planSites } from './WorldSites.js';
@@ -99,8 +100,9 @@ export class WorldGenerator {
     // ---- Capas de chunk -------------------------------------------------------
     this._material = markStencil(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading }), 0);
     if (map) enhanceTerrainMaterial(this._material);
-    this._propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    this._grassMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    // Vegetación que se mece con el viento (P7).
+    this._propMaterial = applyWind(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 1);
+    this._grassMaterial = applyWind(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), 6);
     this._mesher = new TerrainMesher({ colorizer: () => {} });
     this._propMesher = new PropMesher({ colors: propColors });
     this._chunks = new ChunkManager({

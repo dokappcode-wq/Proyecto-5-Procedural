@@ -16,6 +16,8 @@ import { smoothstep, clamp01 } from '../core/MathUtils.js';
  * No sabe nada de la hora "de reloj": solo de la posición del sol.
  */
 const NIGHT_VISION_TINT = new THREE.Color(0xb8f0c8);
+const CLOUD_GREY = new THREE.Color(0x8d939c);
+const FLASH = new THREE.Color(0xdfe8ff);
 const CAVE_FOG = new THREE.Color(0x050506);
 
 export class AtmosphereSystem {
@@ -92,6 +94,18 @@ export class AtmosphereSystem {
     this.apply();
   }
 
+  /**
+   * Clima (P7): nubes (0..1: cielo gris, menos sol), niebla (0..1: se ve menos lejos) y
+   * relámpago (0..1: destello de luz).
+   */
+  setWeather({ cloud = 0, fog = 0, flash = 0 } = {}) {
+    if (Math.abs(cloud - (this._cloud ?? 0)) < 0.002 && Math.abs(fog - (this._fog ?? 0)) < 0.002 && Math.abs(flash - (this._flash ?? 0)) < 0.01) return;
+    this._cloud = cloud;
+    this._fog = fog;
+    this._flash = flash;
+    this.apply();
+  }
+
   /** Poción de visión nocturna (P5): la luz del cielo no baja de un mínimo y se ve lejos en la oscuridad. */
   setNightVision(on) {
     if (!!on === !!this._nightVision) return;
@@ -108,9 +122,39 @@ export class AtmosphereSystem {
   apply() {
     if (this.airless) this._applyAirless();
     else this._applyAir();
+    this._applyWeather();
     this._applyCave();
     this._applyNightVision();
     this._applyUnderwater();
+  }
+
+  _applyWeather() {
+    if (this.airless) return;
+    const c = this._cloud ?? 0;
+    const f = this._fog ?? 0;
+    const flash = this._flash ?? 0;
+    if (c <= 0 && f <= 0 && flash <= 0) return;
+    const L = this._lighting;
+    L.sun.intensity *= 1 - c * 0.72;
+    L.hemi.intensity *= 1 - c * 0.3;
+    if (flash > 0) L.hemi.intensity += flash * 2.2;
+    // Cielo gris (más oscuro cuanto más cubierto); en el destello, blanco azulado.
+    const grey = CLOUD_GREY.clone().multiplyScalar(0.25 + 0.75 * (this._time.daylight ?? 1));
+    this._zenith.lerp(grey, c * 0.75);
+    this._horizon.lerp(grey, c * 0.6 + f * 0.3);
+    this._ground.lerp(grey, c * 0.4);
+    if (flash > 0) {
+      this._zenith.lerp(FLASH, flash * 0.6);
+      this._horizon.lerp(FLASH, flash * 0.5);
+    }
+    this._sky.setColors({ zenith: this._zenith, horizon: this._horizon, ground: this._ground });
+    const fog = this._scene.fog;
+    if (fog) {
+      fog.color.copy(this._horizon);
+      fog.near *= 1 - f * 0.9;
+      fog.far *= 1 - f * 0.82 - c * 0.15;
+    }
+    if (this._scene.background?.isColor) this._scene.background.copy(this._horizon);
   }
 
   _applyNightVision() {
@@ -165,7 +209,7 @@ export class AtmosphereSystem {
     this._sky.setColors({ zenith: this._zenith, horizon: this._horizon, ground: this._ground });
     this._sky.setSunDirection(sun);
     this._sky.setSunColor(this._sunColor);
-    this._sky.setStars(P.NIGHT.STARS * (1 - smoothstep(-0.18, 0.02, h)));
+    this._sky.setStars(P.NIGHT.STARS * (1 - smoothstep(-0.18, 0.02, h)) * (1 - (this._cloud ?? 0))); // nublado: sin estrellas
 
     // Luz directa: el sol de día; de noche, luz de luna desde el lado opuesto.
     // En el horizonte ambas son ~0, así que el cambio de dirección no se nota.
