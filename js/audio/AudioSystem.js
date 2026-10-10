@@ -393,10 +393,7 @@ export class AudioSystem {
     on(E.PLAYER_LANDED, ({ fallSpeed = 0 }) => {
       if (fallSpeed < 3.5) return;
       const k = Math.min(1.3, 0.35 + (fallSpeed - 3.5) / 9);
-      this.play((S, o) => {
-        S.land(o, k);
-        S.step(o, this._surface(), 1);
-      });
+      this.play((S, o) => S.land(o, k));
       this._stride = 0;
     });
     on(E.PLAYER_DAMAGED, ({ amount = 0, source }) => {
@@ -696,12 +693,8 @@ export class AudioSystem {
     const stride = strideLength({ running: st.isRunning, crouching: st.isCrouching, swimming: st.isSwimming });
     if (this._stride < stride) return;
     this._stride = 0;
-    const k = st.isCrouching ? 0.45 : st.isRunning ? 1.15 : 0.85;
-    const surface = this._surface();
-    this.play((S, o) => {
-      if (surface === 'water' && this._underwater) S.bubbles(o, 0.6);
-      else S.step(o, surface, k);
-    });
+    // Sin sonido de pasos al andar (se pidió quitarlo): solo las burbujas al bucear.
+    if (this._surface() === 'water' && this._underwater) this.play((S, o) => S.bubbles(o, 0.6));
   }
 
   /** Cueva, agua cercana, altura, bioma: unas pocas veces por segundo. */
