@@ -3,6 +3,11 @@ import { GameEvents } from '../core/GameEvents.js';
 import { SeededRandom, deriveSeed } from '../core/SeededRandom.js';
 import { Enemy, EnemyState } from './Enemy.js';
 import { createEnemyView, buildGoblinBase, mulberry } from './EnemyViews.js';
+import { buildGoblinFortress } from './FortressModel.js';
+
+// Los que vuelven a salir (no se guardan muertos): slimes y lobos de noche, y los bichos de
+// cuevas y playas (al cargar la partida están otra vez).
+const TRANSIENT = new Set(['SLIME', 'WOLF', 'SPIDER', 'BAT', 'CRAB']);
 
 /**
  * EnemySystem — los enemigos del planeta de inicio.
@@ -14,13 +19,17 @@ import { createEnemyView, buildGoblinBase, mulberry } from './EnemyViews.js';
  * - Equipos de exploración: 3–4 goblins y un jefe goblin (negro) que recorren el
  *   planeta de un punto a otro (lejos del jugador se mueven sin simularse).
  * - Slimes: salen de noche alrededor del jugador y se deshacen al amanecer.
+ * - P10: arañas y colonias de murciélagos (colgados del techo) en las cuevas, cangrejos
+ *   gigantes en las playas, manadas de lobos de noche (se van al amanecer y no se acercan
+ *   al fuego) y la fortaleza del Rey Goblin (sitio GOBLIN_FORTRESS) con su guardia. A media
+ *   vida el rey se enfurece y llama a más goblins.
  *
  * Mismo interfaz que AnimalSystem para golpear (getAnimalsNear / hitAnimal), así la
  * espada, el puño, el arco y el tirachinas sirven igual. Nada aparece a menos de
  * SAFE_RADIUS del inicio. Los muertos y las bases limpias se guardan con la partida.
  */
 export class EnemySystem {
-  constructor({ config, safeRadius = 0, scene, worlds, homeId, player, events, time, obstacles = null, pickups = null, isSheltered = () => false, fires = () => [], fireRadius = 9 }) {
+  constructor({ config, safeRadius = 0, scene, worlds, homeId, player, events, time, obstacles = null, pickups = null, isSheltered = () => false, fires = () => [], fireRadius = 9, damageScale = () => 1 }) {
     this.name = 'enemies';
     this._cfg = config;
     this._safe = safeRadius;
@@ -34,6 +43,8 @@ export class EnemySystem {
     this._isSheltered = isSheltered;
     this._fires = fires;       // hogueras: los slimes no se acercan
     this._fireRadius = fireRadius;
+    this._damageScale = damageScale; // p. ej. la corona del rey: los goblins pegan menos
+    this._wolfIn = 20;
     this.root = new THREE.Group();
     this.root.name = 'enemies';
     scene.add(this.root);
@@ -118,6 +129,10 @@ export class EnemySystem {
       const start = this._randomSpot(trng, 400);
       if (start) this._createTeam(`team${t}`, start, trng);
     }
+    // P10: bichos de las cuevas, cangrejos de la playa y la fortaleza del Rey Goblin.
+    this._cavePests(w, seed);
+    this._crabs(w, seed);
+    for (const site of w.getSites('GOBLIN_FORTRESS')) this._createFortress(site, seed);
     this._applySaved();
   }
 
@@ -148,6 +163,87 @@ export class EnemySystem {
       const z = site.z + Math.sin(a) * d;
       this._add('GOBLIN', `${site.id}:${i}`, x, z, { group: base, home: { x: site.x, z: site.z, radius: 9, leash: 40 }, rng });
     }
+    this.bases.push(base);
+  }
+
+  /** Arañas (sueltas o en pareja) y colonias de murciélagos dormidos en los túneles. */
+  _cavePests(w, seed) {
+    const C = this._cfg;
+    const sp = w.getSpawnPoint();
+    const spots = [];
+    for (const c of w.caves?.caves ?? []) {
+      if (c.kind === 'DUNGEON') continue;
+      c.nodes.forEach((nd, i) => i > 4 && Number.isFinite(nd.floor) && Math.hypot(nd.x - sp.x, nd.z - sp.z) >= this._safe && spots.push({ c, nd, i }));
+    }
+    const rng = new SeededRandom(deriveSeed(seed, 'cavePests'));
+    const take = () => spots.splice(rng.int(0, spots.length - 1), 1)[0];
+    const all = [...spots];
+    for (let k = 0; k < (C.CAVE_BATS ?? 0) && spots.length; k++) {
+      const { c, nd, i } = take();
+      const group = { members: [] };
+      const n = rng.int(C.BAT_COLONY[0], C.BAT_COLONY[1]);
+      for (let j = 0; j < n; j++) {
+        const a = (j / n) * Math.PI * 2;
+        const x = nd.x + Math.cos(a) * 0.9;
+        const z = nd.z + Math.sin(a) * 0.9;
+        const e = this._add('BAT', `cave${c.id}:${i}:bat${j}`, x, z, { dormant: true, group, y: nd.floor, home: { x, z, radius: 3, sleep: true, leash: 30 }, rng });
+        e.cave = true;
+      }
+    }
+    // Arañas: en los túneles que quedan (si no queda ninguno, comparten con los murciélagos).
+    for (let k = 0; k < (C.CAVE_SPIDERS ?? 0); k++) {
+      const pick = spots.length ? take() : all.length ? all[rng.int(0, all.length - 1)] : null;
+      if (!pick) break;
+      const { c, nd, i } = pick;
+      const n = rng.next() < 0.4 ? 2 : 1;
+      for (let j = 0; j < n; j++) {
+        const id = `cave${c.id}:${i}:spider${j}`;
+        if (this.enemies.some((e) => e.id === id)) continue;
+        const e = this._add('SPIDER', id, nd.x + j * 0.9, nd.z + j * 0.6, { y: nd.floor, home: { x: nd.x, z: nd.z, radius: 4, leash: 26 }, rng });
+        e.cave = true;
+      }
+    }
+  }
+
+  /** Cangrejos gigantes en las playas (uno o dos juntos, separados entre sí). */
+  _crabs(w, seed) {
+    const want = this._cfg.CRABS ?? 0;
+    if (!want) return;
+    const rng = new SeededRandom(deriveSeed(seed, 'crabs'));
+    const b = w.getBounds();
+    const sp = w.getSpawnPoint();
+    const homes = [];
+    for (let i = 0; i < 4000 && homes.length < want; i++) {
+      const x = rng.range(b.minX + 40, b.maxX - 40);
+      const z = rng.range(b.minZ + 40, b.maxZ - 40);
+      if (Math.hypot(x - sp.x, z - sp.z) < this._safe) continue;
+      if (w.getBiomeAt(x, z)?.id !== 'BEACH' || !this._isWalkable(x, z, null)) continue;
+      if (homes.some((h) => Math.hypot(h.x - x, h.z - z) < 70)) continue;
+      homes.push({ x, z });
+      const n = rng.next() < 0.35 ? 2 : 1;
+      for (let j = 0; j < n; j++) {
+        this._add('CRAB', `crab${homes.length}:${j}`, x + j * 2, z + j * 1.5, { home: { x, z, radius: 7, leash: 22 }, rng, scale: rng.range(0.9, 1.2) });
+      }
+    }
+  }
+
+  /** La fortaleza del Rey Goblin: el rey en su trono, capitanes en la puerta y guardias. */
+  _createFortress(site, seed) {
+    const F = this._cfg.FORTRESS;
+    const built = buildGoblinFortress(site, (x, z) => this._world.getHeightAt(x, z));
+    built.group.visible = false;
+    this.root.add(built.group);
+    const base = {
+      id: site.id, x: site.x, z: site.z, group: built.group, colliders: built.colliders, fire: built.fire, fires: built.fires,
+      members: [], cleared: false, fortress: true, extent: F.EXTENT, view: 420, throne: built.throne, gate: built.gate,
+    };
+    const rng = new SeededRandom(deriveSeed(seed, site.id));
+    const yard = { x: site.x, z: site.z, radius: 9, leash: 34 };
+    const king = this._add('GOBLIN_KING', `${site.id}:king`, built.throne.x, built.throne.z, { group: base, home: { x: built.throne.x, z: built.throne.z, radius: 2, leash: 32 }, scale: 1.55 });
+    king.heading = site.yaw ?? 0; // mira a la puerta
+    base.king = king;
+    built.spots.captains.slice(0, F.CAPTAINS).forEach((p, i) => this._add('GOBLIN_BOSS', `${site.id}:captain${i}`, p.x, p.z, { group: base, home: { ...yard }, rng, scale: 1.15 }));
+    built.spots.guards.slice(0, F.GUARDS).forEach((p, i) => this._add('GOBLIN', `${site.id}:guard${i}`, p.x, p.z, { group: base, home: { ...yard }, rng }));
     this.bases.push(base);
   }
 
@@ -213,7 +309,8 @@ export class EnemySystem {
   _resolveStatic(pos, r, y0 = -Infinity) {
     let hit = false;
     for (const b of this.bases) {
-      if (Math.abs(pos.x - b.x) > 20 || Math.abs(pos.z - b.z) > 20) continue;
+      const ext = b.extent ?? 20;
+      if (Math.abs(pos.x - b.x) > ext || Math.abs(pos.z - b.z) > ext) continue;
       const gy = this._world.getHeightAt(b.x, b.z);
       for (const c of b.colliders) {
         if (y0 > gy + c.h + 2) continue;
@@ -238,7 +335,7 @@ export class EnemySystem {
     if (!this.enabled) return false;
     let hit = this._resolveStatic(pos, r, y0);
     for (const e of this.enemies) {
-      if (!e.hittable || Math.abs(pos.x - e.x) > 3 || Math.abs(pos.z - e.z) > 3) continue;
+      if (!e.hittable || e.def.FLY || Math.abs(pos.x - e.x) > 3 || Math.abs(pos.z - e.z) > 3) continue;
       if (y1 < e.y || y0 > e.y + e.def.HEIGHT * e.scale) continue;
       const dx = pos.x - e.x;
       const dz = pos.z - e.z;
@@ -253,8 +350,9 @@ export class EnemySystem {
   }
 
   _attack(e) {
+    if (e.type === 'GOBLIN_KING') this._events.emit(GameEvents.BOSS_EVENT, { type: 'slam', x: e.x, y: e.y, z: e.z });
     this._events.emit(GameEvents.PLAYER_DAMAGED, {
-      amount: e.def.DAMAGE,
+      amount: Math.round(e.def.DAMAGE * this._damageScale(e)),
       source: `ENEMY_${e.type}`,
       sourceName: e.def.NAME,
       fromX: e.x,
@@ -281,6 +379,7 @@ export class EnemySystem {
     const R = this._cfg.ACTIVE_RADIUS;
     this._moveTeams(dt, p);
     this._spawnSlimes(dt, p);
+    this._spawnWolves(dt, p);
 
     let active = 0;
     for (const e of this.enemies) {
@@ -292,8 +391,10 @@ export class EnemySystem {
         continue;
       }
       if (e.type === 'SLIME' && !e.melting && !this._time.isNight && e.alive) this._melt(e);
+      if (e.type === 'WOLF' && e.alive) this._wolfDawn(e, p);
       e.update(dt, this._env);
-      if (e.type === 'SLIME' && e.alive) this._keepFromFire(e);
+      if ((e.type === 'SLIME' || e.type === 'WOLF') && e.alive) this._keepFromFire(e);
+      if (e.type === 'GOBLIN_KING' && e.alive) this._kingTick(e);
       if (e.burn) this._burnTick(e, dt);
       if (!view) {
         view = createEnemyView(e);
@@ -322,10 +423,12 @@ export class EnemySystem {
     this.activeCount = active;
     for (const b of this.bases) {
       const d = Math.hypot(b.x - p.x, b.z - p.z);
-      b.group.visible = d < 260;
+      b.group.visible = d < (b.view ?? 260);
       if (b.group.visible) {
-        const f = b.fire.userData.flames;
-        f.scale.set(1 + Math.sin(this._t * 9) * 0.1, 1 + Math.sin(this._t * 13 + 1) * 0.18, 1 + Math.cos(this._t * 8) * 0.1);
+        (b.fires ?? [b.fire]).forEach((fire, i) => {
+          const f = fire.userData.flames;
+          f.scale.set(1 + Math.sin(this._t * 9 + i) * 0.1, 1 + Math.sin(this._t * 13 + 1 + i) * 0.18, 1 + Math.cos(this._t * 8 + i) * 0.1);
+        });
       }
     }
   }
@@ -432,6 +535,71 @@ export class EnemySystem {
     }
   }
 
+  /** Manadas de lobos de noche (no cerca del inicio, ni en cuevas, ni junto al fuego). */
+  _spawnWolves(dt, p) {
+    const W = this._cfg.WOLVES;
+    if (!W || !this._time.isNight) return;
+    this._wolfIn -= dt;
+    if (this._wolfIn > 0) return;
+    const rng = this._wolfRng ??= new SeededRandom(deriveSeed(this._world.seed.sub.animal, 'wolves'));
+    this._wolfIn = rng.range(W.EVERY[0], W.EVERY[1]);
+    const w = this._world;
+    const sp = w.getSpawnPoint();
+    if (Math.hypot(p.x - sp.x, p.z - sp.z) < this._safe) return;
+    if (w.inCave?.(p.x, p.y + 1, p.z) || this._isSheltered()) return;
+    if (this._fires().some((f) => Math.hypot(f.x - p.x, f.z - p.z) < this._fireRadius * 2)) return;
+    const packs = new Set(this.enemies.filter((e) => e.type === 'WOLF' && e.alive && !e.leaving).map((e) => e.group));
+    if (packs.size >= W.PACKS) return;
+    for (let i = 0; i < 10; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(W.DISTANCE[0], W.DISTANCE[1]);
+      const x = p.x + Math.cos(a) * d;
+      const z = p.z + Math.sin(a) * d;
+      if (Math.hypot(x - sp.x, z - sp.z) < this._safe || !this._isWalkable(x, z, null)) continue;
+      if (!W.BIOMES.includes(w.getBiomeAt(x, z)?.id)) continue;
+      const group = { members: [] };
+      const n = rng.int(W.SIZE[0], W.SIZE[1]);
+      for (let j = 0; j < n; j++) {
+        const e = this._add('WOLF', `wolf${++this._slimeSeq}`, x + (j % 2) * 1.6, z + Math.floor(j / 2) * 1.6, { group, home: { x: p.x, z: p.z, radius: 10, leash: 90 }, rng });
+        e.state = EnemyState.CHASE;
+      }
+      this._events.emit(GameEvents.UI_MESSAGE, { text: '🐺 Se oyen aullidos cerca… una manada de lobos. El fuego los mantiene lejos.', type: 'warning' });
+      this._events.emit(GameEvents.WOLF_HOWL, { x, z });
+      return;
+    }
+  }
+
+  /** Al amanecer los lobos se van (y desaparecen lejos del jugador). */
+  _wolfDawn(e, p) {
+    if (!e.leaving && !this._time.isNight) {
+      e.leaving = true;
+      const dx = e.x - p.x;
+      const dz = e.z - p.z;
+      const d = Math.hypot(dx, dz) || 1;
+      e.home = { x: e.x + (dx / d) * 120, z: e.z + (dz / d) * 120, radius: 5, leash: 400 };
+      e.def = { ...e.def, AGGRO: 0 };
+      e.state = EnemyState.RETURN;
+    }
+    if (e.leaving && Math.hypot(e.x - p.x, e.z - p.z) > 70) e.removed = true;
+  }
+
+  /** Rey Goblin: a media vida se enfurece (más rápido) y llama a su guardia. */
+  _kingTick(e) {
+    const F = this._cfg.FORTRESS;
+    if (e.enraged || e.health > e.maxHealth * F.ENRAGE) return;
+    e.enraged = true;
+    e.def = { ...e.def, SPEED: e.def.SPEED * 1.35, WINDUP: e.def.WINDUP * 0.75, COOLDOWN: e.def.COOLDOWN * 0.75 };
+    const base = e.group;
+    for (let k = 0; k < F.SUMMON; k++) {
+      const a = e.heading + (k ? 1 : -1) * 1.2;
+      const g = this._add('GOBLIN', `${base?.id ?? 'king'}:summon${k}`, e.x + Math.sin(a) * 3, e.z + Math.cos(a) * 3, { group: base, home: { x: e.home.x, z: e.home.z, radius: 9, leash: 34 } });
+      g.transient = true;
+      g.state = EnemyState.CHASE;
+    }
+    this._events.emit(GameEvents.BOSS_EVENT, { type: 'phase2', x: e.x, y: e.y, z: e.z });
+    this._events.emit(GameEvents.UI_MESSAGE, { text: '👑 ¡El Rey Goblin se enfurece y llama a su guardia!', type: 'warning' });
+  }
+
   _melt(e) {
     e.melting = true;
     e.state = EnemyState.DEAD;
@@ -451,8 +619,9 @@ export class EnemySystem {
     this._events.emit(GameEvents.ANIMAL_HIT, { animal: e, killed, enemy: true });
     if (!killed) return { killed: false, drops: null };
     const drops = e.rollDrops();
-    if (e.type !== 'SLIME' && !e.id.startsWith('admin')) this._dead.add(e.id);
+    if (!TRANSIENT.has(e.type) && !e.transient && !e.id.startsWith('admin')) this._dead.add(e.id);
     this._events.emit(GameEvents.ENEMY_KILLED, { enemy: e, drops });
+    if (e.type === 'GOBLIN_KING') this._events.emit(GameEvents.UI_MESSAGE, { text: '👑 ¡Has derrotado al Rey Goblin! Su corona es tuya.', type: 'pickup' });
     this._checkBase(e.group);
     return { killed: true, drops };
   }
@@ -520,6 +689,19 @@ export class EnemySystem {
     if (base.members.some((m) => m.alive)) return;
     base.cleared = true;
     this._cleared.add(base.id);
+    if (base.fortress) {
+      // El tesoro de la fortaleza, junto al trono.
+      if (this._pickups) {
+        const rng = new SeededRandom(deriveSeed(this._world.seed.sub.animal, `${base.id}:loot`));
+        for (const [item, [a, b]] of Object.entries(this._cfg.FORTRESS_LOOT)) {
+          const n = rng.int(a, b);
+          if (n > 0) this._pickups.drop(this._homeId, base.throne.x, base.throne.z, item, n);
+        }
+      }
+      this._events.emit(GameEvents.BASE_CLEARED, { base });
+      this._events.emit(GameEvents.UI_MESSAGE, { text: '👑 ¡La fortaleza es tuya! El tesoro del Rey Goblin está junto al trono.', type: 'pickup' });
+      return;
+    }
     // Botín de la base: una bolsa junto al árbol.
     if (this._pickups) {
       const rng = new SeededRandom(deriveSeed(this._world.seed.sub.animal, `${base.id}:loot`));
@@ -599,7 +781,7 @@ export class EnemySystem {
   }
 
   nearest(kind, x, z) {
-    const list = kind === 'BASE' ? this.bases.filter((b) => !b.cleared) : kind === 'TEAM' ? this.teams.filter((t) => t.members.some((m) => m.alive)).map((t) => t.home) : this.enemies.filter((e) => e.type === kind && e.alive && !e.cave);
+    const list = kind === 'FORTRESS' ? this.bases.filter((b) => b.fortress) : kind === 'BASE' ? this.bases.filter((b) => !b.cleared && !b.fortress) : kind === 'TEAM' ? this.teams.filter((t) => t.members.some((m) => m.alive)).map((t) => t.home) : this.enemies.filter((e) => e.type === kind && e.alive && !e.cave);
     let best = null;
     for (const it of list) {
       const d = Math.hypot(it.x - x, it.z - z);

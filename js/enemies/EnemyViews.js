@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { boulderSet } from '../render/Rocks.js';
+import { creatureView } from './CreatureViews.js';
 
 /**
  * EnemyViews — modelos low-poly de los enemigos y su animación a partir del estado
@@ -11,6 +12,8 @@ import { boulderSet } from '../render/Rocks.js';
  *               cuelgan y gotean, se tambalea y salta al moverse.
  *   GOBLIN      tipo mono: encorvado, brazos largos, cabeza grande con orejas, mazo.
  *   JEFE GOBLIN negro, más grande, ojos rojos, cuernos y collar de huesos.
+ *   REY GOBLIN  (P10) enorme, corona de oro, capa roja y maza dorada con pinchos.
+ *   Araña, murciélago, lobo y cangrejo: CreatureViews.
  *
  * Todos miran a +Z (el rumbo del Enemy) y se apoyan en y = 0.
  */
@@ -35,10 +38,10 @@ const mesh = (g, m, [x, y, z] = [0, 0, 0], [sx, sy, sz] = [1, 1, 1]) => {
 };
 
 export function createEnemyView(enemy) {
-  const make = { GOLEM: golemView, SLIME: slimeView, GOBLIN: goblinView, GOBLIN_BOSS: goblinView }[enemy.type];
-  const view = make(enemy);
+  const make = { GOLEM: golemView, SLIME: slimeView, GOBLIN: goblinView, GOBLIN_BOSS: goblinView, GOBLIN_KING: goblinView }[enemy.type];
+  const view = make ? make(enemy) : creatureView(enemy);
   view.root.name = `enemy_${enemy.id}`;
-  view.bar = healthBar(enemy.def.HEIGHT * enemy.scale + 0.45);
+  view.bar = healthBar((enemy.def.HEIGHT + (enemy.def.FLY ?? 0)) * enemy.scale + 0.45);
   view.root.add(view.bar.group);
   return view;
 }
@@ -301,15 +304,18 @@ function slimeView(enemy) {
 // ---- Goblin y jefe goblin --------------------------------------------------------------
 
 function goblinView(enemy) {
+  const king = enemy.type === 'GOBLIN_KING';
   const boss = enemy.type === 'GOBLIN_BOSS';
   const root = new THREE.Group();
-  const skin = lambert(boss ? 0x3c3744 : 0x6d8a3c);
-  const skinDark = lambert(boss ? 0x26222c : 0x55702c);
-  const cloth = lambert(boss ? 0x5a1a1a : 0x6b4a2b);
+  const skin = lambert(king ? 0x4f6b2e : boss ? 0x3c3744 : 0x6d8a3c);
+  const skinDark = lambert(king ? 0x3a5222 : boss ? 0x26222c : 0x55702c);
+  const cloth = lambert(king ? 0x7a1424 : boss ? 0x5a1a1a : 0x6b4a2b);
+  const goldMat = lambert(0xe0b030, { emissive: 0x3a2800 });
+  goldMat.userData.emissive = 0x3a2800;
   const strap = lambert(0x3d2a1a);
   const wood = lambert(0x7a5a34);
   const iron = lambert(0x8e9296);
-  const eyeMat = new THREE.MeshBasicMaterial({ color: boss ? 0xff3a2a : 0xffe25a });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: king ? 0xffa020 : boss ? 0xff3a2a : 0xffe25a });
   const pupil = new THREE.MeshBasicMaterial({ color: 0x120a04 });
   const bone = lambert(0xe9e2cf);
   const mats = [skin, skinDark, cloth];
@@ -347,7 +353,7 @@ function goblinView(enemy) {
   const belt = mesh(box(0.06, 0.62, 0.03), strap, [0, 0.27, 0.17]);
   belt.rotation.z = 0.7;
   torso.add(belt);
-  if (boss) {
+  if (boss || king) {
     for (let i = 0; i < 7; i++) {
       const a = -1.2 + (i / 6) * 2.4;
       const tooth = mesh(cone(5), bone, [Math.sin(a) * 0.19, 0.46 - Math.cos(a) * 0.06, 0.15], [0.025, 0.08, 0.025]);
@@ -376,7 +382,20 @@ function goblinView(enemy) {
     ear.rotation.set(0, s2 * 0.35, s2 * -1.25);
     head.add(ear);
   }
-  if (boss) {
+  if (king) {
+    // Corona de oro con pinchos y una gema.
+    head.add(mesh(cyl(10), goldMat, [0, 0.4, 0.02], [0.17, 0.08, 0.17]));
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      head.add(mesh(cone(4), goldMat, [Math.sin(a) * 0.15, 0.5, 0.02 + Math.cos(a) * 0.15], [0.035, 0.12, 0.035]));
+    }
+    head.add(mesh(ico(), new THREE.MeshBasicMaterial({ color: 0xd0203a }), [0, 0.41, 0.19], [0.035, 0.035, 0.02]));
+    // Capa roja a la espalda y hombreras doradas.
+    const cape = mesh(box(0.62, 0.95, 0.04), cloth, [0, 0.0, -0.2]);
+    cape.rotation.x = 0.12;
+    torso.add(cape);
+    for (const s2 of [-1, 1]) torso.add(mesh(ball, goldMat, [s2 * 0.26, 0.47, 0], [0.1, 0.06, 0.1]));
+  } else if (boss) {
     const hornL = mesh(cone(5), bone, [-0.13, 0.42, 0.02], [0.05, 0.22, 0.05]);
     hornL.rotation.z = 0.35;
     const hornR = mesh(cone(5), bone, [0.13, 0.42, 0.02], [0.05, 0.22, 0.05]);
@@ -412,6 +431,7 @@ function goblinView(enemy) {
   const clubGeo = geo('club', () => new THREE.CylinderGeometry(0.085, 0.032, 0.8, 7));
   mallet.add(mesh(clubGeo, wood, [0, 0.36, 0]));
   if (boss) mallet.add(mesh(box(0.34, 0.22, 0.22), lambert(0x4a4a52), [0, 0.72, 0]));
+  if (king) mallet.add(mesh(ico(), goldMat, [0, 0.74, 0], [0.17, 0.17, 0.17]));
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
     const spike = mesh(cone(4), iron, [Math.cos(a) * 0.08, 0.58 + (i % 2) * 0.1, Math.sin(a) * 0.08], [0.018, 0.07, 0.018]);

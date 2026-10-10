@@ -64,6 +64,7 @@ export const GameEvents = Object.freeze({
   WELL_USE: 'construction:wellUse',                 // { piece, source: 'WELL' | 'COLLECTOR' } (P6)
   WEATHER_CHANGED: 'weather:changed',               // { state, name } (P7)
   THUNDER: 'weather:thunder',                       // { distance } (P7)
+  WOLF_HOWL: 'enemies:wolfHowl',                   // { x, z } una manada aparece (P10)
   BASE_CLEARED: 'enemies:baseCleared',              // { base } (P8)
   TRADE_OPEN: 'trade:open',                         // {} E sobre el mercader (P8)
   TRADE_DONE: 'trade:done',                         // { kind: 'BUY' | 'SELL', item, amount, price } (P8)

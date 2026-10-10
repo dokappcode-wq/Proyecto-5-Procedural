@@ -1,10 +1,12 @@
 /**
- * Enemy — estado y comportamiento de un enemigo (gólem, slime, goblin, jefe goblin).
+ * Enemy — estado y comportamiento de un enemigo (gólem, slime, goblin, jefe goblin y, desde
+ * la P10, araña, murciélago, lobo, cangrejo gigante y el Rey Goblin).
+ * Los voladores (def.FLY) andan por el suelo como los demás y se dibujan FLY m más arriba.
  * Sin Three.js: lo dibuja EnemyViews a partir de estos datos.
  *
  * Estados:
- *   DORMANT     gólem dormido: un montón de piedras en el suelo
- *   ASSEMBLING  las piedras se juntan (no se le puede golpear todavía)
+ *   DORMANT     gólem dormido (montón de piedras) o murciélago colgado del techo
+ *   ASSEMBLING  las piedras se juntan / el murciélago se suelta (no se le puede golpear)
  *   IDLE/WANDER en su casa (base, equipo de exploración…)
  *   CHASE       persigue al jugador
  *   WINDUP      amago del golpe (brazos o mazo arriba): se ve venir, se puede esquivar
@@ -93,7 +95,7 @@ export class Enemy {
 
   // Interfaz común con los animales (InteractionSystem, CombatSystem).
   get aimY() {
-    return this.y + this.def.HEIGHT * this.scale * 0.6;
+    return this.y + ((this.def.FLY ?? 0) + this.def.HEIGHT * 0.6) * this.scale;
   }
 
   get aimRadius() {
@@ -271,8 +273,8 @@ export class Enemy {
           break;
         }
         if (hd < 1.5) {
-          if (this.type === 'GOLEM' && this.home.sleep) {
-            // El gólem vuelve a dormirse: se deshace en piedras donde estaba.
+          if ((this.type === 'GOLEM' || d.SLEEPS) && this.home.sleep) {
+            // El gólem vuelve a dormirse (se deshace en piedras); el murciélago se cuelga.
             this.state = S.DORMANT;
             this.assemble = 0;
             this.health = Math.min(this.maxHealth, this.health + this.maxHealth * 0.5);

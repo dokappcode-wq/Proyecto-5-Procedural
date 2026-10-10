@@ -558,6 +558,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     config: cfg.ENEMIES, safeRadius: cfg.SITES.SAFE_RADIUS, scene: render.scene, worlds, homeId: HOME, player, events, time,
     obstacles: combinedStructures, pickups, isSheltered: () => ship.isAboard(),
     fires: () => construction.pieces.filter((pc) => pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN' || pc.type === 'FORGE'), fireRadius: cfg.BUILD.CAMPFIRE_SLIME_RADIUS,
+    // Con la corona del Rey Goblin puesta los goblins pegan un 15 % menos (P10).
+    damageScale: (e) => (e.type.startsWith('GOBLIN') && equipment.slots.HEAD === 'KING_CROWN' ? 0.85 : 1),
   });
   enemies.playerAlive = () => !health.dead;
   // Granja, corral y pesca (P4).
@@ -1134,6 +1136,19 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     shipMapPanel.showTab('PLANET');
     shipMapPanel.setOpen(true);
   });
+  // Rey Goblin (P10): barra de jefe mientras se le pelea cerca.
+  let kingBar = false;
+  const kingHUD = {
+    name: 'kingHUD',
+    update: () => {
+      const k = enemies.bases.find((b) => b.fortress)?.king;
+      const p = player.position;
+      const show = !!k && k.alive && !k.removed && worlds.activeId === HOME && (k.hostile || k.health < k.maxHealth) && Math.hypot(k.x - p.x, k.z - p.z) < 40;
+      if (show) storyUI.bossBar(k.enraged ? 'REY GOBLIN · ENFURECIDO' : 'REY GOBLIN', k.health / k.maxHealth, k.enraged ? 'Ha llamado a su guardia' : 'Esquiva el mazazo: retrocede cuando levante la maza');
+      else if (kingBar) storyUI.bossBar(null, null);
+      kingBar = show;
+    },
+  };
   // M a pie (P9): el reloj de pulsera muestra el mapa de la región (para poner marcas).
   const mapKey = {
     name: 'mapKey',
@@ -1720,19 +1735,19 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   }
   // Enemigos: crear uno delante e ir al más cercano.
   admin.registerTool({ category: 'Enemigos', type: 'info', label: 'Activos', read: () => `${enemies.activeCount} cerca · ${enemies.enemies.filter((e) => e.alive).length} vivos · ${enemies.bases.filter((b) => !b.cleared).length} bases` });
-  for (const [type, label] of [['GOLEM', 'Gólem'], ['SLIME', 'Slime'], ['GOBLIN', 'Goblin'], ['GOBLIN_BOSS', 'Jefe goblin']]) {
+  for (const [type, label] of [['GOLEM', 'Gólem'], ['SLIME', 'Slime'], ['GOBLIN', 'Goblin'], ['GOBLIN_BOSS', 'Jefe goblin'], ['SPIDER', 'Araña'], ['BAT', 'Murciélago'], ['WOLF', 'Lobo'], ['CRAB', 'Cangrejo gigante']]) {
     admin.registerTool({ category: 'Enemigos', label: `Crear ${label} delante`, run: () => {
       if (worlds.activeId !== HOME) throw new Error('Solo en el planeta de inicio');
       enemies.spawnNear(type);
     } });
   }
-  for (const [kind, label] of [['BASE', 'base goblin'], ['TEAM', 'equipo de exploración'], ['GOLEM', 'gólem']]) {
+  for (const [kind, label] of [['BASE', 'base goblin'], ['TEAM', 'equipo de exploración'], ['GOLEM', 'gólem'], ['FORTRESS', 'fortaleza del Rey Goblin'], ['CRAB', 'cangrejo gigante']]) {
     admin.registerTool({ category: 'Enemigos', label: `Ir a la ${label} más cercana`, run: () => {
       const p = player.position;
       const it = enemies.nearest(kind, p.x, p.z);
       if (!it || worlds.activeId !== HOME) throw new Error('No hay');
       const a = Math.atan2(p.x - it.x, p.z - it.z);
-      const d = kind === 'BASE' ? 24 : 14;
+      const d = kind === 'FORTRESS' ? 45 : kind === 'BASE' ? 24 : 14;
       controller.placeAt(it.x + Math.sin(a) * d, it.z + Math.cos(a) * d);
       player.yaw = player.bodyYaw = a;
     } });
@@ -1783,6 +1798,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(weather);     // clima: cielo, lluvia/nieve, rayos y viento (P7)
   loop.add(life);        // pájaros, mariposas, luciérnagas y peces
   loop.add(mapMarkers);  // marcas del mapa (P9)
+  loop.add(kingHUD);     // barra de vida del Rey Goblin (P10)
   loop.add(mapKey);
   loop.add(settingsPanel);
   loop.add(wetness);     // mojado bajo la lluvia

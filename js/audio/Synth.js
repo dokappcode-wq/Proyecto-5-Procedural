@@ -317,6 +317,49 @@ export class Synth {
     this.tone(out, { type: 'square', f, f2: f * 0.45, a: 0.01, d: 0.35, gain: 0.06 * k, filter: 2200, q: 4 });
   }
 
+  // ---- Bichos nuevos (P10) ----
+
+  /** Araña: chasquidos secos y un siseo. */
+  chitter(out, k = 1) {
+    const t = this.now;
+    for (let i = 0; i < 4; i++) this.noise(out, { color: 'white', t: t + i * 0.045, a: 0.001, d: 0.025, gain: 0.18 * k, type: 'highpass', f: 3500 });
+    this.noise(out, { color: 'white', t: t + 0.18, a: 0.02, d: 0.3, gain: 0.08 * k, type: 'bandpass', f: 6000, q: 2 });
+  }
+
+  /** Murciélago: chillidos muy agudos. */
+  squeak(out, k = 1) {
+    const t = this.now;
+    for (let i = 0; i < 2; i++) {
+      const f = 3600 + Math.random() * 1400;
+      this.tone(out, { t: t + i * 0.07, type: 'sine', f, f2: f * 1.25, a: 0.002, d: 0.04, gain: 0.06 * k });
+    }
+  }
+
+  /** Lobo: gruñido grave. */
+  growl(out, k = 1) {
+    const t = this.now;
+    this.tone(out, { t, type: 'sawtooth', f: 95, f2: 80, a: 0.05, d: 0.6, gain: 0.08 * k, filter: 600, q: 2 });
+    this.noise(out, { color: 'brown', t, a: 0.05, d: 0.55, gain: 0.25 * k, type: 'bandpass', f: 260, q: 3 });
+  }
+
+  /** Lobo: aullido largo que sube y baja. */
+  howl(out, k = 1) {
+    const t = this.now;
+    const o = this.tone(out, { t, type: 'triangle', f: 320, f2: 520, a: 0.35, d: 1.9, gain: 0.07 * k, filter: 1500 });
+    o.frequency.setValueAtTime(320, t);
+    o.frequency.linearRampToValueAtTime(560, t + 0.7);
+    o.frequency.linearRampToValueAtTime(380, t + 2);
+  }
+
+  /** Cangrejo: clac de pinzas. */
+  clack(out, k = 1) {
+    const t = this.now;
+    for (let i = 0; i < 2; i++) {
+      this.noise(out, { color: 'white', t: t + i * 0.09, a: 0.001, d: 0.04, gain: 0.3 * k, type: 'bandpass', f: 2400, q: 5 });
+      this.tone(out, { t: t + i * 0.09, type: 'square', f: 900, f2: 500, a: 0.001, d: 0.03, gain: 0.04 * k });
+    }
+  }
+
   /** Slime que revienta. */
   pop(out, k = 1) {
     this.noise(out, { color: 'pink', a: 0.005, d: 0.18, gain: 0.35 * k, type: 'lowpass', f: 2000, f2: 200, q: 6 });

@@ -452,7 +452,17 @@ export class AudioSystem {
         this.playAt(ax, az, (S, o) => {
           if (type === 'GOLEM') S.impact(o, 'stone', 1);
           else if (type === 'SLIME') S.slime(o, 1);
-          else {
+          else if (type === 'CRAB') {
+            S.impact(o, 'stone', 0.6);
+            S.clack(o, 0.8);
+          } else if (type === 'SPIDER') {
+            S.impact(o, 'flesh', 0.8);
+            S.chitter(o, 0.8);
+          } else if (type === 'BAT') S.squeak(o, 1.2);
+          else if (type === 'WOLF') {
+            S.impact(o, 'flesh', 1);
+            if (!killed) S.growl(o, 0.8);
+          } else {
             S.impact(o, 'flesh', 1);
             if (!killed) S.squeal(o, 0.7);
           }
@@ -469,7 +479,14 @@ export class AudioSystem {
       this.playAt(enemy.x, enemy.z, (S, o) => {
         if (enemy.type === 'GOLEM') S.crumble(o, 1.1);
         else if (enemy.type === 'SLIME') S.pop(o, 1);
-        else S.squeal(o, 1.3);
+        else if (enemy.type === 'CRAB') S.clack(o, 1.2);
+        else if (enemy.type === 'SPIDER') S.chitter(o, 1.2);
+        else if (enemy.type === 'BAT') S.squeak(o, 1.5);
+        else if (enemy.type === 'WOLF') S.squeal(o, 0.9);
+        else if (enemy.type === 'GOBLIN_KING') {
+          S.boom(o, 0.6);
+          S.goblin(o, 2);
+        } else S.squeal(o, 1.3);
       });
     });
     on(E.ENEMY_ATTACKED, ({ enemy }) => {
@@ -479,7 +496,15 @@ export class AudioSystem {
           S.golem(o, 0.8);
           S.whoosh(o, 1.4);
         } else if (enemy.type === 'SLIME') S.slime(o, 1.2);
-        else {
+        else if (enemy.type === 'SPIDER') S.chitter(o, 1.2);
+        else if (enemy.type === 'BAT') S.squeak(o, 1.3);
+        else if (enemy.type === 'WOLF') {
+          S.growl(o, 1.2);
+          S.whoosh(o, 0.8);
+        } else if (enemy.type === 'CRAB') {
+          S.clack(o, 1.3);
+          S.whoosh(o, 0.7);
+        } else {
           S.goblin(o, 1.3);
           S.whoosh(o, 0.9);
         }
@@ -534,6 +559,8 @@ export class AudioSystem {
     }));
     // Clima (P7): trueno más suave cuanto más lejos cae el rayo.
     on(E.THUNDER, ({ distance = 0 }) => this.play((S, o) => S.thunder(o, Math.max(0.15, Math.min(1, 1.3 - distance / 1200)))));
+    // Una manada de lobos cerca (P10): aullido lejano.
+    on(E.WOLF_HOWL, ({ x, z }) => this.playAt(x, z, (S, o) => S.howl(o, 1.2), { ref: 30, max: 120 }));
     on(E.WELL_USE, ({ piece }) => piece && this.playAt(piece.x, piece.z, (S, o) => S.splash(o, 0.4)));
     on(E.FARM_CHANGED, ({ action }) => this.play((S, o) => {
       if (action === 'water') S.splash(o, 0.45);
@@ -904,6 +931,11 @@ export class AudioSystem {
       if (e.type === 'GOBLIN' && Math.random() < (chasing ? 0.45 : 0.12)) this.playAt(e.x, e.z, (S, o) => S.goblin(o, 1));
       else if (e.type === 'SLIME' && Math.random() < 0.25) this.playAt(e.x, e.z, (S, o) => S.slime(o, 0.7));
       else if (e.type === 'GOLEM' && Math.random() < (chasing ? 0.2 : 0.05)) this.playAt(e.x, e.z, (S, o) => S.golem(o, 0.7));
+      else if (e.type === 'SPIDER' && Math.random() < (chasing ? 0.35 : 0.1)) this.playAt(e.x, e.z, (S, o) => S.chitter(o, 0.7));
+      else if (e.type === 'BAT' && Math.random() < 0.35) this.playAt(e.x, e.z, (S, o) => S.squeak(o, 0.8));
+      else if (e.type === 'WOLF' && Math.random() < (chasing ? 0.4 : 0.1)) this.playAt(e.x, e.z, (S, o) => S.growl(o, 0.8));
+      else if (e.type === 'CRAB' && Math.random() < 0.15) this.playAt(e.x, e.z, (S, o) => S.clack(o, 0.5));
+      else if (e.type === 'GOBLIN_KING' && Math.random() < (chasing ? 0.4 : 0.08)) this.playAt(e.x, e.z, (S, o) => S.goblin(o, 1.6));
     }
     const animals = this._animals?.getAnimalsNear?.(p.x, p.z, 32) ?? [];
     if (animals.length) {

@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.32.0',
+    VERSION: '1.33.0',
   },
 
   RENDER: {
@@ -543,6 +543,7 @@ export const GameConfig = deepFreeze({
     STEEL_SHIELD: { NAME: 'Escudo de acero', ICON: '🛡️', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 170, SHIELD: true, REPAIR: 'STEEL', MODEL: { TYPE: 'shield', FACE: 0xc7cdd4, RIM: 0x3b4046 }, DESC: 'Clic dcho mantenido: bloquear. Aguanta 170 golpes (forja).' },
     // Escudos (mano izquierda, ranura ESCUDO): clic derecho mantenido para bloquear. Aguante = golpes parados.
     COPPER_SHIELD: { NAME: 'Escudo de cobre', ICON: '🛡️', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 50, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xb87333, RIM: 0x6e4a2a }, DESC: 'Clic dcho mantenido: bloquear (no se puede atacar a la vez). Aguanta 50 golpes.' },
+    CRAB_SHIELD: { NAME: 'Escudo de caparazón', ICON: '🛡️', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 80, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xd8603a, RIM: 0x7a2e1a }, DESC: 'Clic dcho mantenido: bloquear. Ligero y duro: aguanta 80 golpes.' },
     IRON_SHIELD: { NAME: 'Escudo de hierro', ICON: '🔰', USE: 'EQUIP', SLOT: 'OFFHAND', STACK: 1, DURABILITY: 100, SHIELD: true, MODEL: { TYPE: 'shield', FACE: 0xa9aeb5, RIM: 0x4a4f55 }, DESC: 'Clic dcho mantenido: bloquear. Aguanta 100 golpes.' },
     TORCH: { NAME: 'Antorcha', ICON: '🔥', USE: 'BUILD', BUILD_PIECE: 'TORCH', HOLD: true, MODEL: { TYPE: 'torch' }, DESC: 'En la mano ilumina. Clic dcho / R para clavarla en el suelo.' },
     ...PIECE_ITEMS,
@@ -550,6 +551,9 @@ export const GameConfig = deepFreeze({
     // EFFECTS: estados al comerla (s). RAW_RISK: probabilidad de indigestión (crudo). THIRST: sed que quita.
     MEAT: { NAME: 'Carne cruda', ICON: '🥩', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 'MEAT_NUTRITION', RAW_RISK: 0.45, DESC: 'Cruda puede sentar mal (indigestión). Ásala en una hoguera.' },
     APPLE: { NAME: 'Manzana', ICON: '🍎', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 'APPLE_NUTRITION' },
+    CRAB_MEAT: { NAME: 'Carne de cangrejo', ICON: '🦀', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 12, RAW_RISK: 0.35, DESC: 'De los cangrejos gigantes de la playa. Mejor a la brasa.' },
+    COOKED_CRAB: { NAME: 'Cangrejo a la brasa', ICON: '🍤', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 34, EFFECTS: { WELL_FED: 240 }, DESC: 'Sabroso: bien alimentado 4 min.' },
+    CRAB_SHELL: { NAME: 'Caparazón de cangrejo', ICON: '🐚', DESC: 'Duro y ligero. Con él se hace un escudo.' },
     COOKED_MEAT: { NAME: 'Carne asada', ICON: '🍖', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 42, EFFECTS: { WARM: 180 }, DESC: 'Alimenta más que cruda y da calor (comida caliente, 3 min).' },
     BERRIES: { NAME: 'Bayas', ICON: '🫐', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 7, DESC: 'De los zarzales. Con 6 se hace mermelada.' },
     MUSHROOM: { NAME: 'Setas', ICON: '🍄', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 6, RAW_RISK: 0.2, DESC: 'Mejor asadas o en sopa.' },
@@ -669,6 +673,8 @@ export const GameConfig = deepFreeze({
     PLANK_BATTERY_SMALL: { NAME: 'Batería plank pequeña', ICON: '🔋', USE: 'BATTERY' },
     PLANK_BATTERY_SMALL_EMPTY: { NAME: 'Batería plank pequeña (vacía)', ICON: '🪫' },
     // Se coge en la nave (mesa del laboratorio). Usarlo muestra dónde está la nave.
+    // P10: trofeo del Rey Goblin.
+    KING_CROWN: { NAME: 'Corona del Rey Goblin', ICON: '👑', USE: 'EQUIP', SLOT: 'HEAD', STACK: 1, DEFENSE: 4, COLD_PROTECTION: 0.04, COLOR: 0xe8b830, DESC: 'Trofeo del Rey Goblin. Defensa 4 y los goblins te temen un poco (−15 % de daño de goblins).' },
     SHIP_WATCH: { NAME: 'Reloj de la nave', ICON: '⌚', USE: 'WATCH' },
     // Tecnologías que se encuentran en el mundo y se instalan en una ranura de la nave.
     SPACE_NODE: { NAME: 'Nodo espacial', ICON: '🔷' },
@@ -819,6 +825,7 @@ export const GameConfig = deepFreeze({
     COPPER_SWORD: { RESULT: 'COPPER_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 15, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_COPPER: 2 } },
     IRON_SWORD: { RESULT: 'IRON_SWORD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 18, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, REFINED_IRON: 2 } },
     COPPER_SHIELD: { RESULT: 'COPPER_SHIELD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 4, REFINED_COPPER: 1 } },
+    CRAB_SHIELD: { RESULT: 'CRAB_SHIELD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 12, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 2, CRAB_SHELL: 2 } },
     IRON_SHIELD: { RESULT: 'IRON_SHIELD', AMOUNT: 1, CATEGORY: 'WEAPONS', TIME: 15, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_WOOD: 4, REFINED_IRON: 1 } },
     COPPER_ARROW: { RESULT: 'COPPER_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, REFINED_COPPER: 1, SPIDER_SILK: 3 } },
     IRON_ARROW: { RESULT: 'IRON_ARROW', AMOUNT: 3, CATEGORY: 'WEAPONS', TIME: 6, STATION: 'WORKBENCH', INGREDIENTS: { WOOD: 3, REFINED_IRON: 1, SPIDER_SILK: 3 } },
@@ -859,6 +866,7 @@ export const GameConfig = deepFreeze({
     DIAMOND_CHEST: { RESULT: 'DIAMOND_CHEST', AMOUNT: 1, CATEGORY: 'ARMOR', TIME: 32, STATION: 'WORKBENCH', INGREDIENTS: { REFINED_DIAMOND: 5, REFINED_IRON: 2 } },
     // Hoguera: asar.
     COOKED_MEAT: { RESULT: 'COOKED_MEAT', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 8, STATION: 'CAMPFIRE', INGREDIENTS: { MEAT: 1 } },
+    COOKED_CRAB: { RESULT: 'COOKED_CRAB', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 9, STATION: 'CAMPFIRE', INGREDIENTS: { CRAB_MEAT: 1 } },
     ROASTED_MUSHROOM: { RESULT: 'ROASTED_MUSHROOM', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { MUSHROOM: 1 } },
     FRIED_EGG: { RESULT: 'FRIED_EGG', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { EGG: 1 } },
     BAKED_APPLE: { RESULT: 'BAKED_APPLE', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 5, STATION: 'CAMPFIRE', INGREDIENTS: { APPLE: 1 } },
@@ -1272,6 +1280,15 @@ export const GameConfig = deepFreeze({
     TEAM_SIZE: [3, 4],
     BASE_LOOT: { COIN: [2, 4], LEATHER: [1, 2], REFINED_WOOD: [1, 3], TREASURE_MAP: [0, 1] },
     SLIMES: { MAX: 4, EVERY: [10, 22], DISTANCE: [20, 34] }, // de noche, alrededor del jugador
+    // P10: arañas y murciélagos en las cuevas, lobos de noche, cangrejos en las playas y la
+    // fortaleza del Rey Goblin.
+    CAVE_SPIDERS: 14,       // arañas en los túneles (de 1 a 2)
+    CAVE_BATS: 8,           // colonias de murciélagos colgados del techo (de 3 a 4)
+    BAT_COLONY: [3, 4],
+    CRABS: 16,              // cangrejos gigantes en las playas
+    WOLVES: { PACKS: 2, EVERY: [35, 70], DISTANCE: [38, 55], SIZE: [2, 4], BIOMES: ['FOREST', 'PLAINS', 'FROZEN_MOUNTAINS', 'RIVER'] },
+    FORTRESS: { GUARDS: 4, CAPTAINS: 2, SUMMON: 2, ENRAGE: 0.5, EXTENT: 26 },
+    FORTRESS_LOOT: { COIN: [30, 45], GOLD_INGOT: [2, 3], DIAMOND_ORE: [1, 2], TREASURE_MAP: [1, 1], STEEL: [2, 3] },
     TYPES: {
       GOLEM: {
         NAME: 'Gólem', HEALTH: 30, DAMAGE: 25, SPEED: 1.5, RANGE: 2.2, WINDUP: 1.3, COOLDOWN: 2.6, AGGRO: 24,
@@ -1289,6 +1306,28 @@ export const GameConfig = deepFreeze({
       GOBLIN_BOSS: {
         NAME: 'Jefe goblin', HEALTH: 40, DAMAGE: 30, SPEED: 4.3, RANGE: 2.1, WINDUP: 1.05, COOLDOWN: 2.2, AGGRO: 26,
         RADIUS: 0.55, HEIGHT: 1.8, KNOCKBACK: 0.5, DROPS: { LEATHER: [1, 1], WOOD: [1, 2], COIN: [1, 1], REFINED_IRON: [1, 1] },
+      },
+      // P10.
+      SPIDER: {
+        NAME: 'Araña de cueva', HEALTH: 14, DAMAGE: 12, SPEED: 4.6, RANGE: 1.6, WINDUP: 0.6, COOLDOWN: 1.5, AGGRO: 15,
+        RADIUS: 0.6, HEIGHT: 0.75, KNOCKBACK: 1, DROPS: { SPIDER_SILK: [1, 3] },
+      },
+      BAT: {
+        NAME: 'Murciélago', HEALTH: 5, DAMAGE: 5, SPEED: 6.2, RANGE: 1.4, WINDUP: 0.35, COOLDOWN: 1.4, AGGRO: 18,
+        WAKE_DISTANCE: 9, ASSEMBLE_TIME: 0.5, SLEEPS: true, FLY: 1.5, RADIUS: 0.35, HEIGHT: 0.45, KNOCKBACK: 1.6, DROPS: { BONE: [0, 1] },
+      },
+      WOLF: {
+        NAME: 'Lobo', HEALTH: 18, DAMAGE: 12, SPEED: 6.4, RANGE: 1.8, WINDUP: 0.5, COOLDOWN: 1.6, AGGRO: 32,
+        RADIUS: 0.5, HEIGHT: 1.0, KNOCKBACK: 0.9, DROPS: { MEAT: [1, 2], LEATHER: [1, 1], BONE: [0, 1] },
+      },
+      CRAB: {
+        NAME: 'Cangrejo gigante', HEALTH: 28, DAMAGE: 14, SPEED: 2.4, RANGE: 1.9, WINDUP: 0.9, COOLDOWN: 2, AGGRO: 11,
+        RADIUS: 0.8, HEIGHT: 0.9, KNOCKBACK: 0.3, WANDER_FACTOR: 0.5, DROPS: { CRAB_MEAT: [1, 2], CRAB_SHELL: [0, 1] },
+      },
+      GOBLIN_KING: {
+        NAME: 'Rey Goblin', HEALTH: 170, DAMAGE: 34, SPEED: 3.8, RANGE: 2.6, WINDUP: 1.2, COOLDOWN: 2.4, AGGRO: 22,
+        RADIUS: 0.6, HEIGHT: 1.5, KNOCKBACK: 0.08, BOSS: true,
+        DROPS: { KING_CROWN: [1, 1], COIN: [15, 25], GOLD_INGOT: [1, 2] },
       },
     },
   },
@@ -1523,6 +1562,11 @@ export const GameConfig = deepFreeze({
     LEVEL_10: { NAME: 'Veterano', ICON: '⭐', DESC: 'Llega al nivel 10.', XP: 0 },
     BACKPACK: { NAME: 'Bien equipado', ICON: '🎒', DESC: 'Cósete una mochila.', XP: 30 },
     SURVIVOR: { NAME: 'Superviviente', ICON: '🌅', DESC: 'Sobrevive 10 días.', XP: 100 },
+    // P10.
+    WOLVES: { NAME: 'Cazador nocturno', ICON: '🐺', DESC: 'Derrota a 5 lobos.', XP: 60, COUNT: 5 },
+    CAVE_DWELLER: { NAME: 'Exterminador', ICON: '🕷️', DESC: 'Derrota a 10 arañas o murciélagos.', XP: 60, COUNT: 10 },
+    CRAB: { NAME: 'Marisquero', ICON: '🦀', DESC: 'Derrota a un cangrejo gigante.', XP: 30 },
+    GOBLIN_KING: { NAME: 'Regicida', ICON: '👑', DESC: 'Derrota al Rey Goblin en su fortaleza.', XP: 250 },
   },
 
   // Clima (P7). Cada estado dura TIME s (al azar entre los dos) y luego se pasa a otro según

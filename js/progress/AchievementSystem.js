@@ -33,8 +33,15 @@ export class AchievementSystem {
       this.count('ANGLER');
       if (item === 'GOLDEN_FISH') this.unlock('GOLDEN_FISH');
     });
-    on(GameEvents.ENEMY_KILLED, ({ enemy }) => enemy?.type === 'GOLEM' && this.unlock('GOLEM'));
-    on(GameEvents.BASE_CLEARED, () => this.unlock('GOBLIN_BASE'));
+    on(GameEvents.ENEMY_KILLED, ({ enemy }) => {
+      const t = enemy?.type;
+      if (t === 'GOLEM') this.unlock('GOLEM');
+      else if (t === 'WOLF') this.count('WOLVES');
+      else if (t === 'SPIDER' || t === 'BAT') this.count('CAVE_DWELLER');
+      else if (t === 'CRAB') this.unlock('CRAB');
+      else if (t === 'GOBLIN_KING') this.unlock('GOBLIN_KING');
+    });
+    on(GameEvents.BASE_CLEARED, ({ base } = {}) => !base?.fortress && this.unlock('GOBLIN_BASE'));
     on(GameEvents.PLACE_CHANGED, ({ first }) => first && this.count('EXPLORER'));
     on(GameEvents.POTION_DRUNK, () => this.unlock('POTION'));
     on(GameEvents.TRADE_DONE, () => this.unlock('TRADER'));

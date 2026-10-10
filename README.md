@@ -273,6 +273,19 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Enemigos nuevos y el Rey Goblin (v1.33, P10)**:
+  - **Cuevas**: arañas (rápidas, sueltan telaraña) y colonias de **murciélagos** colgados del techo que despiertan
+    juntos al acercarte, revolotean y vuelven a colgarse.
+  - **Lobos**: de noche, lejos del inicio, aparece a veces una manada (se oye el aullido). Corren más que tú andando
+    pero no que corriendo; no entran en el círculo de una hoguera y al amanecer se marchan.
+  - **Cangrejos gigantes** en las playas: lentos, duros y territoriales. Sueltan carne de cangrejo (a la brasa en la
+    hoguera: bien alimentado) y caparazón (escudo de caparazón en la mesa de trabajo).
+  - **Fortaleza del Rey Goblin**, sobre la Playa Larga (al este, a más de 1 km del inicio): murallas con almenas,
+    torres, puerta abierta, estrado y trono. La guardan cuatro goblins y dos capitanes. El rey es enorme y pega
+    fuerte (retrocede cuando levante la maza); a media vida se enfurece y llama a dos goblins más. Al caer suelta
+    su **corona** (casco: defensa 4 y los goblins te pegan un 15 % menos) y, con la fortaleza despejada, su tesoro
+    aparece junto al trono. Logros nuevos: Regicida, Cazador nocturno, Exterminador y Marisquero.
+  - Admin: crear cada enemigo nuevo delante e ir a la fortaleza o al cangrejo más cercano.
 - **Calidad de vida (v1.32, P9)**:
   - **Ajustes (P)** (o botón ⚙️ del reloj): calidad gráfica (baja, media, alta: resolución y sombras), campo de
     visión, sensibilidad del ratón, invertir eje Y y volúmenes (general, efectos, ambiente, música). Se guardan en el
