@@ -271,6 +271,16 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Comercio, misiones y progresión (v1.30, P8)**:
+  - **Tomás el buhonero** tiene su puesto junto al Camino Real, a unos 120 m de donde llegas. E: su tienda
+    (comprar y vender con monedas goblin; las existencias se reponen cada día) y sus **encargos** (tres a la
+    vez: tráele lo que pide y te paga monedas y experiencia; cada día cambia los cumplidos).
+  - **Ruinas y mapas del tesoro**: hay 9 ruinas repartidas por la isla (y las Ruinas del Viejo Jardín). Un mapa
+    del tesoro (se compra al mercader o sale en las bases goblin) marca una: aparece una X con un haz de luz.
+    Con la pala en la mano, E en la X: un cofre enterrado. Con la pala o el mapa en la mano, arriba se ve en qué
+    dirección queda.
+  - **Diario (K)**: encargos con lo que llevas, tesoros marcados, **habilidades** (recolección, oficio, pesca,
+    regateo y aguante; se suben con los puntos de nivel, hasta 5 cada una) y **logros** (20, con su experiencia).
 - **Construcción y decoración (v1.29, P6)**: todo se fabrica en el reloj (Tab → *Construcción* o *Muebles y hogar*)
   y se coloca seleccionándolo en la barra.
   - **Piedra y ladrillo**: paredes, suelos de losas y de baldosas, tejado de tejas, escalera, columna y murete.

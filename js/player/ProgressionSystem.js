@@ -59,6 +59,8 @@ export class ProgressionSystem {
   /** Gasta un punto en una estadística. @returns {boolean} */
   spend(stat) {
     if (this.points <= 0 || !(stat in this.stats)) return false;
+    const max = this._cfg.STATS[stat].MAX;
+    if (max && this.stats[stat] >= max) return false; // habilidad al máximo
     this.points -= 1;
     this.stats[stat] += 1;
     this._applyMax(stat);
@@ -69,6 +71,11 @@ export class ProgressionSystem {
   /** Bonificación total de una estadística (10 → +10 de vida; 0.08 → +8 %). */
   bonus(stat) {
     return this.stats[stat] * this._cfg.STATS[stat].PER_POINT;
+  }
+
+  /** Habilidad (P8): bonificación de GATHER, CRAFT, ANGLER, TRADE o SURVIVAL (0 si no existe). */
+  perk(stat) {
+    return stat in this.stats ? this.bonus(stat) : 0;
   }
 
   get damageMultiplier() {

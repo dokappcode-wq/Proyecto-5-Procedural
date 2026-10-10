@@ -23,6 +23,7 @@ export class ThirstSystem extends VitalStat {
     this._cfg = config;
     this._damageTimer = 0;
     this.paused = false;
+    this.decayMultiplier = 1; // habilidad «Aguante» (P8)
     events.on(GameEvents.PLAYER_DRANK, ({ amount }) => this.drink(amount ?? config.DRINK_AMOUNT));
   }
 
@@ -32,7 +33,7 @@ export class ThirstSystem extends VitalStat {
 
   update(dt) {
     if (this.paused) return;
-    this.consume(this._cfg.THIRST_DECAY * dt);
+    this.consume(this._cfg.THIRST_DECAY * this.decayMultiplier * dt);
     this._damageTimer = starvationTick(this, dt, this._damageTimer, this._cfg.DEHYDRATION_DAMAGE, 'THIRST', this._cfg, this._events);
   }
 }

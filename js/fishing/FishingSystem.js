@@ -17,7 +17,7 @@ import { GameEvents } from '../core/GameEvents.js';
 export const FishState = Object.freeze({ IDLE: 'IDLE', CAST: 'CAST', WAIT: 'WAIT', BITE: 'BITE', REEL: 'REEL' });
 
 export class FishingSystem {
-  constructor({ config, items, input, hotbar, inventory, player, camera, world, scene, events, isHome = () => true, random = Math.random, ui = null }) {
+  constructor({ config, items, input, hotbar, inventory, player, camera, world, scene, events, isHome = () => true, random = Math.random, ui = null, perk = () => 0 }) {
     this.name = 'fishing';
     this._cfg = config;
     this._items = items;
@@ -31,6 +31,7 @@ export class FishingSystem {
     this._isHome = isHome;
     this._random = random;
     this._ui = ui;
+    this._perk = perk; // habilidad «Pesca» (P8): zona más grande
     this.state = FishState.IDLE;
     this._t = 0;
     this._spot = null;      // { x, y, z, where }
@@ -186,7 +187,7 @@ export class FishingSystem {
   _startReel() {
     const lvl = this._catch.LEVEL;
     this.state = FishState.REEL;
-    this.game = { fish: 0.5, fishV: 0, target: 0.5, zone: 0.35, zoneV: 0, size: 0.34 - lvl * 0.14, progress: 0.3, level: lvl, retarget: 0 };
+    this.game = { fish: 0.5, fishV: 0, target: 0.5, zone: 0.35, zoneV: 0, size: Math.min(0.6, (0.34 - lvl * 0.14) * (1 + this._perk('ANGLER'))), progress: 0.3, level: lvl, retarget: 0 };
     this._emit();
   }
 

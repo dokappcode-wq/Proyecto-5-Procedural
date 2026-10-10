@@ -33,7 +33,7 @@ const TIER_NAMES = { 2: 'un pico de cobre', 3: 'un pico de hierro', 4: 'un pico 
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null, weapon = null, suppressAttack = null, structureAction = null, animalAction = null, animalInteract = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null, weapon = null, suppressAttack = null, structureAction = null, animalAction = null, animalInteract = null, perk = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -53,7 +53,8 @@ export class InteractionSystem {
     // Granja (P4): texto de la parcela; acción con E sobre un animal (dar de comer, ordeñar, esquilar).
     this._structureAction = structureAction ?? (() => null);
     this._animalAction = animalAction ?? (() => null);
-    this._animalInteract = animalInteract ?? (() => false);        // multiplicador de daño del nivel (golpes y rapidez al talar/picar)
+    this._animalInteract = animalInteract ?? (() => false);
+    this._perk = perk ?? (() => 0); // habilidades (P8): GATHER (una más al recoger), CRAFT (talar/picar/romper)        // multiplicador de daño del nivel (golpes y rapidez al talar/picar)
     this._weapon = weapon ?? (() => null);   // arma seleccionada ({ DAMAGE }) o null (puño)
     this._suppressAttack = suppressAttack ?? (() => false); // bloqueando o con arco/tirachinas: el clic no golpea
     // Criaturas a las que se puede golpear: animales y, más adelante, enemigos (misma interfaz).
@@ -165,6 +166,7 @@ export class InteractionSystem {
       result.amount += bonus;
       this._wearTool();
     }
+    if (Math.random() < this._perk('GATHER')) result.amount += 1; // habilidad «Recolección»
     this._inventory.addItem(result.item, result.amount);
     this._events.emit(GameEvents.RESOURCE_HARVESTED, result);
   }
@@ -184,7 +186,7 @@ export class InteractionSystem {
     // La herramienta que ayuda en este golpe se gasta (el hacha en troncos, el pico en rocas).
     const usesTool = rock || (def.HARVEST.MATERIAL !== 'web' && !!this._tool()?.CHOP_SPEED);
     const work = this._chopProgress.get(node.id) ?? { progress: 0, given: 0 };
-    work.progress = Math.min(1, work.progress + (swing * job.speed * this._power()) / job.time);
+    work.progress = Math.min(1, work.progress + (swing * job.speed * this._power() * (1 + this._perk('CRAFT'))) / job.time);
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
     // Trozos que ya deberían haber salido a estas alturas.
     const due = work.progress >= 1 ? job.amount : Math.floor(work.progress * job.amount);
@@ -240,7 +242,7 @@ export class InteractionSystem {
     const work = this._chopProgress.get(key) ?? { progress: 0 };
     // La piedra y el ladrillo (PIECES.*.HARD) aguantan más golpes que la madera.
     const hard = piece.def?.HARD ?? 1;
-    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed * this._power()) / ((C._cfg.BREAK_TIME ?? 3) * hard));
+    work.progress = Math.min(1, work.progress + ((this._cfg.CHOP_SWING ?? 0.6) * speed * this._power() * (1 + this._perk('CRAFT'))) / ((C._cfg.BREAK_TIME ?? 3) * hard));
     this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'chop' });
     const stone = Object.keys(piece.cost ?? C.costOf(piece.type) ?? {}).some((k) => k === 'STONE' || k === 'MINERAL');
     const done = work.progress >= 1;

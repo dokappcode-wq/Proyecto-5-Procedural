@@ -524,9 +524,11 @@ export class EnemySystem {
     if (this._pickups) {
       const rng = new SeededRandom(deriveSeed(this._world.seed.sub.animal, `${base.id}:loot`));
       for (const [item, [a, b]] of Object.entries(this._cfg.BASE_LOOT)) {
-        this._pickups.drop(this._homeId, base.x + 2, base.z + 2, item, rng.int(a, b));
+        const n = rng.int(a, b);
+        if (n > 0) this._pickups.drop(this._homeId, base.x + 2, base.z + 2, item, n);
       }
     }
+    this._events.emit(GameEvents.BASE_CLEARED, { base });
     this._events.emit(GameEvents.UI_MESSAGE, { text: '🏴 ¡Base goblin despejada! Su botín está junto al árbol.', type: 'pickup' });
   }
 

@@ -1437,3 +1437,28 @@ body:has(.cine-bars.on) #hud > :not(.story-ui) { opacity: 0; transition: opacity
 #fishing-ui .fish-meter { position: relative; width: 10px; border-radius: 5px; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden; }
 #fishing-ui .fish-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#ffd34a, #62c24a); }
 .build-empty { padding: 8px 12px; border-radius: 8px; background: rgba(8, 14, 24, 0.7); color: #eef3f8; font-size: 0.85rem; }
+
+/* ---- Mercader y diario (v1.30, P8) ---- */
+#merchant-panel, #journal-panel { width: min(720px, 94vw); max-height: 86vh; }
+#merchant-panel .panel-body, #journal-panel .panel-body { overflow-y: auto; max-height: 72vh; }
+.mp-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 8px; }
+.mp-greet { font-style: italic; opacity: 0.85; font-size: 0.9rem; }
+.mp-coins { font-weight: 700; font-size: 1.1rem; white-space: nowrap; }
+.mp-tabs, .jp-tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.mp-tab, .jp-tab { font: inherit; padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: inherit; cursor: pointer; }
+.mp-tab.active, .jp-tab.active { background: rgba(124, 196, 255, 0.3); border-color: rgba(124, 196, 255, 0.7); }
+.mp-list { display: flex; flex-direction: column; gap: 4px; }
+.mp-row { display: grid; grid-template-columns: 30px 1fr auto auto auto; gap: 10px; align-items: center; padding: 5px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); }
+.mp-row .mp-quote { grid-column: 1 / -1; font-style: italic; opacity: 0.8; font-size: 0.85rem; }
+.mp-icon { font-size: 1.3rem; text-align: center; }
+.mp-price { font-weight: 700; white-space: nowrap; }
+.mp-info { opacity: 0.7; font-size: 0.85rem; white-space: nowrap; }
+.mp-btn { font: inherit; padding: 4px 12px; border-radius: 6px; border: none; background: #ff9a3c; color: #1a1006; font-weight: 700; cursor: pointer; }
+.mp-btn:disabled { background: rgba(255, 255, 255, 0.15); color: rgba(255, 255, 255, 0.45); cursor: default; }
+.mp-note { opacity: 0.8; font-size: 0.88rem; margin: 0 0 6px; }
+.jp-section h3 { margin: 10px 0 6px; font-size: 1rem; }
+.jp-ach { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.jp-ach div { padding: 6px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); font-size: 0.85rem; }
+.jp-ach div.locked { opacity: 0.45; filter: grayscale(1); }
+.jp-ach b { display: block; }
+#treasure-hint { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); padding: 3px 10px; border-radius: 6px; background: rgba(8, 14, 24, 0.6); color: #ffe08a; font: 600 0.85rem system-ui, sans-serif; }

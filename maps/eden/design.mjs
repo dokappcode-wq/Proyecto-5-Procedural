@@ -394,6 +394,7 @@ export const EDEN = {
   landing: { x: 345, z: -960, yaw: Math.PI * 0.08, r: 15, blend: 14 },
   sites: [
     { kind: 'HERMIT_TOWER', x: -420, z: 40, r: 10, blend: 10, yaw: -1.2 },
+    { kind: 'MERCHANT', x: -74, z: 351, r: 9, blend: 6, yaw: 2.6 }, // P8: puesto del mercader junto al Camino Real
     { kind: 'NODE_ARENA', x: 640, z: 140, r: 20, blend: 14, yaw: 0.3 },
     { kind: 'RESEARCH_CENTER', x: 850, z: -480, r: 26, blend: 12, yaw: 0 },
     // Bases goblin: claros del bosque y de los linderos.

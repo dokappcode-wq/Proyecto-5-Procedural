@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.29.0',
+    VERSION: '1.30.0',
   },
 
   RENDER: {
@@ -148,6 +148,7 @@ export const GameConfig = deepFreeze({
       CROUCH: ['KeyC'],                 // a pie: agacharse / levantarse
       TOGGLE_CAMERA: ['KeyV'],
       TOGGLE_HELP: ['KeyH'],
+      JOURNAL: ['KeyK'],                // diario: encargos, tesoros, habilidades y logros (P8)
       INTERACT: ['KeyE'],               // recoger / interactuar
       ATTACK: ['Mouse0', 'KeyF'],       // golpear (clic izquierdo con el ratón capturado)
       USE: ['Mouse2', 'KeyR'],          // usar el objeto seleccionado · en modo construcción: quitar pieza
@@ -331,6 +332,12 @@ export const GameConfig = deepFreeze({
       STAMINA: { NAME: 'Estamina', ICON: '⚡', PER_POINT: 10, UNIT: '' },   // +10 de energía máxima
       DAMAGE: { NAME: 'Daño', ICON: '👊', PER_POINT: 0.08, UNIT: '%' },     // +8 % de daño y de rapidez al talar/picar
       SPEED: { NAME: 'Velocidad', ICON: '👟', PER_POINT: 0.03, UNIT: '%' }, // +3 % de velocidad al moverse
+      // Habilidades (P8): se suben en el diario (K), como mucho MAX puntos cada una.
+      GATHER: { NAME: 'Recolección', ICON: '🧺', PER_POINT: 0.1, UNIT: '%', MAX: 5, PERK: true, DESC: 'Probabilidad de sacar una unidad más al recoger.' },
+      CRAFT: { NAME: 'Oficio', ICON: '🪓', PER_POINT: 0.08, UNIT: '%', MAX: 5, PERK: true, DESC: 'Talas, picas y rompes más deprisa.' },
+      ANGLER: { NAME: 'Pesca', ICON: '🎣', PER_POINT: 0.07, UNIT: '%', MAX: 5, PERK: true, DESC: 'La zona verde de la pesca es más grande.' },
+      TRADE: { NAME: 'Regateo', ICON: '💰', PER_POINT: 0.05, UNIT: '%', MAX: 5, PERK: true, DESC: 'Compras más barato y vendes más caro.' },
+      SURVIVAL: { NAME: 'Aguante', ICON: '🍖', PER_POINT: 0.05, UNIT: '%', MAX: 5, PERK: true, DESC: 'El hambre y la sed bajan más despacio.' },
     },
   },
 
@@ -589,6 +596,8 @@ export const GameConfig = deepFreeze({
     // Animales (P4).
     FEATHER: { NAME: 'Pluma', ICON: '🪶', DESC: 'De las gallinas. Flechas mejores y más baratas.' },
     SHEARS: { NAME: 'Tijeras de esquilar', ICON: '✂️', STACK: 1, DURABILITY: 250, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'shears' }, DESC: 'Con E sobre una cabra: esquilarla (lana, sin hacerle daño).' },
+    // Tesoros (P8).
+    TREASURE_MAP: { NAME: 'Mapa del tesoro', ICON: '🗺️', USE: 'TREASURE', DESC: 'Úsalo (clic dcho / R): marca unas ruinas con un tesoro enterrado. Se cava con la pala (E en la X).' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
@@ -1255,7 +1264,7 @@ export const GameConfig = deepFreeze({
     GOBLINS_PER_BASE: [3, 5],
     GOBLIN_TEAMS: 4,        // equipos de exploración (con un jefe goblin cada uno)
     TEAM_SIZE: [3, 4],
-    BASE_LOOT: { COIN: [2, 4], LEATHER: [1, 2], REFINED_WOOD: [1, 3] },
+    BASE_LOOT: { COIN: [2, 4], LEATHER: [1, 2], REFINED_WOOD: [1, 3], TREASURE_MAP: [0, 1] },
     SLIMES: { MAX: 4, EVERY: [10, 22], DISTANCE: [20, 34] }, // de noche, alrededor del jugador
     TYPES: {
       GOLEM: {
@@ -1413,6 +1422,101 @@ export const GameConfig = deepFreeze({
       GOAT: { FOOD: ['WHEAT', 'CARROT', 'BERRIES'], FEEDS: 3, WOOL_EVERY: 420, WOOL: [2, 3] },
       CHICKEN: { FOOD: ['WHEAT_SEEDS', 'PUMPKIN_SEEDS'], FEEDS: 2, EGG_EVERY: 280 },
     },
+  },
+
+  // Comercio (P8): el mercader del Camino Real. Precios en monedas goblin.
+  //   BUY: lo que vende él ({ ITEM, AMOUNT por compra, PRICE, STOCK al día }).
+  //   SELL: lo que te compra ({ ITEM, AMOUNT que le das, PRICE que te paga }).
+  //   ORDERS: encargos (3 a la vez); se renuevan los entregados cada día de juego.
+  TRADE: {
+    MERCHANT: { NAME: 'Tomás el buhonero', SITE: 'MERCHANT' },
+    BUY: [
+      { ITEM: 'WHEAT_SEEDS', AMOUNT: 4, PRICE: 1, STOCK: 6 },
+      { ITEM: 'CARROT', AMOUNT: 2, PRICE: 1, STOCK: 5 },
+      { ITEM: 'POTATO', AMOUNT: 2, PRICE: 1, STOCK: 5 },
+      { ITEM: 'PUMPKIN_SEEDS', AMOUNT: 3, PRICE: 2, STOCK: 3 },
+      { ITEM: 'BREAD', AMOUNT: 1, PRICE: 3, STOCK: 5 },
+      { ITEM: 'ROPE', AMOUNT: 2, PRICE: 2, STOCK: 6 },
+      { ITEM: 'COAL', AMOUNT: 3, PRICE: 1, STOCK: 8 },
+      { ITEM: 'GLASS', AMOUNT: 2, PRICE: 2, STOCK: 6 },
+      { ITEM: 'REFINED_IRON', AMOUNT: 1, PRICE: 4, STOCK: 4 },
+      { ITEM: 'ARROW', AMOUNT: 5, PRICE: 2, STOCK: 6 },
+      { ITEM: 'GLASS_BOTTLE', AMOUNT: 2, PRICE: 2, STOCK: 4 },
+      { ITEM: 'HEALING_POTION', AMOUNT: 1, PRICE: 9, STOCK: 2 },
+      { ITEM: 'FISHING_ROD', AMOUNT: 1, PRICE: 7, STOCK: 1 },
+      { ITEM: 'SHEARS', AMOUNT: 1, PRICE: 7, STOCK: 1 },
+      { ITEM: 'LANTERN', AMOUNT: 1, PRICE: 10, STOCK: 1 },
+      { ITEM: 'TREASURE_MAP', AMOUNT: 1, PRICE: 8, STOCK: 2 },
+      { ITEM: 'BACKPACK', AMOUNT: 1, PRICE: 30, STOCK: 1 },
+    ],
+    SELL: [
+      { ITEM: 'WOOD', AMOUNT: 10, PRICE: 1 },
+      { ITEM: 'STONE', AMOUNT: 10, PRICE: 1 },
+      { ITEM: 'LEATHER', AMOUNT: 1, PRICE: 1 },
+      { ITEM: 'WOOL', AMOUNT: 2, PRICE: 1 },
+      { ITEM: 'FEATHER', AMOUNT: 5, PRICE: 1 },
+      { ITEM: 'EGG', AMOUNT: 3, PRICE: 1 },
+      { ITEM: 'WHEAT', AMOUNT: 4, PRICE: 1 },
+      { ITEM: 'PUMPKIN', AMOUNT: 1, PRICE: 2 },
+      { ITEM: 'FISH', AMOUNT: 1, PRICE: 1 },
+      { ITEM: 'GOLDEN_FISH', AMOUNT: 1, PRICE: 15 },
+      { ITEM: 'CHEESE', AMOUNT: 1, PRICE: 2 },
+      { ITEM: 'JERKY', AMOUNT: 1, PRICE: 2 },
+      { ITEM: 'BREAD', AMOUNT: 1, PRICE: 1 },
+      { ITEM: 'CRYSTAL_SHARD', AMOUNT: 1, PRICE: 2 },
+      { ITEM: 'GOLD_INGOT', AMOUNT: 1, PRICE: 7 },
+      { ITEM: 'REFINED_DIAMOND', AMOUNT: 1, PRICE: 12 },
+      { ITEM: 'SLIME', AMOUNT: 3, PRICE: 1 },
+    ],
+    ORDERS: [
+      { ITEM: 'WOOD', AMOUNT: [20, 40], REWARD: [3, 5], XP: 30, TEXT: 'Necesito madera para arreglar el carro.' },
+      { ITEM: 'LEATHER', AMOUNT: [3, 6], REWARD: [4, 7], XP: 35, TEXT: 'Me piden cuero en el puerto.' },
+      { ITEM: 'WOOL', AMOUNT: [4, 8], REWARD: [3, 6], XP: 30, TEXT: 'Lana para unas mantas, que vienen fríos.' },
+      { ITEM: 'FISH', AMOUNT: [2, 4], REWARD: [3, 6], XP: 35, TEXT: 'Pescado fresco para el mercado.' },
+      { ITEM: 'BREAD', AMOUNT: [2, 4], REWARD: [4, 7], XP: 40, TEXT: 'Pan para el camino.' },
+      { ITEM: 'COPPER_ORE', AMOUNT: [4, 8], REWARD: [4, 7], XP: 40, TEXT: 'Mena de cobre para el herrero.' },
+      { ITEM: 'IRON_ORE', AMOUNT: [3, 6], REWARD: [6, 9], XP: 50, TEXT: 'Mena de hierro, de la buena.' },
+      { ITEM: 'EGG', AMOUNT: [4, 8], REWARD: [3, 5], XP: 30, TEXT: 'Huevos, y que no estén rotos.' },
+      { ITEM: 'PUMPKIN', AMOUNT: [1, 3], REWARD: [4, 7], XP: 40, TEXT: 'Calabazas para la fiesta de la cosecha.' },
+      { ITEM: 'CHEESE', AMOUNT: [1, 3], REWARD: [5, 8], XP: 45, TEXT: 'Un buen queso del Edén.' },
+      { ITEM: 'SLIME', AMOUNT: [4, 8], REWARD: [4, 6], XP: 35, TEXT: 'Baba de slime para un alquimista.' },
+      { ITEM: 'GLOW_FLOWER', AMOUNT: [2, 4], REWARD: [5, 8], XP: 45, TEXT: 'Flores luminosas de las cuevas.' },
+      { ITEM: 'COOKED_MEAT', AMOUNT: [3, 5], REWARD: [4, 6], XP: 35, TEXT: 'Carne asada para mis hijos.' },
+      { ITEM: 'GOLD_INGOT', AMOUNT: [1, 2], REWARD: [10, 14], XP: 60, TEXT: 'Oro, aunque sea poco.' },
+    ],
+    ORDER_SLOTS: 3,
+  },
+
+  // Tesoros (P8): ruinas con un tesoro enterrado; los mapas del tesoro las marcan.
+  TREASURE: {
+    RUINS: 9,                 // ruinas repartidas por la isla (además de las Ruinas del Viejo Jardín)
+    MIN_FROM_SPAWN: 250,
+    DIG_RADIUS: 2.5,          // m: con la pala, E cerca de la X
+    LOOT: { COIN: [6, 14], GOLD_INGOT: [0, 2], REFINED_DIAMOND: [0, 1], HEALING_POTION: [0, 1], CRYSTAL_SHARD: [1, 3], REFINED_IRON: [1, 3] },
+  },
+
+  // Logros (P8): EVENT + condición (contador `COUNT` o comprobación propia en AchievementSystem).
+  ACHIEVEMENTS: {
+    FIRST_TREE: { NAME: 'Leñador', ICON: '🌲', DESC: 'Tala tu primer árbol.', XP: 20 },
+    FIRST_TOOL: { NAME: 'Manos a la obra', ICON: '🛠️', DESC: 'Fabrica una herramienta.', XP: 20 },
+    COOK: { NAME: 'Cocinillas', ICON: '🍳', DESC: 'Cocina algo en la hoguera o la cocina.', XP: 25 },
+    BUILDER: { NAME: 'Constructor', ICON: '🏠', DESC: 'Coloca 30 piezas de construcción.', XP: 60, COUNT: 30 },
+    FARMER: { NAME: 'Agricultor', ICON: '🌾', DESC: 'Cosecha 5 parcelas.', XP: 50, COUNT: 5 },
+    TAMER: { NAME: 'Amigo de los animales', ICON: '🐄', DESC: 'Domestica un animal.', XP: 40 },
+    ANGLER: { NAME: 'Pescador', ICON: '🎣', DESC: 'Pesca 10 veces.', XP: 50, COUNT: 10 },
+    GOLDEN_FISH: { NAME: 'Pez dorado', ICON: '🐡', DESC: 'Pesca un pez dorado.', XP: 100 },
+    GOLEM: { NAME: 'Rompepiedras', ICON: '🗿', DESC: 'Derrota a un gólem.', XP: 50 },
+    GOBLIN_BASE: { NAME: 'Limpieza', ICON: '🏴', DESC: 'Despeja una base goblin.', XP: 80 },
+    DIAMOND: { NAME: '¡Diamantes!', ICON: '💎', DESC: 'Pica una veta de diamante.', XP: 60 },
+    EXPLORER: { NAME: 'Explorador', ICON: '🧭', DESC: 'Descubre 10 lugares con nombre.', XP: 80, COUNT: 10 },
+    POTION: { NAME: 'Alquimista', ICON: '⚗️', DESC: 'Bébete una poción.', XP: 30 },
+    TRADER: { NAME: 'Trato hecho', ICON: '🤝', DESC: 'Compra o vende algo al mercader.', XP: 20 },
+    ORDERS: { NAME: 'Recadero', ICON: '📦', DESC: 'Cumple 5 encargos del mercader.', XP: 80, COUNT: 5 },
+    TREASURE: { NAME: 'Cazatesoros', ICON: '💰', DESC: 'Desentierra un tesoro.', XP: 60 },
+    RICH: { NAME: 'Rico', ICON: '🪙', DESC: 'Junta 100 monedas a la vez.', XP: 60 },
+    LEVEL_10: { NAME: 'Veterano', ICON: '⭐', DESC: 'Llega al nivel 10.', XP: 0 },
+    BACKPACK: { NAME: 'Bien equipado', ICON: '🎒', DESC: 'Cósete una mochila.', XP: 30 },
+    SURVIVOR: { NAME: 'Superviviente', ICON: '🌅', DESC: 'Sobrevive 10 días.', XP: 100 },
   },
 
   ADMIN: {

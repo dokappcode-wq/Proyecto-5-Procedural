@@ -112,6 +112,11 @@ export class ItemUseSystem {
         this._events.emit(GameEvents.POTION_DRUNK, { itemId });
         ok = true;
         break;
+      case 'TREASURE':
+        // Mapa del tesoro (P8): marca unas ruinas; se gasta solo si ha marcado algo.
+        ok = !!this.treasure?.readMap();
+        if (ok) this._inventory.removeItem(itemId, 1);
+        break;
       case 'BACKPACK':
         ok = this._backpack(itemId, def);
         break;

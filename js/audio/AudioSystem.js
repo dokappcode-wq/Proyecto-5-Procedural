@@ -519,6 +519,19 @@ export class AudioSystem {
       this._animalVoice(S, o, animal.species, 1);
       S.craft(o);
     }));
+    // Comercio, tesoros y logros (P8).
+    on(E.TRADE_DONE, () => this.play((S, o) => {
+      S.tone(o, { type: 'triangle', f: 1320, d: 0.12, gain: 0.08 });
+      S.tone(o, { t: S.now + 0.07, type: 'triangle', f: 1760, d: 0.18, gain: 0.07 });
+    }));
+    on(E.ORDER_DONE, () => this.play((S, o) => S.craft(o)));
+    on(E.TREASURE_FOUND, () => this.play((S, o) => {
+      S.thud(o, 0.6);
+      for (let i = 0; i < 4; i++) S.tone(o, { t: S.now + 0.15 + i * 0.09, type: 'triangle', f: [784, 988, 1175, 1568][i], d: 0.25, gain: 0.07 });
+    }));
+    on(E.ACHIEVEMENT_UNLOCKED, () => this.play((S, o) => {
+      for (let i = 0; i < 3; i++) S.tone(o, { t: S.now + i * 0.12, type: 'sine', f: [660, 880, 1320][i], d: 0.35, gain: 0.08 });
+    }));
     on(E.WELL_USE, ({ piece }) => piece && this.playAt(piece.x, piece.z, (S, o) => S.splash(o, 0.4)));
     on(E.FARM_CHANGED, ({ action }) => this.play((S, o) => {
       if (action === 'water') S.splash(o, 0.45);

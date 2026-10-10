@@ -110,6 +110,12 @@ import { HomeSystem } from './construction/HomeSystem.js';
 import { SHAPES } from './construction/BuildRules.js';
 import { RanchSystem } from './animals/RanchSystem.js';
 import { FishingSystem, FishingUI } from './fishing/FishingSystem.js';
+import { TradeSystem, tradeSeed } from './trade/TradeSystem.js';
+import { MerchantPanel } from './trade/MerchantPanel.js';
+import { TreasureSystem } from './trade/TreasureSystem.js';
+import { buildMerchantStall, buildMerchant } from './trade/MerchantModels.js';
+import { AchievementSystem } from './progress/AchievementSystem.js';
+import { JournalPanel } from './ui/JournalPanel.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
   const cfg = GameConfig;
@@ -435,6 +441,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     structureAction: (piece) => (piece.type === 'FARM_PLOT' ? farm.actionText(piece) : home.actionText(piece)), // huerto, pozo, recolector, maniquí
     animalAction: (animal, source) => ranch.actionText(animal, source),
     animalInteract: (animal, source) => ranch.interact(animal, source),
+    perk: (id) => progression.perk(id), // habilidades (P8): recolección y oficio
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'land' && player.playAction(kind));
 
@@ -499,6 +506,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       hunger.decayMultiplier = (nutrition.isUnbalanced ? cfg.NUTRITION.UNBALANCED_HUNGER_DECAY_MULTIPLIER : 1) * statusEffects.hungerMultiplier;
       health.regenMultiplier = statusEffects.regenMultiplier;
       energy.regenMultiplier = statusEffects.energyMultiplier;
+      // Habilidad «Aguante» (P8): el hambre y la sed bajan más despacio.
+      hunger.decayMultiplier *= 1 - progression.perk('SURVIVAL');
+      thirst.decayMultiplier = 1 - progression.perk('SURVIVAL');
       controller.effectSpeed = statusEffects.speedMultiplier;
       controller.jumpBonus = statusEffects.jumpMultiplier;
       atmosphere.setNightVision(statusEffects.nightVision);
@@ -541,10 +551,45 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     config: cfg.RANCH, items: cfg.ITEMS, animals, inventory, hotbar, events, pickups, homeId: HOME, isHome: () => worlds.activeId === HOME,
   });
   const fishing = new FishingSystem({
-    config: cfg.FISHING, items: cfg.ITEMS, input, hotbar, inventory, player, camera: render.camera, world, scene: render.scene, events,
+    config: cfg.FISHING, items: cfg.ITEMS, input, hotbar, inventory, player, camera: render.camera, world, scene: render.scene, events, perk: (id) => progression.perk(id),
     ui: new FishingUI(document.getElementById('hud') ?? document.body),
   });
   events.on(GameEvents.FISH_CAUGHT, () => progression.addXp(PG.XP.KILL));
+  // Comercio, tesoros, logros y diario (P8).
+  const trade = new TradeSystem({
+    config: cfg.TRADE, items: cfg.ITEMS, inventory, events, day: () => time.day, perk: (id) => progression.perk(id),
+    seed: tradeSeed(system.seed), isHome: () => worlds.activeId === HOME,
+  });
+  const treasure = new TreasureSystem({
+    config: cfg.TREASURE, items: cfg.ITEMS, inventory, hotbar, events, scene: worlds.rootOf(HOME) ?? render.scene, colliders: storyColliders, isHome: () => worlds.activeId === HOME,
+  });
+  treasure.setPlayer(player);
+  itemUse.treasure = treasure;
+  interactionProviders.push(trade, treasure);
+  const achievements = new AchievementSystem({ config: cfg.ACHIEVEMENTS, recipes: cfg.RECIPES, events, inventory, day: () => time.day });
+  const merchantPanel = new MerchantPanel({ container: document.getElementById('hud') ?? document.body, input, events, trade, items: cfg.ITEMS, inventory });
+  const journal = new JournalPanel({
+    container: document.getElementById('hud') ?? document.body, input, events, trade, treasure, progression, statDefs: PG.STATS, achievements, achievementDefs: cfg.ACHIEVEMENTS,
+    items: cfg.ITEMS, inventory, places: null,
+  });
+  events.on(GameEvents.ORDER_DONE, ({ order }) => progression.addXp(order.xp));
+  events.on(GameEvents.ACHIEVEMENT_UNLOCKED, ({ def }) => def.XP && progression.addXp(def.XP));
+  events.on(GameEvents.TREASURE_FOUND, () => progression.addXp(60));
+  // Aviso del tesoro marcado más cercano, con la pala o un mapa en la mano.
+  const treasureHint = document.createElement('div');
+  treasureHint.id = 'treasure-hint';
+  treasureHint.className = 'hidden';
+  (document.getElementById('hud') ?? document.body).append(treasureHint);
+  const treasureHUD = {
+    name: 'treasureHint',
+    update: () => {
+      const held = hotbar.selectedId;
+      const near = (held === 'SHOVEL' || held === 'TREASURE_MAP') && worlds.activeId === HOME ? treasure.nearestMarked() : null;
+      const text = near ? `❌ Tesoro ${treasure.direction(near.ruin)}` : '';
+      if (treasureHint.textContent !== text) treasureHint.textContent = text;
+      treasureHint.classList.toggle('hidden', !text);
+    },
+  };
   events.on(GameEvents.ANIMAL_TAMED, () => progression.addXp(PG.XP.KILL * 2));
   interaction.creatures.push(enemies); // (CombatSystem comparte la lista)
   events.on(GameEvents.ENEMY_KILLED, ({ enemy, drops }) => {
@@ -1342,6 +1387,21 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     ? new Landmarks({ map: worlds.home.map, heightAt: (x, z) => worlds.home.getHeightAt(x, z), colliders: storyColliders, root: worlds.rootOf(HOME), isEnabled: () => worlds.activeId === HOME })
     : null;
 
+  // Puesto del mercader (P8) y ruinas con tesoro: en el mundo de casa, una vez generado.
+  const merchantSite = worlds.home.getSites('MERCHANT')[0];
+  if (merchantSite) {
+    const stall = buildMerchantStall(merchantSite, (x, z) => worlds.home.getHeightAt(x, z));
+    const merchant = buildMerchant();
+    merchant.group.position.set(stall.npc.x, stall.npc.y, stall.npc.z);
+    merchant.group.rotation.y = stall.npc.yaw;
+    (worlds.rootOf(HOME) ?? render.scene).add(stall.group, merchant.group);
+    storyColliders.add('merchant', stall.prims);
+    trade.npc = stall.npc;
+    trade.view = merchant;
+  }
+  treasure.setup(worlds.home);
+  journal._places = placeTracker;
+
   // ---- Menú de inicio: la cápsula en órbita y la caída al planeta ------------------
   let titleScene = null;
   if (!handoff && !save) {
@@ -1457,6 +1517,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('places', { save: () => placeTracker.snapshot(), load: (d) => placeTracker.restore(d) });
   saveGame.register('effects', { save: () => statusEffects.snapshot(), load: (d) => statusEffects.restore(d) });
   saveGame.register('ranch', { save: () => ranch.snapshot(), load: (d) => ranch.restore(d) });
+  saveGame.register('trade', { save: () => trade.snapshot(), load: (d) => trade.restore(d) });
+  saveGame.register('treasure', { save: () => treasure.snapshot(), load: (d) => treasure.restore(d) });
+  saveGame.register('achievements', { save: () => achievements.snapshot(), load: (d) => achievements.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
   saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
@@ -1628,6 +1691,12 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(animals);     // simula y dibuja animales cercanos
   loop.add(farm);        // huerto: crecer y dibujar los cultivos
   loop.add(home);        // recolector de lluvia y maniquíes
+  loop.add(trade);       // mercader: existencias y encargos del día
+  loop.add(treasure);    // X de los tesoros marcados
+  loop.add(treasureHUD);
+  loop.add(achievements);
+  loop.add(merchantPanel);
+  loop.add(journal);     // diario (K)
   loop.add(enemies);     // gólems, slimes, goblins
   loop.add(story);       // la historia: escenas, Nova, brújula, tutorial
   loop.add(storyKeys);
