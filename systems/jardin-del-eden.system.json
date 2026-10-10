@@ -223,6 +223,10 @@
         {
           "template": "cow",
           "herds": 30
+        },
+        {
+          "template": "chicken",
+          "herds": 30
         }
       ],
       "lore": {

@@ -216,7 +216,7 @@ const BUILDERS = {
     box(g, 0x787d84, 0.075, 0.075, 0.03, 0, 0.44, -0.13); // cara de golpear
     plate(g, 0x5d6168, [[0, 0.02], [0.08, 0.035], [0.12, -0.01], [0, -0.02]], 0.05, [0, 0.44, 0.08], 0.003).rotation.x = 0; // uña
   },
-  bucket(g, water = false) {
+  bucket(g, water = false, milk = false) {
     // Cubo de metal con asa (el puño agarra el asa en el origen).
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.22, 12, 1, true), lambert(0x8f949a, { side: THREE.DoubleSide }));
     body.position.set(0, -0.2, 0);
@@ -230,6 +230,25 @@ const BUILDERS = {
     }
     tube(g, 0x5d6168, [[-0.13, -0.1, 0], [-0.09, 0.0, 0], [0, 0.03, 0], [0.09, 0.0, 0], [0.13, -0.1, 0]], 0.006, 10, 4);
     if (water) cyl(g, 0x3a8fc0, 0.125, 0.125, 0.01, 0, -0.13, 0, 12);
+    if (milk) cyl(g, 0xf4f1e8, 0.125, 0.125, 0.01, 0, -0.13, 0, 12);
+  },
+  // Caña de pescar (P4): vara larga que se afina, carrete y anillas.
+  rod(g) {
+    cyl(g, 0x6b4a2c, 0.018, 0.022, 0.32, 0, 0.12, 0, 8);
+    cyl(g, 0x8a6a42, 0.006, 0.016, 1.15, 0, 0.85, 0, 6);
+    cyl(g, 0x3e4348, 0.045, 0.045, 0.03, 0.04, 0.2, 0, 10).rotation.z = Math.PI / 2;
+    for (const y of [0.55, 0.9, 1.25]) cyl(g, 0xb9bec4, 0.012, 0.012, 0.004, 0.012, y, 0, 6);
+  },
+  // Tijeras de esquilar (P4): dos hojas de hierro unidas por un muelle.
+  shears(g) {
+    for (const s of [-1, 1]) {
+      plate(g, 0xb9bec4, [[0.018, 0], [0.004, 0.2], [-0.012, 0]], 0.008, [s * 0.025, 0.1, 0], 0.002);
+      cyl(g, 0x6b4a2c, 0.016, 0.016, 0.1, s * 0.025, 0.03, 0, 6);
+    }
+    const spring = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI), lambert(0x8f949a));
+    spring.position.set(0, -0.03, 0);
+    spring.rotation.z = Math.PI;
+    g.add(spring);
   },
   spyglass(g) {
     // Catalejo de latón en tres tramos (hacia −Z).
@@ -353,7 +372,7 @@ export function buildItemModel(itemId, items) {
       BUILDERS.arrow(group, M.TIP);
       break;
     case 'bucket':
-      BUILDERS.bucket(group, !!M.WATER);
+      BUILDERS.bucket(group, !!M.WATER, !!M.MILK);
       break;
     case 'potion':
       BUILDERS.potion(group, M.COLOR);
@@ -372,7 +391,7 @@ export function buildItemModel(itemId, items) {
   }
   const kind = {
     axe: 'tool', pickaxe: 'tool', sword: 'sword', shield: 'shield', slingshot: 'slingshot', bow: 'bow', torch: 'torch', arrow: 'item',
-    shovel: 'tool', sickle: 'tool', hammer: 'tool', bucket: 'item', spyglass: 'item', lantern: 'lantern', spear: 'sword', crossbow: 'crossbow', mace: 'sword', bomb: 'item', potion: 'item',
+    shovel: 'tool', sickle: 'tool', hammer: 'tool', bucket: 'item', spyglass: 'item', lantern: 'lantern', spear: 'sword', crossbow: 'crossbow', mace: 'sword', bomb: 'item', potion: 'item', rod: 'tool', shears: 'item',
   }[M.TYPE];
   return { group, kind, light };
 }

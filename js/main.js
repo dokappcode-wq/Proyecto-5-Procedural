@@ -105,6 +105,9 @@ import { PlaceTracker } from './world/map/PlaceTracker.js';
 import { Landmarks } from './world/map/Landmarks.js';
 import { StatusEffects } from './player/StatusEffects.js';
 import { StatusEffectsHUD } from './ui/StatusEffectsHUD.js';
+import { FarmSystem } from './farming/FarmSystem.js';
+import { RanchSystem } from './animals/RanchSystem.js';
+import { FishingSystem, FishingUI } from './fishing/FishingSystem.js';
 
 function boot(system, { file, catalog = [], handoff = null, store = new SystemStore(), imported = [], save = null, maps: designMaps = {} } = {}) {
   const cfg = GameConfig;
@@ -424,7 +427,11 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     wearTool: () => hotbar.selectedIndex !== null && inventory.wearSlot(hotbar.selectedIndex, 1), // aguante de la herramienta
     power: () => progression.damageMultiplier * statusEffects.damageMultiplier, // nivel (y poción de fuerza): más daño y más rapidez al talar/picar/romper
     weapon: () => cfg.ITEMS[hotbar.selectedId]?.WEAPON ?? null, // espada seleccionada: su daño
-    suppressAttack: () => combat.suppressAttack, // bloqueando o con arco/tirachinas el clic no golpea
+    suppressAttack: () => combat.suppressAttack || fishing.busy, // bloqueando, con arco/tirachinas o pescando el clic no golpea
+    // Granja (P4): letrero de las parcelas y E sobre los animales (dar de comer, ordeñar, esquilar).
+    structureAction: (piece) => (piece.type === 'FARM_PLOT' ? farm.actionText(piece) : null),
+    animalAction: (animal, source) => ranch.actionText(animal, source),
+    animalInteract: (animal, source) => ranch.interact(animal, source),
   });
   events.on(GameEvents.PLAYER_ACTION, ({ kind }) => kind !== 'land' && player.playAction(kind));
 
@@ -505,7 +512,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     interaction,
     thirst,
     events,
-    capturesUse: () => combat.capturesUse, // con escudo o arma a distancia, el clic dcho es del combate
+    capturesUse: () => combat.capturesUse || fishing.capturesUse, // escudo, arma a distancia o caña: el clic dcho es suyo
   });
   // Combate: escudo (bloquear) y armas a distancia (apuntar, tensar, disparar).
   const combat = new CombatSystem({
@@ -521,6 +528,17 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     fires: () => construction.pieces.filter((pc) => pc.type === 'CAMPFIRE' || pc.type === 'KITCHEN' || pc.type === 'FORGE'), fireRadius: cfg.BUILD.CAMPFIRE_SLIME_RADIUS,
   });
   enemies.playerAlive = () => !health.dead;
+  // Granja, corral y pesca (P4).
+  const farm = new FarmSystem({ config: cfg.FARM, items: cfg.ITEMS, construction, inventory, hotbar, events, hourSeconds: (cfg.TIME.DAY_LENGTH_MINUTES * 60) / 24 });
+  const ranch = new RanchSystem({
+    config: cfg.RANCH, items: cfg.ITEMS, animals, inventory, hotbar, events, pickups, homeId: HOME, isHome: () => worlds.activeId === HOME,
+  });
+  const fishing = new FishingSystem({
+    config: cfg.FISHING, items: cfg.ITEMS, input, hotbar, inventory, player, camera: render.camera, world, scene: render.scene, events,
+    ui: new FishingUI(document.getElementById('hud') ?? document.body),
+  });
+  events.on(GameEvents.FISH_CAUGHT, () => progression.addXp(PG.XP.KILL));
+  events.on(GameEvents.ANIMAL_TAMED, () => progression.addXp(PG.XP.KILL * 2));
   interaction.creatures.push(enemies); // (CombatSystem comparte la lista)
   events.on(GameEvents.ENEMY_KILLED, ({ enemy, drops }) => {
     progression.addXp(PG.XP.KILL * (enemy.type === 'GOBLIN_BOSS' ? 4 : enemy.type === 'SLIME' ? 1 : 2));
@@ -1424,6 +1442,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('construction', { save: () => construction.snapshot(), load: (d) => construction.restore(d) });
   saveGame.register('places', { save: () => placeTracker.snapshot(), load: (d) => placeTracker.restore(d) });
   saveGame.register('effects', { save: () => statusEffects.snapshot(), load: (d) => statusEffects.restore(d) });
+  saveGame.register('ranch', { save: () => ranch.snapshot(), load: (d) => ranch.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
   saveGame.register('pickups', { save: () => pickups.snapshot(), load: (d) => pickups.restore(d, isItem) });
@@ -1588,16 +1607,19 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(hotbar);      // teclas 1–9
   loop.add(construction); // modo construcción: apuntar, vista previa, colocar/quitar
   loop.add(combat);      // escudo y armas a distancia (antes que la interacción: decide si el clic golpea)
+  loop.add(fishing);     // pesca: lanzar, esperar, minijuego (antes que la interacción)
   loop.add(interaction); // objetivo de la mira + recoger/golpear
   loop.add(itemUse);     // usar objeto seleccionado (comer, beber, equipar, colocar)
+  loop.add(ranch);       // animales domesticados: atraer con comida, huevos (antes que los animales)
   loop.add(animals);     // simula y dibuja animales cercanos
+  loop.add(farm);        // huerto: crecer y dibujar los cultivos
   loop.add(enemies);     // gólems, slimes, goblins
   loop.add(story);       // la historia: escenas, Nova, brújula, tutorial
   loop.add(storyKeys);
   loop.add(pickups);     // objetos sueltos (nodo espacial, cofres)
   loop.add(chopEffects); // astillas y árboles que caen
-  loop.add(torches);
-  loop.add(gadgets);     // catalejo y luz del farol     // luz de las antorchas clavadas y de las flores luminosas
+  loop.add(torches);     // luz de las antorchas clavadas, hogueras, flores luminosas y cristales
+  loop.add(gadgets);     // catalejo y luz del farol
   if (landmarks) loop.add(landmarks); // vapor de las termas, bruma de las cascadas
   loop.add(caveDark);    // oscuridad dentro de las cuevas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante

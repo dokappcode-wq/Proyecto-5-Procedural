@@ -345,6 +345,15 @@ export class Synth {
     lfo.stop(t + 0.5);
   }
 
+  /** Cacareo de gallina (P4): tres notas cortas y nasales. */
+  cluck(out, k = 1) {
+    const t = this.now;
+    for (let i = 0; i < 3; i++) {
+      const f = 520 + (i === 2 ? 160 : 0) + Math.random() * 40;
+      this.tone(out, { t: t + i * 0.11, type: 'square', f, f2: f * 0.8, a: 0.004, d: 0.07 + (i === 2 ? 0.08 : 0), gain: 0.05 * k, filter: 1800, q: 5 });
+    }
+  }
+
   // ---- Jefe --------------------------------------------------------------------------
 
   boom(out, k = 1) {

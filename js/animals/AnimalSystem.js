@@ -5,11 +5,12 @@ import { AnimalRenderer } from './AnimalRenderer.js';
 import { Deer } from './Deer.js';
 import { Goat } from './Goat.js';
 import { Cow } from './Cow.js';
+import { Chicken } from './Chicken.js';
 import { resolveSpecies } from './SpeciesVariants.js';
 import { pickWeighted } from './Animal.js';
 
 /** Registro de especies: añadir una especie = crear su clase y añadirla aquí + config. */
-const SPECIES_CLASSES = { DEER: Deer, GOAT: Goat, COW: Cow };
+const SPECIES_CLASSES = { DEER: Deer, GOAT: Goat, COW: Cow, CHICKEN: Chicken };
 
 /**
  * AnimalSystem — rebaños de animales del mundo.

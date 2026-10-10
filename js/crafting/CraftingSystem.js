@@ -147,6 +147,8 @@ export class CraftingSystem {
       this.queue.shift();
       const r = this._recipes[q.recipeId];
       this._inventory.addItem(r.RESULT, r.AMOUNT);
+      // Lo que se recupera (el cubo vacío al hacer queso).
+      for (const [id, n] of Object.entries(r.RETURNS ?? {})) this._inventory.addItem(id, n);
       this._events.emit(GameEvents.ITEM_CRAFTED, { recipeId: q.recipeId, result: r.RESULT, amount: r.AMOUNT });
       this._changed();
     }

@@ -509,6 +509,33 @@ export class AudioSystem {
       if (command === 'TAKEOFF') this._shipSound((S, o) => S.charge(o, 1.2));
     });
     on(E.BOSS_EVENT, (ev) => this._bossSound(ev));
+    // Granja, corral y pesca (P4).
+    on(E.ANIMAL_CARE, ({ animal, action }) => animal && this.playAt(animal.x, animal.z, (S, o) => {
+      if (action === 'feed' || action === 'egg') this._animalVoice(S, o, animal.species, 0.8);
+      else if (action === 'milk') S.splash(o, 0.25);
+      else if (action === 'shear') S.whoosh(o, 0.5);
+    }));
+    on(E.ANIMAL_TAMED, ({ animal }) => this.play((S, o) => {
+      this._animalVoice(S, o, animal.species, 1);
+      S.craft(o);
+    }));
+    on(E.FARM_CHANGED, ({ action }) => this.play((S, o) => {
+      if (action === 'water') S.splash(o, 0.45);
+      else if (action === 'harvest') S.pickup(o);
+      else S.impact(o, 'wood', 0.2);
+    }));
+    on(E.FISHING_STATE, ({ state }) => this.play((S, o) => {
+      if (state === 'CAST') S.whoosh(o, 0.7);
+      else if (state === 'WAIT') S.splash(o, 0.18);
+      else if (state === 'BITE') {
+        S.pop(o, 1);
+        S.splash(o, 0.3);
+      } else if (state === 'REEL') S.click(o);
+    }));
+    on(E.FISH_CAUGHT, () => this.play((S, o) => {
+      S.splash(o, 0.7);
+      S.pickup(o);
+    }));
   }
 
   _stony(piece) {
@@ -519,6 +546,7 @@ export class AudioSystem {
   _animalVoice(S, o, species, k = 1) {
     if (species === 'COW') S.moo(o, k);
     else if (species === 'GOAT') S.bleat(o, k, 1);
+    else if (species === 'CHICKEN') S.cluck(o, k);
     else S.bleat(o, k * 0.7, 1.7);
   }
 

@@ -33,7 +33,7 @@ const TIER_NAMES = { 2: 'un pico de cobre', 3: 'un pico de hierro', 4: 'un pico 
  *   interact(id)
  */
 export class InteractionSystem {
-  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null, weapon = null, suppressAttack = null }) {
+  constructor({ config, resourceTypes, input, camera, player, world, animals, inventory, events, construction = null, providers = [], tool = null, canWork = null, wearTool = null, power = null, weapon = null, suppressAttack = null, structureAction = null, animalAction = null, animalInteract = null }) {
     this.name = 'interaction';
     this._cfg = config;
     this._types = resourceTypes;
@@ -49,7 +49,11 @@ export class InteractionSystem {
     this._tool = tool ?? (() => null); // herramienta seleccionada ({ CHOP_SPEED }) o null
     this._canWork = canWork ?? (() => true); // ¿queda energía para golpear?
     this._wearTool = wearTool ?? (() => {}); // gasta 1 de aguante de la herramienta seleccionada
-    this._power = power ?? (() => 1);        // multiplicador de daño del nivel (golpes y rapidez al talar/picar)
+    this._power = power ?? (() => 1);
+    // Granja (P4): texto de la parcela; acción con E sobre un animal (dar de comer, ordeñar, esquilar).
+    this._structureAction = structureAction ?? (() => null);
+    this._animalAction = animalAction ?? (() => null);
+    this._animalInteract = animalInteract ?? (() => false);        // multiplicador de daño del nivel (golpes y rapidez al talar/picar)
     this._weapon = weapon ?? (() => null);   // arma seleccionada ({ DAMAGE }) o null (puño)
     this._suppressAttack = suppressAttack ?? (() => false); // bloqueando o con arco/tirachinas: el clic no golpea
     // Criaturas a las que se puede golpear: animales y, más adelante, enemigos (misma interfaz).
@@ -142,6 +146,8 @@ export class InteractionSystem {
       this._events.emit(GameEvents.PLAYER_DRANK, { source: target.ref?.river ? 'RIVER' : 'POND' });
     } else if (target?.kind === 'animal' && button === 'ATTACK') {
       this._hit(target.ref, target.source);
+    } else if (target?.kind === 'animal' && button === 'INTERACT') {
+      if (!this._animalInteract(target.ref, target.source)) this._cooldown = 0;
     } else if (button === 'ATTACK') {
       this._events.emit(GameEvents.PLAYER_ACTION, { kind: 'miss' });
     } else {
@@ -401,12 +407,14 @@ export class InteractionSystem {
       // Las piezas sin uso (paredes, suelos…) no muestran letrero: se rompen manteniendo el clic.
       if (!SHAPES[t.ref.type]?.interact) return { ...t, silent: true, label: t.ref.def.NAME, action: null };
       const kind = SHAPES[t.ref.type].interact;
-      const action = t.ref.actionText ?? (kind === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : kind === 'CRAFT' ? 'Usar' : kind === 'STORAGE' ? 'Abrir' : 'Dormir');
+      const action = this._structureAction(t.ref) ?? t.ref.actionText ?? (kind === 'DOOR' ? (t.ref.open ? 'Cerrar' : 'Abrir') : kind === 'CRAFT' ? 'Usar' : kind === 'STORAGE' ? 'Abrir' : 'Dormir');
       return { ...t, label: t.ref.def.NAME, action, key: 'E', open: t.ref.open };
     }
     if (t.kind === 'animal') {
       const hp = t.ref.maxHealth ? ` ❤ ${Math.ceil(t.ref.health)}/${t.ref.maxHealth}` : '';
-      return { ...t, label: `${t.ref.def.NAME}${hp}`, action: 'Golpear', key: 'Clic' };
+      const care = this._animalAction(t.ref, t.source);
+      if (care) return { ...t, label: `${t.ref.def.NAME}${t.ref.tamed ? ' (tuya)' : ''}${hp}`, action: care, key: 'E' };
+      return { ...t, label: `${t.ref.def.NAME}${t.ref.tamed ? ' (tuya)' : ''}${hp}`, action: 'Golpear', key: 'Clic' };
     }
     const def = this._types[t.ref.type];
     const B = def.BREAK;

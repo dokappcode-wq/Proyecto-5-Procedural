@@ -120,7 +120,10 @@ export class ItemUseSystem {
         ok = true;
         break;
       default:
-        if (def.TOOL) this._message(`${def.NAME}: herramienta. Mantén el clic sobre ${def.TOOL.CHOP_SPEED ? 'un tronco para talar más deprisa' : 'una roca para picarla'}.`);
+        if (def.SEED) this._message(`${def.NAME}: ponte delante de una 🌱 parcela de cultivo y pulsa E para sembrar.`);
+        else if (def.FERTILIZER) this._message(`${def.NAME}: con E sobre una parcela sembrada, la abonas (crece más deprisa y da más).`);
+        else if (itemId === 'SHEARS') this._message('✂️ Tijeras: con E sobre una cabra la esquilas (lana).');
+        else if (def.TOOL) this._message(`${def.NAME}: herramienta. Mantén el clic sobre ${def.TOOL.CHOP_SPEED ? 'un tronco para talar más deprisa' : 'una roca para picarla'}.`);
         else if (def.WEAPON) this._message(`${def.NAME}: ${def.WEAPON.DAMAGE} de daño. Clic para golpear${this._items[this._equipment.slots.OFFHAND]?.SHIELD ? '' : ' (con un escudo puesto, clic dcho bloquea)'}.`);
         else this._message(`${def.NAME}: sirve como material de fabricación (Tab).`);
     }
@@ -255,6 +258,16 @@ export class ItemUseSystem {
         this._inventory._emit?.(to, 0);
       } else if (this._inventory.removeItem(itemId, 1)) this._inventory.addItem(to, 1);
     };
+    if (itemId === 'BUCKET_MILK') {
+      // Leche (P4): alimenta y quita sed; el cubo queda vacío.
+      const r = this._nutrition.eat?.(itemId);
+      if (!r?.ok) {
+        this._message('No tienes hambre.');
+        return false;
+      }
+      swap('BUCKET');
+      return true;
+    }
     if (itemId === 'BUCKET') {
       if (this._interaction.target?.kind !== 'water') {
         this._message('🪣 Mira al agua (lago, río o charca) para llenar el cubo.');

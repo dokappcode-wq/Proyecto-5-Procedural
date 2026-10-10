@@ -430,6 +430,19 @@ export const BUILD_MODELS = {
     add(b, ico, [0.66, 1.12, -0.2], [0.1, 0.1, 0.1], 0xc8302a);
     return b.build();
   },
+  FARM_PLOT() {
+    const b = new PartsBuilder();
+    const r = rnd(51);
+    // Borde de troncos, tierra labrada en surcos y unas piedrecitas.
+    for (const s of [-1, 1]) {
+      add(b, cyl, [0, 0.1, s * 0.92], [0.16, 2.0, 0.16], pick(WOOD, r), [0, 0, Math.PI / 2]);
+      add(b, cyl, [s * 0.92, 0.1, 0], [0.16, 1.68, 0.16], pick(WOOD, r), [Math.PI / 2, 0, 0]);
+    }
+    add(b, box, [0, 0.09, 0], [1.72, 0.2, 1.72], 0x4a3322);
+    for (let i = 0; i < 5; i++) add(b, box, [-0.68 + i * 0.34, 0.2, 0], [0.18, 0.05, 1.66], i % 2 ? 0x5a3e28 : 0x553a25);
+    for (let i = 0; i < 4; i++) add(b, ico, [(r() - 0.5) * 1.5, 0.21, (r() - 0.5) * 1.5], [0.05, 0.03, 0.04], STONE[1]);
+    return b.build();
+  },
   // ---- Estaciones de la P5 -------------------------------------------------------
   LOOM() {
     const b = new PartsBuilder();

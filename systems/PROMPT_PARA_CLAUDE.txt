@@ -155,7 +155,7 @@ Claves (ruta: tipo — qué es):
 - planets[].flora[].size: número 0.3–3 — Tamaño (1 = normal, 2 = el doble). Uno por tipo en todo el cuerpo.
 - planets[].fauna: lista de hasta 8 — Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.
 - planets[].fauna[]: objeto — Una especie animal (a partir de una plantilla).
-- planets[].fauna[].template: uno de: deer (Herbívoro ágil de pradera (tipo ciervo): huye), goat (Herbívoro lanudo (tipo cabra): da lana, a veces se defiende), cow (Herbívoro grande y lento (tipo vaca): da cuero) (obligatorio) — Tipo de animal.
+- planets[].fauna[].template: uno de: deer (Herbívoro ágil de pradera (tipo ciervo): huye), goat (Herbívoro lanudo (tipo cabra): da lana, a veces se defiende), cow (Herbívoro grande y lento (tipo vaca): da cuero), chicken (Ave pequeña de corral (tipo gallina): da plumas y, domesticada, huevos) (obligatorio) — Tipo de animal.
 - planets[].fauna[].herds: entero 0–60 (obligatorio) — Número de rebaños en toda la región.
 - planets[].fauna[].name: texto (hasta 30) — Nombre de la especie en singular (p. ej. "Ramoneador"). Si se pone, es una especie propia de este cuerpo.
 - planets[].fauna[].size: número 0.3–3 — Tamaño (1 = el de la plantilla). Los grandes tienen más vida y golpean más fuerte.
@@ -281,7 +281,7 @@ Claves (ruta: tipo — qué es):
 - planets[].moons[].flora[].size: número 0.3–3 — Tamaño (1 = normal, 2 = el doble). Uno por tipo en todo el cuerpo.
 - planets[].moons[].fauna: lista de hasta 8 — Animales. Si se omite: los del Jardín del Edén en planetas con aire; ninguno en los demás. [] = ninguno.
 - planets[].moons[].fauna[]: objeto — Una especie animal (a partir de una plantilla).
-- planets[].moons[].fauna[].template: uno de: deer (Herbívoro ágil de pradera (tipo ciervo): huye), goat (Herbívoro lanudo (tipo cabra): da lana, a veces se defiende), cow (Herbívoro grande y lento (tipo vaca): da cuero) (obligatorio) — Tipo de animal.
+- planets[].moons[].fauna[].template: uno de: deer (Herbívoro ágil de pradera (tipo ciervo): huye), goat (Herbívoro lanudo (tipo cabra): da lana, a veces se defiende), cow (Herbívoro grande y lento (tipo vaca): da cuero), chicken (Ave pequeña de corral (tipo gallina): da plumas y, domesticada, huevos) (obligatorio) — Tipo de animal.
 - planets[].moons[].fauna[].herds: entero 0–60 (obligatorio) — Número de rebaños en toda la región.
 - planets[].moons[].fauna[].name: texto (hasta 30) — Nombre de la especie en singular (p. ej. "Ramoneador"). Si se pone, es una especie propia de este cuerpo.
 - planets[].moons[].fauna[].size: número 0.3–3 — Tamaño (1 = el de la plantilla). Los grandes tienen más vida y golpean más fuerte.

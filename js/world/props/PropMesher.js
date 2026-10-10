@@ -24,7 +24,7 @@ export class PropMesher {
       nodes.map((n) => ({
         template: this._pick(n.depleted && this._templates[`${n.type}_EMPTY`] ? `${n.type}_EMPTY` : n.type, n.variant),
         x: n.x,
-        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave || n.type === 'MUSHROOM' || n.type === 'BIRD_NEST' || n.type === 'CLAY_DEPOSIT' || n.type === 'WILD_FLOWERS' ? 0 : 0.12),
+        y: n.y - (n.type === 'ROCK' || n.type === 'MINERAL_ROCK' ? 0.25 * n.scale : n.type === 'COBWEB' || n.cave || n.type === 'MUSHROOM' || n.type === 'BIRD_NEST' || n.type === 'CLAY_DEPOSIT' || n.type === 'WILD_FLOWERS' || n.type.startsWith('WILD_') ? 0 : 0.12),
         z: n.z,
         scale: n.scale,
         rotation: n.rotation,
@@ -238,6 +238,37 @@ export class PropMesher {
       b.add(ico, { position: [0, 0.03, 0], scale: [0.4, 0.05, 0.4], color: shade(C.BUSH, 1.15), jitter: lumpy(820 + variant, 0.3) });
       return b.build();
     };
+    // P4: hortalizas silvestres (mata de zanahoria con la raíz asomando, patatera con flores,
+    // calabaza con su guía de hojas).
+    const wildVeg = (kind, variant) => {
+      const b = new PartsBuilder();
+      const rng = new SeededRandom(1000 + variant + kind.length * 31);
+      if (kind === 'CARROT' || kind === 'POTATO') {
+        for (let p = 0; p < 3; p++) {
+          const px = (rng.next() - 0.5) * 0.5;
+          const pz = (rng.next() - 0.5) * 0.5;
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + rng.next();
+            b.add(kind === 'CARROT' ? cone : ico, {
+              position: [px + Math.cos(a) * 0.05, 0.14, pz + Math.sin(a) * 0.05],
+              rotation: [Math.cos(a) * 0.5, a, Math.sin(a) * 0.5],
+              scale: kind === 'CARROT' ? [0.05, 0.28, 0.02] : [0.09, 0.07, 0.09],
+              color: kind === 'CARROT' ? 0x5aa83a : 0x4f9a3a,
+            });
+          }
+          if (kind === 'CARROT') b.add(cone, { position: [px, 0.02, pz], rotation: [Math.PI, 0, 0], scale: [0.05, 0.08, 0.05], color: 0xec7a24 });
+          else b.add(ico, { position: [px, 0.24, pz], scale: 0.03, color: p % 2 ? 0xf2f2f2 : 0xc9a0e8 });
+        }
+      } else {
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + rng.next();
+          b.add(ico, { position: [Math.cos(a) * 0.4, 0.06, Math.sin(a) * 0.4], scale: [0.22, 0.04, 0.22], color: 0x4f8f32 });
+        }
+        b.add(ico, { position: [0.1, 0.2, 0], scale: [0.3, 0.22, 0.3], color: 0xe8862a, jitter: lumpy(1100 + variant, 0.1) });
+        b.add(stemBox, { position: [0.1, 0.43, 0], scale: [0.03, 0.08, 0.03], color: 0x5a6e2a });
+      }
+      return b.build();
+    };
     // P5: drusa de cristal (cristales violetas que brillan; la luz la pone el juego).
     const crystalCluster = (variant) => {
       const b = new PartsBuilder();
@@ -400,6 +431,9 @@ export class PropMesher {
       BUSH: [bush(0), bush(1)],
       BUSH_EMPTY: [bush(0, false), bush(1, false)],
       CLAY_DEPOSIT: [clay(0), clay(1)],
+      WILD_CARROT: [wildVeg('CARROT', 0), wildVeg('CARROT', 1)],
+      WILD_POTATO: [wildVeg('POTATO', 0), wildVeg('POTATO', 1)],
+      WILD_PUMPKIN: [wildVeg('PUMPKIN', 0), wildVeg('PUMPKIN', 1)],
       WILD_FLOWERS: [wildFlowers(0), wildFlowers(1), wildFlowers(2)],
       WILD_FLOWERS_EMPTY: [wildFlowers(0, false), wildFlowers(1, false), wildFlowers(2, false)],
       GOLD_ORE: [ore(0, C.GOLD ?? 0xf2c230, 'chunks'), ore(1, C.GOLD ?? 0xf2c230, 'chunks')],

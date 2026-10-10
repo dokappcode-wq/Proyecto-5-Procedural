@@ -41,6 +41,8 @@ const BUILD_PIECES = {
   TANNER: { NAME: 'Curtidor', ICON: '🪣', RECIPE: { REFINED_WOOD: 4, REFINED_STONE: 2, RESIN: 2 }, TIME: 15, STATION_PIECE: true, DESC: 'Cuba y bastidor: cuero refinado con resina (más por piel), botas de piel y mochilas (E).' },
   ALCHEMY: { NAME: 'Mesa de alquimia', ICON: '⚗️', RECIPE: { REFINED_WOOD: 3, GLASS: 4, BRICK: 4 }, TIME: 20, STATION_PIECE: true, DESC: 'Alambique y frascos: pociones, polvo de diamante y manzana dorada (E).' },
   FORGE: { NAME: 'Forja', ICON: '⚒️', RECIPE: { BRICK: 12, REFINED_IRON: 4, REFINED_STONE: 4 }, TIME: 25, STATION_PIECE: true, DESC: 'Fragua de ladrillo con yunque: acero, oro de las monedas y fundición que rinde más (E). Da luz y calor.' },
+  // Granja (P4): parcela de tierra labrada con borde de troncos. E con semillas para sembrar.
+  FARM_PLOT: { NAME: 'Parcela de cultivo', ICON: '🌱', RECIPE: { WOOD: 2, FIBER: 2 }, TIME: 4, DESC: 'Tierra para sembrar (2×2 m). E con semillas: sembrar · con el cubo de agua: regar · con harina de hueso: abonar · madura: cosechar.' },
   // Solo en las lunas (BODIES): cargan baterías plank y rellenan el oxígeno del traje.
   CHARGING_STATION: { NAME: 'Estación de carga', ICON: '🔌', RECIPE: { STONE: 4, MINERAL: 3 }, TIME: 8, BODIES: 'MOON' },
   OXYGEN_STATION: { NAME: 'Estación de oxígeno', ICON: '🫧', RECIPE: { STONE: 4, MINERAL: 4 }, TIME: 8, BODIES: 'MOON' },
@@ -59,7 +61,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.27.0',
+    VERSION: '1.28.0',
   },
 
   RENDER: {
@@ -356,6 +358,19 @@ export const GameConfig = deepFreeze({
       NAME: 'Arcilla', COLLISION_RADIUS: 0, SCALE: [0.8, 1.25], AIM_HEIGHT: 0.08, AIM_RADIUS: 0.75, CELL_ID: true,
       HARVEST: { ITEM: 'CLAY', AMOUNT: 3, REMOVE_WHEN_EMPTY: true, VERB: 'Sacar arcilla' },
     },
+    // P4: hortalizas silvestres (de ellas salen las primeras para sembrar).
+    WILD_CARROT: {
+      NAME: 'Zanahorias silvestres', COLLISION_RADIUS: 0, SCALE: [0.85, 1.15], AIM_HEIGHT: 0.15, AIM_RADIUS: 0.55, CELL_ID: true,
+      HARVEST: { ITEM: 'CARROT', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Arrancar zanahorias' },
+    },
+    WILD_POTATO: {
+      NAME: 'Patatas silvestres', COLLISION_RADIUS: 0, SCALE: [0.85, 1.15], AIM_HEIGHT: 0.15, AIM_RADIUS: 0.55, CELL_ID: true,
+      HARVEST: { ITEM: 'POTATO', AMOUNT: 2, REMOVE_WHEN_EMPTY: true, VERB: 'Sacar patatas' },
+    },
+    WILD_PUMPKIN: {
+      NAME: 'Calabaza silvestre', COLLISION_RADIUS: 0, SCALE: [0.85, 1.2], AIM_HEIGHT: 0.25, AIM_RADIUS: 0.7, CELL_ID: true,
+      HARVEST: { ITEM: 'PUMPKIN', AMOUNT: 1, REMOVE_WHEN_EMPTY: true, VERB: 'Coger calabaza' },
+    },
     WILD_FLOWERS: {
       NAME: 'Flores silvestres', COLLISION_RADIUS: 0, SCALE: [0.8, 1.2], AIM_HEIGHT: 0.25, AIM_RADIUS: 0.55, CELL_ID: true,
       HARVEST: { ITEM: 'WILD_FLOWER', AMOUNT: 2, REMOVE_WHEN_EMPTY: false, REGROW_SECONDS: 420, VERB: 'Coger flores' },
@@ -516,6 +531,30 @@ export const GameConfig = deepFreeze({
     NIGHT_VISION_POTION: { NAME: 'Poción de visión nocturna', ICON: '👁️', STACK: 10, USE: 'POTION', EFFECTS: { NIGHT_VISION: 240 }, MODEL: { TYPE: 'potion', COLOR: 0x9c7bff }, DESC: 'Ves en la oscuridad de las cuevas y de la noche (4 min).' },
     LEAP_POTION: { NAME: 'Poción de salto', ICON: '🐸', STACK: 10, USE: 'POTION', EFFECTS: { LEAP: 150 }, MODEL: { TYPE: 'potion', COLOR: 0x62c24a }, DESC: 'Saltas mucho más alto y las caídas duelen la mitad (2,5 min).' },
     GOLDEN_ELIXIR: { NAME: 'Elixir dorado', ICON: '🌟', STACK: 5, USE: 'POTION', HEAL: 100, EFFECTS: { REGENERATION: 60, STRENGTH: 90, SWIFT: 90, WARMTH: 90 }, MODEL: { TYPE: 'potion', COLOR: 0xffd34a }, DESC: 'Cura del todo y da fuerza, rapidez, calor y regeneración (1,5 min).' },
+    // Granja (P4): semillas y cosecha. SEED: qué cultivo se siembra con él (FARM.CROPS).
+    WHEAT_SEEDS: { NAME: 'Semillas de trigo', ICON: '🌰', SEED: 'WHEAT', DESC: 'Con E sobre una parcela: sembrar trigo. Salen del trigo (reloj).' },
+    CARROT: { NAME: 'Zanahoria', ICON: '🥕', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 9, SEED: 'CARROT', DESC: 'Se come cruda. Con E sobre una parcela: sembrarla.' },
+    POTATO: { NAME: 'Patata', ICON: '🥔', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 6, RAW_RISK: 0.25, SEED: 'POTATO', DESC: 'Mejor asada. Con E sobre una parcela: sembrarla.' },
+    PUMPKIN: { NAME: 'Calabaza', ICON: '🎃', DESC: 'Para la tarta de calabaza y semillas (reloj).' },
+    PUMPKIN_SEEDS: { NAME: 'Pipas de calabaza', ICON: '🫘', SEED: 'PUMPKIN', DESC: 'Con E sobre una parcela: sembrar calabaza.' },
+    BONE_MEAL: { NAME: 'Harina de hueso', ICON: '🦴', FERTILIZER: true, DESC: 'Abono: con E sobre una parcela sembrada, crece más deprisa y da más.' },
+    BAKED_POTATO: { NAME: 'Patata asada', ICON: '🥔', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 20, EFFECTS: { WARM: 120 } },
+    PUMPKIN_PIE: { NAME: 'Tarta de calabaza', ICON: '🥧', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 55, EFFECTS: { WELL_FED: 420 } },
+    VEGETABLE_STEW: { NAME: 'Guiso de verduras', ICON: '🍲', USE: 'EAT', FOOD: 'PLANT', NUTRITION: 44, EFFECTS: { WELL_FED: 300, WARM: 240 } },
+    CHEESE: { NAME: 'Queso', ICON: '🧀', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 22, DESC: 'De la leche, en la cocina.' },
+    BUCKET_MILK: { NAME: 'Cubo de leche', ICON: '🥛', STACK: 1, USE: 'BUCKET', FOOD: 'ANIMAL', NUTRITION: 16, THIRST: 30, MODEL: { TYPE: 'bucket', MILK: true }, DESC: 'Clic dcho / R: beber (quita hambre y sed). En la cocina: queso.' },
+    // Pesca (P4).
+    FISHING_ROD: { NAME: 'Caña de pescar', ICON: '🎣', STACK: 1, DURABILITY: 200, USE: 'FISH', REPAIR: 'REFINED_WOOD', MODEL: { TYPE: 'rod' }, DESC: 'Clic dcho mirando al agua: lanzar. Cuando pique, clic; luego mantén el clic para que el pez no se escape.' },
+    SMALL_FISH: { NAME: 'Pescadito', ICON: '🐟', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 6, RAW_RISK: 0.4, DESC: 'Percas y sardinas. Fritos en la hoguera.' },
+    FISH: { NAME: 'Pescado', ICON: '🐠', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 10, RAW_RISK: 0.4, DESC: 'Truchas, carpas y lubinas. A la brasa en la hoguera.' },
+    GOLDEN_FISH: { NAME: 'Pez dorado', ICON: '🐡', DESC: 'Rarísimo. Asado da un buen festín.' },
+    FRIED_FISH: { NAME: 'Pescaditos fritos', ICON: '🍤', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 24, EFFECTS: { WARM: 90 } },
+    GRILLED_FISH: { NAME: 'Pescado a la brasa', ICON: '🍣', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 34, EFFECTS: { WARM: 120 } },
+    FISH_SOUP: { NAME: 'Sopa de pescado', ICON: '🥣', USE: 'EAT', FOOD: 'MIXED', NUTRITION: 46, THIRST: 25, EFFECTS: { WARM: 300, WELL_FED: 240 } },
+    ROAST_GOLDEN_FISH: { NAME: 'Pez dorado asado', ICON: '🌟', USE: 'EAT', FOOD: 'ANIMAL', NUTRITION: 60, HEAL: 40, EFFECTS: { WELL_FED: 600, REGENERATION: 60 } },
+    // Animales (P4).
+    FEATHER: { NAME: 'Pluma', ICON: '🪶', DESC: 'De las gallinas. Flechas mejores y más baratas.' },
+    SHEARS: { NAME: 'Tijeras de esquilar', ICON: '✂️', STACK: 1, DURABILITY: 250, REPAIR: 'REFINED_IRON', MODEL: { TYPE: 'shears' }, DESC: 'Con E sobre una cabra: esquilarla (lana, sin hacerle daño).' },
     WATER: { NAME: 'Agua', ICON: '💧', USE: 'DRINK' },
     WATERSKIN: { NAME: 'Odre', ICON: '🧴', USE: 'WATERSKIN', DESC: 'Lleva agua: úsalo mirando al agua para llenarlo y otra vez para beber.' },
     // Ropa (EQUIPMENT.SLOTS): no se apila; COLD_PROTECTION se suma (todo el conjunto: 30 %).
@@ -677,6 +716,21 @@ export const GameConfig = deepFreeze({
     BRICK: { RESULT: 'BRICK', AMOUNT: 4, CATEGORY: 'MATERIALS', TIME: 10, STATION: 'FURNACE', INGREDIENTS: { CLAY: 4, COAL: 1 } },
     GOLD_INGOT: { RESULT: 'GOLD_INGOT', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 12, STATION: 'FURNACE', INGREDIENTS: { GOLD_ORE: 2, COAL: 1 } },
     GLASS_BOTTLE: { RESULT: 'GLASS_BOTTLE', AMOUNT: 3, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'FURNACE', INGREDIENTS: { GLASS: 2 } },
+    // Granja, pesca y animales (P4).
+    WHEAT_SEEDS: { RESULT: 'WHEAT_SEEDS', AMOUNT: 3, CATEGORY: 'FARMING', TIME: 2, INGREDIENTS: { WHEAT: 1 } },
+    PUMPKIN_SEEDS: { RESULT: 'PUMPKIN_SEEDS', AMOUNT: 4, CATEGORY: 'FARMING', TIME: 3, INGREDIENTS: { PUMPKIN: 1 } },
+    BONE_MEAL: { RESULT: 'BONE_MEAL', AMOUNT: 3, CATEGORY: 'FARMING', TIME: 3, INGREDIENTS: { BONE: 1 } },
+    FISHING_ROD: { RESULT: 'FISHING_ROD', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 10, INGREDIENTS: { REFINED_WOOD: 2, ROPE: 1, SPIDER_SILK: 3 } },
+    SHEARS: { RESULT: 'SHEARS', AMOUNT: 1, CATEGORY: 'TOOLS', TIME: 10, INGREDIENTS: { REFINED_IRON: 2 } },
+    ARROW_FEATHER: { RESULT: 'ARROW', AMOUNT: 5, CATEGORY: 'WEAPONS', TIME: 6, INGREDIENTS: { WOOD: 3, STONE: 1, FEATHER: 2 } },
+    BAKED_POTATO: { RESULT: 'BAKED_POTATO', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 6, STATION: 'CAMPFIRE', INGREDIENTS: { POTATO: 1 } },
+    FRIED_FISH: { RESULT: 'FRIED_FISH', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 6, STATION: 'CAMPFIRE', INGREDIENTS: { SMALL_FISH: 2 } },
+    GRILLED_FISH: { RESULT: 'GRILLED_FISH', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 8, STATION: 'CAMPFIRE', INGREDIENTS: { FISH: 1 } },
+    ROAST_GOLDEN_FISH: { RESULT: 'ROAST_GOLDEN_FISH', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 10, STATION: 'CAMPFIRE', INGREDIENTS: { GOLDEN_FISH: 1 } },
+    PUMPKIN_PIE: { RESULT: 'PUMPKIN_PIE', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 20, STATION: 'KITCHEN', INGREDIENTS: { PUMPKIN: 1, WHEAT: 2, EGG: 1 } },
+    VEGETABLE_STEW: { RESULT: 'VEGETABLE_STEW', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 16, STATION: 'KITCHEN', INGREDIENTS: { CARROT: 2, POTATO: 2, MUSHROOM: 1 } },
+    FISH_SOUP: { RESULT: 'FISH_SOUP', AMOUNT: 1, CATEGORY: 'COOKING', TIME: 16, STATION: 'KITCHEN', INGREDIENTS: { FISH: 1, POTATO: 1, CARROT: 1 } },
+    CHEESE: { RESULT: 'CHEESE', AMOUNT: 3, CATEGORY: 'COOKING', TIME: 20, STATION: 'KITCHEN', INGREDIENTS: { BUCKET_MILK: 1 }, RETURNS: { BUCKET: 1 } },
     // Telar.
     CLOTH: { RESULT: 'CLOTH', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'LOOM', INGREDIENTS: { FIBER: 4 } },
     CLOTH_WOOL: { RESULT: 'CLOTH', AMOUNT: 1, CATEGORY: 'MATERIALS', TIME: 6, STATION: 'LOOM', INGREDIENTS: { WOOL: 2 } },
@@ -788,6 +842,7 @@ export const GameConfig = deepFreeze({
     SURVIVAL: 'Supervivencia',
     COOKING: 'Cocina',
     ALCHEMY: 'Pociones',
+    FARMING: 'Granja',
   },
 
   // Construcción modular (Fase 9): el jugador construye pieza a pieza.
@@ -806,7 +861,7 @@ export const GameConfig = deepFreeze({
       type, { NAME: d.NAME, ICON: d.ICON, COST: { [pieceItemId(type)]: 1 }, ...(d.BODIES ? { BODIES: d.BODIES } : {}) },
     ])),
     // Piezas que no se pueden hacer en las lunas (BODIES: 'HOME').
-    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN', 'LOOM', 'TANNER', 'ALCHEMY', 'FORGE'],
+    HOME_ONLY: ['FENCE', 'BED', 'CHEST', 'FURNACE', 'WORKBENCH', 'TORCH', 'REFINERY', 'CAMPFIRE', 'KITCHEN', 'LOOM', 'TANNER', 'ALCHEMY', 'FORGE', 'FARM_PLOT'],
     CAMPFIRE_WARM_RADIUS: 5,   // m: cerca de una hoguera (o de la cocina) se está caliente
     CAMPFIRE_SLIME_RADIUS: 9,  // m: los slimes no se acercan a una hoguera
     CHEST_SLOTS: 27,
@@ -1231,6 +1286,24 @@ export const GameConfig = deepFreeze({
         SCALE: [0.9, 1.1],
         COLORS: { BODY: 0xe8e2d4, BELLY: 0xd2c9b6, DARK: 0x5b5048 },
       },
+      CHICKEN: {
+        NAME: 'Gallina',
+        NAME_PLURAL: 'Gallinas',
+        DROPS: { MEAT: 1, FEATHER: 2 },
+        HEALTH: 4,
+        ATTACK_DAMAGE: 1,
+        ATTACK_COOLDOWN: 1.5,
+        TEMPERAMENT_WEIGHTS: { FLEE: 0.55, CURIOUS: 0.15, NEUTRAL: 0.3 },
+        HIT_REACTION_WEIGHTS: { FLEE: 1, FIGHT: 0 },
+        WALK_SPEED: 0.9,
+        FLEE_SPEED: 4.8,
+        ALERT_DISTANCE: 9,
+        FLEE_DISTANCE: 4,
+        HERD_SIZE: [4, 7],
+        BIOMES: { PLAINS: 1, FOREST: 0.6 },
+        SCALE: [0.9, 1.1],
+        COLORS: { BODY: 0xf2ede2, BELLY: 0xe0d6c2, DARK: 0xd23a2a },
+      },
       COW: {
         NAME: 'Vaca',
         NAME_PLURAL: 'Vacas',
@@ -1249,6 +1322,53 @@ export const GameConfig = deepFreeze({
         SCALE: [0.95, 1.1],
         COLORS: { BODY: 0xf2eee6, BELLY: 0x3b3230, DARK: 0x2b2522 },
       },
+    },
+  },
+
+  // Granja (P4): cultivos de las parcelas. GROW: s de crecimiento regado (seco, ×DRY_SPEED);
+  // abonado crece ×FERT_SPEED y da FERT_BONUS más. YIELD: lo que da al cosechar [mín, máx].
+  FARM: {
+    DRY_SPEED: 0.35,          // sin regar crece mucho más despacio
+    WATER_TIME: 900,          // s que dura regada una parcela
+    WATER_RADIUS: 3.2,        // un cubo riega también las parcelas de al lado
+    FERT_SPEED: 1.6,
+    FERT_BONUS: 1,
+    CROPS: {
+      WHEAT: { NAME: 'Trigo', GROW: 420, YIELD: { WHEAT: [2, 4], WHEAT_SEEDS: [1, 2] }, COLORS: [0x6fae3a, 0xd9be5c] },
+      CARROT: { NAME: 'Zanahorias', GROW: 360, YIELD: { CARROT: [3, 5] }, COLORS: [0x5aa83a, 0xec7a24] },
+      POTATO: { NAME: 'Patatas', GROW: 480, YIELD: { POTATO: [3, 6] }, COLORS: [0x4f9a3a, 0xc9a66a] },
+      PUMPKIN: { NAME: 'Calabazas', GROW: 640, YIELD: { PUMPKIN: [1, 2], PUMPKIN_SEEDS: [0, 2] }, COLORS: [0x4f8f32, 0xe8862a] },
+    },
+  },
+
+  // Pesca (P4). Dónde se pesca cada pez (RIVER, LAKE, SEA), su peso y su dificultad (0..1).
+  FISHING: {
+    RANGE: 16,                // m: hasta dónde llega el lanzamiento
+    BITE_TIME: [4, 11],       // s esperando a que pique
+    BITE_WINDOW: 1.3,         // s para clicar cuando pica
+    CATCH_TIME: 3.5,          // s con el pez dentro de la zona para sacarlo
+    ESCAPE_TIME: 4,           // s fuera de la zona (en total) y se escapa
+    MAX_DISTANCE: 7,          // m: si el jugador se aleja del sitio, se rompe el sedal
+    CATCHES: [
+      { ITEM: 'SMALL_FISH', NAME: 'una perca', WHERE: ['LAKE', 'RIVER'], WEIGHT: 5, LEVEL: 0.15 },
+      { ITEM: 'FISH', NAME: 'una trucha', WHERE: ['RIVER'], WEIGHT: 4, LEVEL: 0.45 },
+      { ITEM: 'FISH', NAME: 'una carpa', WHERE: ['LAKE'], WEIGHT: 3, LEVEL: 0.35 },
+      { ITEM: 'SMALL_FISH', NAME: 'unas sardinas', WHERE: ['SEA'], WEIGHT: 5, LEVEL: 0.2 },
+      { ITEM: 'FISH', NAME: 'una lubina', WHERE: ['SEA'], WEIGHT: 3, LEVEL: 0.55 },
+      { ITEM: 'GOLDEN_FISH', NAME: '¡un pez dorado!', WHERE: ['LAKE', 'RIVER', 'SEA'], WEIGHT: 0.35, LEVEL: 0.85 },
+      { ITEM: 'WOOD', NAME: 'una rama vieja', WHERE: ['LAKE', 'RIVER', 'SEA'], WEIGHT: 0.6, LEVEL: 0.05 },
+      { ITEM: 'COIN', NAME: 'una moneda goblin perdida', WHERE: ['LAKE', 'RIVER', 'SEA'], WEIGHT: 0.3, LEVEL: 0.1 },
+    ],
+  },
+
+  // Domesticar y cuidar animales (P4). FOOD: lo que comen de tu mano; FEEDS: veces para domesticarlos.
+  RANCH: {
+    LURE_DISTANCE: 14,        // m: con su comida en la mano, se acercan y te siguen
+    HOME_RADIUS: 6,           // m que pasean alrededor de donde los dejaste
+    SPECIES: {
+      COW: { FOOD: ['WHEAT', 'CARROT'], FEEDS: 3, MILK_EVERY: 300 },
+      GOAT: { FOOD: ['WHEAT', 'CARROT', 'BERRIES'], FEEDS: 3, WOOL_EVERY: 420, WOOL: [2, 3] },
+      CHICKEN: { FOOD: ['WHEAT_SEEDS', 'PUMPKIN_SEEDS'], FEEDS: 2, EGG_EVERY: 280 },
     },
   },
 

@@ -271,6 +271,26 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Granja, pesca y animales (v1.28, P4)**:
+  - **Huerto**: fabrica una 🌱 *parcela de cultivo* (2 madera + 2 fibra) y colócala. Con E y en la mano:
+    semillas de trigo (del trigo, en el reloj), una zanahoria, una patata o pipas de calabaza → sembrar;
+    cubo de agua → regar (también las parcelas de al lado; seca crece mucho más despacio); harina de hueso
+    (de los huesos) → abonar (más deprisa y da más). Madura (4 fases a la vista): E para cosechar.
+    Durmiendo también crece. Las primeras zanahorias, patatas y calabazas salen silvestres en praderas,
+    huertos y orillas.
+  - **Pesca**: 🎣 caña (reloj). Clic dcho mirando al agua: lanzar. Cuando el corcho se hunde («¡PICA!»), clic
+    enseguida. Luego, en la barra, mantén el clic para subir la zona verde y que el pez quede dentro hasta
+    llenar la captura. Río: truchas y percas; lago: carpas y percas; mar: sardinas y lubinas; y muy rara vez
+    un pez dorado. Se cocinan en la hoguera (y sopa de pescado en la cocina).
+  - **Domesticar**: con su comida en la mano (vaca: trigo o zanahoria; cabra: trigo, zanahoria o bayas;
+    gallina: semillas) se acercan y te siguen. E para darles de comer; a las 3 (gallina: 2) son tuyas: ya no
+    huyen y se quedan donde las lleves. **Ordeñar**: vaca tuya + cubo vacío (E) → cubo de leche (se bebe o
+    queso en la cocina). **Esquilar**: ✂️ tijeras + cabra (E) → lana. **Gallinas** nuevas en las praderas:
+    plumas (flechas más baratas) y, si son tuyas, ponen huevos.
+  - Recetas nuevas: patata asada, pescaditos fritos, pescado a la brasa, pez dorado asado, guiso de verduras,
+    sopa de pescado, tarta de calabaza y queso.
+- **Arreglos**: la bomba de slime ya no congela el juego (y si algo falla, el juego sigue y lo avisa); sin
+  sonido de pasos al andar; `python serve.py` para arrancar sin problemas de caché.
 - **Materiales y estaciones (v1.27, P5)**:
   - **Materiales nuevos**: arcilla (E en las orillas de lagos y marismas) → ladrillos en el horno; fibra (E en
     cualquier arbusto, vuelve a crecer) → cuerda o tela; resina (sale al talar pinos); huesos (animales y

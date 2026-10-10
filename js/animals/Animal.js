@@ -16,6 +16,10 @@
  *
  * Evita agua, pendientes fuertes y salir del mundo, y no atraviesa árboles ni
  * rocas. Sin reproducción, necesidades ni IA avanzada.
+ *
+ * Granja (P4): con su comida en la mano del jugador (env.lure) se acercan y le siguen
+ * en vez de huir. Domesticado (tamed) no huye del jugador y pasea alrededor de su casa
+ * propia, que se mueve a donde el jugador lo lleve.
  */
 export const AnimalState = Object.freeze({
   IDLE: 'IDLE',
@@ -75,6 +79,8 @@ export class Animal {
     this._attackCooldown = 0;
     this._curiousCooldown = 0;
     this._hitFlee = false; // la huida actual la provocó un golpe (no el temperamento)
+    this.tamed = false;     // P4: domesticado (RanchSystem)
+    this.lured = false;     // P4: sigue al jugador (lleva su comida en la mano)
   }
 
   get alive() {
@@ -148,7 +154,17 @@ export class Animal {
     // ---- Reacción ante el jugador según temperamento -------------------------
     // (los estados provocados por un golpe tienen prioridad)
     const hitDriven = this.state === AnimalState.ATTACK || (this.state === AnimalState.FLEE && this._hitFlee);
-    if (!hitDriven) this._reactToPlayer(distToPlayer, env);
+    // Con su comida en la mano del jugador se acerca (y le sigue); domesticado no huye.
+    this.lured = !hitDriven && !!env.lure?.has(this.species) && distToPlayer < (env.lureDistance ?? 14);
+    if (this.lured) {
+      this.state = AnimalState.CURIOUS;
+      this.timer = Math.max(this.timer, 1);
+      if (this.tamed && distToPlayer < 6) {
+        // Su casa va con él: se queda donde el jugador lo lleve.
+        this.home.x = this.x;
+        this.home.z = this.z;
+      }
+    } else if (!hitDriven && !this.tamed) this._reactToPlayer(distToPlayer, env);
 
     let desiredHeading = this.heading;
     let desiredSpeed = 0;

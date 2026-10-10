@@ -117,6 +117,11 @@ export const SHAPES = {
     slot: 'FREE', half: [1.1, 0.8], top: 2.2, interact: 'CRAFT', station: 'FORGE',
     colliders: [{ x0: -1.1, x1: 1.1, z0: -0.8, z1: 0.8, y0: 0, y1: 1.1 }, { x0: -1.1, x1: -0.1, z0: -0.8, z1: 0.0, y0: 1.1, y1: 2.2 }], surfaces: [],
   },
+  // Parcela de cultivo (P4): se pisa (tierra a 0,2 m) y con E se siembra, riega o cosecha.
+  FARM_PLOT: {
+    slot: 'FREE', half: [1, 1], top: 0.25, interact: 'FARM',
+    colliders: [], surfaces: [{ kind: 'flat', y: 0.2, bottom: 0 }],
+  },
   // Antorcha clavada en el suelo: ilumina (no estorba el paso).
   TORCH: {
     slot: 'FREE', half: [0.12, 0.12], top: 1.1,

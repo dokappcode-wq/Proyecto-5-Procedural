@@ -92,6 +92,7 @@ export const FAUNA_TEMPLATES = Object.freeze({
   deer: { species: 'DEER', label: 'Herbívoro ágil de pradera (tipo ciervo): huye' },
   goat: { species: 'GOAT', label: 'Herbívoro lanudo (tipo cabra): da lana, a veces se defiende', wool: true },
   cow: { species: 'COW', label: 'Herbívoro grande y lento (tipo vaca): da cuero' },
+  chicken: { species: 'CHICKEN', label: 'Ave pequeña de corral (tipo gallina): da plumas y, domesticada, huevos' },
 });
 
 // ---- Generadores de terreno -------------------------------------------------
