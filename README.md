@@ -273,6 +273,15 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Terreno nuevo en terrazas (v1.36)**: el relieve ya no es una ladera continua de ruido (cuestas incómodas y
+  llanuras enormes). Ahora son **plataformas de hierba casi llanas a distintas alturas separadas por paredes de
+  roca** (escalones de 7 m con bordes que serpentean), como en las referencias.
+  - Para subir: **rampas naturales** repartidas por la isla, los **caminos** (abren paso por los cortados) o
+    **escalar** la pared (gasta energía). Cerca de ríos, lagos, cuevas y playas el terreno sigue suave.
+  - Las paredes se dibujan como **roca de verdad**: relieve con salientes y grietas, estratos de color, borde de
+    hierba arriba y arenisca naranja en el desierto. Van pegadas al suelo físico: andar y escalar no cambia.
+  - El diseño (`maps/eden/design.mjs` → `terraces`) controla el escalón, el tamaño de las plataformas, la
+    cantidad de rampas y dónde no hay escalones; cada región puede fijar su propia fuerza (`terrace`).
 - **Templos de retos (v1.35)**: cinco monolitos de piedra con una runa azul repartidos por la isla.
   - **E** sobre la piedra: se abre en dos y aparece un portal; crúzalo y entras en el recinto del templo (patio
     amurallado con columnas y altar). Arriba se ve el estado del reto. El portal de salida (E) está junto al muro.

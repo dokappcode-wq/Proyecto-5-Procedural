@@ -14,6 +14,7 @@ import { PropMesher } from './props/PropMesher.js';
 import { applyWind } from './Wind.js';
 import { CaveSystem } from './CaveSystem.js';
 import { buildCaveMeshes, markStencil, hideOverCaves } from './CaveMesher.js';
+import { buildCliffGeometry } from './map/CliffMesher.js';
 import { planSites } from './WorldSites.js';
 import { AuthoredTerrain, AuthoredWater, buildWaterGeometry, createFreshWaterMaterial } from './map/AuthoredWorld.js';
 import { createMapColorizer } from './map/MapColorizer.js';
@@ -128,6 +129,24 @@ export class WorldGenerator {
             mesh.geometry.dispose();
           },
         },
+        // Paredes de roca de los cortados (mapas diseñados): roca con relieve y estratos.
+        ...(map ? [{
+          name: 'cliffs',
+          viewDistance: Math.min(3, config.VIEW_DISTANCE_CHUNKS),
+          build: (cx, cz) => {
+            const cs = config.CHUNK_SIZE;
+            const x0 = -this._half + cx * cs;
+            const z0 = -this._half + cz * cs;
+            const holes = this.caves?.mouthNear(x0 - 8, z0 - 8, x0 + cs + 8, z0 + cs + 8) ? (x, y, z) => this.caves.openAt(x, y, z) || this.caves.openAt(x, y + 2, z) : null;
+            const geo = buildCliffGeometry(this._map, x0, z0, cs, this._spacing, { holes });
+            if (!geo) return null;
+            this._cliffMaterial ??= markStencil(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }), 0);
+            const mesh = new THREE.Mesh(geo, this._cliffMaterial);
+            mesh.castShadow = mesh.receiveShadow = true;
+            return mesh;
+          },
+          dispose: (mesh) => mesh.geometry.dispose(),
+        }] : []),
         ...(map ? [{
           name: 'water',
           viewDistance: config.VIEW_DISTANCE_CHUNKS,

@@ -141,6 +141,13 @@ export const EDEN = {
     { x: -1300, z: -200, h: 30 },
   ],
   undulation: { amplitude: 5, frequency: 1 / 260, hills: 7, hillFrequency: 1 / 110 },
+  // Terrazas: escalones de `step` m (desde `base` m sobre el mar) sobre el relieve suavizado
+  // (`smooth` celdas) con los bordes deformados por ruido (warp × step, a la escala
+  // warpFrequency); cima casi llana (±top m). Rampas: fracción del
+  // ruido entre ramp[0] y ramp[1] (cuesta suave en vez de cortado). Sin escalones a menos de
+  // coast[0]–coast[1] m de la orilla ni water[0]–water[1] m del agua dulce y las cuevas.
+  // Cada región puede fijar su `terrace` (0..1); si no, depende de su suelo.
+  terraces: { step: 7, base: 2.5, smooth: 12, warp: 0.95, warpFrequency: 1 / 300, top: 0.6, rampFrequency: 1 / 230, ramp: [0.3, 0.55], coast: [25, 90], water: [18, 55] },
 
   // Cordilleras: crestas con altura (h) y anchura (w) en cada punto. rough: crestas y
   // barrancos (ruido "ridged"); snow: lleva nieve por encima de snowLine.

@@ -32,7 +32,7 @@ const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)} s]`
 const N = Math.round((2 * D.half) / D.cell) + 1;
 const CELL = D.cell;
 const noise = (name) => new SimplexNoise(deriveSeed(D.seed, name));
-const nz = { coast: noise('coast'), base: noise('base'), hills: noise('hills'), ridge: noise('ridge'), detail: noise('detail'), patch: noise('patch'), flora: noise('flora'), clear: noise('clear'), snow: noise('snow'), stack: noise('stack') };
+const nz = { coast: noise('coast'), base: noise('base'), hills: noise('hills'), ridge: noise('ridge'), detail: noise('detail'), patch: noise('patch'), flora: noise('flora'), clear: noise('clear'), snow: noise('snow'), stack: noise('stack'), terrace: noise('terrace'), ramp: noise('ramp') };
 
 const H = new Grid(N, D.half);
 log(`rejilla ${N}×${N} (${CELL} m)`);
@@ -172,18 +172,22 @@ for (const hl of D.hills ?? []) {
   });
 }
 const plateauMask = new Float32Array(N * N); // 1 en los cortados (no se erosionan ni se derrumban)
-for (const pl of D.plateaus ?? []) {
-  const line = closedLine(pl.points, 4);
-  H.forBox(bbox(pl.points, pl.edge + 4), (i, j, x, z, k) => {
-    const inside = pointInPolygon(pl.points, x, z);
-    const d = inside ? 0 : nearestOnLine(line, x, z).d;
-    if (d > pl.edge) return;
-    const top = pl.top + nz.detail.noise2D(x / 40, z / 40) * 0.8;
-    const t = Math.pow(smooth(0, pl.edge, d + nz.detail.noise2D(x / 18, z / 18) * 3), 0.55);
-    H.data[k] = Math.max(H.data[k], lerp(top, H.data[k], t));
-    if (d > 0) plateauMask[k] = Math.max(plateauMask[k], 1 - t);
-  });
+function applyPlateaus() {
+  for (const pl of D.plateaus ?? []) {
+    const line = closedLine(pl.points, 4);
+    H.forBox(bbox(pl.points, pl.edge + 4), (i, j, x, z, k) => {
+      const inside = pointInPolygon(pl.points, x, z);
+      const d = inside ? 0 : nearestOnLine(line, x, z).d;
+      if (d > pl.edge) return;
+      const top = pl.top + nz.detail.noise2D(x / 40, z / 40) * 0.8;
+      // Borde en cortado: casi vertical, con el trazado un poco irregular.
+      const t = smooth(0, pl.edge, d + nz.detail.noise2D(x / 18, z / 18) * 1.2);
+      H.data[k] = Math.max(H.data[k], lerp(top, H.data[k], t));
+      if (d > 0) plateauMask[k] = Math.max(plateauMask[k], 1 - t);
+    });
+  }
 }
+applyPlateaus();
 log('montañas');
 
 // ---- 5. Detalle fino según el terreno --------------------------------------------------
@@ -259,6 +263,15 @@ erode(H.data, {
 thermal(H.data, { n: N, talus: 1.5, rate: 0.2, iterations: 4, mask: mask.map((m) => (m > 0 ? 0.6 : 0)) });
 despike(H.data);
 log('erosión');
+
+// ---- 8b. Terrazas: plataformas llanas separadas por cortados de roca -----------------------
+// El relieve no es una ladera continua (cuestas incómodas, llanuras enormes) sino plataformas de
+// hierba casi llanas a distintas alturas separadas por paredes de roca, como en las referencias.
+// La altura (ya con su forma grande: cordilleras, valles, costa) se reparte en escalones de
+// TERRACES.step m sobre un campo deformado con ruido: los bordes serpentean y una misma llanura
+// queda partida en plataformas. Rampas naturales (ruido) y los caminos dejan subir andando; los
+// cortados se escalan. Cerca del agua, de las cuevas y de las playas el terreno sigue suave.
+if (D.terraces) terraceRelief(D.terraces);
 
 // ---- 9. Lugares, caminos, lagos y ríos (definitivos) -----------------------------------
 const pads = [];
@@ -393,7 +406,7 @@ H.forAll((i, j, x, z, k) => {
   } else if (poiR.some((p) => Math.hypot(x - p.x, z - p.z) < p.r * (0.55 + 0.25 * fine))) {
     s = poiR.find((p) => Math.hypot(x - p.x, z - p.z) < p.r)?.kind === 'quarry' ? SURFACE.SCREE : SURFACE.PAVED;
   } else if (sl > 1.15) {
-    s = SURFACE.CLIFF;
+    s = reg.ground === 'desert' ? SURFACE.SANDSTONE : SURFACE.CLIFF;
   } else if (h > snowLine && sl < 1.0 + patch * 0.2) {
     s = SURFACE.SNOW;
     b = BIOME_INDEX.FROZEN_MOUNTAINS;
@@ -471,6 +484,73 @@ writePreview();
 log('vista previa');
 
 // ==== Funciones ===========================================================================
+
+/** Fuerza de las terrazas según el suelo de la región (0 = sin escalones, 1 = escalones netos). */
+function terraceStrength(reg) {
+  if (Number.isFinite(reg.terrace)) return reg.terrace;
+  return { meadow: 1, lush: 1, dry: 1, desert: 1, forest: 0.9, windswept: 0.85, pine: 0.75, foothill: 0.7, rocky: 0.6, alpine: 0.4, marsh: 0.2, sand: 0 }[reg.ground] ?? 0.8;
+}
+
+function terraceRelief(TR) {
+  const macro = H.data.slice();
+  // Distancia al agua dulce y a las cuevas: ahí el terreno no se escalona (orillas y bocas suaves).
+  const calm = new Float32Array(N * N).fill(Infinity);
+  for (const r of rivers) {
+    H.forBox(bbox(r.line, TR.water[1] + 10), (i, j, x, z, k) => {
+      const q = r.line.near(x, z);
+      if (q.d < calm[k]) calm[k] = Math.max(0, q.d - lerpPoint(r.line, q.i, q.t).w);
+    });
+  }
+  for (const l of D.lakes) {
+    const line = closedLine(l.points, 6);
+    H.forBox(bbox(l.points, TR.water[1] + 10), (i, j, x, z, k) => {
+      const d = pointInPolygon(l.points, x, z) ? 0 : nearestOnLine(line, x, z).d;
+      if (d < calm[k]) calm[k] = d;
+    });
+  }
+  for (const c of D.caves ?? []) {
+    for (const p of c.path) {
+      H.forBox({ minX: p.x - 40, maxX: p.x + 40, minZ: p.z - 40, maxZ: p.z + 40 }, (i, j, x, z, k) => {
+        const d = Math.hypot(x - p.x, z - p.z) * (TR.water[1] / 40);
+        if (d < calm[k]) calm[k] = d;
+      });
+    }
+  }
+  // Los niveles salen del relieve suavizado (sin las colinas pequeñas): plataformas grandes.
+  const smoothG = new Grid(N, D.half);
+  smoothG.data.set(macro);
+  blur(smoothG, TR.smooth, 2);
+  const terr = new Float32Array(N * N);
+  const str = new Float32Array(N * N);
+  H.forAll((i, j, x, z, k) => {
+    if (macro[k] <= 0.5) return;
+    const reg = regionOf(k);
+    const P = seedParams.get(coastJF.nearest[k]);
+    // Playas y marismas: más margen hasta el primer escalón; acantilados de costa: casi nada.
+    const soft = P ? 0.3 + 1.2 * (P.beach + P.marsh) : 1;
+    let s = terraceStrength(reg) * smooth(TR.coast[0] * soft, TR.coast[1] * soft, coastD[k]);
+    s *= smooth(TR.water[0], TR.water[1], calm[k]);
+    // Rampas naturales: zonas donde el terreno sube en cuesta suave de un nivel a otro.
+    s *= 1 - smooth(TR.ramp[0], TR.ramp[1], nz.ramp.fbm(x, z, { frequency: TR.rampFrequency, octaves: 2 }));
+    str[k] = s;
+    const warp = nz.terrace.fbm(x, z, { frequency: TR.warpFrequency, octaves: 2 }) * TR.step * TR.warp;
+    // Nunca por debajo del primer nivel (la tierra no se hunde bajo el mar).
+    const level = Math.max(0, Math.round((smoothG.data[k] + warp - TR.base) / TR.step));
+    terr[k] = TR.base + level * TR.step + nz.detail.fbm(x + 311, z - 97, { frequency: 1 / 70, octaves: 2 }) * TR.top;
+  });
+  // El borde de cada plataforma ocupa unos 4 m (sin dientes de sierra en diagonal).
+  const sm = terr.slice();
+  for (let j = 1; j < N - 1; j++) {
+    for (let i = 1; i < N - 1; i++) {
+      const k = j * N + i;
+      if (str[k] > 0) sm[k] = (terr[k] * 4 + terr[k - 1] + terr[k + 1] + terr[k - N] + terr[k + N]) / 8;
+    }
+  }
+  for (let k = 0; k < N * N; k++) if (str[k] > 0) H.data[k] = lerp(macro[k], sm[k], str[k]);
+  // Las mesetas del diseño (la plataforma de inicio, las mesas del desierto…) quedan encima.
+  applyPlateaus();
+  log('terrazas');
+}
 
 /** Quita pozos y agujas aislados (restos de la erosión): la celda vuelve a la media de sus vecinas. */
 function despike(h, wl = null) {
@@ -849,7 +929,7 @@ function groundSurface(ground, { x, z, h, sl, patch, fine, wet, flow, dep, snowL
       return patch > 0.4 && fine > 0.3 ? SURFACE.FLOWERS : SURFACE.GRASS_LUSH;
     case 'desert':
       // Dunas ámbar; riscos y mesetas de arenisca; alguna mata de hierba seca.
-      if (gully || scree || sl > 0.45 || (h > 30 && sl < 0.25)) return SURFACE.SANDSTONE;
+      if (gully || scree || sl > 0.45 || (patch > 0.5 && fine > -0.3)) return SURFACE.SANDSTONE;
       return patch > 0.35 && fine > 0 ? SURFACE.GRASS_DRY : SURFACE.DESERT;
     case 'dry':
       if (gully || scree) return SURFACE.DIRT;
