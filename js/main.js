@@ -113,6 +113,7 @@ import { FishingSystem, FishingUI } from './fishing/FishingSystem.js';
 import { TradeSystem, tradeSeed } from './trade/TradeSystem.js';
 import { MerchantPanel } from './trade/MerchantPanel.js';
 import { TreasureSystem } from './trade/TreasureSystem.js';
+import { RecognitionTowers } from './world/RecognitionTowers.js';
 import { buildMerchantStall, buildMerchant } from './trade/MerchantModels.js';
 import { AchievementSystem } from './progress/AchievementSystem.js';
 import { JournalPanel } from './ui/JournalPanel.js';
@@ -587,7 +588,9 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   treasure.setPlayer(player);
   itemUse.treasure = treasure;
-  interactionProviders.push(trade, treasure);
+  // Torres de reconocimiento (P11): E para activarlas; revelan el mapa a su alrededor.
+  const recon = new RecognitionTowers({ config: cfg.RECON, events, scene: worlds.rootOf(HOME) ?? render.scene, colliders: storyColliders, isHome: () => worlds.activeId === HOME });
+  interactionProviders.push(trade, treasure, recon);
   const achievements = new AchievementSystem({ config: cfg.ACHIEVEMENTS, recipes: cfg.RECIPES, events, inventory, day: () => time.day });
   const merchantPanel = new MerchantPanel({ container: document.getElementById('hud') ?? document.body, input, events, trade, items: cfg.ITEMS, inventory });
   const journal = new JournalPanel({
@@ -1069,6 +1072,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
       getCatalog: () => celestial.catalog,
       getBed: () => (respawnBed && !respawnBed.ship && construction.exists(respawnBed) ? respawnBed : null),
       getMarkers: () => pickups.markers(worlds.activeId),
+      get fog() {
+        return recon.fog;
+      },
+      towerMarks: () => recon.marks(),
       userMarkers: mapMarkers,
       bodyId: () => worlds.activeId,
       spaceNodeRequired: cfg.SHIP.SPACE_NODE_REQUIRED,
@@ -1494,6 +1501,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     trade.view = merchant;
   }
   treasure.setup(worlds.home);
+  recon.setup(worlds.home);
   journal._places = placeTracker;
 
   // ---- Menú de inicio: la cápsula en órbita y la caída al planeta ------------------
@@ -1619,6 +1627,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   });
   saveGame.register('trade', { save: () => trade.snapshot(), load: (d) => trade.restore(d) });
   saveGame.register('treasure', { save: () => treasure.snapshot(), load: (d) => treasure.restore(d) });
+  saveGame.register('recon', { save: () => recon.snapshot(), load: (d) => recon.restore(d) });
   saveGame.register('achievements', { save: () => achievements.snapshot(), load: (d) => achievements.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
@@ -1805,6 +1814,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(home);        // recolector de lluvia y maniquíes
   loop.add(trade);       // mercader: existencias y encargos del día
   loop.add(treasure);    // X de los tesoros marcados
+  loop.add(recon);       // torres de reconocimiento: escaneo y animación (P11)
   loop.add(treasureHUD);
   loop.add(achievements);
   loop.add(merchantPanel);
@@ -1882,7 +1892,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, get hasWatch() { return hasWatch; },
   };
 }
 

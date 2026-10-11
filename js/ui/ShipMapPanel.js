@@ -11,6 +11,8 @@ import { orbitPosition } from '../celestial/CelestialCatalog.js';
  *   posiciones según la hora del TimeSystem). Las lunas no se pueden visitar:
  *   falta el "nodo espacial".
  *
+ * Niebla (P11, sources.fog): en el planeta de inicio, lo que no se ha revelado con las torres de
+ * reconocimiento está tapado; las torres reveladas salen como marcas (sources.towerMarks).
  * Marcas del jugador (P9, sources.userMarkers): clic en el mapa de la región pone una marca
  * (haz de luz en el mundo) y clic sobre una marca la quita; también se quitan en la lista.
  * Por lo demás solo vista: lee estado y no modifica nada.
@@ -104,6 +106,16 @@ export class ShipMapPanel extends ModalPanel {
     }
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(map.canvas, 0, 0, SIZE, SIZE);
+    // Niebla del planeta de inicio (P11): solo lo revelado por las torres y el entorno del inicio.
+    const fog = this._src.fog;
+    if (fog && this._src.onHome?.()) {
+      this._fogCanvas ??= Object.assign(document.createElement('canvas'), { width: SIZE, height: SIZE });
+      fog.draw(ctx, (x, z) => map.toMap(x, z).map((v) => v * SIZE), SIZE, this._fogCanvas);
+      for (const t of this._src.towerMarks?.() ?? []) {
+        const [tx, ty] = map.toMap(t.x, t.z).map((v) => v * SIZE);
+        marker(ctx, tx, ty, t.active ? '#ffd23f' : '#7fd8ff', 'Torre');
+      }
+    }
     // Rejilla de coordenadas cada 128 m.
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;

@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.33.0',
+    VERSION: '1.34.0',
   },
 
   RENDER: {
@@ -1533,6 +1533,10 @@ export const GameConfig = deepFreeze({
   },
 
   // Tesoros (P8): ruinas con un tesoro enterrado; los mapas del tesoro las marcan.
+  // Torres de reconocimiento (P11): activarlas tarda SCAN_TIME s y revela SCAN_RADIUS m a su alrededor.
+  // Al empezar ya se ve START_REVEAL m alrededor del inicio; el resto del mapa está tapado.
+  RECON: { SCAN_TIME: 7, SCAN_RADIUS: 240, START_REVEAL: 110, TOWER_HEIGHT: 15, REVEAL_LIMIT: 64 },
+
   TREASURE: {
     RUINS: 9,                 // ruinas repartidas por la isla (además de las Ruinas del Viejo Jardín)
     MIN_FROM_SPAWN: 250,
@@ -1562,6 +1566,7 @@ export const GameConfig = deepFreeze({
     LEVEL_10: { NAME: 'Veterano', ICON: '⭐', DESC: 'Llega al nivel 10.', XP: 0 },
     BACKPACK: { NAME: 'Bien equipado', ICON: '🎒', DESC: 'Cósete una mochila.', XP: 30 },
     SURVIVOR: { NAME: 'Superviviente', ICON: '🌅', DESC: 'Sobrevive 10 días.', XP: 100 },
+    SCOUT: { NAME: 'Cartógrafo', ICON: '🗺️', DESC: 'Activa las 4 torres de reconocimiento.', XP: 80, COUNT: 4 },
     // P10.
     WOLVES: { NAME: 'Cazador nocturno', ICON: '🐺', DESC: 'Derrota a 5 lobos.', XP: 60, COUNT: 5 },
     CAVE_DWELLER: { NAME: 'Exterminador', ICON: '🕷️', DESC: 'Derrota a 10 arañas o murciélagos.', XP: 60, COUNT: 10 },

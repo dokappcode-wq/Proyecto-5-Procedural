@@ -550,6 +550,14 @@ export class AudioSystem {
       S.tone(o, { t: S.now + 0.07, type: 'triangle', f: 1760, d: 0.18, gain: 0.07 });
     }));
     on(E.ORDER_DONE, () => this.play((S, o) => S.craft(o)));
+    // Torres de reconocimiento (P11): un barrido que sube y, al terminar, un acorde.
+    on(E.TOWER_ACTIVATED, () => this.play((S, o) => {
+      S.tone(o, { type: 'sine', f: 330, f2: 1320, d: 1.4, gain: 0.07, filter: 2400 });
+      S.noise(o, { color: 'white', t: S.now + 0.1, a: 0.3, d: 1.2, gain: 0.03, type: 'bandpass', f: 1800, f2: 4200, q: 4 });
+    }));
+    on(E.TOWER_REVEALED, () => this.play((S, o) => {
+      for (let i = 0; i < 3; i++) S.tone(o, { t: S.now + i * 0.1, type: 'triangle', f: [523, 659, 784][i], d: 0.5, gain: 0.07 });
+    }));
     on(E.TREASURE_FOUND, () => this.play((S, o) => {
       S.thud(o, 0.6);
       for (let i = 0; i < 4; i++) S.tone(o, { t: S.now + 0.15 + i * 0.09, type: 'triangle', f: [784, 988, 1175, 1568][i], d: 0.25, gain: 0.07 });

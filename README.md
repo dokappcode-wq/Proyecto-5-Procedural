@@ -273,6 +273,15 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Terreno y torres de reconocimiento (v1.34)**:
+  - El Edén tiene ahora un **desierto ámbar** al este (con mesas de arenisca), verdes más vivos y agua turquesa.
+  - **Zona de inicio**: una plataforma de hierba con acantilado de unos 14 m. La gruta del acantilado está en su
+    cara norte y, al norte, se ve la torre rota (el jugador empieza mirando hacia allí). La cascada de la referencia
+    **no está hecha todavía**.
+  - **Torres de reconocimiento** (4, repartidas por la isla): acércate, mira la torre y pulsa **E**. Durante 7 s
+    barren la zona y revelan un círculo de 240 m en el mapa (**M** a pie con el reloj, o el mapa de la nave).
+    Al empezar el mapa está casi tapado: solo se ve el entorno del inicio. Las torres reveladas salen marcadas;
+    activar las 4 da el logro **Cartógrafo**.
 - **Enemigos nuevos y el Rey Goblin (v1.33, P10)**:
   - **Cuevas**: arañas (rápidas, sueltan telaraña) y colonias de **murciélagos** colgados del techo que despiertan
     juntos al acercarte, revolotean y vuelven a colgarse.
