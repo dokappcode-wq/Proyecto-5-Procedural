@@ -71,6 +71,7 @@ export class MapData {
     this.biome = bytes('biome');
     this.region = bytes('region');
     this.flora = bytes('flora');
+    this.flags = L.flags ? bytes('flags') : null; // 1 = no se escala (muros del valle del inicio)
     this.regions = meta.regions ?? [];
     this._w = {};
   }
@@ -113,6 +114,11 @@ export class MapData {
 
   floraAt(x, z) {
     return this.flora[this.index(x, z)];
+  }
+
+  /** ¿Pared que no se puede escalar (los muros naturales del valle del inicio)? */
+  noClimbAt(x, z) {
+    return !!this.flags && (this.flags[this.index(x, z)] & 1) === 1;
   }
 
   /** Región con nombre en (x, z) ({ id, name, biome, … }) o null. */

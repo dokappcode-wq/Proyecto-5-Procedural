@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.37.0',
+    VERSION: '1.38.0',
   },
 
   RENDER: {
@@ -1536,7 +1536,7 @@ export const GameConfig = deepFreeze({
   // Torres de reconocimiento (P11): activarlas tarda SCAN_TIME s y revela SCAN_RADIUS m a su alrededor.
   // Hasta activar la torre de una zona su terreno y sus nombres están tapados en el mapa
   // (START_REVEAL: metros que se ven alrededor del inicio al empezar; 0 = nada).
-  RECON: { SCAN_TIME: 7, SCAN_RADIUS: 240, START_REVEAL: 0, TOWER_HEIGHT: 15, REVEAL_LIMIT: 64 },
+  RECON: { SCAN_TIME: 7, SCAN_RADIUS: 240, START_REVEAL: 60, TOWER_HEIGHT: 15, REVEAL_LIMIT: 64 },
 
   // Templos de retos (P12): monolito con runa → E abre el portal → dentro, la prueba.
   TEMPLES: {
@@ -1546,6 +1546,7 @@ export const GameConfig = deepFreeze({
     FIGHT: { ENEMIES: ['GOBLIN', 'GOBLIN', 'GOBLIN', 'GOBLIN_BOSS'] },
     SURVIVE: { TIME: 45, EVERY: 9, PER_WAVE: 2, ENEMY: 'SPIDER' },
     EXPLORE: { RELICS: 4 },
+    TRIAL: { ENEMIES: ['SLIME', 'SLIME'] }, // la prueba del templo del Valle del Despertar (abre la salida)
     REWARD: { COIN: [20, 30], CRYSTAL_SHARD: [2, 3], HEALING_POTION: [1, 1] },
   },
 
@@ -1579,8 +1580,8 @@ export const GameConfig = deepFreeze({
     BACKPACK: { NAME: 'Bien equipado', ICON: '🎒', DESC: 'Cósete una mochila.', XP: 30 },
     SURVIVOR: { NAME: 'Superviviente', ICON: '🌅', DESC: 'Sobrevive 10 días.', XP: 100 },
     TEMPLE: { NAME: 'Retador', ICON: '🏛️', DESC: 'Supera un templo de retos.', XP: 80 },
-    TEMPLES_ALL: { NAME: 'Maestro de los templos', ICON: '🏆', DESC: 'Supera los 5 templos de retos.', XP: 250, COUNT: 5 },
-    SCOUT: { NAME: 'Cartógrafo', ICON: '🗺️', DESC: 'Activa las 4 torres de reconocimiento.', XP: 80, COUNT: 4 },
+    TEMPLES_ALL: { NAME: 'Maestro de los templos', ICON: '🏆', DESC: 'Supera los 6 templos de retos (el del valle incluido).', XP: 250, COUNT: 6 },
+    SCOUT: { NAME: 'Cartógrafo', ICON: '🗺️', DESC: 'Activa las 5 torres de reconocimiento (la del valle incluida).', XP: 80, COUNT: 5 },
     // P10.
     WOLVES: { NAME: 'Cazador nocturno', ICON: '🐺', DESC: 'Derrota a 5 lobos.', XP: 60, COUNT: 5 },
     CAVE_DWELLER: { NAME: 'Exterminador', ICON: '🕷️', DESC: 'Derrota a 10 arañas o murciélagos.', XP: 60, COUNT: 10 },

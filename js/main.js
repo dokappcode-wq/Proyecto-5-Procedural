@@ -104,6 +104,7 @@ import { MapData } from './world/map/MapData.js';
 import { PlaceTracker } from './world/map/PlaceTracker.js';
 import { Landmarks } from './world/map/Landmarks.js';
 import { FloatingIslands } from './world/map/FloatingIslands.js';
+import { StartValley } from './world/StartValley.js';
 import { StatusEffects } from './player/StatusEffects.js';
 import { StatusEffectsHUD } from './ui/StatusEffectsHUD.js';
 import { FarmSystem } from './farming/FarmSystem.js';
@@ -186,6 +187,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Edificios de la historia (torre, arena del nodo, centro de investigación…).
   const storyColliders = new StaticColliders();
   let landmarks = null; // lugares del mapa diseñado (se crean tras generar el mundo)
+  let startValley = null; // el Valle del Despertar (zona inicial del mapa diseñado)
   // ¿Hay una hoguera (o una cocina) encendida a menos de r m? (calor, luz, slimes)
   const nearFire = (x, y, z, r) => {
     for (const pc of construction?.pieces ?? []) {
@@ -365,6 +367,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
         if (story.onWatchTaken()) return; // la historia: nombre, color, transmisión, tutorial
         if (!shipFound) setTimeout(() => message(`📡 El reloj capta la señal de la nave: está en lo alto de las ${worlds.home.biomes.get('FROZEN_MOUNTAINS')?.NAME ?? 'montañas'}. Busca el haz de luz… y abrígate antes de subir: allí arriba se congela uno.`, 'warning'), 5000);
       },
+      onSave: () => events.emit(GameEvents.GAME_SAVE_REQUEST, { reason: 'manual' }), // la cápsula: punto de guardado
     })
     : null;
   crashSite?.setPlayer(player);
@@ -1444,6 +1447,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     shipAI, ship, time, colliders: storyColliders, lock: setControlLock, items: cfg.ITEMS, pickups, health,
   });
   interactionProviders.push(story);
+  story._d.recon = recon; // el tutorial del valle mira su torre y su templo
+  story._d.temples = temples;
   // Segunda parte: la nave, el centro de investigación, la mazmorra y el gólem gigante.
   const storyPart2 = new StoryPart2({
     story, events, worlds, homeId: HOME, ship, shipAI, inventory, crafting, enemies, pickups, colliders: storyColliders, player,
@@ -1453,7 +1458,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   // Sonido: efectos, ambiente y música generados con WebAudio (N: silenciar).
   const audio = new AudioSystem({
     events, input, player, camera: render.camera, worlds, homeId: HOME, construction, ship, enemies, animals, time, story2: storyPart2, items: cfg.ITEMS,
-    waterfalls: () => landmarks?.waterfalls ?? [],
+    waterfalls: () => [...(landmarks?.waterfalls ?? []), ...(startValley?.waterfalls ?? [])],
   });
   const settingsPanel = new SettingsPanel({ container: hudRoot, input, events, settings, audio });
   events.on(GameEvents.SETTINGS_OPEN_REQUEST, () => settingsPanel.setOpen(true));
@@ -1481,6 +1486,19 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   const floatingIslands = worlds.home.map?.meta?.floatingIslands?.length
     ? new FloatingIslands({ map: worlds.home.map, root: worlds.rootOf(HOME), isEnabled: () => worlds.activeId === HOME })
     : null;
+  // Valle del Despertar: piedras de salto, lianas, restos de la nave, pistas, puentes, cascadas y
+  // la losa de la salida (se aparta al superar el templo del valle).
+  startValley = worlds.home.map?.meta?.valley
+    ? new StartValley({
+      map: worlds.home.map, heightAt: (x, z) => worlds.home.getHeightAt(x, z), root: worlds.rootOf(HOME), colliders: storyColliders,
+      events, player, enemies, inventory, items: cfg.ITEMS, ui: storyUI, camera, lock: setControlLock, isHome: () => worlds.activeId === HOME,
+    })
+    : null;
+  if (startValley) {
+    interactionProviders.push(startValley);
+    story._d.valley = startValley;
+    if (!campaign) startValley.restore({ gate: true, slimes: true }); // modo libre: la salida, abierta
+  }
 
   // ---- Clima y mundo vivo (P7) -------------------------------------------------------
   const outdoors = () => worlds.activeId === HOME && !ship.isAboard() && !world.inCave?.(player.position.x, player.position.y + 1, player.position.z);
@@ -1653,6 +1671,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('treasure', { save: () => treasure.snapshot(), load: (d) => treasure.restore(d) });
   saveGame.register('recon', { save: () => recon.snapshot(), load: (d) => recon.restore(d) });
   saveGame.register('temples', { save: () => temples.snapshot(), load: (d) => temples.restore(d) });
+  saveGame.register('valley', { save: () => startValley?.snapshot() ?? null, load: (d) => startValley?.restore(d) });
   saveGame.register('achievements', { save: () => achievements.snapshot(), load: (d) => achievements.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
@@ -1855,6 +1874,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(gadgets);     // catalejo y luz del farol
   if (landmarks) loop.add(landmarks); // vapor de las termas, bruma de las cascadas
   if (floatingIslands) loop.add(floatingIslands); // islas que se mecen y sus cascadas
+  if (startValley) loop.add(startValley); // cascadas del valle, slimes de las ruinas, losa y mirador
   loop.add(caveDark);    // oscuridad dentro de las cuevas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante
   loop.add(shipBeacon);  // haz de luz sobre la nave hasta encontrarla
@@ -1906,6 +1926,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   if (save) {
     titleScene?.stop();
     saveGame.apply(save);
+    // Partida de antes del Valle del Despertar: su salida ya está abierta.
+    if (startValley && !(save.parts && 'valley' in save.parts)) startValley.legacy();
     autosaveIn = cfg.SAVE.AUTOSAVE_SECONDS;
     ui.startNow();
     message(`💾 Partida cargada (${saveDateText(save.at)}).`, 'info');
@@ -1920,7 +1942,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, temples, landmarks, floatingIslands, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, temples, landmarks, floatingIslands, startValley, get hasWatch() { return hasWatch; },
   };
 }
 

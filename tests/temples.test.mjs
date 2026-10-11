@@ -69,6 +69,35 @@ test('puzzle: runas 1, 2, 3; equivocarse reinicia; quedarse encima no cuenta dos
   assert.equal(c.update(0.1, on(2)), 'won');
 });
 
+test('prueba del valle (TRIAL): primero las runas en orden, luego los guardianes', () => {
+  const c = createChallenge('TRIAL', { cx: 0, cz: 0, cfg: T });
+  assert.equal(c.type, 'TRIAL');
+  const spawned = [];
+  const ctx = { alive: true, px: 50, pz: 50, spawn: (type, x, z) => { const e = { type, x, z, alive: true }; spawned.push(e); return e; }, message() {} };
+  const step = (p) => c.update(0.1, { ...ctx, px: p.x, pz: p.z });
+  assert.equal(step({ x: 50, z: 50 }), null);
+  assert.equal(c.lit(0), false);
+  // Runa 2 primero: no cuenta.
+  step(c.plates[1]);
+  assert.equal(c.puzzle.step, 0);
+  step({ x: 50, z: 50 });
+  for (const i of [0, 1, 2]) {
+    step(c.plates[i]);
+    step({ x: 50, z: 50 });
+  }
+  assert.equal(c.phase, 'guardians');
+  assert.ok([0, 1, 2].every((i) => c.lit(i)));
+  assert.equal(spawned.length, T.TRIAL.ENEMIES.length);
+  assert.match(c.status(), /Guardianes/);
+  assert.equal(step({ x: 0, z: 0 }), null, 'quedan guardianes');
+  spawned.forEach((e) => (e.alive = false));
+  assert.equal(step({ x: 0, z: 0 }), 'won');
+  // Morir lo pierde.
+  const d = createChallenge('TRIAL', { cx: 0, cz: 0, cfg: T });
+  assert.equal(d.update(0.1, { ...ctx, alive: false }), 'lost');
+  assert.ok(CHALLENGE_TYPES.TRIAL.NAME);
+});
+
 test('supervivencia: oleadas cada pocos segundos; se gana aguantando', () => {
   const spawned = [];
   const c = createChallenge('SURVIVE', { cx: 0, cz: 0, cfg: T });
@@ -185,7 +214,7 @@ test('templo: pelea con enemigos de verdad; salir a medias los quita; morir dent
   assert.equal(k.teleports.length, before, 'muerto no se le mueve (reaparece en su cama)');
 });
 
-test('en el Edén: cinco templos, cada uno con su recinto llano y seco a unos 30 m', () => {
+test('en el Edén: seis templos (cinco por la isla y el del valle del inicio), cada uno con su recinto llano y seco a unos 30 m', () => {
   const dir = new URL('../maps/eden/', import.meta.url);
   const map = MapData.fromFiles(JSON.parse(fs.readFileSync(new URL('eden.map.json', dir))), zlib.gunzipSync(fs.readFileSync(new URL('eden.map.bin.gz', dir))));
   const worlds = new WorldManager({
@@ -200,8 +229,8 @@ test('en el Edén: cinco templos, cada uno con su recinto llano y seco a unos 30
   w.generate('42');
   const temples = new TempleSystem({ config: T, items: C.ITEMS, inventory: null, events: new EventBus(), scene: new THREE.Scene(), player: { position: new THREE.Vector3() }, teleport() {} });
   temples.setup(w);
-  assert.equal(temples.temples.length, 5);
-  assert.deepEqual(temples.temples.map((t) => t.type).sort(), [...T.TYPES_BY_SITE].sort());
+  assert.equal(temples.temples.length, 6);
+  assert.deepEqual(temples.temples.map((t) => t.type).sort(), [...T.TYPES_BY_SITE, 'TRIAL'].sort());
   for (const t of temples.temples) {
     const d = Math.hypot(t.x - t.arena.x, t.z - t.arena.z);
     assert.ok(d > 25 && d < 35, `${t.id}: recinto a ${d.toFixed(0)} m`);

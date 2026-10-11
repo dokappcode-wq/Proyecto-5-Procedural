@@ -233,12 +233,6 @@ export const EDEN = {
 
   // Mesetas: cima llana (top) con bordes en cortado (edge m).
   plateaus: [
-    { id: 'PLATAFORMA_INICIO', name: 'Plataforma del Inicio', top: 31, edge: 3.5, points: ring(-120, 470, 44, 14) },
-    // Mesa del Manantial: a 150 m al oeste del inicio; su arroyo cae por el borde este a una poza.
-    {
-      id: 'MESA_MANANTIAL', name: 'Mesa del Manantial', top: 36, edge: 3,
-      points: [{ x: -345, z: 448 }, { x: -300, z: 440 }, { x: -262, z: 444 }, { x: -255, z: 456 }, { x: -255, z: 476 }, { x: -262, z: 488 }, { x: -300, z: 492 }, { x: -340, z: 484 }],
-    },
     { id: 'MESA_AMBAR_1', name: 'Mesa Ámbar', top: 40, edge: 7, points: ring(900, -80, 50, 12) },
     { id: 'MESA_AMBAR_2', name: 'Mesa del Arroyo', top: 34, edge: 6, points: ring(700, 250, 36, 10) },
     {
@@ -258,14 +252,19 @@ export const EDEN = {
   // ---- Agua dulce ------------------------------------------------------------------
   // Ríos: nivel del agua (level) y anchura (w) en cada punto; fall: cascada en ese tramo.
   rivers: [
-    // Arroyo del Manantial (zona de inicio): cruza la mesa y cae ~20 m por su borde este.
-    // El salto empieza al 82 % del tramo con `fall` (x = −255, el borde de la mesa).
+    // Valle del Despertar: dos arroyos bajan de las pozas de las cascadas al lago del valle.
     {
-      id: 'ARROYO_MANANTIAL', name: 'Arroyo del Manantial', valley: 0.6,
+      id: 'ARROYO_VELO_NORTE', name: 'Arroyo de la Cascada', valley: 0,
       points: [
-        { x: -326, z: 466, level: 35.5, w: 1.8 },
-        { x: -323, z: 465, level: 35.4, w: 2, fall: true },
-        { x: -240, z: 465, level: 12.6, w: 3 },
+        { x: -272, z: 354, level: 29.55, w: 2.2 }, { x: -262, z: 385, level: 29.45, w: 2.6 }, { x: -248, z: 420, level: 29.35, w: 2.8 },
+        { x: -228, z: 452, level: 29.2, w: 3 }, { x: -202, z: 476, level: 29.05, w: 3.2 }, { x: -182, z: 488, level: 28.95, w: 3.4 },
+      ],
+    },
+    {
+      id: 'ARROYO_LEVANTE', name: 'Arroyo del Levante', valley: 0,
+      points: [
+        { x: -48, z: 370, level: 29.55, w: 1.8 }, { x: -68, z: 400, level: 29.4, w: 2.2 }, { x: -98, z: 430, level: 29.25, w: 2.4 },
+        { x: -124, z: 455, level: 29.1, w: 2.6 }, { x: -142, z: 474, level: 28.95, w: 2.8 },
       ],
     },
     {
@@ -340,7 +339,10 @@ export const EDEN = {
 
   // Lagos: contorno (en el sentido de las agujas) y nivel del agua. ice: helado (se camina).
   lakes: [
-    { id: 'MANANTIAL', name: 'Manantial', level: 35.6, depth: 1.4, points: ring(-334, 466, 7, 8) },
+    // Valle del Despertar: el lago del centro y las pozas al pie de las cascadas.
+    { id: 'LAGO_VALLE', name: 'Lago del Despertar', level: 28.9, depth: 2.4, points: ring(-160, 494, 25, 12) },
+    { id: 'POZA_CASCADA', name: 'Poza de la Cascada', level: 29.6, depth: 1.8, points: ring(-272, 348, 9, 9) },
+    { id: 'POZA_LEVANTE', name: 'Poza del Levante', level: 29.6, depth: 1.6, points: ring(-46, 364, 8, 9) },
     {
       id: 'LAGO_ESPEJO', name: 'Lago Espejo', level: 14, depth: 4,
       points: [
@@ -357,7 +359,7 @@ export const EDEN = {
     },
     {
       id: 'CHARCA_ROCIO', name: 'Charca del Rocío', level: 15.2, depth: 1.6,
-      points: [{ x: 22, z: 452 }, { x: 52, z: 448 }, { x: 70, z: 470 }, { x: 58, z: 494 }, { x: 28, z: 496 }, { x: 12, z: 474 }],
+      points: [{ x: 152, z: 452 }, { x: 182, z: 448 }, { x: 200, z: 470 }, { x: 188, z: 494 }, { x: 158, z: 496 }, { x: 142, z: 474 }],
     },
     {
       id: 'OJO_EDEN', name: 'Ojo del Edén', level: 6, depth: 6, sinkhole: 9,
@@ -388,42 +390,66 @@ export const EDEN = {
   },
 
   // ---- Caminos ------------------------------------------------------------------------
-  // Sendas de tierra que unen los lugares (se suavizan y se ven en el mapa).
+  // Sin red de caminos por la isla: solo el sendero que guía el tutorial y los accesos de algún
+  // lugar. flatten: false → solo marca el suelo (no allana el relieve).
   roads: [
+    // Sendero del tutorial (no altera el relieve: solo marca el suelo): de la cápsula a la peña de
+    // los saltos, la roca de los restos, el puente, las ruinas, la torre, el templo y la salida.
     {
-      id: 'CAMINO_REAL', name: 'Camino Viejo', w: 3.2,
-      points: [{ x: -120, z: 470 }, { x: -60, z: 330 }, { x: 0, z: 200 }, { x: 120, z: 100 }, { x: 290, z: 40 }, { x: 470, z: 70 }, { x: 600, z: 115 }],
-    },
-    {
-      id: 'SENDA_ERMITANO', name: 'Senda del Ermitaño', w: 2.6,
-      points: [{ x: -60, z: 330 }, { x: -200, z: 250 }, { x: -320, z: 140 }, { x: -400, z: 55 }],
-    },
-    {
-      id: 'CAMINO_OBSERVATORIO', name: 'Camino del Observatorio', w: 3.6,
-      points: [{ x: 600, z: 115 }, { x: 720, z: 20 }, { x: 760, z: -120 }, { x: 740, z: -250 }, { x: 790, z: -330 }, { x: 850, z: -430 }],
-    },
-    {
-      id: 'SENDA_COLLADO', name: 'Senda del Collado', w: 2.4,
+      id: 'SENDERO_DESPERTAR', name: 'Sendero del Despertar', w: 2.2, flatten: false,
       points: [
-        { x: 740, z: -250 }, { x: 620, z: -420 }, { x: 560, z: -560 }, { x: 540, z: -640 }, { x: 470, z: -700 },
-        { x: 520, z: -760 }, { x: 430, z: -800 }, { x: 470, z: -860 }, { x: 390, z: -890 }, { x: 345, z: -935 },
+        { x: -298, z: 526 }, { x: -287, z: 500 }, { x: -266, z: 478 }, { x: -264, z: 440 }, { x: -252, z: 400 },
+        { x: -222, z: 396 }, { x: -196, z: 418 }, { x: -172, z: 392 }, { x: -150, z: 376 }, { x: -112, z: 384 },
+        { x: -84, z: 414 }, { x: -58, z: 444 }, { x: -38, z: 464 }, { x: -24, z: 492 }, { x: -30, z: 520 }, { x: -56, z: 548 }, { x: -94, z: 572 },
+        { x: -134, z: 598 }, { x: -131, z: 640 }, { x: -125, z: 680 }, { x: -120, z: 708 },
       ],
     },
+    // Bajada del mirador de la salida del valle hasta la pradera.
+    { id: 'BAJADA_MIRADOR', name: 'Bajada del Mirador', w: 2.6, flatten: false, points: [{ x: -112, z: 724 }, { x: -96, z: 752 }, { x: -76, z: 780 }, { x: -56, z: 806 }] },
+    // Subida al Centro de Investigación (por la ladera de la meseta).
     {
-      id: 'SENDA_SUR', name: 'Senda de la Laguna', w: 2.4,
-      points: [{ x: -120, z: 470 }, { x: -200, z: 640 }, { x: -260, z: 860 }, { x: -230, z: 1080 }, { x: -170, z: 1300 }],
+      id: 'SUBIDA_OBSERVATORIO', name: 'Subida del Observatorio', w: 3.2,
+      points: [{ x: 760, z: -120 }, { x: 740, z: -250 }, { x: 790, z: -330 }, { x: 850, z: -430 }],
     },
   ],
 
+  // ---- Valle del Despertar (zona inicial) ------------------------------------------------
+  // Valle cerrado y elevado donde cae la cápsula. Fondo casi llano (floor m) rodeado por muros
+  // naturales de roca que no se pueden escalar: pared interior de `wall` m, cima de `ring` m (alta
+  // `rim` m) y pared exterior de `outer` m. Una sola salida: la garganta del sur (gorge, w: anchura
+  // del fondo), cerrada por una losa de roca (gate) hasta superar el templo del valle, que acaba en
+  // un mirador (balcony) sobre la isla y una bajada (ramp) a la pradera. Dentro: peñas (mesas, con
+  // la cima a `top` m sobre el fondo) y cascadas que caen de los muros (falls: pie y dirección al
+  // muro).
+  valley: {
+    id: 'VALLE_DESPERTAR', name: 'Valle del Despertar',
+    floor: 30, rim: [74, 90], wall: 16, ring: 44, outer: 22,
+    points: [{ x: -250, z: 322 }, { x: -180, z: 312 }, { x: -110, z: 322 }, { x: -55, z: 345 }, { x: -10, z: 385 }, { x: 12, z: 440 }, { x: 12, z: 500 }, { x: -10, z: 555 }, { x: -55, z: 595 }, { x: -105, z: 612 }, { x: -160, z: 618 }, { x: -215, z: 612 }, { x: -265, z: 595 }, { x: -310, z: 565 }, { x: -342, z: 515 }, { x: -352, z: 455 }, { x: -342, z: 400 }, { x: -310, z: 352 }],
+    gorge: { w: 11, points: [{ x: -134, z: 596 }, { x: -131, z: 640 }, { x: -125, z: 680 }, { x: -120, z: 708 }] },
+    gate: { x: -131, z: 646, w: 15, h: 11 },
+    balcony: { x: -119, z: 716, r: 15, edge: 4 },
+    ramp: { w: 5, points: [{ x: -110, z: 728 }, { x: -96, z: 752 }, { x: -76, z: 780 }, { x: -56, z: 806 }] },
+    mesas: [
+      // stones: piedras para aprender a saltar (hacia ese punto); vines: lianas (paredes trepables).
+      { id: 'PENA_SALTOS', name: 'Peña de los Saltos', x: -276, z: 460, r: 6, top: 4, edge: 1.2, stones: { x: -262, z: 478, n: 5 } },
+      { id: 'ROCA_RESTOS', name: 'Roca de los Restos', x: -292, z: 405, r: 12, top: 8, edge: 1.6, vines: { x: -264, z: 440, arc: 1.3 } },
+    ],
+    falls: [
+      { id: 'CASCADA_VALLE', name: 'Cascada del Valle', x: -272, z: 348, dx: -0.25, dz: -1, w: 5 },
+      { id: 'CASCADA_LEVANTE', name: 'Cascada del Levante', x: -46, z: 364, dx: 0.55, dz: -1, w: 3.5 },
+    ],
+  },
+
   // ---- Lugares --------------------------------------------------------------------------
   // Lugares de la historia (con su explanada) y el inicio.
-  spawn: { x: -120, z: 470, yaw: 1.0 }, // mira al noroeste: la torre rota y la cascada del manantial
-  // Cicatriz del choque de la cápsula: tierra quemada y árboles tumbados.
-  scar: [{ x: -470, z: 230, w: 5 }, { x: -330, z: 320, w: 7 }, { x: -200, z: 410, w: 8 }, { x: -128, z: 462, w: 6 }],
+  spawn: { x: -300, z: 530, yaw: -0.74 }, // en el valle; mira al noreste: la torre del valle y la cascada
+  // Cicatriz del choque de la cápsula: entró por encima del muro oeste y se arrastró por el valle.
+  scar: [{ x: -344, z: 550, w: 4 }, { x: -323, z: 540, w: 6 }, { x: -305, z: 533, w: 5 }],
   landing: { x: 345, z: -960, yaw: Math.PI * 0.08, r: 15, blend: 14 },
   sites: [
-    { kind: 'HERMIT_TOWER', x: -420, z: 40, r: 10, blend: 10, yaw: -1.2 },
-    { kind: 'MERCHANT', x: -74, z: 351, r: 9, blend: 6, yaw: 2.6 }, // P8: puesto del mercader junto al Camino Real
+    // La torre del ermitaño se ve desde el mirador de la salida del valle (su luz cálida).
+    { kind: 'HERMIT_TOWER', x: 20, z: 900, r: 10, blend: 10, yaw: -1.2 },
+    { kind: 'MERCHANT', x: -40, z: 812, r: 9, blend: 6, yaw: 2.6 }, // P8: puesto del mercader al pie del mirador
     // Templos de retos (P12): el monolito (CHALLENGE_TEMPLE) y, a 30 m, la explanada de su
     // recinto (CHALLENGE_ARENA), emparejados por orden. Tipo de reto: TEMPLES.TYPES_BY_SITE.
     { kind: 'CHALLENGE_TEMPLE', x: -190, z: -120, r: 4, blend: 4, yaw: 5.5 },
@@ -431,16 +457,20 @@ export const EDEN = {
     { kind: 'CHALLENGE_TEMPLE', x: 720, z: 1350, r: 4, blend: 4, yaw: 5.5 },
     { kind: 'CHALLENGE_TEMPLE', x: -960, z: -1380, r: 4, blend: 4, yaw: 2.36 },
     { kind: 'CHALLENGE_TEMPLE', x: 1140, z: -1240, r: 4, blend: 4, yaw: 2.36 },
+    // Templo de desafío del Valle del Despertar: su prueba (TRIAL) abre la salida del valle.
+    { kind: 'CHALLENGE_TEMPLE', x: -36, z: 476, r: 4, blend: 4, yaw: 1.57, type: 'TRIAL' },
     { kind: 'CHALLENGE_ARENA', x: -169, z: -141, r: 18, blend: 8, yaw: 0 },
     { kind: 'CHALLENGE_ARENA', x: 160, z: 1390, r: 18, blend: 8, yaw: 0 },
     { kind: 'CHALLENGE_ARENA', x: 741, z: 1329, r: 18, blend: 8, yaw: 0 },
     { kind: 'CHALLENGE_ARENA', x: -981, z: -1359, r: 18, blend: 8, yaw: 0 },
     { kind: 'CHALLENGE_ARENA', x: 1119, z: -1219, r: 18, blend: 8, yaw: 0 },
+    { kind: 'CHALLENGE_ARENA', x: -62, z: 494, r: 18, blend: 8, yaw: 0 },
     // Torres de reconocimiento (P11): se activan con E y revelan el mapa a su alrededor.
     { kind: 'RECON_TOWER', x: -1410, z: -180, r: 7, blend: 6, yaw: 0 },
     { kind: 'RECON_TOWER', x: -630, z: 750, r: 7, blend: 6, yaw: 0 },
     { kind: 'RECON_TOWER', x: 1140, z: 1120, r: 7, blend: 6, yaw: 0 },
     { kind: 'RECON_TOWER', x: -320, z: -930, r: 7, blend: 6, yaw: 0 },
+    { kind: 'RECON_TOWER', x: -150, z: 362, r: 7, blend: 6, yaw: 0 }, // la del Valle del Despertar (se ve al empezar)
     { kind: 'GOBLIN_FORTRESS', x: 980, z: 860, r: 24, blend: 10, yaw: -1.91 }, // P10: fortaleza del Rey Goblin sobre la Playa Larga
     { kind: 'NODE_ARENA', x: 640, z: 140, r: 20, blend: 14, yaw: 0.3 },
     { kind: 'RESEARCH_CENTER', x: 850, z: -480, r: 26, blend: 12, yaw: 0 },
@@ -467,8 +497,7 @@ export const EDEN = {
     { id: 'EL_ABUELO', name: 'El Abuelo', x: -820, z: 140, kind: 'bigTree' },
     { id: 'RUINAS', name: 'Ruinas del Viejo Jardín', x: -260, z: 880, kind: 'ruins', r: 34 },
     { id: 'FARO_ROTO', name: 'Faro Roto', x: 1810, z: 1275, kind: 'lighthouse' },
-    { id: 'TORRE_INICIO', name: 'Torre Rota', x: -250, z: 250, kind: 'lighthouse' },
-    { id: 'CASCADA_MANANTIAL', name: 'Cascada del Manantial', x: -258, z: 465, kind: 'waterfall' },
+    { id: 'RUINAS_VALLE', name: 'Ruinas del Despertar', x: -190, z: 428, kind: 'ruins', r: 16 },
     { id: 'ARCO_MAR', name: 'Arco del Mar', x: 345, z: 1625, kind: 'arch' },
     { id: 'CENTINELAS', name: 'Los Centinelas', x: 180, z: 1755, kind: 'stacks' },
     { id: 'TERMAS', name: 'Termas del Collado', x: 535, z: -705, kind: 'springs' },
@@ -482,10 +511,10 @@ export const EDEN = {
   // Islas flotantes (decorado, sin colisiones): cima de radio r a `alt` m sobre lo más alto que
   // tienen debajo. fall: ángulo (rad, x–z) del borde por el que cae su cascada.
   floatingIslands: [
-    // Desde el inicio se ven dos: la del Alba (con su cascada hacia ti) y el Peñón.
-    { id: 'ISLA_ALBA', name: 'Isla del Alba', x: -215, z: 360, r: 15, alt: 58, trees: 3, fall: 0.86 },
+    // Desde el inicio se ve la del Alba, flotando dentro del valle con su cascada hacia ti.
+    { id: 'ISLA_ALBA', name: 'Isla del Alba', x: -215, z: 380, r: 15, alt: 50, trees: 3, fall: 2.1 },
     { id: 'PENON_ALTO', name: 'Peñón Alto', x: -30, z: 340, r: 8, alt: 78, trees: 1 },
-    { id: 'ISLA_VALLE', name: 'Isla del Valle', x: -150, z: 700, r: 20, alt: 66, trees: 5, fall: -1.45 },
+    { id: 'ISLA_VALLE', name: 'Isla del Valle', x: -170, z: 880, r: 20, alt: 62, trees: 5, fall: -1.45 },
     { id: 'ISLA_RUINAS', name: 'Isla de las Ruinas', x: -370, z: 950, r: 11, alt: 82, trees: 2 },
     { id: 'ISLA_ESPEJO', name: 'Isla del Espejo', x: 60, z: -60, r: 14, alt: 62, trees: 3, fall: 0.3 },
     { id: 'ISLA_ABUELO', name: 'Isla del Abuelo', x: -760, z: 60, r: 12, alt: 72, trees: 2 },
@@ -505,8 +534,8 @@ export const EDEN = {
       id: 'CUEVA_INICIO', name: 'Gruta del Acantilado', kind: 'MOUNTAIN', theme: 'roots',
       ores: { COAL: 3, COPPER: 0.4, IRON: 0.05, DIAMOND: 0, FLOWERS: 2, GOLD: 0, CRYSTAL: 0 },
       path: [
-        { x: -120, z: 420, r: 3.4, d: 0 }, { x: -120, z: 426, r: 3.2, d: 1.6 }, { x: -120, z: 433, r: 3, d: 3 },
-        { x: -120, z: 441, r: 5.4, d: 4.6, name: 'Gruta del Acantilado' }, { x: -120, z: 449, r: 3, d: 5.6 },
+        { x: -350, z: 458, r: 3.4, d: 0 }, { x: -357, z: 458, r: 3.2, d: 1.6 }, { x: -365, z: 459, r: 3, d: 3 },
+        { x: -374, z: 461, r: 5.4, d: 4.6, name: 'Gruta del Acantilado' }, { x: -383, z: 463, r: 3, d: 5.6 },
       ],
     },
     {
@@ -596,6 +625,10 @@ export const EDEN = {
   // Zonas con nombre: bioma, suelo y vegetación. Gana la primera que contiene el punto;
   // la costa (playas), los ríos y la nieve se deciden después por reglas.
   regions: [
+    // Valle del Despertar: el fondo y los muros (manual: no se rellenan por contorno; los fija
+    // el horneado del valle, celda a celda).
+    { id: 'CUNA', name: 'Valle del Despertar', biome: 'PLAINS', ground: 'lush', flora: 'lakeside', manual: true, points: [{ x: -250, z: 322 }, { x: -180, z: 312 }, { x: -110, z: 322 }, { x: -55, z: 345 }, { x: -10, z: 385 }, { x: 12, z: 440 }, { x: 12, z: 500 }, { x: -10, z: 555 }, { x: -55, z: 595 }, { x: -105, z: 612 }, { x: -160, z: 618 }, { x: -215, z: 612 }, { x: -265, z: 595 }, { x: -310, z: 565 }, { x: -342, z: 515 }, { x: -352, z: 455 }, { x: -342, z: 400 }, { x: -310, z: 352 }] },
+    { id: 'CUNA_MUROS', name: 'Valle del Despertar', biome: 'PLAINS', ground: 'meadow', flora: 'mixed', manual: true, points: [{ x: -250, z: 322 }, { x: -180, z: 312 }, { x: -110, z: 322 }, { x: -55, z: 345 }, { x: -10, z: 385 }, { x: 12, z: 440 }, { x: 12, z: 500 }, { x: -10, z: 555 }, { x: -55, z: 595 }, { x: -105, z: 612 }, { x: -160, z: 618 }, { x: -215, z: 612 }, { x: -265, z: 595 }, { x: -310, z: 565 }, { x: -342, z: 515 }, { x: -352, z: 455 }, { x: -342, z: 400 }, { x: -310, z: 352 }] },
     { id: 'TERMAS', name: 'Termas del Collado', biome: 'MOUNTAINS', ground: 'alpine', flora: 'alpine', points: ring(535, -705, 70, 10) },
     { id: 'HUERTO', name: 'Huerto Silvestre', biome: 'PLAINS', ground: 'meadow', flora: 'orchard', points: ring(820, 420, 115, 12) },
     { id: 'RUINAS', name: 'Ruinas del Viejo Jardín', biome: 'PLAINS', ground: 'meadow', flora: 'meadow', points: ring(-260, 880, 70, 10) },
@@ -650,7 +683,7 @@ export const EDEN = {
       points: [{ x: -1300, z: -1420 }, { x: -820, z: -1000 }, { x: -760, z: -1120 }, { x: -1100, z: -1500 }],
     },
     {
-      id: 'VALLE', name: 'Valle del Despertar', biome: 'PLAINS', ground: 'meadow', flora: 'meadow',
+      id: 'VALLE', name: 'Praderas del Despertar', biome: 'PLAINS', ground: 'meadow', flora: 'meadow',
       points: [{ x: -520, z: 120 }, { x: -260, z: 60 }, { x: 60, z: 160 }, { x: 330, z: 300 }, { x: 420, z: 700 }, { x: 0, z: 960 }, { x: -520, z: 760 }],
     },
     {

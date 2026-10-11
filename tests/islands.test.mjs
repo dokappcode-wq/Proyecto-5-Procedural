@@ -1,5 +1,5 @@
 /**
- * Islas flotantes y cascada del manantial (v1.37): decorado del Edén según las láminas.
+ * Islas flotantes (v1.37): decorado del Edén según las láminas.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -93,21 +93,4 @@ test('el Edén: islas flotando sobre el terreno, sin tocarlo, y se mecen', () =>
   const y1 = g.position.y;
   fi.update(1);
   assert.equal(g.position.y, y1, 'fuera del Edén no se anima');
-});
-
-test('cascada del manantial: el arroyo cruza la mesa, cae por el borde a una poza', () => {
-  const top = map.heightAt(-300, 465);
-  const pool = map.waterAt(-240, 465);
-  assert.ok(top > 33, `la mesa está alta (${top.toFixed(1)} m)`);
-  assert.ok(map.waterAt(-300, 465) > map.heightAt(-300, 465), 'el arroyo lleva agua por la mesa');
-  assert.ok(map.waterAt(-334, 466) - map.heightAt(-334, 466) > 1, 'el manantial tiene fondo');
-  assert.ok(pool !== null && map.heightAt(-240, 465) < pool - 1.5, 'la poza al pie tiene fondo');
-  assert.ok(map.waterAt(-300, 465) - pool > 18, 'salto de casi 20 m');
-  // La orilla de la poza no queda por debajo del agua (no hay agua colgada en el borde).
-  for (let a = 0; a < 24; a++) {
-    const x = -240 + Math.cos(a / 24 * Math.PI * 2) * 16;
-    const z = 465 + Math.sin(a / 24 * Math.PI * 2) * 16;
-    if (map.waterAt(x, z) === null) assert.ok(map.heightAt(x, z) > pool - 0.3, `orilla en ${x.toFixed(0)},${z.toFixed(0)}`);
-  }
-  assert.ok(meta.pois.some((p) => p.id === 'CASCADA_MANANTIAL' && p.kind === 'waterfall'));
 });

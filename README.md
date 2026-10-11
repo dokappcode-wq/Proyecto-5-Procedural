@@ -273,9 +273,27 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
-- **Islas flotantes y cascada del inicio (v1.37)**:
-  - Al empezar miras al oeste: a la izquierda, la **Mesa del Manantial** (36 m), con un arroyo que nace en un
-    pequeño manantial, cruza la mesa y **cae ~20 m por su borde** a una poza con bruma. A la derecha, la torre rota.
+- **Zona inicial: el Valle del Despertar (v1.38)**, según la lámina «Zona inicial»:
+  - **Partida nueva**: despiertas **dentro de la cápsula** (E abre la compuerta y sales). La cápsula está en un
+    valle cerrado por **muros naturales de roca que no se pueden escalar**; dentro hay un río con dos cascadas que
+    caen de los muros, un lago, puentes, ruinas, ciervos, una isla flotante y, al norte, una **torre de
+    reconocimiento** que se ve desde el inicio. Después, **E en la cápsula guarda la partida** (es tu punto de
+    partida y guardado).
+  - **Tutorial** (si lo eliges tras coger el reloj), con flecha: salir de la cápsula → moverse → saltar de piedra
+    en piedra hasta la Peña de los Saltos → trepar la pared con lianas de la Roca de los Restos → registrar los
+    **restos de la nave** (E: odre, espada básica, fruta seca, cuerda, tela y el registro de la nave) → combate básico
+    con los **slimes de las ruinas** → activar la **torre del valle** (el mapa revela la zona) → el **templo de
+    desafío** del este: pisa las runas 1-2-3 y vence a sus guardianes. Al superarlo, **la losa de la garganta del sur
+    se aparta**. Sigue hasta el **mirador**: un plano de cine muestra la isla («el mundo te espera») y una bajada
+    lleva a la pradera, donde está el mercader y, a lo lejos, la torre del ermitaño. Luego siguen los pasos de
+    siempre (madera, piedras, fabricar…).
+  - En **juego libre** el valle es igual: la salida se abre con la prueba del templo (las piedras grabadas dan la
+    pista). El mapa empieza con solo la zona de la cápsula a la vista; cada torre revela su zona.
+  - **Caminos**: ya no hay red de caminos marrones. Solo queda el sendero de tierra que guía el tutorial en el valle,
+    la bajada del mirador y la subida al centro de investigación.
+  - Las partidas guardadas antes de esta versión tienen la salida del valle abierta (y la torre del ermitaño y el
+    mercader han cambiado de sitio: ahora están al sur del valle).
+- **Islas flotantes (v1.37)**:
   - **10 islas flotantes** repartidas por la isla (la del Alba se ve desde el inicio, con su cascada cayendo hacia
     ti): cima de hierba con árboles, panza de roca en estratos con salientes, lianas y rocas sueltas alrededor. Se
     mecen despacio y sus cascadas se deshacen en bruma antes de llegar al suelo. Son decorado: no se puede subir.
@@ -284,7 +302,7 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 - **Terreno nuevo en terrazas (v1.36)**: el relieve ya no es una ladera continua de ruido (cuestas incómodas y
   llanuras enormes). Ahora son **plataformas de hierba casi llanas a distintas alturas separadas por paredes de
   roca** (escalones de 7 m con bordes que serpentean), como en las referencias.
-  - Para subir: **rampas naturales** repartidas por la isla, los **caminos** (abren paso por los cortados) o
+  - Para subir: **rampas naturales** repartidas por la isla, alguna subida a un lugar (abre paso por los cortados) o
     **escalar** la pared (gasta energía). Cerca de ríos, lagos, cuevas y playas el terreno sigue suave.
   - Las paredes se dibujan como **roca de verdad**: relieve con salientes y grietas, estratos de color, borde de
     hierba arriba y arenisca naranja en el desierto. Van pegadas al suelo físico: andar y escalar no cambia.
@@ -346,7 +364,7 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
   - **Vida**: bandadas de pájaros de día, mariposas en praderas y bosques con buen tiempo, luciérnagas de noche y
     peces en ríos y lagos.
 - **Comercio, misiones y progresión (v1.30, P8)**:
-  - **Tomás el buhonero** tiene su puesto junto al Camino Real, a unos 120 m de donde llegas. E: su tienda
+  - **Tomás el buhonero** tiene su puesto al pie del mirador de la salida del valle. E: su tienda
     (comprar y vender con monedas goblin; las existencias se reponen cada día) y sus **encargos** (tres a la
     vez: tráele lo que pide y te paga monedas y experiencia; cada día cambia los cumplidos).
   - **Ruinas y mapas del tesoro**: hay 9 ruinas repartidas por la isla (y las Ruinas del Viejo Jardín). Un mapa

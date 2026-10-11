@@ -180,7 +180,7 @@ function buildIslandProps(isl, outline, depth, rng, fallAngle) {
 }
 
 /** Textura de chorros para la cascada (se desplaza hacia abajo). Sin DOM. */
-function fallTexture() {
+export function fallTexture() {
   const W = 16;
   const H = 64;
   const data = new Uint8Array(W * H * 4);

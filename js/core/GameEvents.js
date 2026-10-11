@@ -70,6 +70,10 @@ export const GameEvents = Object.freeze({
   TEMPLE_FAILED: 'temple:failed',                  // { id, type } (P12)
   TOWER_ACTIVATED: 'tower:activated',              // { id } empieza el escaneo (P11)
   TOWER_REVEALED: 'tower:revealed',                // { id, x, z, r } la zona ya está en el mapa (P11)
+  VALLEY_OPENED: 'valley:opened',                  // {} la losa de la salida del valle se aparta
+  VALLEY_LEFT: 'valley:left',                      // {} primera salida al mirador (tras el plano de cine)
+  VALLEY_DEBRIS: 'valley:debris',                  // {} restos de la nave registrados
+  VALLEY_CLUE: 'valley:clue',                      // { i } piedra grabada leída
   WOLF_HOWL: 'enemies:wolfHowl',                   // { x, z } una manada aparece (P10)
   BASE_CLEARED: 'enemies:baseCleared',              // { base } (P8)
   TRADE_OPEN: 'trade:open',                         // {} E sobre el mercader (P8)

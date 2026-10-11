@@ -23,14 +23,16 @@ export class CrashSite {
    * @param {Function} p.activeBody () → id del cuerpo activo
    * @param {boolean} p.withWatch   ¿está el reloj en la cápsula?
    * @param {Function} p.onTakeWatch al coger el reloj
+   * @param {Function} [p.onSave]   E sobre la cápsula (ya sin el reloj): guardar la partida
    */
-  constructor({ rootOf, bodyId, activeBody, withWatch = true, onTakeWatch = () => {} }) {
+  constructor({ rootOf, bodyId, activeBody, withWatch = true, onTakeWatch = () => {}, onSave = null }) {
     this.name = 'crashSite';
     this._rootOf = rootOf;
     this.bodyId = bodyId;
     this._activeBody = activeBody;
     this.watchTaken = !withWatch;
     this._onTakeWatch = onTakeWatch;
+    this._onSave = onSave;
     this.group = null;
     this.position = null;   // { x, z } del centro de la cápsula
     this._circles = [];     // obstáculos { x, z, r, top }
@@ -80,6 +82,7 @@ export class CrashSite {
     root.add(pod);
     this._pod = pod;
     this._interior = cap.interiorLight;
+    addInterior(pod);
 
     // Obstáculos: círculos a lo largo del eje (en planta).
     this._circles = [];
@@ -108,6 +111,10 @@ export class CrashSite {
 
     // La compuerta arrancada, tirada al lado.
     const hatch = buildCapsuleHatch();
+    const porthole = new THREE.Mesh(new THREE.CircleGeometry(0.11, 12), new THREE.MeshBasicMaterial({ color: 0xfff2c8, side: THREE.DoubleSide }));
+    porthole.rotation.x = -Math.PI / 2;
+    porthole.position.set(0, -0.03, 0.12);
+    hatch.add(porthole);
     const hx = cx - sideDir.x * 2.4 + toPlayer.x * 1.9;
     const hz = cz - sideDir.z * 2.4 + toPlayer.z * 1.9;
     hatch.position.set(hx, world.getHeightAt(hx, hz) + 0.05, hz);
@@ -184,6 +191,13 @@ export class CrashSite {
     this._blowPuff = 1;
   }
 
+  /** Plano desde dentro de la cápsula, mirando a la compuerta (inicio de la partida). */
+  insideView() {
+    if (!this._pod) return null;
+    this._pod.updateMatrixWorld(true);
+    return { pos: this._pod.localToWorld(new THREE.Vector3(0, 1.12, -0.3)), look: this._pod.localToWorld(new THREE.Vector3(0, 1.05, 0.95)) };
+  }
+
   /** Un punto justo fuera de la compuerta (de donde sale el jugador). */
   doorWorld() {
     return this._door?.clone() ?? null;
@@ -234,13 +248,23 @@ export class CrashSite {
   // ---- Interacción (provider) ------------------------------------------------
 
   getInteractablesNear(x, y, z, range) {
-    if (this.watchTaken || !this.group || this._activeBody() !== this.bodyId) return [];
+    if (!this.group || this._activeBody() !== this.bodyId) return [];
+    if (this.watchTaken) {
+      // La cápsula es tu punto de partida y de guardado.
+      const d = this._door;
+      if (!this._onSave || !d || Math.hypot(d.x - x, d.z - z) > range + 2.5) return [];
+      return [{ id: 'capsule:save', x: d.x, y: d.y, z: d.z, aimRadius: 1.4, reach: 1.6, label: '🚀 Cápsula de escape', action: 'Guardar partida', key: 'E' }];
+    }
     const s = this.watchSpot;
     if (Math.hypot(s.x - x, s.z - z) > range + 2) return [];
     return [{ id: 'watch', x: s.x, y: s.y, z: s.z, aimRadius: 0.75, reach: 0.9, label: '⌚ Tu reloj de pulsera', action: 'Coger', key: 'E' }];
   }
 
   interact(id) {
+    if (id === 'capsule:save') {
+      this._onSave?.();
+      return;
+    }
     if (id !== 'watch' || this.watchTaken) return;
     this.watchTaken = true;
     this._watch.group.visible = false;
@@ -290,6 +314,29 @@ export class CrashSite {
 }
 
 // ---- Piezas ---------------------------------------------------------------------
+
+/** Interior de la cápsula (se ve al empezar, desde dentro): asiento, consola y lucecitas. */
+function addInterior(pod) {
+  const mat = (color, emissive = 0) => new THREE.MeshLambertMaterial({ color, emissive, flatShading: true });
+  const add = (geo, m, p, r = [0, 0, 0]) => {
+    const o = new THREE.Mesh(geo, m);
+    o.position.set(...p);
+    o.rotation.set(...r);
+    pod.add(o);
+    return o;
+  };
+  add(new THREE.BoxGeometry(0.62, 0.12, 0.55), mat(0x3b4148), [0, 0.38, -0.55]);
+  add(new THREE.BoxGeometry(0.62, 0.7, 0.12), mat(0x3b4148), [0, 0.72, -0.86], [-0.15, 0, 0]);
+  add(new THREE.BoxGeometry(0.06, 0.6, 0.04), mat(0xe8742a), [-0.2, 0.75, -0.79], [-0.15, 0, 0]);
+  add(new THREE.BoxGeometry(0.06, 0.6, 0.04), mat(0xe8742a), [0.2, 0.75, -0.79], [-0.15, 0, 0]);
+  // Lucecitas de la consola, en la pared junto al asiento.
+  for (let i = 0; i < 6; i++) {
+    const light = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.02), new THREE.MeshBasicMaterial({ color: i % 3 === 0 ? 0xff4a3a : i % 3 === 1 ? 0x4fe0ff : 0xffc23a }));
+    light.position.set(-0.6, 0.62 + i * 0.07, -0.55);
+    light.rotation.y = 1.0;
+    pod.add(light);
+  }
+}
 
 /** Mancha de tierra quemada que sigue el terreno (disco irregular, bordes difuminados). */
 function scorchDecal(world, cx, cz, radius, rng) {

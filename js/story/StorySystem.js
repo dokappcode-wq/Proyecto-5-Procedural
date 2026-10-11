@@ -155,11 +155,11 @@ export class StorySystem {
     this._setAIName(this.state.watchName);
     this._refresh();
     this._d.part2?.onRestore?.();
-    if (this.state.tutorial === 'on') this._tutorial.start(this.state.tutStep);
+    if (this.state.tutorial === 'on') this._tutorial.start(typeof this.state.tutStepId === 'string' ? this.state.tutStepId : this.state.tutStep);
   }
 
   snapshot() {
-    return { ...this.state, tutStep: this._tutorial.step ?? this.state.tutStep };
+    return { ...this.state, tutStep: this._tutorial.step ?? this.state.tutStep, tutStepId: this._tutorial.stepId ?? this.state.tutStepId };
   }
 
   /** El nombre del reloj es el de la IA de la nave (sin que la IA lo anuncie). */
@@ -303,9 +303,14 @@ export class StorySystem {
     const s = this.state;
     if (!this.enabled) return '';
     switch (s.stage) {
-      case 'CRASH': return 'Coge tu reloj de pulsera de la cápsula (E)';
+      case 'CRASH': return this._awaitHatch ? 'Pulsa E para abrir la compuerta de la cápsula' : 'Coge tu reloj de pulsera de la cápsula (E)';
       case 'SETUP': return '';
-      case 'TOWER': return 'Explora: busca la torre del ermitaño (una luz cálida a lo lejos)';
+      case 'TOWER': {
+        const v = this._d.valley;
+        if (v && !v.open) return 'Encuentra la salida del valle: el templo de desafío del este guarda la llave';
+        if (v && !v.state.vista) return 'La losa se ha apartado: sal del valle por la garganta del sur';
+        return 'Explora: busca la torre del ermitaño (una luz cálida a lo lejos)';
+      }
       case 'NODE': return 'Lleva la clave A1 al nodo espacial (sigue la brújula)';
       case 'ARENA': return `¡Derrota a los gólems guardianes! (${this._arenaLeft()} de 4)`;
       case 'CAPSULE': return 'Abre la cápsula que ha caído del cielo';
@@ -334,6 +339,11 @@ export class StorySystem {
     const p = this._player.position;
     const b = this._built;
     const onHome = this._worlds.activeId === this._home;
+    // Dentro de la cápsula, esperando a que se abra la compuerta (E).
+    if (this._awaitHatch) {
+      this._awaitHatch.t += dt;
+      if (this._awaitHatch.t > 0.5 && this._d.input?.wasPressed('INTERACT')) this._exitCapsule(this._awaitHatch.spawn);
+    }
     // Secuencia de cine en curso y temporizadores.
     this._runTimers(dt);
     if (this._seq) this._runSeq(dt);
@@ -441,32 +451,46 @@ export class StorySystem {
     if (!cs?.group) return;
     const P = this._player;
     const spawn = P.position.clone();
+    this._lock(true);
+    P.model.setHidden(true);
+    cs.closeHatch?.();
+    this._ui.letterbox(true, '');
+    const inside = cs.insideView?.();
+    if (!inside) return this._exitCapsule(spawn);
+    // Se despierta dentro de la cápsula, con la compuerta cerrada: E la abre (paso 1 de la referencia).
+    this._cam.setCinematic(() => inside, { speed: 50 });
+    this._awaitHatch = { spawn, t: 0 };
+    this._ui.caption('Despiertas dentro de la cápsula de escape… Pulsa E para abrir la compuerta.');
+  }
+
+  /** E dentro de la cápsula: la compuerta salta y el jugador sale de un salto. */
+  _exitCapsule(spawn) {
+    this._awaitHatch = null;
+    const cs = this._d.crashSite;
+    const P = this._player;
     const door = cs.doorWorld?.() ?? cs.watchSpot.clone();
     const out = new THREE.Vector3(cs.facing.x, 0, cs.facing.z);
     const side = new THREE.Vector3(-out.z, 0, out.x);
     const camPos = new THREE.Vector3().copy(cs.watchSpot).addScaledVector(out, 7.5).addScaledVector(side, 4).add(new THREE.Vector3(0, 2.6, 0));
     const look = cs.watchSpot.clone().add(new THREE.Vector3(0, 0.3, 0));
-    this._lock(true);
-    P.model.setHidden(true);
-    cs.closeHatch?.();
-    this._ui.letterbox(true, '');
-    this._cam.setCinematic(() => ({ pos: camPos, look }), { speed: 50 });
+    this._ui.caption('');
     let jumpFrom = null;
     this._sequence([
-      { at: 0.6, run: () => cs.rattleHatch?.(1.2) },
-      { at: 1.9, run: () => cs.blowHatch?.() },
-      { at: 3.0, run: () => {
+      { at: 0.05, run: () => cs.rattleHatch?.(1.0) },
+      { at: 1.1, run: () => cs.blowHatch?.() },
+      { at: 1.5, run: () => this._cam.setCinematic(() => ({ pos: camPos, look }), { speed: 2.4 }) },
+      { at: 2.6, run: () => {
         P.model.setHidden(false);
         jumpFrom = door.clone();
         this._ui.caption('…');
       } },
-      { at: 4.6, run: () => this._ui.caption('') },
+      { at: 4.0, run: () => this._ui.caption('') },
     ], {
-      duration: 5.4,
+      duration: 4.8,
       tick: (dt, t) => {
         if (!jumpFrom) return;
         // Sale de la cápsula de un salto y se queda junto a ella.
-        const k = Math.min(1, (t - 3.0) / 1.1);
+        const k = Math.min(1, (t - 2.6) / 1.1);
         P.position.lerpVectors(jumpFrom, spawn, k);
         P.position.y += Math.sin(k * Math.PI) * 0.9;
         P.velocity.set(0, 0, 0);
@@ -477,7 +501,7 @@ export class StorySystem {
         this._cam.setCinematic(null, { speed: 2.5 });
         this._ui.letterbox(false);
         this._lock(false);
-        this._msg('💥 La cápsula se ha estrellado. Tu reloj de pulsera ha quedado en la compuerta (el que brilla): cógelo con E.', 'warning');
+        this._msg('💥 La cápsula se ha estrellado en un valle rodeado de muros de roca. Tu reloj de pulsera ha quedado en la compuerta (el que brilla): cógelo con E.', 'warning');
       },
     });
   }
@@ -515,7 +539,8 @@ export class StorySystem {
       this.state.tutorial = id === 'tutorial' ? 'on' : 'off';
       this._lock(false);
       this._refresh();
-      if (id === 'tutorial') this._tutorial.start(0);
+      if (id === 'tutorial') this._tutorial.start('MOVE');
+      else if (this._d.valley && !this._d.valley.open) this._msg('🌲 Juego libre. Estás en un valle cerrado por muros de roca: busca la forma de salir.', 'info');
       else this._msg('🌲 Juego libre. A lo lejos se ve una luz cálida sobre una torre…', 'info');
     });
   }

@@ -48,7 +48,7 @@ export class TempleSystem {
       const a = arenas[i];
       if (!a) return;
       const t = {
-        id: s.id, type: types[i % types.length], x: s.x, z: s.z, y: world.getHeightAt(s.x, s.z), yaw: s.yaw ?? 0,
+        id: s.id, type: CHALLENGE_TYPES[s.type] ? s.type : types[i % types.length], x: s.x, z: s.z, y: world.getHeightAt(s.x, s.z), yaw: s.yaw ?? 0,
         arena: { x: a.x, z: a.z, y: world.getHeightAt(a.x, a.z) },
         done: false, open: 0, opening: 0, challenge: null, result: null, leaveIn: 0, enemies: [], dyn: null,
       };
@@ -253,7 +253,7 @@ export class TempleSystem {
         g.add(m);
         g.userData.items.push(m);
       });
-    } else if (t.type === 'PUZZLE') {
+    } else if (c.plates) {
       c.plates.forEach((p, i) => {
         const plate = new THREE.Group();
         plate.position.set(p.x, y + 0.08, p.z);
@@ -290,7 +290,7 @@ export class TempleSystem {
         m.visible = i >= c.next;
         m.material.opacity = i === c.next ? 0.75 + Math.sin(this._t * 6) * 0.2 : 0.18;
       });
-    } else if (t.type === 'PUZZLE') {
+    } else if (c.plates) {
       items.forEach((m, i) => {
         m.material.color.setHex(c.lit(i) ? 0x7dff7a : 0x3a7fd0);
         m.material.emissive.setHex(c.lit(i) ? 0x7dff7a : 0x3a7fd0);

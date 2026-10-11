@@ -6,8 +6,8 @@
  *   update(dt, ctx) → 'won' | 'lost' | null
  *
  * Tipos: RACE (carrera por puntos de control con tiempo), FIGHT (oleada de goblins), PUZZLE
- * (pisar las runas en orden), SURVIVE (aguantar oleadas un tiempo) y EXPLORE (encontrar
- * reliquias escondidas). `status()` da el texto para el HUD.
+ * (pisar las runas en orden), SURVIVE (aguantar oleadas un tiempo), EXPLORE (encontrar
+ * reliquias escondidas) y TRIAL (runas y guardianes: la del valle del inicio). `status()` da el texto para el HUD.
  */
 export const CHALLENGE_TYPES = Object.freeze({
   RACE: { NAME: 'Carrera', ICON: '🏃', HINT: 'Corre por los puntos de luz en orden antes de que acabe el tiempo.' },
@@ -15,6 +15,7 @@ export const CHALLENGE_TYPES = Object.freeze({
   PUZZLE: { NAME: 'Puzzle', ICON: '🧩', HINT: 'Pisa las runas en orden: 1, 2 y 3. Si te equivocas, vuelve a empezar.' },
   SURVIVE: { NAME: 'Supervivencia', ICON: '❄️', HINT: 'Aguanta con vida hasta que se acabe el tiempo.' },
   EXPLORE: { NAME: 'Exploración', ICON: '🧭', HINT: 'Encuentra las reliquias escondidas junto a las columnas (E).' },
+  TRIAL: { NAME: 'Prueba del valle', ICON: '🔷', HINT: 'Pisa las runas en orden (1, 2 y 3) y vence a los guardianes que despierten.' },
 });
 
 class RaceChallenge {
@@ -169,6 +170,42 @@ class ExploreChallenge {
 }
 
 /**
+ * La prueba del templo del Valle del Despertar: primero las runas en orden (como el puzzle) y,
+ * al encenderse la tercera, despiertan unos guardianes (slimes) que hay que vencer.
+ */
+class TrialChallenge {
+  constructor({ plates, spawns }) {
+    this.puzzle = new PuzzleChallenge({ plates, order: [0, 1, 2] });
+    this.plates = plates;
+    this.spawns = spawns;
+    this.phase = 'runes';
+    this.enemies = [];
+  }
+
+  lit(i) {
+    return this.phase !== 'runes' || this.puzzle.lit(i);
+  }
+
+  update(dt, ctx) {
+    if (!ctx.alive) return 'lost';
+    if (this.phase === 'runes') {
+      if (this.puzzle.update(dt, ctx) === 'won') {
+        this.phase = 'guardians';
+        this.enemies = this.spawns.map((s) => ctx.spawn(s.type, s.x, s.z)).filter(Boolean);
+        ctx.message?.('🔷 Las runas se encienden… ¡y despiertan los guardianes del templo!');
+        if (!this.enemies.length) return 'won';
+      }
+      return null;
+    }
+    return this.enemies.every((e) => !e.alive) ? 'won' : null;
+  }
+
+  status() {
+    return this.phase === 'runes' ? `🔷 Runas ${this.puzzle.step}/3` : `🔷 Guardianes: quedan ${this.enemies.filter((e) => e.alive).length}`;
+  }
+}
+
+/**
  * Crea la prueba de un tipo dentro de un recinto circular (centro cx, cz).
  * Los datos (puntos, runas, reliquias) dependen solo del tipo y del recinto: son fijos.
  */
@@ -190,6 +227,9 @@ export function createChallenge(type, { cx, cz, cfg }) {
       break;
     case 'SURVIVE':
       c = new SurviveChallenge({ seconds: cfg.SURVIVE.TIME, every: cfg.SURVIVE.EVERY, perWave: cfg.SURVIVE.PER_WAVE, enemy: cfg.SURVIVE.ENEMY, ring: { x: cx, z: cz, r: 11 } });
+      break;
+    case 'TRIAL':
+      c = new TrialChallenge({ plates: ring(3, 5, -Math.PI / 2), spawns: (cfg.TRIAL?.ENEMIES ?? ['SLIME', 'SLIME']).map((type, i, all) => ({ type, ...ring(all.length, 9, 0.9)[i] })) });
       break;
     case 'EXPLORE':
       c = new ExploreChallenge({ relics: ring(cfg.EXPLORE.RELICS, 11.5, 0.6).map((p, i) => ({ id: `relic${i}`, ...p })) });

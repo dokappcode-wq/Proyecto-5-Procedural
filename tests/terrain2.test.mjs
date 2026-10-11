@@ -62,8 +62,9 @@ test('el Edén en terrazas: llanuras partidas en plataformas con cortados, cimas
   assert.ok(flat / total > 0.6, `sobre todo llano para andar (${(flat / total * 100).toFixed(0)} %)`);
   assert.ok(cliff > 200, `con cortados entre plataformas (${cliff})`);
   assert.ok(mid / total < 0.12, `pocas cuestas incómodas de 20–35° (${(mid / total * 100).toFixed(1)} %)`);
-  // La plataforma de inicio, más alta que lo que la rodea.
+  // El inicio, en el fondo del Valle del Despertar (más alto que la pradera de fuera).
   const sp = meta.spawn;
-  assert.ok(map.heightAt(sp.x, sp.z) - map.heightAt(sp.x, sp.z - 70) > 6, 'el inicio está sobre una plataforma con su cortado');
+  assert.ok(Math.abs(map.heightAt(sp.x, sp.z) - meta.valley.floor) < 2, 'el inicio está en el fondo del valle');
+  assert.ok(map.heightAt(sp.x, sp.z) - map.heightAt(meta.valley.balcony.x + 40, meta.valley.balcony.z + 90) > 8, 'el valle está por encima de la pradera');
   assert.ok(Object.values(map.meta.sites ?? []).length > 0);
 });

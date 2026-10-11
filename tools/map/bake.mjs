@@ -44,7 +44,8 @@ const regions = D.regions.map((r) => ({ ...r }));
 // con ruido (sin líneas rectas): se rellena en una rejilla y se lee en coordenadas movidas.
 {
   const raw = new Grid(N, D.half, Uint8Array);
-  for (let ri = regions.length - 1; ri >= 0; ri--) fillPolygon(raw, regions[ri].points, ri + 1);
+  // (las regiones `manual` no se rellenan por contorno: las fija su etapa, p. ej. el valle del inicio)
+  for (let ri = regions.length - 1; ri >= 0; ri--) if (!regions[ri].manual) fillPolygon(raw, regions[ri].points, ri + 1);
   const warp = noise('regionWarp');
   region.forAll((i, j, x, z, k) => {
     const wx = x + warp.fbm(x, z, { frequency: 1 / 260, octaves: 4 }) * 85;
@@ -273,6 +274,13 @@ log('erosión');
 // cortados se escalan. Cerca del agua, de las cuevas y de las playas el terreno sigue suave.
 if (D.terraces) terraceRelief(D.terraces);
 
+// ---- 8c. Valle del Despertar: la zona inicial, cerrada por muros de roca --------------------
+// Fondo casi llano y elevado, muros naturales casi verticales que no se pueden escalar (capa
+// `flags`), una garganta de salida al sur que acaba en un mirador y una bajada a la pradera.
+const noClimb = new Uint8Array(N * N); // 1 = no se escala (los muros del valle)
+const valleyPlan = D.valley ? carveStartValley(D.valley) : null;
+if (valleyPlan) log('valle del inicio');
+
 // ---- 9. Lugares, caminos, lagos y ríos (definitivos) -----------------------------------
 const pads = [];
 const site = (s, kind) => ({ ...s, kind, height: meanHeight(s.x, s.z, s.r) });
@@ -289,7 +297,7 @@ for (const s of [...sites, landing, spawnPad]) {
   });
 }
 const roads = D.roads.map((r) => prepRoad(r));
-for (const r of roads) flattenRoad(r);
+for (const r of roads) if (r.flatten !== false) flattenRoad(r); // los senderos `flatten: false` solo marcan el suelo
 // Cicatriz del choque: surco poco hondo con cordones a los lados.
 const scar = spline(D.scar, { step: 2 });
 measure(scar);
@@ -327,6 +335,9 @@ log('agua');
 despike(H.data, water.data);
 const caves = (D.caves ?? []).map((c) => prepCave(c));
 log(`cuevas: ${caves.length}`);
+// Cascadas de los muros del valle (con el relieve ya definitivo).
+const valleyFalls = valleyPlan ? D.valley.falls.map((f) => cliffFall(D.valley, f)) : [];
+
 // ---- 10. Pendiente, humedad y clasificación -------------------------------------------
 const slope = new Float32Array(N * N);
 for (let j = 1; j < N - 1; j++) {
@@ -448,6 +459,7 @@ const sections = [
   ['biome', biome.data],
   ['region', region.data],
   ['flora', flora.data],
+  ['flags', noClimb],
 ];
 let offset = 0;
 const layout = {};
@@ -466,7 +478,7 @@ const meta = {
   layout,
   spawn: { ...D.spawn, y: round(H.sample(D.spawn.x, D.spawn.z)) },
   landing: { x: landing.x, z: landing.z, yaw: landing.yaw, height: round(landing.height), r: landing.r },
-  sites: sites.map((s) => ({ kind: s.kind, x: s.x, z: s.z, r: s.r, yaw: s.yaw ?? 0, height: round(s.kind === 'GOLEMS' ? H.sample(s.x, s.z) : s.height) })),
+  sites: sites.map((s) => ({ kind: s.kind, x: s.x, z: s.z, r: s.r, yaw: s.yaw ?? 0, height: round(s.kind === 'GOLEMS' ? H.sample(s.x, s.z) : s.height), ...(s.type ? { type: s.type } : {}) })),
   regions: regions.map((r, i) => ({ index: i + 1, id: r.id, name: r.name, biome: r.biome, ground: r.ground, flora: r.flora, center: centroid(r.points) })),
   pois: D.pois ?? [],
   lakes: lakes.map((l) => ({ id: l.id, name: l.name, level: l.level, ice: !!l.ice, hot: !!l.hot, sinkhole: l.sinkhole ?? 0, points: l.points.map((p) => ({ x: round(p.x), z: round(p.z) })) })),
@@ -476,6 +488,7 @@ const meta = {
   lagoon: D.lagoon ? { id: D.lagoon.id, name: D.lagoon.name, points: D.lagoon.points } : null,
   islets: (D.islets ?? []).map((i) => ({ id: i.id, name: i.name, center: centroid(i.points) })),
   stacks: D.stacks ?? [],
+  valley: valleyPlan ? { ...valleyPlan, falls: valleyFalls } : null,
   floatingIslands: (D.floatingIslands ?? []).map((f) => ({ ...f, y: round(highestAround(f.x, f.z, f.r * 1.8) + f.alt) })),
   caves: caves.map((c) => ({ id: c.id, name: c.name, kind: c.kind, theme: c.theme, ores: c.ores, mouth: c.mouth, chains: c.chains })),
 };
@@ -485,6 +498,116 @@ writePreview();
 log('vista previa');
 
 // ==== Funciones ===========================================================================
+
+// ---- Valle del inicio -------------------------------------------------------------------
+
+/**
+ * Esculpe el Valle del Despertar (D.valley) y marca sus muros como no escalables. Devuelve lo
+ * que el juego necesita: contorno del fondo, garganta, losa, mirador, bajada y peñas.
+ */
+function carveStartValley(V) {
+  const poly = spline(V.points, { step: 4, closed: true }).map((p) => ({ x: p.x, z: p.z }));
+  const edge = closedLine(poly, 2);
+  const band = V.wall + V.ring + V.outer;
+  const near = lineIndex(edge, band + 30);
+  const vn = noise('valley');
+  const iFloor = regions.findIndex((r) => r.id === 'CUNA') + 1;
+  const iWalls = regions.findIndex((r) => r.id === 'CUNA_MUROS') + 1;
+  const ramp = spline(V.ramp.points, { step: 2 });
+  measure(ramp);
+  const rampEnd = ramp[ramp.length - 1];
+  const rampBottom = H.sample(rampEnd.x, rampEnd.z);
+  // 1. Fondo, muro interior, cima y muro exterior según la distancia (con signo) al contorno.
+  H.forBox(bbox(poly, band + 12), (i, j, x, z, k) => {
+    const inside = pointInPolygon(poly, x, z);
+    const q = near(x, z);
+    const dist = Math.min(q.d, band + 30);
+    const d = (inside ? -dist : dist) + vn.noise2D(x / 26, z / 26) * 4 + vn.noise2D(x / 9, z / 9) * 1.4;
+    if (d > band + 2) return;
+    const old = H.data[k];
+    const floorH = V.floor + vn.fbm(x, z, { frequency: 1 / 70, octaves: 2 }) * 0.9;
+    const rimH = lerp(V.rim[0], V.rim[1], vn.fbm(x + 500, z - 300, { frequency: 1 / 160, octaves: 2 }) * 0.5 + 0.5);
+    const top = rimH + vn.fbm(x - 77, z + 41, { frequency: 1 / 35, octaves: 3 }) * 3 * smooth(V.wall, V.wall + 8, d);
+    let h;
+    if (d <= 0) h = floorH + smooth(-7, 0, d) * 1.6; // talud al pie del muro
+    else if (d < V.wall) {
+      const t = d / V.wall;
+      h = floorH + 1.6 + (top - floorH - 1.6) * (0.35 * t + 0.65 * smooth(0, 1, t));
+    } else if (d < V.wall + V.ring) h = top;
+    else h = lerp(top, old, smooth(0, 1, (d - V.wall - V.ring) / V.outer));
+    H.data[k] = h;
+    if (d > -2.5 && d < band + 1) noClimb[k] = 1;
+    if (d < band - 2) region.data[k] = d < 0 ? iFloor : iWalls;
+  });
+  // 2. Garganta de salida: un corte de paredes casi verticales a la altura del fondo.
+  const gorge = spline(V.gorge.points, { step: 2 });
+  measure(gorge);
+  const gw = V.gorge.w / 2;
+  H.forBox(bbox(gorge, band), (i, j, x, z, k) => {
+    const q = nearestOnLine(gorge, x, z);
+    const gFloor = V.floor + vn.noise2D(x / 12, z / 12) * 0.25;
+    const off = q.d - gw + vn.noise2D(x / 7, z / 7) * 1.2;
+    // Fondo de la garganta (también donde el muro exterior ya ha bajado: llega al mirador).
+    if (off < 0 && q.i < gorge.length - 1) H.data[k] = gFloor;
+    else if (gFloor + Math.max(0, off) * 3.6 < H.data[k]) H.data[k] = gFloor + Math.max(0, off) * 3.6;
+  });
+  // 3. Mirador: una repisa a la altura del valle asomada a la pradera.
+  const B = V.balcony;
+  const bTop = V.floor + 0.2;
+  H.forBox({ minX: B.x - B.r - B.edge - 2, maxX: B.x + B.r + B.edge + 2, minZ: B.z - B.r - B.edge - 2, maxZ: B.z + B.r + B.edge + 2 }, (i, j, x, z, k) => {
+    const d = Math.hypot(x - B.x, z - B.z) + vn.noise2D(x / 8, z / 8) * 1.5;
+    if (d < B.r) H.data[k] = bTop + vn.noise2D(x / 5, z / 5) * 0.12;
+    else if (d < B.r + B.edge && H.data[k] < bTop) H.data[k] = lerp(bTop, H.data[k], smooth(B.r, B.r + B.edge, d));
+  });
+  // 4. Bajada del mirador a la pradera: una rampa suave (unos 15 %).
+  H.forBox(bbox(ramp, V.ramp.w + 10), (i, j, x, z, k) => {
+    const q = nearestOnLine(ramp, x, z);
+    const t = 1 - smooth(V.ramp.w / 2, V.ramp.w / 2 + 6, q.d);
+    if (t > 0) H.data[k] = lerp(H.data[k], lerp(bTop, rampBottom, q.s / rampEnd.s), t);
+  });
+  // 5. Peñas del interior (saltos y escalada): cima llana y borde en cortado.
+  const mesas = V.mesas.map((m) => {
+    const top = V.floor + m.top;
+    H.forBox({ minX: m.x - m.r - m.edge - 2, maxX: m.x + m.r + m.edge + 2, minZ: m.z - m.r - m.edge - 2, maxZ: m.z + m.r + m.edge + 2 }, (i, j, x, z, k) => {
+      const d = Math.hypot(x - m.x, z - m.z) + vn.noise2D(x / 6, z / 6) * 0.5;
+      if (d < m.r) H.data[k] = top + vn.noise2D(x / 5, z / 5) * 0.12;
+      else if (d < m.r + m.edge) H.data[k] = Math.max(H.data[k], lerp(top, H.data[k], smooth(m.r, m.r + m.edge, d)));
+    });
+    return { id: m.id, name: m.name, x: m.x, z: m.z, r: m.r, top: round(top), ...(m.stones ? { stones: m.stones } : {}), ...(m.vines ? { vines: m.vines } : {}) };
+  });
+  return {
+    id: V.id, name: V.name, floor: V.floor,
+    points: poly.filter((_, i) => i % 2 === 0).map((p) => ({ x: round(p.x), z: round(p.z) })),
+    gorge: V.gorge.points, gate: V.gate, balcony: { ...B, y: bTop }, mesas,
+  };
+}
+
+/**
+ * Cascada que cae por un muro del valle: desde el borde de arriba hasta la poza (f: pie y
+ * dirección hacia el muro). La cinta va pegada a la pared, separándose un poco al caer.
+ */
+function cliffFall(V, f) {
+  const len = Math.hypot(f.dx, f.dz);
+  const ux = f.dx / len;
+  const uz = f.dz / len;
+  const at = (s) => H.sample(f.x + ux * s, f.z + uz * s);
+  let hi = -Infinity;
+  for (let s = 0; s < 110; s += 1) hi = Math.max(hi, at(s));
+  let sTop = 0;
+  while (sTop < 110 && at(sTop) < hi - 3) sTop += 0.5;
+  const yTop = at(sTop) - 1.2;
+  const base = water.data[H.idx(Math.round((f.x + D.half) / CELL), Math.round((f.z + D.half) / CELL))];
+  const yBot = Number.isNaN(base) ? H.sample(f.x, f.z) : base;
+  const points = [];
+  for (let y = yTop; y > yBot - 0.5; y -= 2) {
+    let s = sTop;
+    while (s > 0 && at(s) > y) s -= 0.25; // la pared a esa altura
+    const k = (yTop - y) / Math.max(1, yTop - yBot);
+    const off = 0.9 + 2.2 * Math.sqrt(k);
+    points.push({ x: round(f.x + ux * (s - off)), y: round(Math.max(y, yBot)), z: round(f.z + uz * (s - off)) });
+  }
+  return { id: f.id, name: f.name, w: f.w, top: round(yTop), foot: { x: f.x, z: f.z, y: round(yBot) }, points };
+}
 
 /** Altura máxima del terreno en un círculo (para que lo que flota no lo atraviese). */
 function highestAround(x, z, r) {

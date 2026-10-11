@@ -424,7 +424,13 @@ export class PlayerController {
       along = (t.getHeightAt(pos.x + this._wish.x * ahead, pos.z + this._wish.z * ahead) - center) / ahead;
     }
     const wantsUp = moving && along > this._climbTan;
-    const canClimb = this._mods.canClimb !== false;
+    // Los muros naturales del valle del inicio no se escalan (ni con energía): se resbala.
+    const noClimb = !!t.noClimbAt?.(pos.x + this._wish.x * 0.6, pos.z + this._wish.z * 0.6) || !!t.noClimbAt?.(pos.x, pos.z);
+    const canClimb = this._mods.canClimb !== false && !noClimb;
+    if (noClimb && wantsUp && !this._noClimbHint) {
+      this._noClimbHint = true;
+      this._events?.emit(GameEvents.UI_MESSAGE, { text: '🧗 Esta pared es demasiado lisa: no se puede escalar. Busca otro camino.', type: 'info' });
+    }
 
     if ((wantsUp || (p.state.isClimbing && steepHere)) && canClimb) {
       if (this._input.wasPressed('JUMP')) {

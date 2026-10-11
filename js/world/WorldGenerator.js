@@ -327,7 +327,7 @@ export class WorldGenerator {
     const clearZones = [];
     for (const s of meta.sites ?? []) {
       const list = (this.sites[s.kind] ??= []);
-      list.push({ id: `${s.kind}:${list.length}`, kind: s.kind, x: s.x, z: s.z, radius: s.r, height: s.height, yaw: s.yaw ?? 0, seed: deriveSeed(fixed, `site:${s.kind}:${list.length}`) });
+      list.push({ id: `${s.kind}:${list.length}`, kind: s.kind, x: s.x, z: s.z, radius: s.r, height: s.height, yaw: s.yaw ?? 0, ...(s.type ? { type: s.type } : {}), seed: deriveSeed(fixed, `site:${s.kind}:${list.length}`) });
       clearZones.push({ x: s.x, z: s.z, r: s.r + 2 });
     }
     if (this._landing) clearZones.push({ x: this._landing.x, z: this._landing.z, r: (this._landingCfg?.CLEAR_RADIUS ?? 11) + 4 });
@@ -646,6 +646,11 @@ export class WorldGenerator {
   }
 
   /** ¿El terreno en (x, z) está abierto por la boca de una cueva? */
+  /** ¿Pared que no se puede escalar? (muros del valle del inicio del mapa diseñado) */
+  noClimbAt(x, z) {
+    return this._map?.noClimbAt?.(x, z) ?? false;
+  }
+
   isCaveHole(x, z) {
     return !!this.caves?.holeAt(x, this.getHeightAt(x, z), z);
   }

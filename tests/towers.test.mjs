@@ -69,8 +69,9 @@ test('torres: se activan con E, barren y revelan su zona; no se repiten; cuentan
   const achievements = new AchievementSystem({ config: C.ACHIEVEMENTS, recipes: C.RECIPES, events });
   const revealed = [];
   events.on(GameEvents.TOWER_REVEALED, (e) => revealed.push(e.id));
-  // Al empezar no se ve nada (solo tu posición): ni siquiera el inicio.
-  assert.ok(!towers.fog.isRevealed(0, 0));
+  // Al empezar solo se ve una zona pequeña alrededor del inicio (la cápsula): lo demás, en niebla.
+  assert.ok(towers.fog.isRevealed(0, 0) && !towers.fog.isRevealed(R.START_REVEAL + 20, 0));
+  assert.ok(!towers.fog.isRevealed(100, 100));
   const near = towers.getInteractablesNear(100, 12, 100, 2);
   assert.equal(near.length, 1, 'solo la torre cercana');
   assert.equal(near[0].action, 'Activar');
@@ -92,20 +93,21 @@ test('torres: se activan con E, barren y revelan su zona; no se repiten; cuentan
   assert.equal(achievements.progress('SCOUT')[0], 1);
 });
 
-test('torres: guardar y cargar (datos raros fuera); a cuatro torres llega el logro', () => {
-  const sites = [{ id: 'A', x: 0, z: 0 }, { id: 'B', x: 800, z: 0 }, { id: 'C', x: 0, z: 800 }, { id: 'D', x: 800, z: 800 }];
+test('torres: guardar y cargar (datos raros fuera); con todas las torres llega el logro', () => {
+  const sites = [{ id: 'A', x: 0, z: 0 }, { id: 'B', x: 800, z: 0 }, { id: 'C', x: 0, z: 800 }, { id: 'D', x: 800, z: 800 }, { id: 'E', x: 400, z: 400 }];
   const { events, towers } = kit(sites);
   const achievements = new AchievementSystem({ config: C.ACHIEVEMENTS, recipes: C.RECIPES, events });
   for (const s of sites) {
     towers.interact(`recon:${s.id}`);
     towers.update(R.SCAN_TIME + 0.1);
   }
-  assert.equal(towers.activeCount, 4);
+  assert.equal(towers.activeCount, 5);
+  assert.equal(C.ACHIEVEMENTS.SCOUT.COUNT, 5);
   assert.ok(achievements.unlocked.has('SCOUT'));
   const snap = JSON.parse(JSON.stringify(towers.snapshot()));
   const k2 = kit(sites);
   k2.towers.restore(snap);
-  assert.equal(k2.towers.activeCount, 4);
+  assert.equal(k2.towers.activeCount, 5);
   assert.ok(k2.towers.fog.isRevealed(800, 800));
   k2.towers.restore({ active: ['A', 'NO', 7, { x: 1 }], fog: [{ x: 5e6, z: 0, r: 3 }] });
   assert.equal(k2.towers.activeCount, 1, 'solo los ids conocidos');
@@ -114,7 +116,7 @@ test('torres: guardar y cargar (datos raros fuera); a cuatro torres llega el log
   assert.equal(k2.towers.activeCount, 1, 'sin datos no cambia nada');
 });
 
-test('en el Edén: cuatro torres de reconocimiento, todas en tierra firme', () => {
+test('en el Edén: cinco torres de reconocimiento, todas en tierra firme', () => {
   const dir = new URL('../maps/eden/', import.meta.url);
   const map = MapData.fromFiles(JSON.parse(fs.readFileSync(new URL('eden.map.json', dir))), zlib.gunzipSync(fs.readFileSync(new URL('eden.map.bin.gz', dir))));
   const worlds = new WorldManager({
@@ -128,13 +130,17 @@ test('en el Edén: cuatro torres de reconocimiento, todas en tierra firme', () =
   const w = worlds.home;
   w.generate('42');
   const sites = w.getSites('RECON_TOWER');
-  assert.equal(sites.length, 4);
+  assert.equal(sites.length, 5, 'cuatro por la isla y la del Valle del Despertar');
   for (const s of sites) {
     assert.ok(w.getHeightAt(s.x, s.z) > 4, `${s.id} sobre tierra`);
     assert.ok(!w.water?.isWater?.(s.x, s.z, 4), `${s.id} sin agua`);
   }
   const towers = new RecognitionTowers({ config: C.RECON, events: new EventBus(), scene: new THREE.Scene() });
   towers.setup(w);
-  assert.equal(towers.towers.length, 4);
-  assert.ok(!towers.fog.isRevealed(w.getSpawnPoint().x, w.getSpawnPoint().z), 'hasta activar una torre no se ve nada');
+  assert.equal(towers.towers.length, 5);
+  const sp = w.getSpawnPoint();
+  assert.ok(towers.fog.isRevealed(sp.x, sp.z), 'al empezar se ve la zona de la cápsula');
+  const valleyTower = towers.towers.at(-1);
+  assert.ok(Math.hypot(valleyTower.x - sp.x, valleyTower.z - sp.z) < 250, 'la torre del valle está cerca del inicio');
+  assert.ok(!towers.fog.isRevealed(valleyTower.x, valleyTower.z), 'pero el resto del valle no, hasta activar su torre');
 });
