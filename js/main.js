@@ -103,6 +103,7 @@ import { AudioSystem } from './audio/AudioSystem.js';
 import { MapData } from './world/map/MapData.js';
 import { PlaceTracker } from './world/map/PlaceTracker.js';
 import { Landmarks } from './world/map/Landmarks.js';
+import { FloatingIslands } from './world/map/FloatingIslands.js';
 import { StatusEffects } from './player/StatusEffects.js';
 import { StatusEffectsHUD } from './ui/StatusEffectsHUD.js';
 import { FarmSystem } from './farming/FarmSystem.js';
@@ -1476,6 +1477,10 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   landmarks = worlds.home.map
     ? new Landmarks({ map: worlds.home.map, heightAt: (x, z) => worlds.home.getHeightAt(x, z), colliders: storyColliders, root: worlds.rootOf(HOME), isEnabled: () => worlds.activeId === HOME })
     : null;
+  // Islas flotantes (decorado): se mecen despacio; alguna con su cascada.
+  const floatingIslands = worlds.home.map?.meta?.floatingIslands?.length
+    ? new FloatingIslands({ map: worlds.home.map, root: worlds.rootOf(HOME), isEnabled: () => worlds.activeId === HOME })
+    : null;
 
   // ---- Clima y mundo vivo (P7) -------------------------------------------------------
   const outdoors = () => worlds.activeId === HOME && !ship.isAboard() && !world.inCave?.(player.position.x, player.position.y + 1, player.position.z);
@@ -1849,6 +1854,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(torches);     // luz de las antorchas clavadas, hogueras, flores luminosas y cristales
   loop.add(gadgets);     // catalejo y luz del farol
   if (landmarks) loop.add(landmarks); // vapor de las termas, bruma de las cascadas
+  if (floatingIslands) loop.add(floatingIslands); // islas que se mecen y sus cascadas
   loop.add(caveDark);    // oscuridad dentro de las cuevas
   if (crashSite) loop.add(crashSite); // cápsula estrellada: humo y el reloj brillante
   loop.add(shipBeacon);  // haz de luz sobre la nave hasta encontrarla
@@ -1914,7 +1920,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, temples, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, temples, landmarks, floatingIslands, get hasWatch() { return hasWatch; },
   };
 }
 

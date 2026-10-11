@@ -234,6 +234,11 @@ export const EDEN = {
   // Mesetas: cima llana (top) con bordes en cortado (edge m).
   plateaus: [
     { id: 'PLATAFORMA_INICIO', name: 'Plataforma del Inicio', top: 31, edge: 3.5, points: ring(-120, 470, 44, 14) },
+    // Mesa del Manantial: a 150 m al oeste del inicio; su arroyo cae por el borde este a una poza.
+    {
+      id: 'MESA_MANANTIAL', name: 'Mesa del Manantial', top: 36, edge: 3,
+      points: [{ x: -345, z: 448 }, { x: -300, z: 440 }, { x: -262, z: 444 }, { x: -255, z: 456 }, { x: -255, z: 476 }, { x: -262, z: 488 }, { x: -300, z: 492 }, { x: -340, z: 484 }],
+    },
     { id: 'MESA_AMBAR_1', name: 'Mesa Ámbar', top: 40, edge: 7, points: ring(900, -80, 50, 12) },
     { id: 'MESA_AMBAR_2', name: 'Mesa del Arroyo', top: 34, edge: 6, points: ring(700, 250, 36, 10) },
     {
@@ -253,6 +258,16 @@ export const EDEN = {
   // ---- Agua dulce ------------------------------------------------------------------
   // Ríos: nivel del agua (level) y anchura (w) en cada punto; fall: cascada en ese tramo.
   rivers: [
+    // Arroyo del Manantial (zona de inicio): cruza la mesa y cae ~20 m por su borde este.
+    // El salto empieza al 82 % del tramo con `fall` (x = −255, el borde de la mesa).
+    {
+      id: 'ARROYO_MANANTIAL', name: 'Arroyo del Manantial', valley: 0.6,
+      points: [
+        { x: -326, z: 466, level: 35.5, w: 1.8 },
+        { x: -323, z: 465, level: 35.4, w: 2, fall: true },
+        { x: -240, z: 465, level: 12.6, w: 3 },
+      ],
+    },
     {
       id: 'RIO_PLATEADO', name: 'Río Plateado', valley: 0.7,
       points: [
@@ -325,6 +340,7 @@ export const EDEN = {
 
   // Lagos: contorno (en el sentido de las agujas) y nivel del agua. ice: helado (se camina).
   lakes: [
+    { id: 'MANANTIAL', name: 'Manantial', level: 35.6, depth: 1.4, points: ring(-334, 466, 7, 8) },
     {
       id: 'LAGO_ESPEJO', name: 'Lago Espejo', level: 14, depth: 4,
       points: [
@@ -401,7 +417,7 @@ export const EDEN = {
 
   // ---- Lugares --------------------------------------------------------------------------
   // Lugares de la historia (con su explanada) y el inicio.
-  spawn: { x: -120, z: 470, yaw: 0 }, // mira al norte: la gruta del acantilado y la torre rota
+  spawn: { x: -120, z: 470, yaw: 1.0 }, // mira al noroeste: la torre rota y la cascada del manantial
   // Cicatriz del choque de la cápsula: tierra quemada y árboles tumbados.
   scar: [{ x: -470, z: 230, w: 5 }, { x: -330, z: 320, w: 7 }, { x: -200, z: 410, w: 8 }, { x: -128, z: 462, w: 6 }],
   landing: { x: 345, z: -960, yaw: Math.PI * 0.08, r: 15, blend: 14 },
@@ -452,6 +468,7 @@ export const EDEN = {
     { id: 'RUINAS', name: 'Ruinas del Viejo Jardín', x: -260, z: 880, kind: 'ruins', r: 34 },
     { id: 'FARO_ROTO', name: 'Faro Roto', x: 1810, z: 1275, kind: 'lighthouse' },
     { id: 'TORRE_INICIO', name: 'Torre Rota', x: -250, z: 250, kind: 'lighthouse' },
+    { id: 'CASCADA_MANANTIAL', name: 'Cascada del Manantial', x: -258, z: 465, kind: 'waterfall' },
     { id: 'ARCO_MAR', name: 'Arco del Mar', x: 345, z: 1625, kind: 'arch' },
     { id: 'CENTINELAS', name: 'Los Centinelas', x: 180, z: 1755, kind: 'stacks' },
     { id: 'TERMAS', name: 'Termas del Collado', x: 535, z: -705, kind: 'springs' },
@@ -460,6 +477,22 @@ export const EDEN = {
     { id: 'PUENTE', name: 'Puente de Piedra', x: -60, z: -262, kind: 'bridge' },
     { id: 'HUERTO', name: 'Huerto Silvestre', x: 820, z: 420, kind: 'orchard', r: 110 },
     { id: 'PLAYA_FIORDO', name: 'Playa del Fiordo', x: -870, z: -1065, kind: 'cove' },
+  ],
+
+  // Islas flotantes (decorado, sin colisiones): cima de radio r a `alt` m sobre lo más alto que
+  // tienen debajo. fall: ángulo (rad, x–z) del borde por el que cae su cascada.
+  floatingIslands: [
+    // Desde el inicio se ven dos: la del Alba (con su cascada hacia ti) y el Peñón.
+    { id: 'ISLA_ALBA', name: 'Isla del Alba', x: -215, z: 360, r: 15, alt: 58, trees: 3, fall: 0.86 },
+    { id: 'PENON_ALTO', name: 'Peñón Alto', x: -30, z: 340, r: 8, alt: 78, trees: 1 },
+    { id: 'ISLA_VALLE', name: 'Isla del Valle', x: -150, z: 700, r: 20, alt: 66, trees: 5, fall: -1.45 },
+    { id: 'ISLA_RUINAS', name: 'Isla de las Ruinas', x: -370, z: 950, r: 11, alt: 82, trees: 2 },
+    { id: 'ISLA_ESPEJO', name: 'Isla del Espejo', x: 60, z: -60, r: 14, alt: 62, trees: 3, fall: 0.3 },
+    { id: 'ISLA_ABUELO', name: 'Isla del Abuelo', x: -760, z: 60, r: 12, alt: 72, trees: 2 },
+    { id: 'ISLA_HUERTO', name: 'Isla del Huerto', x: 760, z: 520, r: 16, alt: 68, trees: 4, fall: 2.5 },
+    { id: 'ISLA_COLLADO', name: 'Isla del Collado', x: 430, z: -640, r: 10, alt: 64, trees: 1 },
+    { id: 'ISLA_AMBAR', name: 'Isla Ámbar', x: 1000, z: 60, r: 13, alt: 76, trees: 1 },
+    { id: 'ISLA_PONIENTE', name: 'Isla del Poniente', x: -1450, z: -60, r: 15, alt: 60, trees: 3, fall: 3.14 },
   ],
 
   // ---- Cuevas ---------------------------------------------------------------------------

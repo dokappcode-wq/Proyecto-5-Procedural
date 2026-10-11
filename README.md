@@ -273,6 +273,14 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Islas flotantes y cascada del inicio (v1.37)**:
+  - Al empezar miras al oeste: a la izquierda, la **Mesa del Manantial** (36 m), con un arroyo que nace en un
+    pequeño manantial, cruza la mesa y **cae ~20 m por su borde** a una poza con bruma. A la derecha, la torre rota.
+  - **10 islas flotantes** repartidas por la isla (la del Alba se ve desde el inicio, con su cascada cayendo hacia
+    ti): cima de hierba con árboles, panza de roca en estratos con salientes, lianas y rocas sueltas alrededor. Se
+    mecen despacio y sus cascadas se deshacen en bruma antes de llegar al suelo. Son decorado: no se puede subir.
+  - Se configuran en `maps/eden/design.mjs` → `floatingIslands` (posición, radio, altura sobre el suelo, árboles
+    y lado de la cascada); el horneado calcula la altura para que nunca toquen el terreno.
 - **Terreno nuevo en terrazas (v1.36)**: el relieve ya no es una ladera continua de ruido (cuestas incómodas y
   llanuras enormes). Ahora son **plataformas de hierba casi llanas a distintas alturas separadas por paredes de
   roca** (escalones de 7 m con bordes que serpentean), como en las referencias.
@@ -294,8 +302,7 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 - **Terreno y torres de reconocimiento (v1.34)**:
   - El Edén tiene ahora un **desierto ámbar** al este (con mesas de arenisca), verdes más vivos y agua turquesa.
   - **Zona de inicio**: una plataforma de hierba con acantilado de unos 14 m. La gruta del acantilado está en su
-    cara norte y, al norte, se ve la torre rota (el jugador empieza mirando hacia allí). La cascada de la referencia
-    **no está hecha todavía**.
+    cara norte y, al norte, se ve la torre rota. La cascada de la referencia llegó en la v1.37.
   - **Torres de reconocimiento** (4, repartidas por la isla): acércate, mira la torre y pulsa **E**. Durante 7 s
     barren la zona y revelan un círculo de 240 m en el mapa (**M** a pie con el reloj, o el mapa de la nave).
     Al empezar el mapa está tapado del todo (ni terreno ni nombres): solo se ve tu posición. Las torres reveladas

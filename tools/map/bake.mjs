@@ -476,6 +476,7 @@ const meta = {
   lagoon: D.lagoon ? { id: D.lagoon.id, name: D.lagoon.name, points: D.lagoon.points } : null,
   islets: (D.islets ?? []).map((i) => ({ id: i.id, name: i.name, center: centroid(i.points) })),
   stacks: D.stacks ?? [],
+  floatingIslands: (D.floatingIslands ?? []).map((f) => ({ ...f, y: round(highestAround(f.x, f.z, f.r * 1.8) + f.alt) })),
   caves: caves.map((c) => ({ id: c.id, name: c.name, kind: c.kind, theme: c.theme, ores: c.ores, mouth: c.mouth, chains: c.chains })),
 };
 fs.writeFileSync(path.join(OUT, `${id}.map.json`), JSON.stringify(meta));
@@ -484,6 +485,17 @@ writePreview();
 log('vista previa');
 
 // ==== Funciones ===========================================================================
+
+/** Altura máxima del terreno en un círculo (para que lo que flota no lo atraviese). */
+function highestAround(x, z, r) {
+  let hi = -Infinity;
+  for (let dz = -r; dz <= r; dz += CELL) {
+    for (let dx = -r; dx <= r; dx += CELL) {
+      if (dx * dx + dz * dz <= r * r) hi = Math.max(hi, H.sample(x + dx, z + dz));
+    }
+  }
+  return Math.max(hi, 0);
+}
 
 /** Fuerza de las terrazas según el suelo de la región (0 = sin escalones, 1 = escalones netos). */
 function terraceStrength(reg) {
@@ -736,7 +748,8 @@ function carveRiver(r, { valley }) {
       // Orilla: un poco por encima del agua (sin desbordarse) y sin paredes colgadas.
       const lo = p.level + 0.12 + (d - w) * 0.18;
       const hi = p.level + 0.4 + (d - w) * 1.4;
-      H.data[k] = clamp(H.data[k], lo, Math.max(lo, hi));
+      // En un lago (el río nace o desemboca en él) la orilla no le rellena el fondo.
+      H.data[k] = waterKind[k] >= 2 ? Math.min(H.data[k], Math.max(lo, hi)) : clamp(H.data[k], lo, Math.max(lo, hi));
     }
     if (d < w + 1.5 && (Number.isNaN(water.data[k]) || p.level > water.data[k])) {
       water.data[k] = p.level;
