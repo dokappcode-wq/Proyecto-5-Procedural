@@ -550,6 +550,19 @@ export class AudioSystem {
       S.tone(o, { t: S.now + 0.07, type: 'triangle', f: 1760, d: 0.18, gain: 0.07 });
     }));
     on(E.ORDER_DONE, () => this.play((S, o) => S.craft(o)));
+    // Templos de retos (P12): la piedra que se abre, entrar, superar o fallar.
+    on(E.TEMPLE_OPENED, () => this.play((S, o) => {
+      S.thud(o, 0.9);
+      S.noise(o, { color: 'brown', a: 0.2, d: 1.6, gain: 0.35, type: 'lowpass', f: 300 });
+      S.tone(o, { t: S.now + 0.4, type: 'sine', f: 220, f2: 880, d: 1.2, gain: 0.06 });
+    }));
+    on(E.TEMPLE_ENTERED, () => this.play((S, o) => S.whoosh(o, 1.4)));
+    on(E.TEMPLE_CLEARED, () => this.play((S, o) => {
+      for (let i = 0; i < 4; i++) S.tone(o, { t: S.now + i * 0.13, type: 'triangle', f: [523, 659, 784, 1047][i], d: 0.45, gain: 0.08 });
+    }));
+    on(E.TEMPLE_FAILED, () => this.play((S, o) => {
+      for (let i = 0; i < 3; i++) S.tone(o, { t: S.now + i * 0.22, type: 'sawtooth', f: [330, 262, 196][i], d: 0.35, gain: 0.05, filter: 900 });
+    }));
     // Torres de reconocimiento (P11): un barrido que sube y, al terminar, un acorde.
     on(E.TOWER_ACTIVATED, () => this.play((S, o) => {
       S.tone(o, { type: 'sine', f: 330, f2: 1320, d: 1.4, gain: 0.07, filter: 2400 });

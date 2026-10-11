@@ -273,6 +273,15 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
 
 ## Cómo probar las últimas fases
 
+- **Templos de retos (v1.35)**: cinco monolitos de piedra con una runa azul repartidos por la isla.
+  - **E** sobre la piedra: se abre en dos y aparece un portal; crúzalo y entras en el recinto del templo (patio
+    amurallado con columnas y altar). Arriba se ve el estado del reto. El portal de salida (E) está junto al muro.
+  - Retos: **Carrera** (centro, junto al Lago Espejo: 7 puntos de luz en orden en 35 s), **Puzzle** (sur: pisa las
+    runas 1, 2 y 3 en orden), **Pelea** (sureste: 3 goblins y un jefe), **Exploración** (noroeste: 4 reliquias junto
+    a las columnas) y **Supervivencia** (noreste: aguanta 45 s las oleadas de arañas).
+  - Superarlo da monedas, fragmentos de cristal y una poción, y el templo queda superado (se guarda). Si fallas o
+    mueres, vuelves a abrir la piedra y lo repites. Logros: Retador y Maestro de los templos.
+  - De los 10 tipos de la referencia faltan sigilo, ritmo/música, arquería, constante y elementos.
 - **Terreno y torres de reconocimiento (v1.34)**:
   - El Edén tiene ahora un **desierto ámbar** al este (con mesas de arenisca), verdes más vivos y agua turquesa.
   - **Zona de inicio**: una plataforma de hierba con acantilado de unos 14 m. La gruta del acantilado está en su

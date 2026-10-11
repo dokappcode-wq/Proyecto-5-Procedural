@@ -767,6 +767,22 @@ export class EnemySystem {
     }
   }
 
+  /**
+   * Enemigo de un templo de retos (P12): en (x, z) a la altura `y`, persiguiendo, sin guardarse
+   * como muerto. `remove(e)` lo quita sin soltar nada (al salir del templo).
+   */
+  spawnAt(type, x, z, y, { leash = 40 } = {}) {
+    if (!this._cfg.TYPES[type]) return null;
+    const e = this._add(type, `temple${++this._slimeSeq}`, x, z, { home: { x, z, radius: 6, leash }, y, dormant: false });
+    e.transient = true;
+    e.state = EnemyState.CHASE;
+    return e;
+  }
+
+  remove(e) {
+    if (e) e.removed = true;
+  }
+
   // ---- Depuración ------------------------------------------------------------------------
 
   /** Crea un enemigo junto al jugador (Admin). */

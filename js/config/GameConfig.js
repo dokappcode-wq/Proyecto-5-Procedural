@@ -92,7 +92,7 @@ const PIECE_RECIPES = Object.fromEntries(Object.entries(BUILD_PIECES).filter(([,
 export const GameConfig = deepFreeze({
   GAME: {
     TITLE: 'Mundo Cero',
-    VERSION: '1.34.0',
+    VERSION: '1.35.0',
   },
 
   RENDER: {

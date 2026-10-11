@@ -114,6 +114,7 @@ import { TradeSystem, tradeSeed } from './trade/TradeSystem.js';
 import { MerchantPanel } from './trade/MerchantPanel.js';
 import { TreasureSystem } from './trade/TreasureSystem.js';
 import { RecognitionTowers } from './world/RecognitionTowers.js';
+import { TempleSystem } from './temples/TempleSystem.js';
 import { buildMerchantStall, buildMerchant } from './trade/MerchantModels.js';
 import { AchievementSystem } from './progress/AchievementSystem.js';
 import { JournalPanel } from './ui/JournalPanel.js';
@@ -590,7 +591,24 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   itemUse.treasure = treasure;
   // Torres de reconocimiento (P11): E para activarlas; revelan el mapa a su alrededor.
   const recon = new RecognitionTowers({ config: cfg.RECON, events, scene: worlds.rootOf(HOME) ?? render.scene, colliders: storyColliders, isHome: () => worlds.activeId === HOME });
-  interactionProviders.push(trade, treasure, recon);
+  // Templos de retos (P12): la piedra se abre con E, el portal lleva al recinto y allí, la prueba.
+  const temples = new TempleSystem({
+    config: cfg.TEMPLES, items: cfg.ITEMS, inventory, events, scene: worlds.rootOf(HOME) ?? render.scene, colliders: storyColliders, enemies, player,
+    teleport: (x, y, z) => player.teleport(x, y, z), isDead: () => health.dead, isHome: () => worlds.activeId === HOME,
+  });
+  interactionProviders.push(trade, treasure, recon, temples);
+  const templeHint = document.createElement('div');
+  templeHint.id = 'temple-hud';
+  templeHint.className = 'hidden';
+  (document.getElementById('hud') ?? document.body).append(templeHint);
+  const templeHUD = {
+    name: 'templeHUD',
+    update: () => {
+      const text = temples.status;
+      if (templeHint.textContent !== text) templeHint.textContent = text;
+      templeHint.classList.toggle('hidden', !text);
+    },
+  };
   const achievements = new AchievementSystem({ config: cfg.ACHIEVEMENTS, recipes: cfg.RECIPES, events, inventory, day: () => time.day });
   const merchantPanel = new MerchantPanel({ container: document.getElementById('hud') ?? document.body, input, events, trade, items: cfg.ITEMS, inventory });
   const journal = new JournalPanel({
@@ -1502,6 +1520,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   }
   treasure.setup(worlds.home);
   recon.setup(worlds.home);
+  temples.setup(worlds.home);
   journal._places = placeTracker;
 
   // ---- Menú de inicio: la cápsula en órbita y la caída al planeta ------------------
@@ -1628,6 +1647,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   saveGame.register('trade', { save: () => trade.snapshot(), load: (d) => trade.restore(d) });
   saveGame.register('treasure', { save: () => treasure.snapshot(), load: (d) => treasure.restore(d) });
   saveGame.register('recon', { save: () => recon.snapshot(), load: (d) => recon.restore(d) });
+  saveGame.register('temples', { save: () => temples.snapshot(), load: (d) => temples.restore(d) });
   saveGame.register('achievements', { save: () => achievements.snapshot(), load: (d) => achievements.restore(d) });
   saveGame.register('story', { save: () => (campaign ? story.snapshot() : null), load: (d) => campaign && story.restore(d) });
   saveGame.register('enemies', { save: () => enemies.snapshot(), load: (d) => enemies.restore(d) });
@@ -1815,6 +1835,8 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
   loop.add(trade);       // mercader: existencias y encargos del día
   loop.add(treasure);    // X de los tesoros marcados
   loop.add(recon);       // torres de reconocimiento: escaneo y animación (P11)
+  loop.add(temples);     // templos de retos: portal y pruebas (P12)
+  loop.add(templeHUD);
   loop.add(treasureHUD);
   loop.add(achievements);
   loop.add(merchantPanel);
@@ -1892,7 +1914,7 @@ function boot(system, { file, catalog = [], handoff = null, store = new SystemSt
     controller, camera, ui, admin, loop, time, atmosphere, temperature, ship, planetMap, shipMapPanel, shipChargerPanel, shipWatch,
     worlds, pickups, bubbles, lifeSupport, stations, shipAI, aiPanel, meteors, eva, escape, podPanel,
     celestial, spaceTravel, spaceView, starMap, spaceHUD, starMapHUD, system, hyperPanel, warp, giantWave, importPanel, playerMenu, chopEffects, progression, crafting,
-    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, get hasWatch() { return hasWatch; },
+    crashSite, titleScene, held, saveGame, saveNow, combat, audio, weather, mapMarkers, settings, settingsPanel, recon, temples, get hasWatch() { return hasWatch; },
   };
 }
 

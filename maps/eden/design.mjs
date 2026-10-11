@@ -401,6 +401,18 @@ export const EDEN = {
   sites: [
     { kind: 'HERMIT_TOWER', x: -420, z: 40, r: 10, blend: 10, yaw: -1.2 },
     { kind: 'MERCHANT', x: -74, z: 351, r: 9, blend: 6, yaw: 2.6 }, // P8: puesto del mercader junto al Camino Real
+    // Templos de retos (P12): el monolito (CHALLENGE_TEMPLE) y, a 30 m, la explanada de su
+    // recinto (CHALLENGE_ARENA), emparejados por orden. Tipo de reto: TEMPLES.TYPES_BY_SITE.
+    { kind: 'CHALLENGE_TEMPLE', x: -190, z: -120, r: 4, blend: 4, yaw: 5.5 },
+    { kind: 'CHALLENGE_TEMPLE', x: 160, z: 1420, r: 4, blend: 4, yaw: 4.71 },
+    { kind: 'CHALLENGE_TEMPLE', x: 720, z: 1350, r: 4, blend: 4, yaw: 5.5 },
+    { kind: 'CHALLENGE_TEMPLE', x: -960, z: -1380, r: 4, blend: 4, yaw: 2.36 },
+    { kind: 'CHALLENGE_TEMPLE', x: 1140, z: -1240, r: 4, blend: 4, yaw: 2.36 },
+    { kind: 'CHALLENGE_ARENA', x: -169, z: -141, r: 18, blend: 8, yaw: 0 },
+    { kind: 'CHALLENGE_ARENA', x: 160, z: 1390, r: 18, blend: 8, yaw: 0 },
+    { kind: 'CHALLENGE_ARENA', x: 741, z: 1329, r: 18, blend: 8, yaw: 0 },
+    { kind: 'CHALLENGE_ARENA', x: -981, z: -1359, r: 18, blend: 8, yaw: 0 },
+    { kind: 'CHALLENGE_ARENA', x: 1119, z: -1219, r: 18, blend: 8, yaw: 0 },
     // Torres de reconocimiento (P11): se activan con E y revelan el mapa a su alrededor.
     { kind: 'RECON_TOWER', x: -1410, z: -180, r: 7, blend: 6, yaw: 0 },
     { kind: 'RECON_TOWER', x: -630, z: 750, r: 7, blend: 6, yaw: 0 },

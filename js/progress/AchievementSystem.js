@@ -48,6 +48,10 @@ export class AchievementSystem {
     on(GameEvents.ORDER_DONE, () => this.count('ORDERS'));
     on(GameEvents.TREASURE_FOUND, () => this.unlock('TREASURE'));
     on(GameEvents.TOWER_REVEALED, () => this.count('SCOUT'));
+    on(GameEvents.TEMPLE_CLEARED, () => {
+      this.unlock('TEMPLE');
+      this.count('TEMPLES_ALL');
+    });
     on(GameEvents.PLAYER_LEVEL_UP, ({ level }) => level >= 10 && this.unlock('LEVEL_10'));
     on(GameEvents.INVENTORY_EXPANDED, () => this.unlock('BACKPACK'));
     on(GameEvents.INVENTORY_CHANGED, () => this._inv && this._inv.getItemCount('COIN') >= 100 && this.unlock('RICH'));
