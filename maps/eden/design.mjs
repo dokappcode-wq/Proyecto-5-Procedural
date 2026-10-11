@@ -208,6 +208,9 @@ export const EDEN = {
     { id: 'TORRE_GRIS', name: 'Torreón Gris', x: 1230, z: -360, h: 18, r: 90, rough: 0.6 },
   ],
 
+  // Mesetas del desierto y la plataforma de inicio (acantilado: edge corto).
+  // INICIO: el ledge de hierba donde aparece el jugador; la cueva está en su cara norte.
+  // (Los puntos del ring: centro y radio; el top es la altura absoluta de la cima.)
   // Cerros redondeados (sumados al relieve).
   hills: [
     { id: 'CERRO_ERMITANO', name: 'Cerro del Ermitaño', x: -420, z: 30, h: 15, r: 80 },
@@ -223,6 +226,9 @@ export const EDEN = {
 
   // Mesetas: cima llana (top) con bordes en cortado (edge m).
   plateaus: [
+    { id: 'PLATAFORMA_INICIO', name: 'Plataforma del Inicio', top: 31, edge: 3.5, points: ring(-120, 470, 44, 14) },
+    { id: 'MESA_AMBAR_1', name: 'Mesa Ámbar', top: 40, edge: 7, points: ring(900, -80, 50, 12) },
+    { id: 'MESA_AMBAR_2', name: 'Mesa del Arroyo', top: 34, edge: 6, points: ring(700, 250, 36, 10) },
     {
       id: 'MESETA_OBSERVATORIO', name: 'Meseta del Observatorio', top: 50, edge: 22,
       points: [{ x: 700, z: -620 }, { x: 860, z: -650 }, { x: 1000, z: -580 }, { x: 1040, z: -430 }, { x: 960, z: -330 }, { x: 790, z: -340 }, { x: 690, z: -440 }],
@@ -388,7 +394,7 @@ export const EDEN = {
 
   // ---- Lugares --------------------------------------------------------------------------
   // Lugares de la historia (con su explanada) y el inicio.
-  spawn: { x: -120, z: 470, yaw: 0.6 },
+  spawn: { x: -120, z: 470, yaw: 0 }, // mira al norte: la gruta del acantilado y la torre rota
   // Cicatriz del choque de la cápsula: tierra quemada y árboles tumbados.
   scar: [{ x: -470, z: 230, w: 5 }, { x: -330, z: 320, w: 7 }, { x: -200, z: 410, w: 8 }, { x: -128, z: 462, w: 6 }],
   landing: { x: 345, z: -960, yaw: Math.PI * 0.08, r: 15, blend: 14 },
@@ -421,6 +427,7 @@ export const EDEN = {
     { id: 'EL_ABUELO', name: 'El Abuelo', x: -820, z: 140, kind: 'bigTree' },
     { id: 'RUINAS', name: 'Ruinas del Viejo Jardín', x: -260, z: 880, kind: 'ruins', r: 34 },
     { id: 'FARO_ROTO', name: 'Faro Roto', x: 1810, z: 1275, kind: 'lighthouse' },
+    { id: 'TORRE_INICIO', name: 'Torre Rota', x: -250, z: 250, kind: 'lighthouse' },
     { id: 'ARCO_MAR', name: 'Arco del Mar', x: 345, z: 1625, kind: 'arch' },
     { id: 'CENTINELAS', name: 'Los Centinelas', x: 180, z: 1755, kind: 'stacks' },
     { id: 'TERMAS', name: 'Termas del Collado', x: 535, z: -705, kind: 'springs' },
@@ -437,6 +444,14 @@ export const EDEN = {
   // (from). kind: UNDERGROUND (agujero en el suelo), MOUNTAIN (en una ladera), SEA (al
   // pie de un acantilado). theme: el ambiente (colores, decoración, luz y menas).
   caves: [
+    {
+      id: 'CUEVA_INICIO', name: 'Gruta del Acantilado', kind: 'MOUNTAIN', theme: 'roots',
+      ores: { COAL: 3, COPPER: 0.4, IRON: 0.05, DIAMOND: 0, FLOWERS: 2, GOLD: 0, CRYSTAL: 0 },
+      path: [
+        { x: -120, z: 420, r: 3.4, d: 0 }, { x: -120, z: 426, r: 3.2, d: 1.6 }, { x: -120, z: 433, r: 3, d: 3 },
+        { x: -120, z: 441, r: 5.4, d: 4.6, name: 'Gruta del Acantilado' }, { x: -120, z: 449, r: 3, d: 5.6 },
+      ],
+    },
     {
       id: 'CUEVA_ROCIO', name: 'Cueva del Rocío', kind: 'UNDERGROUND', theme: 'roots',
       ores: { COAL: 4, COPPER: 0.5, IRON: 0.12, DIAMOND: 0, FLOWERS: 3, GOLD: 0.08, CRYSTAL: 0 },
@@ -554,7 +569,7 @@ export const EDEN = {
       points: [{ x: -220, z: -260 }, { x: 120, z: -280 }, { x: 320, z: -120 }, { x: 300, z: 120 }, { x: 60, z: 160 }, { x: -260, z: 60 }],
     },
     {
-      id: 'COLINAS', name: 'Colinas Doradas', biome: 'PLAINS', ground: 'dry', flora: 'savanna',
+      id: 'COLINAS', name: 'Desierto Ámbar', biome: 'PLAINS', ground: 'desert', flora: 'scrub',
       points: [{ x: 300, z: -300 }, { x: 760, z: -300 }, { x: 1000, z: -200 }, { x: 1040, z: 200 }, { x: 1150, z: 520 }, { x: 980, z: 800 }, { x: 600, z: 760 }, { x: 330, z: 520 }, { x: 260, z: 200 }],
     },
     {

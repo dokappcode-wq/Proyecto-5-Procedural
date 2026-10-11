@@ -847,6 +847,10 @@ function groundSurface(ground, { x, z, h, sl, patch, fine, wet, flow, dep, snowL
       return patch < -0.45 ? SURFACE.GRASS_DRY : SURFACE.GRASS;
     case 'lush':
       return patch > 0.4 && fine > 0.3 ? SURFACE.FLOWERS : SURFACE.GRASS_LUSH;
+    case 'desert':
+      // Dunas ámbar; riscos y mesetas de arenisca; alguna mata de hierba seca.
+      if (gully || scree || sl > 0.45 || (h > 30 && sl < 0.25)) return SURFACE.SANDSTONE;
+      return patch > 0.35 && fine > 0 ? SURFACE.GRASS_DRY : SURFACE.DESERT;
     case 'dry':
       if (gully || scree) return SURFACE.DIRT;
       if (sl > 0.5) return SURFACE.ROCK;
@@ -958,6 +962,7 @@ function writePreview() {
     [SURFACE.CLIFF]: [104, 98, 92], [SURFACE.SAND]: [226, 210, 154], [SURFACE.WET_SAND]: [196, 180, 128], [SURFACE.MUD]: [104, 88, 66],
     [SURFACE.GRAVEL]: [150, 140, 120], [SURFACE.SNOW]: [242, 246, 250], [SURFACE.ICE]: [180, 220, 240], [SURFACE.PAVED]: [170, 166, 156],
     [SURFACE.MARSH]: [104, 132, 84], [SURFACE.TRAVERTINE]: [226, 222, 204], [SURFACE.SEABED]: [170, 160, 120], [SURFACE.HEATH]: [140, 110, 130], [SURFACE.MOSS]: [70, 120, 56],
+    [SURFACE.DESERT]: [226, 169, 90], [SURFACE.SANDSTONE]: [200, 124, 68],
   };
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {

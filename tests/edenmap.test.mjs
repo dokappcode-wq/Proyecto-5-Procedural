@@ -70,9 +70,9 @@ test('agua dulce: lagos y ríos con su nivel; el lago helado se pisa', () => {
   assert.equal(w.waterSurfaceAt(-250, -1010), null, 'el Lago Helado es hielo');
 });
 
-test('cuevas diseñadas: seis, con salas con nombre, roca encima y suelo transitable', () => {
+test('cuevas diseñadas: siete, con salas con nombre, roca encima y suelo transitable', () => {
   const groups = new Set(w.caves.caves.filter((c) => c.authored).map((c) => c.group));
-  assert.equal(groups.size, 6);
+  assert.equal(groups.size, 7, 'seis cuevas más la gruta del acantilado de inicio');
   for (const c of w.caves.caves.filter((c) => c.authored)) {
     c.nodes.forEach((n, i) => {
       const f = w.caveFloorAt(n.x, n.z, n.floor + 0.2);

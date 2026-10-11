@@ -11,11 +11,11 @@ import { SURFACE } from './MapLegend.js';
  * Firma igual que BiomeColorizer: colorize(ctx, out) con ctx.surface.
  */
 export const PALETTE = {
-  [SURFACE.GRASS]: [0x7aab4a, 0x92b955, 0x6a9a40],
-  [SURFACE.GRASS_LUSH]: [0x5a9a3c, 0x6cad47, 0x4f8c36],
+  [SURFACE.GRASS]: [0x8ec24e, 0xa0cf5c, 0x7fb243],
+  [SURFACE.GRASS_LUSH]: [0x5fb040, 0x6fbf4c, 0x52a037],
   [SURFACE.FLOWERS]: [0x84b350, 0x98bf5c, 0xc9c27a],
-  [SURFACE.GRASS_DRY]: [0xbfae62, 0xa89c56, 0xd2c27a],
-  [SURFACE.FOREST_FLOOR]: [0x4d6a33, 0x655535, 0x3f5a2c],
+  [SURFACE.GRASS_DRY]: [0xd6b65a, 0xc5a64c, 0xe2c86e],
+  [SURFACE.FOREST_FLOOR]: [0x3f7d3b, 0x4b7a3e, 0x36692f],
   [SURFACE.PINE_FLOOR]: [0x6f5c3b, 0x5a6239, 0x7d6842],
   [SURFACE.ALPINE]: [0x8c9b62, 0x7a895a, 0x9aa070],
   [SURFACE.DIRT]: [0x86684a, 0x957555, 0x76593e],
@@ -35,7 +35,9 @@ export const PALETTE = {
   [SURFACE.TRAVERTINE]: [0xe7e1cd, 0xd9cfb3, 0xf1ece0],
   [SURFACE.SEABED]: [0xc4b27c, 0xb3a272, 0xd1c08c],
   [SURFACE.HEATH]: [0x8d7a80, 0x7f8a55, 0x9a7f90],
-  [SURFACE.MOSS]: [0x4f8b3b, 0x417c33, 0x5c9944],
+  [SURFACE.MOSS]: [0x63b04a, 0x58a542, 0x72bb55],
+  [SURFACE.DESERT]: [0xe2a95a, 0xd49a4c, 0xeab76e],
+  [SURFACE.SANDSTONE]: [0xc87c44, 0xb86c3a, 0xd98d52],
 };
 const ROCK_LIKE = new Set([SURFACE.ROCK, SURFACE.SCREE, SURFACE.CLIFF, SURFACE.SNOW, SURFACE.ICE, SURFACE.PAVED, SURFACE.TRAVERTINE]);
 

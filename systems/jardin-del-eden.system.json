@@ -24,8 +24,8 @@
       "water": {
         "sea": true,
         "ponds": 40,
-        "sea_color": "#2d6f98",
-        "pond_color": "#3a7fa8"
+        "sea_color": "#1f9bb4",
+        "pond_color": "#3ec0c4"
       },
       "terrain": {
         "generator": "island",

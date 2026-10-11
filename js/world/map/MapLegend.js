@@ -31,6 +31,8 @@ export const SURFACE = Object.freeze({
   SEABED: 22,
   HEATH: 23,       // brezo (acantilados)
   MOSS: 24,        // musgo espeso (bosque antiguo)
+  DESERT: 25,      // arena ámbar del desierto
+  SANDSTONE: 26,   // arenisca naranja (mesetas, riscos del desierto)
 });
 export const SURFACE_NAMES = Object.freeze(Object.fromEntries(Object.entries(SURFACE).map(([k, v]) => [v, k])));
 
@@ -38,6 +40,7 @@ export const SURFACE_NAMES = Object.freeze(Object.fromEntries(Object.entries(SUR
 export const SURFACE_STEP = Object.freeze({
   [SURFACE.ROCK]: 'stone', [SURFACE.SCREE]: 'stone', [SURFACE.CLIFF]: 'stone', [SURFACE.PAVED]: 'stone', [SURFACE.TRAVERTINE]: 'stone', [SURFACE.GRAVEL]: 'stone',
   [SURFACE.SAND]: 'sand', [SURFACE.WET_SAND]: 'sand', [SURFACE.SEABED]: 'sand',
+  [SURFACE.DESERT]: 'sand', [SURFACE.SANDSTONE]: 'stone',
   [SURFACE.SNOW]: 'snow', [SURFACE.ICE]: 'snow',
   [SURFACE.MUD]: 'water', [SURFACE.MARSH]: 'water',
 });
