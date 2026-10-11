@@ -69,6 +69,8 @@ test('torres: se activan con E, barren y revelan su zona; no se repiten; cuentan
   const achievements = new AchievementSystem({ config: C.ACHIEVEMENTS, recipes: C.RECIPES, events });
   const revealed = [];
   events.on(GameEvents.TOWER_REVEALED, (e) => revealed.push(e.id));
+  // Al empezar no se ve nada (solo tu posición): ni siquiera el inicio.
+  assert.ok(!towers.fog.isRevealed(0, 0));
   const near = towers.getInteractablesNear(100, 12, 100, 2);
   assert.equal(near.length, 1, 'solo la torre cercana');
   assert.equal(near[0].action, 'Activar');
@@ -86,8 +88,6 @@ test('torres: se activan con E, barren y revelan su zona; no se repiten; cuentan
   assert.equal(towers.activeCount, 1);
   assert.ok(towers.marks().some((m) => m.id === 'T1' && m.active));
   assert.ok(towers.marks().some((m) => m.id === 'T2') === false, 'la torre tapada no sale en el mapa');
-  // Tapado al empezar: el inicio sí se ve.
-  assert.ok(towers.fog.isRevealed(0, 0));
   // Logro de las cuatro torres.
   assert.equal(achievements.progress('SCOUT')[0], 1);
 });
@@ -136,5 +136,5 @@ test('en el Edén: cuatro torres de reconocimiento, todas en tierra firme', () =
   const towers = new RecognitionTowers({ config: C.RECON, events: new EventBus(), scene: new THREE.Scene() });
   towers.setup(w);
   assert.equal(towers.towers.length, 4);
-  assert.ok(towers.fog.isRevealed(w.getSpawnPoint().x, w.getSpawnPoint().z), 'el inicio ya está visto');
+  assert.ok(!towers.fog.isRevealed(w.getSpawnPoint().x, w.getSpawnPoint().z), 'hasta activar una torre no se ve nada');
 });

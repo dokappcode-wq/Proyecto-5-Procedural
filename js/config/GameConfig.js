@@ -1534,8 +1534,20 @@ export const GameConfig = deepFreeze({
 
   // Tesoros (P8): ruinas con un tesoro enterrado; los mapas del tesoro las marcan.
   // Torres de reconocimiento (P11): activarlas tarda SCAN_TIME s y revela SCAN_RADIUS m a su alrededor.
-  // Al empezar ya se ve START_REVEAL m alrededor del inicio; el resto del mapa está tapado.
-  RECON: { SCAN_TIME: 7, SCAN_RADIUS: 240, START_REVEAL: 110, TOWER_HEIGHT: 15, REVEAL_LIMIT: 64 },
+  // Hasta activar la torre de una zona su terreno y sus nombres están tapados en el mapa
+  // (START_REVEAL: metros que se ven alrededor del inicio al empezar; 0 = nada).
+  RECON: { SCAN_TIME: 7, SCAN_RADIUS: 240, START_REVEAL: 0, TOWER_HEIGHT: 15, REVEAL_LIMIT: 64 },
+
+  // Templos de retos (P12): monolito con runa → E abre el portal → dentro, la prueba.
+  TEMPLES: {
+    ARENA_RADIUS: 16, WALL_HEIGHT: 5.5, PORTAL_TIME: 40, PORTAL_REACH: 2.2, LEAVE_DELAY: 3,
+    TYPES_BY_SITE: ['RACE', 'PUZZLE', 'FIGHT', 'EXPLORE', 'SURVIVE'],
+    RACE: { POINTS: 6, RADIUS: 11, TIME: 35 },
+    FIGHT: { ENEMIES: ['GOBLIN', 'GOBLIN', 'GOBLIN', 'GOBLIN_BOSS'] },
+    SURVIVE: { TIME: 45, EVERY: 9, PER_WAVE: 2, ENEMY: 'SPIDER' },
+    EXPLORE: { RELICS: 4 },
+    REWARD: { COIN: [20, 30], CRYSTAL_SHARD: [2, 3], HEALING_POTION: [1, 1] },
+  },
 
   TREASURE: {
     RUINS: 9,                 // ruinas repartidas por la isla (además de las Ruinas del Viejo Jardín)
@@ -1566,6 +1578,8 @@ export const GameConfig = deepFreeze({
     LEVEL_10: { NAME: 'Veterano', ICON: '⭐', DESC: 'Llega al nivel 10.', XP: 0 },
     BACKPACK: { NAME: 'Bien equipado', ICON: '🎒', DESC: 'Cósete una mochila.', XP: 30 },
     SURVIVOR: { NAME: 'Superviviente', ICON: '🌅', DESC: 'Sobrevive 10 días.', XP: 100 },
+    TEMPLE: { NAME: 'Retador', ICON: '🏛️', DESC: 'Supera un templo de retos.', XP: 80 },
+    TEMPLES_ALL: { NAME: 'Maestro de los templos', ICON: '🏆', DESC: 'Supera los 5 templos de retos.', XP: 250, COUNT: 5 },
     SCOUT: { NAME: 'Cartógrafo', ICON: '🗺️', DESC: 'Activa las 4 torres de reconocimiento.', XP: 80, COUNT: 4 },
     // P10.
     WOLVES: { NAME: 'Cazador nocturno', ICON: '🐺', DESC: 'Derrota a 5 lobos.', XP: 60, COUNT: 5 },

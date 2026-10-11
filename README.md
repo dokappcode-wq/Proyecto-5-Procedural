@@ -280,8 +280,10 @@ Depuración desde la consola del navegador: `window.__MUNDO0__` expone los siste
     **no está hecha todavía**.
   - **Torres de reconocimiento** (4, repartidas por la isla): acércate, mira la torre y pulsa **E**. Durante 7 s
     barren la zona y revelan un círculo de 240 m en el mapa (**M** a pie con el reloj, o el mapa de la nave).
-    Al empezar el mapa está casi tapado: solo se ve el entorno del inicio. Las torres reveladas salen marcadas;
-    activar las 4 da el logro **Cartógrafo**.
+    Al empezar el mapa está tapado del todo (ni terreno ni nombres): solo se ve tu posición. Las torres reveladas
+    salen marcadas; activar las 4 da el logro **Cartógrafo**.
+  - **Mapa con zoom**: rueda del ratón o los botones ＋/−; arrastra para moverte y ⌖ te centra. La nave ya no sale
+    en el mapa.
 - **Enemigos nuevos y el Rey Goblin (v1.33, P10)**:
   - **Cuevas**: arañas (rápidas, sueltan telaraña) y colonias de **murciélagos** colgados del techo que despiertan
     juntos al acercarte, revolotean y vuelven a colgarse.

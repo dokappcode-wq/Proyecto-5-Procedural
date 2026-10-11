@@ -47,7 +47,7 @@ export class FogOfWar {
    * Dibuja la niebla encima de un mapa ya dibujado. `toPx(x, z)` → [px, py] en el canvas del
    * mapa; `scratch` es un canvas del mismo tamaño (se reutiliza para no crear uno cada vez).
    */
-  draw(ctx, toPx, size, scratch, color = 'rgba(6, 10, 16, 0.9)') {
+  draw(ctx, toPx, size, scratch, color = 'rgb(6, 10, 16)') {
     const g = scratch.getContext('2d');
     g.globalCompositeOperation = 'source-over';
     g.clearRect(0, 0, size, size);

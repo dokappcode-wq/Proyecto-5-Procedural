@@ -7,8 +7,8 @@ import { FogOfWar } from './map/FogOfWar.js';
  *
  * Cada torre (sitios RECON_TOWER del mapa diseñado) se activa con E: durante RECON.SCAN_TIME s
  * un haz y un anillo barren la zona; al acabar, un círculo de RECON.SCAN_RADIUS m queda revelado
- * en el mapa (FogOfWar). El resto del mapa está tapado con niebla: al empezar solo se ve el
- * entorno del inicio. Provider de InteractionSystem. Se guarda: torres activas y zonas vistas.
+ * en el mapa (FogOfWar). El resto del mapa está tapado con niebla: al empezar solo se ve tu
+ * posición (RECON.START_REVEAL = 0). Provider de InteractionSystem. Se guarda: torres activas y zonas vistas.
  */
 export class RecognitionTowers {
   constructor({ config, events, scene, colliders = null, isHome = () => true }) {
@@ -42,7 +42,7 @@ export class RecognitionTowers {
     const sp = world?.getSpawnPoint?.();
     if (sp) {
       this._spawn = { x: sp.x, z: sp.z };
-      this.fog.reveal(sp.x, sp.z, this._cfg.START_REVEAL);
+      if (this._cfg.START_REVEAL > 0) this.fog.reveal(sp.x, sp.z, this._cfg.START_REVEAL);
     }
   }
 

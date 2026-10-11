@@ -12,7 +12,9 @@ import { orbitPosition } from '../celestial/CelestialCatalog.js';
  *   falta el "nodo espacial".
  *
  * Niebla (P11, sources.fog): en el planeta de inicio, lo que no se ha revelado con las torres de
- * reconocimiento está tapado; las torres reveladas salen como marcas (sources.towerMarks).
+ * reconocimiento está tapado del todo (ni terreno ni nombres); las torres reveladas salen como
+ * marcas (sources.towerMarks). Zoom: rueda del ratón o ＋/−, arrastrar para moverse, ⌖ centra en ti.
+ * La nave no sale en el mapa: hay que recordar dónde se dejó (o usar el reloj de la nave).
  * Marcas del jugador (P9, sources.userMarkers): clic en el mapa de la región pone una marca
  * (haz de luz en el mundo) y clic sobre una marca la quita; también se quitan en la lista.
  * Por lo demás solo vista: lee estado y no modifica nada.
@@ -32,6 +34,11 @@ export class ShipMapPanel extends ModalPanel {
       <div class="map-tabs" role="tablist">
         <button type="button" data-tab="PLANET" role="tab">Mapa de la región</button>
         <button type="button" data-tab="SYSTEM" role="tab">Mapa planetario</button>
+        <span class="map-zoom">
+          <button type="button" data-zoom="out" title="Alejar (rueda del ratón)">−</button>
+          <button type="button" data-zoom="in" title="Acercar (rueda del ratón)">＋</button>
+          <button type="button" data-zoom="me" title="Centrar en ti">⌖</button>
+        </span>
       </div>
       <div class="map-layout">
         <canvas width="${SIZE}" height="${SIZE}" aria-label="Mapa"></canvas>
@@ -42,21 +49,97 @@ export class ShipMapPanel extends ModalPanel {
     this._side = this.body.querySelector('.map-side');
     this.body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => this.showTab(b.dataset.tab)));
     this._timer = 0;
-    this._canvas.addEventListener('mousedown', (e) => this._onMapClick(e));
+    // Vista del mapa de la región: zoom (1 = entero) y centro en coordenadas del mapa (0..1).
+    this.zoom = 1;
+    this._cu = 0.5;
+    this._cv = 0.5;
+    this._drag = null;
     this._canvas.style.cursor = 'crosshair';
+    this._canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const [px, py] = this._canvasPx(e);
+      this._drag = { px, py, cu: this._cu, cv: this._cv, moved: false };
+    });
+    window.addEventListener('mousemove', (e) => {
+      const d = this._drag;
+      if (!d || !this.isOpen) return;
+      const [px, py] = this._canvasPx(e);
+      if (!d.moved && Math.hypot(px - d.px, py - d.py) < 5) return;
+      d.moved = true;
+      this._cu = d.cu - (px - d.px) / (SIZE * this.zoom);
+      this._cv = d.cv - (py - d.py) / (SIZE * this.zoom);
+      this._clampView();
+      this._draw();
+    });
+    window.addEventListener('mouseup', () => {
+      const d = this._drag;
+      this._drag = null;
+      if (d && !d.moved) this._onMapClick(d.px, d.py);
+    });
+    this._canvas.addEventListener('wheel', (e) => {
+      if (this.tab !== 'PLANET') return;
+      e.preventDefault();
+      const [px, py] = this._canvasPx(e);
+      this.setZoom(this.zoom * (e.deltaY < 0 ? 1.25 : 0.8), px, py);
+    }, { passive: false });
+    this.body.querySelectorAll('[data-zoom]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.zoom === 'in') this.setZoom(this.zoom * 1.5);
+      else if (b.dataset.zoom === 'out') this.setZoom(this.zoom / 1.5);
+      else this.centerOnPlayer();
+    }));
   }
 
-  /** Clic en el mapa de la región: marca nueva, o quita la que haya debajo. */
-  _onMapClick(e) {
+  /** Posición del ratón en píxeles del canvas (el canvas puede verse escalado). */
+  _canvasPx(e) {
+    const r = this._canvas.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * SIZE, ((e.clientY - r.top) / r.height) * SIZE];
+  }
+
+  /** Mapa (u, v en 0..1) → píxel del canvas con el zoom actual. */
+  toView(u, v) {
+    return [(u - this._cu) * SIZE * this.zoom + SIZE / 2, (v - this._cv) * SIZE * this.zoom + SIZE / 2];
+  }
+
+  /** Píxel del canvas → mapa (u, v). */
+  fromView(px, py) {
+    return [this._cu + (px - SIZE / 2) / (SIZE * this.zoom), this._cv + (py - SIZE / 2) / (SIZE * this.zoom)];
+  }
+
+  _clampView() {
+    const h = 0.5 / this.zoom;
+    this._cu = Math.min(1 - h, Math.max(h, this._cu));
+    this._cv = Math.min(1 - h, Math.max(h, this._cv));
+  }
+
+  /** Cambia el zoom (1–8) dejando quieto el punto (px, py) del canvas. */
+  setZoom(z, px = SIZE / 2, py = SIZE / 2) {
+    const [u, v] = this.fromView(px, py);
+    this.zoom = Math.min(8, Math.max(1, z));
+    this._cu = u - (px - SIZE / 2) / (SIZE * this.zoom);
+    this._cv = v - (py - SIZE / 2) / (SIZE * this.zoom);
+    this._clampView();
+    if (this.isOpen) this._draw();
+  }
+
+  centerOnPlayer() {
+    const map = this._src.map;
+    if (!map?.toMap) return;
+    const p = this._src.player.position;
+    [this._cu, this._cv] = map.toMap(p.x, p.z);
+    if (this.zoom < 2) this.zoom = 2.5;
+    this._clampView();
+    if (this.isOpen) this._draw();
+  }
+
+  /** Clic en el mapa de la región (px, py del canvas): marca nueva, o quita la que haya debajo. */
+  _onMapClick(px, py) {
     const M = this._src.userMarkers;
     const map = this._src.map;
     if (!M || this.tab !== 'PLANET' || !map?.ready || !map.fromMap) return;
-    e.preventDefault();
-    const r = this._canvas.getBoundingClientRect();
-    const u = (e.clientX - r.left) / r.width;
-    const v = (e.clientY - r.top) / r.height;
+    const [u, v] = this.fromView(px, py);
     const [x, z] = map.fromMap(u, v);
-    const [x2] = map.fromMap(u + 10 / SIZE, v); // 10 px del mapa, en metros
+    const [x2] = map.fromMap(u + 10 / (SIZE * this.zoom), v); // 10 px del canvas, en metros
     const body = this._src.bodyId();
     const hit = M.near(body, x, z, Math.abs(x2 - x));
     if (hit) M.remove(hit.id);
@@ -72,6 +155,7 @@ export class ShipMapPanel extends ModalPanel {
   render() {
     this.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === this.tab));
     this.body.querySelector('[data-tab="PLANET"]').textContent = `Mapa: ${this._src.planetConfig.NAME}`;
+    this.body.querySelector('.map-zoom')?.classList.toggle('hidden', this.tab !== 'PLANET');
     this._side.replaceChildren();
     if (this.tab === 'PLANET') this._renderPlanetSide();
     else this._renderSystemSide();
@@ -94,7 +178,7 @@ export class ShipMapPanel extends ModalPanel {
 
   _drawPlanet() {
     const ctx = this._ctx;
-    const { map, player, ship, world } = this._src;
+    const { map, player, world } = this._src;
     ctx.fillStyle = '#0b1522';
     ctx.fillRect(0, 0, SIZE, SIZE);
     if (!map.ready) {
@@ -105,34 +189,45 @@ export class ShipMapPanel extends ModalPanel {
       return;
     }
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(map.canvas, 0, 0, SIZE, SIZE);
-    // Niebla del planeta de inicio (P11): solo lo revelado por las torres y el entorno del inicio.
-    const fog = this._src.fog;
-    if (fog && this._src.onHome?.()) {
+    // El trozo del mapa que se ve con el zoom actual.
+    const cw = map.canvas.width;
+    const ch = map.canvas.height;
+    const sw = cw / this.zoom;
+    const sh = ch / this.zoom;
+    ctx.drawImage(map.canvas, this._cu * cw - sw / 2, this._cv * ch - sh / 2, sw, sh, 0, 0, SIZE, SIZE);
+    const at = (x, z) => this.toView(...map.toMap(x, z));
+    // Niebla del planeta de inicio (P11): solo se ve lo revelado por las torres de reconocimiento.
+    const fog = this._src.onHome?.() ? this._src.fog : null;
+    if (fog) {
       this._fogCanvas ??= Object.assign(document.createElement('canvas'), { width: SIZE, height: SIZE });
-      fog.draw(ctx, (x, z) => map.toMap(x, z).map((v) => v * SIZE), SIZE, this._fogCanvas);
+      fog.draw(ctx, at, SIZE, this._fogCanvas);
       for (const t of this._src.towerMarks?.() ?? []) {
-        const [tx, ty] = map.toMap(t.x, t.z).map((v) => v * SIZE);
+        const [tx, ty] = at(t.x, t.z);
         marker(ctx, tx, ty, t.active ? '#ffd23f' : '#7fd8ff', 'Torre');
       }
     }
-    // Rejilla de coordenadas cada 128 m.
+    // Rejilla de coordenadas (8 × 8 en todo el mapa).
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
     for (let i = 1; i < 8; i++) {
-      const p = (i / 8) * SIZE;
+      const [gx, gy] = this.toView(i / 8, i / 8);
       ctx.beginPath();
-      ctx.moveTo(p, 0);
-      ctx.lineTo(p, SIZE);
-      ctx.moveTo(0, p);
-      ctx.lineTo(SIZE, p);
+      if (gx > 0 && gx < SIZE) {
+        ctx.moveTo(gx, 0);
+        ctx.lineTo(gx, SIZE);
+      }
+      if (gy > 0 && gy < SIZE) {
+        ctx.moveTo(0, gy);
+        ctx.lineTo(SIZE, gy);
+      }
       ctx.stroke();
     }
-    const at = (x, z) => map.toMap(x, z).map((v) => v * SIZE);
 
     const spawn = world.getSpawnPoint();
-    const [sx, sz] = at(spawn.x, spawn.z);
-    marker(ctx, sx, sz, '#ffe38a', 'Inicio', 'dot');
+    if (!fog || fog.isRevealed(spawn.x, spawn.z)) {
+      const [sx, sz] = at(spawn.x, spawn.z);
+      marker(ctx, sx, sz, '#ffe38a', 'Inicio', 'dot');
+    }
 
     const bed = this._src.getBed?.();
     if (bed) {
@@ -161,11 +256,6 @@ export class ShipMapPanel extends ModalPanel {
       label(ctx, fx, fz - 20, m.label, m.color);
     }
 
-    const s = ship.ship;
-    const [shx, shz] = at(s.x, s.z);
-    arrow(ctx, shx, shz, s.yaw, '#ff9a4a', 9);
-    label(ctx, shx, shz + 18, 'Nave', '#ffcf9e');
-
     const p = player.position;
     const [px, pz] = at(p.x, p.z);
     arrow(ctx, px, pz, player.yaw, '#ffffff', 7);
@@ -184,7 +274,6 @@ export class ShipMapPanel extends ModalPanel {
       <ul class="legend">${items.join('')}</ul>
       <ul class="legend markers">
         <li><span class="mk" style="color:#fff">▲</span>Tú</li>
-        <li><span class="mk" style="color:#ff9a4a">▲</span>Nave</li>
         <li><span class="mk" style="color:#ffe38a">●</span>Inicio</li>
         <li><span class="mk" style="color:#ff9ecf">●</span>Cama (reaparición)</li>
         ${(this._src.getMarkers?.() ?? []).map((m) => `<li><span class="mk" style="color:${m.color}">◎</span>${escapeHtml(m.label)}</li>`).join('')}
